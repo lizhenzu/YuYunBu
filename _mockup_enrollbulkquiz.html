@@ -1,0 +1,189 @@
+<title>SQL 입력 화면 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;800&display=swap">
+<style>
+/* 레이아웃: 맨 위 검은 띠에서 안 전환 → 아래에 그 안의 휴대폰 폭 화면 + 설명 한 단락 (사이트 밝은 테마 단일) */
+:root{
+  --blue:#2F80ED; --soft:#EAF2FD; --soft2:#DCEAFB; --ink:#111827; --tx:#374151; --dim:#6B7280; --dim2:#9CA3AF;
+  --line:#EEF0F3; --grey:#F4F6F9; --num:#7FA3DB; --warn:#B4531F; --warnbg:#FBEFE7; --red:#D9534F; --redbg:#FDEEEE;
+  --ok:#15803D; --okbg:#EAF7EF; --white:#FFFFFF; --bar:#111827; --barTx:#D1D5DB; --green:#4CAF50; --bsGreen:#198754;
+  --font:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+body{background:var(--grey);color:var(--tx);font-family:var(--font)}
+*{box-sizing:border-box}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bar);padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.bar span{color:var(--barTx);font-size:12.5px;margin-right:6px}
+.bar button{border:0;font:inherit;font-size:13px;font-weight:700;padding:7px 14px;border-radius:999px;background:#374151;color:#fff;cursor:pointer}
+.bar button.on{background:var(--blue)}
+.bar button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:400px 1fr;gap:28px;align-items:start}
+@media (max-width:820px){.wrap{grid-template-columns:1fr}}
+.phone{width:100%;max-width:400px;background:var(--white);border:1px solid #E2E8F0;border-radius:8px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.06);min-height:640px}
+.note{min-width:0}
+.note h2{margin:4px 0 8px;font-size:20px;font-weight:800;color:var(--ink);text-wrap:balance}
+.note p{margin:0 0 10px;font-size:14px;line-height:1.75;max-width:62ch}
+.note ul{margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.8}
+.note .tag{display:inline-block;font-size:12px;font-weight:800;color:var(--blue);background:var(--soft);padding:3px 10px;border-radius:999px}
+.note .tag.rec{color:var(--warn);background:var(--warnbg)}
+
+/* ── 지금 모습 ── */
+.old{background:#f4f7f9;min-height:640px}
+.old header{background:var(--green);color:#fff;padding:22px;text-align:center;box-shadow:0 2px 5px rgba(0,0,0,.2)}
+.old header h1{margin:0;font-size:32px;font-weight:700}
+.old .c{padding:25px}
+.old label{font-weight:600;font-size:15px;color:#212529}
+.old textarea{display:block;width:100%;margin-top:6px;height:170px;border:1px solid #ced4da;border-radius:4px;font:inherit;padding:6px}
+.old .b{display:block;width:100%;margin-top:25px;border:0;border-radius:4px;background:var(--bsGreen);color:#fff;padding:7px;font:inherit;font-size:16px}
+.old .row3{display:flex;gap:10px;padding:0 0 10px}
+.old .row3 div{flex:1;text-align:center;background:var(--bsGreen);color:#fff;border-radius:4px;padding:3px;font-size:15px}
+
+/* ── 새 테마 공용 (quiz-bright.css qb-* 와 같은 값) ── */
+.qb{padding:0 16px 28px}
+.qb-top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 0 12px;border-bottom:1px solid var(--line);font-size:13px;color:var(--dim)}
+.qb-top a{font-weight:700;color:var(--tx);text-decoration:none}
+.qb-top .sep{margin:0 6px;color:#D1D5DB}
+.qb-top .r{color:var(--dim2);letter-spacing:.04em;font-size:12px}
+.qb-k{margin-top:18px;font-size:12px;font-weight:800;letter-spacing:.02em;color:var(--blue)}
+.qb-h1{margin:5px 0 0;font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.35;color:var(--ink)}
+.qb-sub{margin-top:3px;font-size:12.5px;color:var(--dim);line-height:1.6;word-break:keep-all}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 6px;font-size:12px;color:var(--dim)}
+.lbl b{font-size:14px;font-weight:800;color:var(--ink)}
+.sql{display:block;width:100%;min-height:210px;border:0;border-radius:14px;background:var(--grey);padding:12px 14px;font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--ink);resize:vertical;white-space:pre;overflow:auto}
+.sql:focus{outline:none;box-shadow:inset 0 0 0 2px var(--blue);background:var(--white)}
+.btn{height:46px;width:100%;border:0;border-radius:14px;display:grid;place-items:center;font:inherit;font-size:14px;font-weight:800;cursor:pointer;background:var(--soft);color:var(--blue)}
+.btn.p{background:var(--blue);color:#fff}
+.btn.p:disabled{background:#C9D9F2;cursor:not-allowed}
+.btn.g{background:var(--grey);color:var(--dim)}
+.btns{display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-top:12px}
+.sec{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);font-size:15px;font-weight:800;color:var(--ink)}
+.lk{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line);text-decoration:none;color:var(--tx)}
+.lk .n{flex:none;width:24px;font-size:15px;font-weight:800;color:var(--num)}
+.lk .t{flex:1;min-width:0}
+.lk .t b{display:block;font-size:15px;font-weight:800;color:var(--ink)}
+.lk .t small{display:block;font-size:12px;color:var(--dim)}
+.lk .g{font-size:18px;color:var(--num)}
+.lk:hover .t b,.lk:hover .g{color:var(--blue)}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:18px}
+.pills a{font-size:12.5px;font-weight:800;padding:6px 12px;border-radius:999px;background:var(--soft);color:var(--blue);text-decoration:none}
+
+/* B안 전용 */
+.chk{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.chk div{border-radius:10px;background:var(--grey);padding:8px 10px;text-align:center}
+.chk small{display:block;font-size:11px;color:var(--dim)}
+.chk b{display:block;font-size:18px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.chk .w{background:var(--warnbg)} .chk .w b,.chk .w small{color:var(--warn)}
+.alert{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--warnbg);color:var(--warn);font-size:12.5px;line-height:1.6;word-break:keep-all}
+.alert b{font-weight:800}
+.ok{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--okbg);color:var(--ok);font-size:12.5px;font-weight:700}
+.agree{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--tx);cursor:pointer;line-height:1.5}
+.agree input{margin-top:3px;accent-color:var(--blue);width:16px;height:16px}
+.done{margin-top:14px;display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--okbg);color:var(--ok);font-size:12.5px}
+.done b{font-weight:800}
+.ex{font-size:11px;font-weight:700;color:var(--dim2);margin-left:6px}
+</style>
+
+<div class="bar" role="tablist">
+  <span>/BibleBulk/EnrollBulkQuiz</span>
+  <button data-v="now">지금 모습</button>
+  <button data-v="a">A안 · 깔끔한 입력</button>
+  <button data-v="b" class="on">B안 · 실행 전 점검</button>
+</div>
+
+<!-- 지금 모습 -->
+<section class="wrap" data-p="now" hidden>
+  <div class="phone old">
+    <header><h1>SQL 입력</h1></header>
+    <div class="c">
+      <label for="o1">SQLs</label>
+      <textarea id="o1"></textarea>
+      <button class="b" type="button">저장</button>
+    </div>
+    <div class="row3"><div>Home</div><div>Manage</div><div>Work</div></div>
+  </div>
+  <div class="note">
+    <span class="tag">지금 모습</span>
+    <h2>초록 띠 + 부트스트랩 기본 양식</h2>
+    <p>예전 초록 테마 그대로예요. 라벨이 영어 필드명(SQLs)이고, 아래 Home · Manage · Work 버튼은 무엇으로 가는지 알기 어려워요. 붙여 넣은 SQL이 바로 DB에서 실행되는데, 실행 전에 확인할 장치가 없어요.</p>
+  </div>
+</section>
+
+<!-- A안 -->
+<section class="wrap" data-p="a" hidden>
+  <div class="phone"><div class="qb">
+    <div class="qb-top"><span><a href="#a">← 홈으로</a><span class="sep">|</span><a href="#a">관리</a></span><span class="r">ADMIN</span></div>
+    <div class="qb-k">관리 · 성경 퀴즈</div>
+    <h1 class="qb-h1">SQL 입력</h1>
+    <div class="qb-sub">퀴즈 문제를 한꺼번에 넣을 때 SQL을 붙여 넣고 실행해요.</div>
+    <label class="lbl" for="sa"><b>SQL 문장</b><span id="ca">0줄</span></label>
+    <textarea class="sql" id="sa" spellcheck="false"></textarea>
+    <div class="btns"><button class="btn g" type="button" data-clear="sa">지우기</button><button class="btn p" type="button">실행하고 저장</button></div>
+    <div class="sec">이어서 하기</div>
+    <a class="lk" href="#a"><span class="n">1</span><span class="t"><b>관리 화면</b><small>관리자 메뉴 전체</small></span><span class="g">›</span></a>
+    <a class="lk" href="#a"><span class="n">2</span><span class="t"><b>성경 누락 목록</b><small>한·영·쉬운말 빠진 장 찾기</small></span><span class="g">›</span></a>
+  </div></div>
+  <div class="note">
+    <span class="tag">A안</span>
+    <h2>최신 테마 옷만 갈아입히기</h2>
+    <p>퀴즈 출제 화면(quiz-bright)과 같은 머리(← 홈으로 · 작은 파란 머리말 · 큰 제목)를 씁니다. SQL 칸은 고정폭 글꼴의 회색 상자로 바꾸고 줄 수를 오른쪽 위에 보여 줘요. Home · Manage · Work는 "이어서 하기" 번호 줄로 바꿔 어디로 가는지 글로 알려 줍니다.</p>
+    <ul><li>바뀌는 파일: 뷰 하나 (컨트롤러·DB 그대로)</li><li>기능은 지금과 똑같아요</li></ul>
+  </div>
+</section>
+
+<!-- B안 -->
+<section class="wrap" data-p="b">
+  <div class="phone"><div class="qb">
+    <div class="qb-top"><span><a href="#b">← 홈으로</a><span class="sep">|</span><a href="#b">관리</a></span><span class="r">ADMIN</span></div>
+    <div class="qb-k">관리 · 성경 퀴즈</div>
+    <h1 class="qb-h1">SQL 입력</h1>
+    <div class="qb-sub">붙여 넣은 SQL은 바로 운영 DB에서 실행돼요. 실행 전에 아래 점검표를 꼭 확인하세요.</div>
+    <label class="lbl" for="sb"><b>SQL 문장 <span class="ex">예시</span></b><span id="cb">0줄</span></label>
+    <textarea class="sql" id="sb" spellcheck="false">INSERT INTO BibleQuiz (BibleText, Jang, Question, Answer) VALUES (N'창세기', 1, N'하나님이 첫째 날 만드신 것은?', N'빛');
+INSERT INTO BibleQuiz (BibleText, Jang, Question, Answer) VALUES (N'창세기', 1, N'하나님이 사람을 만드신 날은?', N'여섯째 날');
+INSERT INTO BibleQuiz (BibleText, Jang, Question, Answer) VALUES (N'창세기', 2, N'하나님이 쉬신 날은?', N'일곱째 날');</textarea>
+    <div class="chk">
+      <div><small>넣기</small><b id="nI">0</b></div>
+      <div id="bU"><small>바꾸기</small><b id="nU">0</b></div>
+      <div id="bD"><small>지우기</small><b id="nD">0</b></div>
+    </div>
+    <div id="msg"></div>
+    <label class="agree"><input type="checkbox" id="ag"> 위 내용을 확인했고, 실행하면 되돌릴 수 없다는 걸 알아요.</label>
+    <div class="btns"><button class="btn g" type="button" data-clear="sb">지우기</button><button class="btn p" type="button" id="go" disabled>실행하고 저장</button></div>
+    <div class="done"><b>✓ 실행했어요</b><span>저장 뒤 이 화면으로 돌아오면 이렇게 알려 줘요</span></div>
+    <div class="pills"><a href="#b">관리 화면</a><a href="#b">성경 누락 목록</a></div>
+  </div></div>
+  <div class="note">
+    <span class="tag rec">B안 · 추천</span>
+    <h2>새 테마 + 실행 전 점검표</h2>
+    <p>A안 디자인에 안전장치를 더했어요. 붙여 넣는 순간 문장을 세어 넣기(INSERT) · 바꾸기(UPDATE) · 지우기(DELETE) 개수를 보여 주고, UPDATE · DELETE · DROP · TRUNCATE가 있으면 주황 경고를 띄웁니다. "확인했어요"에 체크해야 실행 버튼이 켜지고, 저장 뒤 돌아오면 "실행했어요" 알림이 나와요.</p>
+    <ul><li>바뀌는 파일: 뷰 + 컨트롤러 한 줄 (TempData로 완료 알림)</li><li>점검은 화면에서만 하고, 서버 실행 방식은 그대로예요</li><li>왼쪽 칸에서 SQL을 직접 고쳐 보면 숫자와 경고가 바뀌어요</li></ul>
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('.bar button').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.bar button').forEach(function(x){x.classList.toggle('on',x===b)});
+    document.querySelectorAll('[data-p]').forEach(function(p){p.hidden=p.dataset.p!==b.dataset.v});
+  });
+});
+function lines(t){return t.split('\n').filter(function(l){return l.trim()}).length}
+function cnt(t,re){return (t.match(re)||[]).length}
+var sa=document.getElementById('sa'),sb=document.getElementById('sb'),ag=document.getElementById('ag'),go=document.getElementById('go');
+function upA(){document.getElementById('ca').textContent=lines(sa.value)+'줄'}
+function upB(){
+  var t=sb.value,i=cnt(t,/\binsert\s+into\b/gi),u=cnt(t,/\bupdate\b/gi),d=cnt(t,/\bdelete\b/gi),x=cnt(t,/\b(drop|truncate|alter)\b/gi);
+  document.getElementById('cb').textContent=lines(t)+'줄';
+  document.getElementById('nI').textContent=i;document.getElementById('nU').textContent=u;document.getElementById('nD').textContent=d;
+  document.getElementById('bU').className=u?'w':'';document.getElementById('bD').className=d?'w':'';
+  var m=document.getElementById('msg');
+  if(x) m.innerHTML='<div class="alert"><b>표를 지우거나 바꾸는 명령(DROP·TRUNCATE·ALTER)이 있어요.</b> 정말 필요한지 다시 확인하세요.</div>';
+  else if(u||d) m.innerHTML='<div class="alert"><b>바꾸기·지우기 문장이 있어요.</b> WHERE 조건이 맞는지 확인하세요.</div>';
+  else if(i) m.innerHTML='<div class="ok">넣기 문장만 있어요. 문제 '+i+'개가 추가돼요.</div>';
+  else m.innerHTML='';
+  go.disabled=!(ag.checked&&t.trim());
+}
+sa.addEventListener('input',upA);sb.addEventListener('input',upB);ag.addEventListener('change',upB);
+document.querySelectorAll('[data-clear]').forEach(function(b){b.addEventListener('click',function(){var e=document.getElementById(b.dataset.clear);e.value='';e.dispatchEvent(new Event('input'))})});
+upA();upB();
+</script>

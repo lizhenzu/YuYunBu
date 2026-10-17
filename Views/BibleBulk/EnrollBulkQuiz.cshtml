@@ -4,98 +4,77 @@
 @using BulletinBoard.Enums
 @inject IAuthService AuthService
 
+@*  ══════════════════════════════════════════════════════════════
+    SQL 입력 — 2026-10-17 A안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 저장 주소(CreateBulkQuiz)와 필드(SQLs)는 그대로.  Home · Manage · Work 버튼은 위 "← 홈으로"와 "이어서 하기" 줄로 바꿈.
+    · 이전 화면은 EnrollBulkQuiz.cshtml.bak_before_brighttheme
+    ══════════════════════════════════════════════════════════════ *@
+
 @{
     Layout = null;
 }
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SQL 정보 입력</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>SQL 입력</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <style>
-        body {
-            background: #f4f7f9;
-            font-family: 'Noto Sans KR', sans-serif;
-        }
-
-        header {
-            background-color: #4caf50;
-            color: white;
-            padding: 1.5rem;
-            text-align: center;
-            font-size: 2rem;
-            font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 10px auto;
-            padding: 25px;
-        }
-
-        label {
-            font-weight: 600;
-        }
-
-        .form-row {
-            margin-bottom: 15px;
-        }
-
-        .btn-group {
-            display: flex;
-            justify-content: space-between;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-        .form-group {
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-
-        .form-row {
-            margin-top: 10px;
-            margin-bottom: 10px;
-        }
-
-        button {
-            width: 100%;
-        }
-
-        @@media (max-width: 480px) {
-            .form-inline .form-control {
-                width: 100%;
-                margin-top: 5px;
-            }
-        }
+        body { margin: 0; background: #FFFFFF; }
+        .sq-lbl { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 6px; font-size: 12px; color: var(--dim2); }
+        .sq-lbl b { font-size: 14px; font-weight: 800; color: var(--ink); }
+        .sq-in { display: block; width: 100%; min-height: 220px; border: 0; border-radius: 14px; background: var(--grey); padding: 12px 14px;
+                 font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12.5px; line-height: 1.7; color: var(--ink);
+                 resize: vertical; white-space: pre; overflow: auto; }
+        .sq-in:focus { outline: 0; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .sq-btns { grid-template-columns: 1fr 2fr; }
     </style>
 </head>
 <body>
+<div class="qb">
+    <div class="qb-top">
+        <span><a href="/">← @(ConstatsCommon.ToHome)</a><span class="sep">|</span><a href="/Admin/Index">관리</a></span>
+        <span>ADMIN</span>
+    </div>
 
-    <header>
-        <h1>SQL 입력</h1>
-    </header>
-    <form asp-action="CreateBulkQuiz" method="post" class="verse-form">
-        <div class="container">
+    <div class="qb-k">관리 · 성경 퀴즈</div>
+    <h1 class="qb-h1">SQL 입력</h1>
+    <div class="qb-sub">퀴즈 문제를 한꺼번에 넣을 때 SQL을 붙여 넣고 실행해요.</div>
 
-            <div class="form-group">
-                <label asp-for="SQLs"></label>
-                <textarea id="SQLs" name="SQLs" asp-for="SQLs" class="form-control" rows="7" autofocus></textarea>
-                <span asp-validation-for="SQLs" class="text-danger"></span>
-            </div>
+    <form asp-action="CreateBulkQuiz" method="post">
+        <label class="sq-lbl" for="SQLs"><b>SQL 문장</b><span id="sqCnt">0줄</span></label>
+        <textarea id="SQLs" name="SQLs" class="sq-in" spellcheck="false" autofocus>@Model?.SQLs</textarea>
+        <span asp-validation-for="SQLs" class="field-error"></span>
 
-            <div class="btn-group">
-                <button type="submit" class="btn btn-success" onclick="save()">저장</button>
-            </div>
+        <div class="qb-btns sq-btns">
+            <button type="button" class="qb-btn g" id="sqClear">지우기</button>
+            <button type="submit" class="qb-btn p">실행하고 저장</button>
         </div>
     </form>
-    <div class="btn-group">
-        <div class="btn btn-success" style="padding:3px;" onclick="location.href='/'">Home</div>
-        <div class="btn btn-success" style="padding:3px;" onclick="location.href='/Admin/Index'">Manage</div>
-        <div class="btn btn-success" style="padding:3px;" onclick="location.href='/BibleBulk/BibleMissingListB_KO_EN_SU'">Work</div>
-    </div>
+
+    <div class="qb-sec">이어서 하기</div>
+    <a class="qb-row" href="/Admin/Index">
+        <span class="n">1</span>
+        <span class="t"><b>관리 화면</b><small>관리자 메뉴 전체</small></span>
+        <span class="g">›</span>
+    </a>
+    <a class="qb-row" href="/BibleBulk/BibleMissingListB_KO_EN_SU">
+        <span class="n">2</span>
+        <span class="t"><b>성경 누락 목록</b><small>한·영·쉬운말 빠진 장 찾기</small></span>
+        <span class="g">›</span>
+    </a>
+</div>
+
+<script>
+    (function () {
+        var box = document.getElementById('SQLs'), cnt = document.getElementById('sqCnt');
+        function up() { cnt.textContent = box.value.split('\n').filter(function (l) { return l.trim(); }).length + '줄'; }
+        box.addEventListener('input', up);
+        document.getElementById('sqClear').addEventListener('click', function () { box.value = ''; up(); box.focus(); });
+        up();
+    })();
+</script>
 </body>
 </html>
