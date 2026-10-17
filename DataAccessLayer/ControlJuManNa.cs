@@ -241,6 +241,55 @@ namespace BulletinBoard.DataAccessLayer
             ps.Add(new SqlParameter($"@tz{i}", SqlDbType.Int) { Value = Num(d.ToZul) });
         }
 
+        /// <summary>
+        /// 영상 구간 편집 — 표에 저장된 분 · 초 그대로(0 = 기본값) + 장별 영상 주소 · 길이(뷰).
+        /// 뷰의 YouTuBuEnd* 는 0 을 영상 길이로 바꿔 주므로, 구간 값은 원래 표(T)에서 읽는다.
+        /// </summary>
+        public DataSet fetchJuManNaSeg(DateTime? firstDay, int id)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine(" select T.Id, T.ExposeDate, T.BibleText, T.FromJang, T.FromZul, T.ToJang, T.ToZul, ");
+            for (int n = 1; n <= 5; n++)
+            {
+                string k = n == 1 ? "" : n.ToString();
+                sb.AppendLine($"   isnull(T.YouTuBuStartMM{k},0) SM{n}, isnull(T.YouTuBuStartSS{k},0) SS{n}, isnull(T.YouTuBuEndMM{k},0) EM{n}, isnull(T.YouTuBuEndSS{k},0) ES{n}, ");
+                sb.AppendLine($"   V.URL{k} URL{n}, isnull(V.TimeMM{k},0) TM{n}, isnull(V.TimeSS{k},0) TS{n}{(n == 5 ? "" : ",")} ");
+            }
+            sb.AppendLine(" from [dbo].[TodayWordToRead] T ");
+            sb.AppendLine(" left outer join [view_TodayWordToRead_eBibleYouTuBu2] V on V.Id_A = T.Id ");
+
+            if (firstDay.HasValue)
+            {
+                sb.AppendLine($" where T.ExposeDate >= '{firstDay.Value:yyyy-MM-dd}' and T.ExposeDate < '{firstDay.Value.AddMonths(1):yyyy-MM-dd}' ");
+            }
+            else
+            {
+                sb.AppendLine($" where T.Id = {id} ");
+            }
+            sb.AppendLine(" order by T.ExposeDate ");
+
+            return DataAccessModule.commonQuery(sb.ToString());
+        }
+
+        /// <summary>영상 구간 한 점(시작 또는 종료)만 저장.  slot 1 ~ 5, 컬럼 이름은 여기서만 만든다</summary>
+        public int SaveJuManNaSegPoint(int id, int slot, bool isStart, int mm, int ss)
+        {
+            if (slot < 1 || slot > 5) return 0;
+            string k = slot == 1 ? "" : slot.ToString();
+            string kind = isStart ? "Start" : "End";
+
+            string sql = $" update [dbo].[TodayWordToRead] set YouTuBu{kind}MM{k} = @mm, YouTuBu{kind}SS{k} = @ss, "
+                       + $" updateDT = DATEADD(HOUR,{ConstatsCommon.timeDifference16}, GETDATE()) where [Id] = @id ";
+
+            var ps = new List<SqlParameter>
+            {
+                new SqlParameter("@mm", SqlDbType.Int) { Value = mm },
+                new SqlParameter("@ss", SqlDbType.Int) { Value = ss },
+                new SqlParameter("@id", SqlDbType.Int) { Value = id }
+            };
+            return DataAccessModule.executeNonQuery(sql, ps);
+        }
+
         public void HitJuManNa(int Id)
         {
             StringBuilder sb = new StringBuilder();

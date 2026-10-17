@@ -96,6 +96,38 @@ namespace BulletinBoard.Controllers
             return RedirectToAction(nameof(MonthlyBulk), new { YYYYMM = firstDay.ToString("yyyy-MM") });
         }
 
+        // 영상 구간 편집 — 한 달 전체.  영상 창에서 시작 · 종료를 누르면 SaveSegment 로 바로 저장(화면 그대로)
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public IActionResult SegmentEditor(string YYYYMM)
+        {
+            if (!TryParseMonth(YYYYMM, out var firstDay))
+            {
+                return RedirectToAction(nameof(IndexGroupByYYYYMM));
+            }
+            return View(new ManageJuManNa().getJuManNaSegMonth(firstDay));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public IActionResult SaveSegment(int id, int slot, string kind, int sec)
+        {
+            if (kind != "start" && kind != "end")
+            {
+                return Json(new { ok = false, msg = "잘못된 요청이에요" });
+            }
+            try
+            {
+                var (ok, msg, seg) = new ManageJuManNa().SaveJuManNaSegPoint(id, slot, kind == "start", sec);
+                if (!ok) return Json(new { ok = false, msg });
+                return Json(new { ok = true, start = seg.StartSec, end = seg.EndSec, len = seg.LenSec });
+            }
+            catch (Exception)
+            {
+                return Json(new { ok = false, msg = "저장하지 못했어요. 다시 눌러 주세요" });
+            }
+        }
+
         private static bool TryParseMonth(string YYYYMM, out DateTime firstDay)
         {
             return DateTime.TryParseExact((YYYYMM ?? "") + "-01", "yyyy-MM-dd",
