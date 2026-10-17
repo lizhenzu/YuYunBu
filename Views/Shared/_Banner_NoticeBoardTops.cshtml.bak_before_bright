@@ -1,0 +1,247 @@
+﻿@using BulletinBoard.Models
+@{
+    var posts = ViewBag.NoticeBoardTopPosts as List<BoardPost>;
+}
+
+@if (posts != null && posts.Any())
+{
+    <style>
+        /* =========================================
+                   NoticeBoard 상단고정 배너 (NEW)
+                   - 모바일 날짜 어둡게 보임 + 줄깨짐(SVG/Writer 분리) 완전 해결판
+                   ========================================= */
+
+        .nbtops-wrap {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .nbtops-shell {
+            position: relative;
+            border-radius: 6px;
+            padding: 18px;
+            overflow: hidden;
+            background: radial-gradient(900px 420px at 12% 0%, rgba(255,196,61,.18), transparent 60%), radial-gradient(900px 420px at 88% 20%, rgba(56,189,248,.20), transparent 55%), radial-gradient(900px 420px at 40% 120%, rgba(167,139,250,.18), transparent 60%), linear-gradient(135deg, rgba(15,23,42,.94), rgba(2,6,23,.94));
+            border: 1px solid rgba(255,255,255,.12);
+            box-shadow: 0 26px 70px rgba(2,6,23,.35), inset 0 1px 0 rgba(255,255,255,.10);
+        }
+
+            .nbtops-shell::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                padding: 2px;
+                border-radius: 6px;
+                background: linear-gradient(90deg, rgba(255,196,61,.75), rgba(56,189,248,.70), rgba(167,139,250,.65));
+                -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+                -webkit-mask-composite: xor;
+                mask-composite: exclude;
+                pointer-events: none;
+                opacity: .85;
+            }
+
+        .nbtops-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .nbtops-h1 {
+            font-size: 18px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+            line-height: 1.2;
+            color: #f8fafc;
+        }
+
+        .nbtops-actions a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: 13px;
+            text-decoration: none;
+            border: 1px solid rgba(255,255,255,.16);
+            color: rgba(248,250,252,.95);
+            background: rgba(255,255,255,.08);
+            transition: transform .12s ease, background .12s ease;
+        }
+
+            .nbtops-actions a:hover {
+                transform: translateY(-2px);
+                background: rgba(255,255,255,.12);
+            }
+
+        .nbtops-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .nbtops-card {
+            position: relative;
+            padding: 14px 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            box-shadow: 0 12px 24px rgba(0,0,0,.18);
+            overflow: hidden;
+        }
+
+            .nbtops-card::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(700px 220px at 15% 0%, rgba(255,196,61,.16), transparent 55%);
+                pointer-events: none;
+                opacity: .9;
+            }
+
+            .nbtops-card a {
+                text-decoration: none;
+                color: inherit;
+                position: relative;
+                z-index: 1;
+                display: block;
+            }
+
+        .nbtops-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .nbtops-ctitle {
+            font-weight: 950;
+            color: rgba(248,250,252,.98);
+            line-height: 1.25;
+            font-size: 15px;
+            letter-spacing: -.1px;
+            margin: 0;
+        }
+
+        .nbtops-pill {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+            color: #ffffff;
+            backdrop-filter: blur(6px);
+        }
+
+        /* ✅ 메타: 모바일 줄깨짐/정렬 깨짐 완전 해결 (flex) */
+        .nbtops-meta {
+            margin-top: 6px;
+            font-size: 12px;
+            color: rgba(255,255,255,.85);
+            font-variant-numeric: tabular-nums;
+            display: flex; /* 🔥 핵심 */
+            align-items: center; /* 🔥 한 줄 세로정렬 */
+            gap: 6px; /* 간격 */
+            flex-wrap: wrap; /* 작은 화면에서 자연스럽게 줄바꿈 */
+        }
+
+        /* ✅ 날짜: SVG 아이콘 + 텍스트 한 덩어리로 선명하게 */
+        .meta-date {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffffff;
+            font-weight: 900;
+            letter-spacing: .3px;
+            white-space: nowrap;
+        }
+
+        /* ✅ SVG 아이콘 */
+        .meta-icon {
+            width: 14px;
+            height: 14px;
+            opacity: .92;
+            flex-shrink: 0;
+        }
+
+        /* ✅ 작성자: 줄바꿈되더라도 깔끔하게 */
+        .meta-writer {
+            white-space: nowrap;
+        }
+
+        .nbtops-excerpt {
+            margin-top: 10px;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #ffffff;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        @@media (min-width: 860px) {
+            .nbtops-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .nbtops-card {
+                padding: 16px 16px;
+            }
+
+            .nbtops-h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+
+    <section class="nbtops-wrap">
+        <div class="nbtops-shell">
+
+            <div class="nbtops-head">
+                <div class="nbtops-h1">최신 게시</div>
+
+                <div class="nbtops-actions">
+                    <a href="/ReplayBoard/Index?tableName=NoticeBoard" title="공지게시판 목록으로">게시목록 →</a>
+                </div>
+            </div>
+
+            <div class="nbtops-grid">
+                @foreach (var p in posts)
+                {
+                    <article class="nbtops-card">
+                        <a href="/ReplayBoard/Details/@p.Id?tableName=NoticeBoard" title="상세 보기">
+
+                            <div class="nbtops-row">
+                                <h3 class="nbtops-ctitle">@p.Title</h3>
+                                <span class="nbtops-pill"></span>
+                            </div>
+
+                            <div class="nbtops-meta">
+                                <span class="meta-date" title="작성일">
+                                     @p.CreatedAt.ToString("yyyy.MM.dd") ·  @p.Writer · 👀 @p.ViewCount.ToString("N0") 회
+                                </span>
+ 
+                                @* @if (p.PopupUntil.HasValue)
+                                {
+                                    <span> · ~ @p.PopupUntil.Value.ToString("yyyy.MM.dd")</span>
+                                } *@
+                            </div>
+
+                            <div class="nbtops-excerpt">
+                                @Html.Raw((p.Content ?? "").Replace("\n", "<br />"))
+                            </div>
+
+                        </a>
+                    </article>
+                }
+            </div>
+
+        </div>
+    </section>
+}

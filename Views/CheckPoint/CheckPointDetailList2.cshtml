@@ -1,0 +1,276 @@
+﻿@model IEnumerable<BulletinBoard.Models.PointByUserName>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>아이들 참여 현황 대시보드</title>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Gowun Dodum', sans-serif;
+            margin: 0;
+            padding: 0px;
+            background-color: #f1f8f9;
+            color: #333;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px;
+            background-color: #00897b;
+            color: white;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin-top: 0px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 3px;
+            margin: 10px;
+            flex: 1 1 300px;
+       /*     max-width: 320px;*/
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .avatar {
+            flex-shrink: 0;
+        }
+
+            .avatar img {
+                margin-left :20px;
+                margin-right: 20px;
+                width: 100px;
+                height: 100px;
+                border-radius: 50%;
+                border: 3.5px solid #26a69a;
+            }
+
+        .card-content {
+            flex: 1;
+        }
+
+            .card-content h3 {
+                margin: 0 0 6px;
+                color: #00796b;
+            }
+
+        .class-info {
+            font-size: 0.9em;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .progress {
+            background-color: #e0f2f1;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 20px;
+            margin-top: 6px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #26a69a;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+            font-size: 0.9em;
+        }
+
+        .details {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #444;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.9em;
+            color: #777;
+            margin-top: 40px;
+        }
+
+        @@media print {
+        .card {
+              page-break-inside: avoid;
+              break-inside: avoid;
+          }
+        }
+
+
+
+    </style>
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+
+
+
+</head>
+<body>
+
+    <header>
+        <h1>@ConstatsCommon.MainKeyTitle</h1>
+        <h2>참여자 현황</h2>
+        <p style="text-decoration: line-through;">현재 목표 점수: 1,000 점</p>
+        <p>현재 목표 점수: @ViewBag.maxAwardLevel.ToString("N0") 점</p>
+        <p>참여자 수: @Model.ToList().Count 명</p>
+    </header>
+
+    <div class="button-bar no-select">
+        <div class="buttonCommon colorBaseBrightBlue" onclick="location.href='/Home/MissionMainBoard'">@ConstatsCommon.MainKeyTitle</div>
+        <div class="buttonCommon colorBaseHome" onclick="location.href='/'">홈으로</div>
+        @if (ViewBag.RankQueryOption == RankQueryOption.All)
+        {
+            <div class="buttonCommon colorBaseMediumAquamarine" onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=@RankQueryOption.StudentOnly'">학생만보기</div>
+        }
+        else
+        {
+            <div class="buttonCommon colorBaseMediumAquamarine" onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=@RankQueryOption.All'">모두보기</div>
+        }
+        <div class="buttonCommon colorBaseSoftTeal " onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=@RankQueryOption.maxClickDate'">수행일자</div>
+    </div>
+
+    <div class="container">
+
+        @foreach (var item in Model)
+        {
+
+
+            string PerData = $"{(item.DC_Total * 100) / ViewBag.maxAwardLevel}%";
+            int PerDataNum = (item.DC_Total * 100) / ViewBag.maxAwardLevel;
+            string YearBan = string.Empty;
+            string roleString = string.Empty;
+
+
+            if (item.RoleCode == "T1001" && item.ClassYear > 0)
+            {
+                YearBan = $"{item.ClassYear}학년{item.ClassBan}반";
+                roleString = item.RoleNM;
+            }
+            else if (item.RoleCode == "T1001")
+            {
+                roleString = $"기타";
+            }
+            else
+            {
+                 roleString = item.RoleNM;
+            }
+
+
+
+            <div class="card">
+                @if (isSuperAdmin)
+                {
+                    <div class="avatar" onclick="window.location.href='/HumanResource/ManageUserInfo?UserId=@item.UserId';">
+                        <img src="@item.ProfilePicturePath" alt="사진">
+                    </div>
+
+                }
+                else
+                {
+                    <div class="avatar">
+                        <img src="@item.ProfilePicturePath" alt="사진">
+                    </div>
+
+                }
+                <div class="card-content">
+                    <h3>@item.sequenceNo) @item.FullName</h3>
+                    <div class="class-info">@YearBan @roleString</div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width:@PerDataNum%;">@PerData</div>
+                    </div>
+                    <div class="details">
+                        현점수:
+                        @if (@item.DC_Total == @item.Total)
+                        {                       
+                            <strong>
+                                @(
+                                                        $"{@item.DC_Total.ToString("N0")}점"
+                                    )
+                            </strong>                          
+                        }
+                        else
+                        {                       
+                            <strong>
+                                @(
+                                                        $"{@item.DC_Total.ToString("N0")}점"
+                                    )
+                            </strong>
+                            <strong style="color:red;">
+                               (@(
+                                                $"{@item.Total.ToString("N0")}점"
+                                    ))
+                            </strong>
+                        }
+                        <br />
+                        달성률: <strong>@PerData</strong><br />
+                        수행일: <strong>@item.maxclickDate.ToString("yy년 MM월 dd일")</strong>
+                    </div>
+                </div>
+            </div>
+        }
+
+
+    </div>
+
+    <div class="button-bar no-select">
+        <div class="buttonCommon colorBaseBrightBlue" onclick="location.href='/Home/MissionMainBoard'">@ConstatsCommon.MainKeyTitle</div>
+        <div class="buttonCommon colorBaseHome" onclick="location.href='/'">홈으로</div>
+        @if (ViewBag.RankQueryOption == RankQueryOption.All)
+        {
+            <div class="buttonCommon colorBaseMediumAquamarine" onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=StudentOnly'">학생만보기</div>
+        }
+        else
+        {
+            <div class="buttonCommon colorBaseMediumAquamarine" onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=All'">모두보기</div>
+        }
+        <div class="buttonCommon colorBaseSoftTeal " onclick="location.href='/CheckPoint/CheckPointDetailList2?rankQueryOption=maxClickDate'">수행일자</div>
+    </div>
+
+    <footer>
+        @{
+            string churchString = $"{@ChurchName} {@DepartmentName}.";
+        }
+        &copy; 2024 @churchString All Rights Reserved.
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,201 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ChurchName · @DepartmentName · 여름 성경학교</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, 'Noto Sans KR', sans-serif;
+            background: linear-gradient(160deg, #fef9c3 0%, #fde68a 35%, #fbbf24 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header-badge {
+            display: inline-block;
+            background: rgba(255,255,255,.55);
+            border: 1.5px solid rgba(255,255,255,.80);
+            border-radius: 999px;
+            padding: 5px 18px;
+            font-size: 12px;
+            font-weight: 900;
+            color: #92400e;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .header-title {
+            font-size: 28px;
+            font-weight: 950;
+            color: #78350f;
+            line-height: 1.25;
+            margin-bottom: 8px;
+        }
+
+        .header-sub {
+            font-size: 14px;
+            font-weight: 700;
+            color: #a16207;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .btn-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 22px 24px;
+            border-radius: 20px;
+            background: #ffffff;
+            box-shadow: 0 8px 32px rgba(120, 53, 15, .18);
+            border: 2px solid rgba(255,255,255,.90);
+            text-decoration: none;
+            color: inherit;
+            transition: transform .12s ease, box-shadow .18s ease;
+            cursor: pointer;
+        }
+
+        .btn-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 14px 40px rgba(120, 53, 15, .25);
+        }
+
+        .btn-card:active {
+            transform: translateY(0);
+        }
+
+        .btn-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+
+        .btn-icon.yellow { background: linear-gradient(135deg, #fef08a, #fbbf24); }
+        .btn-icon.orange { background: linear-gradient(135deg, #fed7aa, #f97316); }
+
+        .btn-text { flex: 1; }
+
+        .btn-label {
+            font-size: 17px;
+            font-weight: 950;
+            color: #1c1917;
+            margin-bottom: 3px;
+        }
+
+        .btn-desc {
+            font-size: 12px;
+            font-weight: 700;
+            color: #78716c;
+        }
+
+        .btn-arrow {
+            font-size: 20px;
+            color: #d4a017;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            margin-top: 48px;
+            text-align: center;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.45);
+            border: 1.5px solid rgba(255,255,255,.75);
+            font-size: 13px;
+            font-weight: 900;
+            color: #92400e;
+            text-decoration: none;
+            transition: background .15s;
+        }
+
+        .back-link:hover { background: rgba(255,255,255,.65); }
+
+        @@media (max-width: 480px) {
+            .header-title { font-size: 22px; }
+            .btn-card { padding: 18px 18px; }
+            .btn-icon { width: 46px; height: 46px; font-size: 22px; }
+            .btn-label { font-size: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="header-badge">☀️ @ChurchName · @DepartmentName</div>
+        <div class="header-title">여름 성경학교 🏕️</div>
+        <div class="header-sub">아래 버튼을 눌러 확인하세요</div>
+    </div>
+
+    <div class="btn-group">
+
+        <a class="btn-card" href="https://www.jamsilkids.com/dummy.html" target="_blank" rel="noopener noreferrer">
+            <div class="btn-icon yellow">📝</div>
+            <div class="btn-text">
+                <div class="btn-label">여름성경학교 가정통신문</div>
+                <div class="btn-desc">부모님께 전달드리는 안내사항</div>
+            </div>
+            <span class="btn-arrow">›</span>
+        </a>
+
+        <a class="btn-card" href="/VBSParticipationSurvey/Index">
+            <div class="btn-icon orange">📋</div>
+            <div class="btn-text">
+                <div class="btn-label">참여자 조사</div>
+                <div class="btn-desc">성경학교 참석여부 조사</div>
+            </div>
+            <span class="btn-arrow">›</span>
+        </a>
+
+    </div>
+
+    <div class="footer">
+        <a class="back-link" href="/Home/Index">🏠 메인으로</a>
+    </div>
+
+</body>
+</html>

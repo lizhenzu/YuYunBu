@@ -1,0 +1,233 @@
+﻿@model IEnumerable<BulletinBoard.Models.OpicDatas>
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Http;
+
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Interview</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        header {
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding-top: 50px;
+            padding-bottom: 50px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin-bottom: 70px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: left;
+            transition: transform 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+            .card:hover {
+                transform: scale(1.05);
+            }
+
+        .card-title {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #282c34;
+        }
+
+        .card-content {
+            margin-bottom: 20px;
+        }
+
+        .card-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+        }
+
+            .card-buttons button {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                color: white;
+                font-size: 0.9rem;
+            }
+
+        .edit-button {
+            background-color: #007bff;
+        }
+
+        .mark-button {
+            background-color: #28a745;
+        }
+
+        .Answer-button {
+            background-color: #00704A;
+        }
+
+        .login-button {
+            background-color: #9e1a20;
+        }
+
+        footer {
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+
+        input {
+            padding-top: 6px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-bottom: 3px;
+            height: 23px;
+            margin-top: 0px;
+            margin-left: 0px;
+            margin-right: 0px;
+            margin-bottom: 0px;
+        }
+
+        .formatted-text {
+            white-space: pre-wrap; /* 유지된 공백 및 줄바꿈 */
+            word-wrap: break-word; /* 너무 긴 단어를 자동으로 줄바꿈 */
+        }
+
+        .no-select {
+            user-select: none; /* 기본 브라우저 지원 */
+            -moz-user-select: none; /* Firefox */
+            -webkit-user-select: none; /* Safari 및 Chrome */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+        }
+
+        @@media (max-width: 768px) {
+            header {
+                font-size: 2rem;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .card-title {
+                font-size: 1.25rem;
+            }
+
+            .card-buttons button {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        English Interview
+    </header>
+
+    <div class="container">
+
+        <div class="search-container" style="text-align: center; margin-top: 10px;">
+            <form method="get" action="/LearningCenter/SearchQuery">
+                <input type="text" name="query" placeholder="검색어 입력" />
+                <button type="submit" style="padding: 5px 10px; height: 35px; margin-left: 0;">검색</button>
+            </form>
+        </div>
+
+
+        @if (await AuthService.IsSignedIn(User) &&
+        (
+        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+        )
+        {
+            <div class="card">
+                <div class="card-title">Mgmt. Panel</div>
+                <div class="card-buttons">
+                    <button class="edit-button" onclick="location.href='/'">Home</button>
+                    <button class="mark-button" onclick="location.href='/LearningCenter/Index'">L.Home</button>
+                    <button class="Answer-button" onclick="location.href='/LearningCenter/EnrollView'">Enroll</button>
+                    <button class="Answer-button" onclick="location.href='/LearningCenter/List?sortBy=WorkVisited'">Verif</button>
+                    <button class="Answer-button" onclick="location.href='/LearningCenter/List?sortBy=Visited'">Visit</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-title">Panel</div>
+                <div class="card-buttons">
+                    <button class="edit-button" onclick="location.href='/'">Home</button>
+                    <button class="mark-button" onclick="location.href='/LearningCenter/Index'">L.Home</button>
+                </div>
+            </div>
+        }
+
+        @foreach (var item in Model)
+        {
+            <div class="card no-select">
+                @if (string.IsNullOrEmpty(item.KeyWord1))
+                {
+                    <div class="card-title" style="color:#006341; font-weight: bold">English Interview @item.PageNo</div>
+                }
+                else
+                {
+                    <div class="card-title">Interview @item.PageNo</div>
+                }
+                <div class="card-content">
+                    <p class="formatted-text">@item.Question (@item.Visited) (@item.WorkVisited)</p>
+                </div>
+                @*                <div class="card-content">
+            <p class="formatted-text">@item.Vocabulary (@item.visited)</p>
+            </div>
+            *@
+                <div class="card-buttons">
+                    <button class="Answer-button" onclick="location.href='/LearningCenter/DetailView?Id=@item.Id'">Answer</button>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <footer>
+        &copy; 2024 Learning Platform
+    </footer>
+
+</body>
+</html>

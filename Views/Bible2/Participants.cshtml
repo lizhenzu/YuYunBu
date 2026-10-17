@@ -1,0 +1,249 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+@*  ══════════════════════════════════════════════════════════════
+    성경통독 참여자 — Bone 스킨 (B안: 사진 링 카드 2칸)
+    · 전에는 Layout = null 로 따로 떨어진 어두운 화면이었는데,
+      이제 Bible2 공통 레이아웃(왼쪽 목차 · 밝게/어둡게)을 쓴다.
+    이전 화면은 Participants_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+
+    ViewData["Title"] = "참여자 현황";
+    ViewData["Page"]  = "participants";
+
+    var communityUsers = ViewBag.CommunityUsers as List<BulletinBoard.Models.BibleLastReadRateByUserSimple>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserSimple>();
+    var lastReadBooks  = ViewBag.LastReadBooks  as Dictionary<string, BulletinBoard.Models.BibleLastReadInfo>
+                         ?? new Dictionary<string, BulletinBoard.Models.BibleLastReadInfo>();
+    var completedUsers = ViewBag.CompletedUsers as List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>();
+    var kstNow = DateHelper.GetKoreaNow();
+
+    const double RING = 2 * Math.PI * 29;   // 카드 링 둘레 (r=29)
+    string F(double d) => d.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+<style>
+    .b2p { --pad: 18px; max-width: 980px; margin: 0 auto; padding: 8px var(--pad) 40px; color: var(--b2-tx); }
+    @@media (min-width: 769px) { .b2p { --pad: 32px; } }
+    .b2p a { text-decoration: none; color: inherit; }
+    .b2p .k { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--b2-acc); }
+    .b2p .T { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 28px; margin: 6px 0 0; }
+    .b2p .lbl { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; font-weight: 700; letter-spacing: .2em; color: var(--b2-acc); margin: 28px 0 10px; }
+    .b2p .lbl small { font-size: 11px; letter-spacing: 0; font-weight: 400; color: var(--b2-dim); }
+
+    .b2p .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--b2-tx); border-bottom: 1px solid var(--b2-rule); margin-top: 16px; }
+    .b2p .stats div { text-align: center; padding: 11px 0; font-size: 10.5px; color: var(--b2-dim); }
+    .b2p .stats div + div { border-left: 1px solid var(--b2-rule); }
+    .b2p .stats b { display: block; font-family: "Inter", sans-serif; font-weight: 300; font-size: 21px; color: var(--b2-tx); font-variant-numeric: tabular-nums; }
+
+    /* 사진 (없으면 첫 글자) */
+    .b2p .av { position: relative; border-radius: 50%; overflow: hidden; background: #CFC8BB; display: grid; place-items: center; font-family: "Noto Serif KR", serif; color: #fff; }
+    .b2p .av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .25s; }
+    .b2p .av img.ok { opacity: 1; }
+
+    /* 명예의 전당 — 가로로 넘기기 */
+    .b2p .hall { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+    .b2p .hall .h { flex: 0 0 92px; text-align: center; background: var(--b2-head); color: var(--b2-headtx); padding: 14px 6px 11px; }
+    .b2p .hall .av { width: 46px; height: 46px; margin: 0 auto; font-size: 16px; background: #5A4A30; box-shadow: 0 0 0 2px var(--b2-head), 0 0 0 3.5px #D9C29B; }
+    .b2p .hall b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 13px; margin-top: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .b2p .hall small { font-family: "Inter", sans-serif; font-size: 11.5px; color: #D9C29B; }
+    .b2p .uid { display: block; font-family: "Inter", sans-serif; font-size: 9.5px; color: var(--b2-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .b2p .hall .uid { color: #8A8C91; }
+
+    /* 검색 · 정렬 */
+    .b2p .ctrl { display: flex; gap: 6px; align-items: center; margin-bottom: 12px; }
+    .b2p .ctrl input { flex: 1; min-width: 0; border: 0; border-bottom: 1.5px solid var(--b2-tx); background: transparent; outline: none; padding: 8px 0; font-family: inherit; font-size: 13.5px; color: var(--b2-tx); }
+    .b2p .ctrl input::placeholder { color: #A9A59D; }
+    .b2p .ctrl button { font-family: inherit; font-size: 12px; border: 1px solid var(--b2-rule); background: var(--b2-card); color: var(--b2-tx); padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+    .b2p .ctrl button.on { background: var(--b2-tx); color: var(--b2-bg); border-color: var(--b2-tx); }
+
+    /* 참여자 카드 */
+    .b2p .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    @@media (min-width: 600px) { .b2p .grid { grid-template-columns: repeat(3, 1fr); } }
+    @@media (min-width: 1000px) { .b2p .grid { grid-template-columns: repeat(4, 1fr); } }
+    .b2p .card { position: relative; background: var(--b2-card); padding: 16px 10px 0; text-align: center; box-shadow: 0 6px 16px -12px rgba(22,24,28,.35); display: flex; flex-direction: column; }
+    .b2p .ring { position: relative; width: 66px; height: 66px; margin: 0 auto; }
+    .b2p .ring svg { position: absolute; inset: 0; }
+    .b2p .ring .av { position: absolute; left: 11px; top: 11px; width: 44px; height: 44px; font-size: 15px; }
+    .b2p .ring .fill { transition: stroke-dasharray .8s ease; }
+    .b2p .card b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 14.5px; margin-top: 8px; }
+    .b2p .card .pc { font-family: "Inter", sans-serif; font-size: 16px; font-weight: 300; margin-top: 1px; font-variant-numeric: tabular-nums; }
+    .b2p .card .pc small { font-size: 10px; color: var(--b2-dim); margin-left: 1px; }
+    .b2p .card .role { display: inline-block; font-size: 10px; color: var(--b2-dim2); border: 1px solid var(--b2-rule); padding: 1px 6px; margin-top: 6px; }
+    .b2p .card .m { font-size: 11px; color: var(--b2-dim); margin-top: 6px; line-height: 1.55; flex: 1; }
+    .b2p .card .bar { height: 3px; background: var(--b2-rule); margin: 12px -10px 0; }
+    .b2p .card .bar i { display: block; height: 3px; background: var(--b2-acc); width: 0; transition: width .8s ease; }
+    .b2p .card.dn .pc { color: var(--b2-acc); }
+    .b2p .card .tag { position: absolute; left: 0; top: 0; background: var(--b2-acc); color: #fff; font-size: 10px; padding: 2px 7px; }
+
+    .b2p .empty { text-align: center; padding: 40px 0; font-family: "Noto Serif KR", serif; color: var(--b2-dim); }
+    .b2p .foot { text-align: center; font-family: "Noto Serif KR", serif; font-size: 12.5px; color: var(--b2-acc); margin-top: 26px; }
+</style>
+
+<div class="b2p">
+    <div class="k">함께 읽는 말씀</div>
+    <h1 class="T">참여자 현황</h1>
+
+    @if (communityUsers.Any())
+    {
+        double avgRate    = communityUsers.Average(u => (double)u.TotalProgressRate);
+        int completedCnt  = communityUsers.Count(u => u.readBibleAllCount >= 1);
+        int totalReadings = communityUsers.Sum(u => u.readBibleAllCount);
+        <div class="stats">
+            <div><b>@communityUsers.Count</b>참여자</div>
+            <div><b>@completedCnt</b>완독자</div>
+            <div><b>@(avgRate.ToString("F1"))%</b>평균 진도</div>
+            <div><b>@totalReadings</b>누적 완독</div>
+        </div>
+    }
+
+    @* ── 완독자 명예의 전당 ── *@
+    @if (completedUsers.Any())
+    {
+        <div class="lbl">완독자 명예의 전당<small>@(completedUsers.Count)명</small></div>
+        <div class="hall">
+            @foreach (var cu in completedUsers)
+            {
+                string nm = $"{cu.LastName ?? ""}{cu.FirstName ?? ""}";
+                <div class="h">
+                    <span class="av">
+                        @(nm.Length > 0 ? nm.Substring(0, 1) : "?")
+                        <img data-src="/HumanResource/GetProfilePicture?userId=@cu.UserId" alt="" />
+                    </span>
+                    <b>@nm</b>
+                    <small>@(cu.readBibleAllCount)독</small>
+                    @if (isSuperAdmin) { <span class="uid">@cu.UserName</span> }
+                </div>
+            }
+        </div>
+    }
+
+    @* ── 참여자 ── *@
+    <div class="lbl">성경통독 참여자<small>@(communityUsers.Count)명</small></div>
+
+    @if (communityUsers.Any())
+    {
+        <div class="ctrl">
+            <input type="text" id="commSearch" placeholder="이름 검색" aria-label="이름 검색" />
+            <button type="button" class="on" data-sort="progress">진도율순</button>
+            <button type="button" data-sort="date">최근순</button>
+        </div>
+
+        <div class="grid" id="commGrid">
+            @foreach (var u in communityUsers)
+            {
+                bool done   = u.readBibleAllCount >= 1;
+                double rate = Math.Min(Math.Max((double)u.TotalProgressRate, 0), 100);
+                string nm   = $"{u.LastName ?? ""}{u.FirstName ?? ""}";
+
+                lastReadBooks.TryGetValue(u.UserId, out var lr);
+                string lastBook = lr != null ? $"{lr.BibleText} {lr.Jang}{(lr.BibleText == "시편" ? "편" : "장")}" : "";
+
+                int days = (int)(kstNow.Date - u.ReadDate.Date).TotalDays;
+                string when = days <= 0 ? "오늘" : days == 1 ? "어제" : $"{days}일 전";
+
+                string role;
+                var rc = u.RoleCode ?? "";
+                if (!string.IsNullOrEmpty(rc) && rc != "T1001") role = "교사";
+                else if (u.ClassYear > 0 && u.ClassBan > 0)   role = $"{u.ClassYear}학년 {u.ClassBan}반";
+                else if (u.ClassYear > 0)                      role = $"{u.ClassYear}학년";
+                else                                           role = "기타";
+
+                <div class="card @(done ? "dn" : "")"
+                     data-name="@(nm) @(u.UserName)"
+                     data-rawprogress="@((long)Math.Round(Math.Max((double)u.TotalProgressRate, 0)))"
+                     data-date="@u.ReadDate.Ticks">
+                    @if (done) { <span class="tag">@(u.readBibleAllCount)독</span> }
+                    <div class="ring">
+                        <svg viewBox="0 0 66 66" aria-hidden="true">
+                            <circle cx="33" cy="33" r="29" fill="none" stroke="var(--b2-rule)" stroke-width="3" />
+                            <circle class="fill" cx="33" cy="33" r="29" fill="none" stroke="var(--b2-acc)" stroke-width="3"
+                                    stroke-dasharray="0 @F(RING)" data-dash="@F(RING * rate / 100) @F(RING)" transform="rotate(-90 33 33)" />
+                        </svg>
+                        <span class="av">
+                            @(nm.Length > 0 ? nm.Substring(0, 1) : "?")
+                            <img data-src="@u.ProfilePicturePath" alt="" />
+                        </span>
+                    </div>
+                    <b>@nm</b>
+                    @if (isSuperAdmin) { <span class="uid">@u.UserName</span> }
+                    <div class="pc">@rate.ToString("F2")<small>%</small></div>
+                    <div><span class="role">@role</span></div>
+                    <div class="m">@(string.IsNullOrEmpty(lastBook) ? "" : lastBook + " · ")@when</div>
+                    <div class="bar"><i data-w="@((int)Math.Round(rate))"></i></div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="empty">아직 성경통독을 시작한 분이 없어요</div>
+    }
+
+    <div class="foot">말씀을 읽는 것이 복입니다 — 요한계시록 1:3</div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    /* 링 · 막대 — 화면에 들어오면 채운다 */
+    var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            var card = e.target;
+            var f = card.querySelector('.fill'); if (f) f.setAttribute('stroke-dasharray', f.dataset.dash);
+            var b = card.querySelector('.bar i'); if (b) b.style.width = b.dataset.w + '%';
+            io.unobserve(card);
+        });
+    }, { threshold: 0.2 });
+    document.querySelectorAll('.b2p .card').forEach(function (c) { io.observe(c); });
+
+    /* 사진 지연 로딩 — 실패하면 첫 글자 그대로 */
+    var imgIO = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+            if (!e.isIntersecting) return;
+            var img = e.target, src = img.getAttribute('data-src');
+            imgIO.unobserve(img);
+            if (!src) { img.remove(); return; }
+            img.addEventListener('load', function () { img.classList.add('ok'); }, { once: true });
+            img.addEventListener('error', function () { img.remove(); }, { once: true });
+            img.src = src;
+        });
+    }, { rootMargin: '200px 0px' });
+    document.querySelectorAll('.b2p .av img[data-src]').forEach(function (i) { imgIO.observe(i); });
+
+    var grid = document.getElementById('commGrid');
+    if (!grid) return;
+
+    function sortBy(type) {
+        var cards = Array.from(grid.children);
+        cards.sort(function (a, b) {
+            return type === 'progress'
+                ? (+b.dataset.rawprogress || 0) - (+a.dataset.rawprogress || 0)
+                : (+b.dataset.date || 0) - (+a.dataset.date || 0);
+        });
+        cards.forEach(function (c) { grid.appendChild(c); });
+        document.querySelectorAll('.b2p .ctrl button').forEach(function (x) { x.classList.toggle('on', x.dataset.sort === type); });
+    }
+    document.querySelectorAll('.b2p .ctrl button').forEach(function (x) {
+        x.addEventListener('click', function () { sortBy(x.dataset.sort); });
+    });
+    sortBy('progress');
+
+    var s = document.getElementById('commSearch');
+    if (s) s.addEventListener('input', function () {
+        var q = this.value.trim().toLowerCase();
+        grid.querySelectorAll('.card').forEach(function (c) {
+            c.style.display = (c.dataset.name || '').toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+        });
+    });
+})();
+</script>
+}

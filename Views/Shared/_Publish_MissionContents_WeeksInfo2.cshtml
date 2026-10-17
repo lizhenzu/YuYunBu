@@ -1,0 +1,161 @@
+﻿@model BulletinBoard.Models.TodayCheckCompositeData
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IAuthService AuthService
+
+@{
+    int Sum = 0;
+    int HitSum = 0;
+    int HitRatio = 0;
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    string DateString = $"{Model.WeekStatusDatas[0].MMM}월 {Model.WeekStatusDatas[0].DDD}일 ~ {Model.WeekStatusDatas[Model.WeekStatusDatas.Count - 1].MMM}월 {Model.WeekStatusDatas[Model.WeekStatusDatas.Count - 1].DDD}일 ";
+    @foreach (WeekStatusData va in Model.WeekStatusDatas)
+    {
+        if (va.DCount > 0)
+        {
+            HitSum = HitSum + 1;
+        }
+        Sum = Sum + 1;
+    }
+
+    HitRatio = HitSum * 100 / Sum;
+
+    string TodayMesssage = $"오늘은 {BulletinBoard.Common.SharedComm.GetTodayStringKor()} 입니다.";
+}
+<style>
+    .progress-status-root-body {
+       
+        margin: 0;
+        width: 100%;
+        padding: 10px;
+        /*  border-radius: 8px;*/
+        justify-content: center;
+        align-items: center;
+    }
+
+    .progress-status-title {
+        font-size: 18px;
+        color: #FFD700; /* gold color for titles */
+        margin-bottom: 10px;
+    }
+
+    .progress-status-days {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .progress-status-day {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .progress-status-circle {
+        width: 20px;
+        height: 20px;
+        background-color: #999; /* light grey for inactive progress-status-days */
+        border-radius: 50%;
+        margin-top: 5px;
+        position: relative;
+    }
+
+        .progress-status-circle.active {
+            background-color: #FF4500; /* vivid orange for active progress-status-days */
+        }
+
+            .progress-status-circle.active:before {
+                content: '✔';
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                font-size: 14px;
+                color: white; /* white check mark */
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+    .progress-status-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    .progress-status-bar {
+        flex-grow: 1;
+        height: 20px;
+        background-color: #777; /* dark grey background for progress bar */
+        border-radius: 10px;
+        position: relative;
+    }
+
+        .progress-status-bar > div {
+            width: 64%; /* Example percentage */
+            height: 100%;
+            background-color: #00FF00; /* bright green for progress */
+            border-radius: 10px;
+        }
+
+    .progress-status-text {
+        min-width: 50px;
+        text-align: right;
+        color: #FFD700; /* gold text for percentage */
+    }
+</style>
+<style>
+
+
+    .button-header {
+        margin: 10px;
+        display: flex;
+        justify-content: space-between;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .button-core {
+        padding: 5px 13px;
+        border: none;
+        border-radius: 10px;
+        background-color: #0d6efd; /* Bootstrap primary color */
+        color: white;
+        cursor: pointer;
+        box-shadow: 3px 3px 5px rgba(0,0,0,0.2);
+        transition: background-color 0.3s;
+        margin: 5px;
+    }
+
+        .button-core:hover {
+            background-color: #1a73e8; /* Darker blue */
+        }
+
+</style>
+
+
+<div class="score-container" style="user-select: none; background-color : white;  color:black; ">
+
+
+    <!-- Rule 1 -->
+    <div class="score-rule" style="user-select: none;">
+        <div class="progress-status-root-body">
+            @{
+                string Total_All_Desc = $"지금까지 누적 총 포인트 : {@Model.Total_All}점";
+
+                string Total_All_Desc_Reach = SharedComm.HowMuchItTakes(@Model.Total_All);
+
+            }
+            <h3>@TodayMesssage</h3>
+            <h2>@Total_All_Desc</h2>
+            <h4>@Total_All_Desc_Reach</h4>
+            <h3>이번달 "@UserFullName"님의 활동 내용</h3>
+        </div>
+    </div>
+</div>

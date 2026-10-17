@@ -1,0 +1,839 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+
+@{
+    // 🎁 상품 선택 필요 여부 (TempData 유지)
+    var awardPickUrl = TempData.Peek("DM2_AWARD_URL") as string;
+    bool needPickAward = !string.IsNullOrWhiteSpace(awardPickUrl);
+
+    int cYear = DateHelper.GetKoreaNow().Year;
+
+    Layout = "_Layout_Mission2_New";
+
+    // ✅ 추가(네비용)
+    ViewBag.DM2Page = "dash";
+    ViewBag.DM2Done = false;
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var toast = (ViewBag.Toast ?? "").ToString();
+
+    bool canAct = Model.IsActionable;
+
+    int total = Model.YearPoint?.YearTotalPoint ?? 0;
+
+    // ✅ (옵션) 상단 통계/목표 패널 표시 여부 (원하면 true)
+    bool showScoreChips = true;
+
+    // 목표(간단 버전: 남은 점수만 표시)
+    int[] goals = new[] { 1000, 1500, 2000 };
+    Func<int, string> goalText = (g) =>
+    {
+        if (total >= g) return "달성 🎉";
+        return $"남은 점수: {(g - total).ToString("N0")}점";
+    };
+
+    string UrlWithDate(string baseUrl)
+        => $"{baseUrl}?date={d}";
+
+    // ✅ 팝업 메시지/이동 URL (컨트롤러 TempData 세팅)
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+    var awardUrl = TempData["DM2_AWARD_URL"] as string;
+
+    // ✅ 팝업에서 "숨김" 눌렀을 때 돌아갈 URL
+    var returnUrl = (Context?.Request?.Path.ToString() ?? "") + (Context?.Request?.QueryString.ToString() ?? "");
+
+    // ✅ DayStatus 단일 변수로 고정
+    var st = Model.DayStatus;
+
+    // ✅ 기도 완료 로직(2버튼 구조 안전 반영)
+    bool prayDoneComputed = st?.PrayDone ?? false;
+
+    bool doneToMe = st?.Pray_ToMe ?? false;
+    bool doneToParent = st?.Pray_ToParent ?? false;
+    bool doneToFriend = st?.Pray_ToFriend ?? false;
+
+    bool prayDone2Button = (doneToMe && (doneToParent || doneToFriend));
+
+    // ✅ 최종 PrayDone
+    bool finalPrayDone = prayDoneComputed;
+    // bool finalPrayDone = prayDone2Button; // ← 2버튼 기준 강제
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool isStaff = (isAdmin || isSuperAdmin);
+}
+
+<style>
+    :root {
+        --bg0: #f6fbff;
+        --bg1: #f3fff7;
+        --card: rgba(255,255,255,.92);
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: rgba(226,232,240,.95);
+        --shadow: 0 14px 40px rgba(15,23,42,.10);
+        --shadow2: 0 8px 18px rgba(15,23,42,.08);
+        --r-xl: 26px;
+        --r-lg: 18px;
+        --r-md: 14px;
+        --max: 980px;
+        --ok: #22c55e;
+        --warn: #f59e0b;
+        --danger: #fb7185;
+    }
+
+    .dm2Wrap {
+        min-height: 100%;
+        color: var(--ink);
+    }
+
+    .shell {
+        margin: 0 auto;
+    }
+
+    .toast {
+        background: rgba(15,23,42,.86);
+        color: white;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-weight: 900;
+        margin-bottom: 12px;
+        box-shadow: var(--shadow2);
+    }
+
+    /* ✅ HERO 카드: 밝은 배경에서도 경계가 확실히 보이게 */
+    .hero {
+        background: linear-gradient(135deg, rgba(56,189,248,.16), rgba(34,197,94,.14) );
+        border: 1.5px solid rgba(148,163,184,.55);
+        box-shadow: 0 18px 50px rgba(15,23,42,.12), 0 8px 18px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.75), inset 0 0 0 1px rgba(255,255,255,.35);
+        border-radius: var(--r-xl);
+        padding: 16px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        position: relative;
+        text-align: center;
+    }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            pointer-events: none;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.55);
+            opacity: .9;
+        }
+
+        .hero h1 {
+            margin-bottom: 10px;
+        }
+
+        .hero h2 {
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .hero p {
+            margin-bottom: 18px;
+        }
+
+    /* ✅ 최근 3일 제한 안내 */
+    .lockBar {
+        margin-top: 10px;
+        margin-bottom: 10px;
+        border: 1px dashed rgba(148,163,184,.65);
+        background: rgba(241,245,249,.70);
+        border-radius: 16px;
+        padding: 15px 20px;
+        font-weight: 900;
+        color: rgba(15,23,42,.86);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lockIcon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15,23,42,.08);
+        border: 1px solid rgba(226,232,240,.95);
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+
+    .mini {
+        font-size: 13px;
+        color: rgba(71,85,105,.92);
+        font-weight: 900;
+    }
+
+    .chipRow {
+        margin-top: 12px;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        max-width: 760px;
+        margin-left: auto;
+        margin-right: auto;
+        justify-content: center;
+    }
+
+    @@media (min-width:640px) {
+        .chipRow {
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+    }
+
+    .chipGroup {
+        padding: 12px;
+        border-radius: 20px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,.72);
+        box-shadow: var(--shadow2);
+        text-align: center;
+    }
+
+    .chipGroupTitle {
+        font-weight: 950;
+        font-size: 13px;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+        color: rgba(15,23,42,.78);
+        width: 100%;
+        text-align: center;
+    }
+
+    .chip {
+        justify-content: space-between;
+        gap: 10px;
+        font-weight: 950;
+        font-size: 13px;
+        margin-top: 8px;
+        max-width: 520px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+        .chip small {
+            font-weight: 950;
+            color: rgba(71,85,105,.95);
+            display: inline-block;
+        }
+
+    /* =========================================================
+           ✅ QUICK ACTIONS
+           ========================================================= */
+    .actions {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        align-items: stretch;
+        /* ✅ FIX: 1fr 제거 -> 텍스트 벌어짐/늘어짐 방지 */
+        grid-auto-rows: auto;
+    }
+
+    @@media (min-width:740px) {
+        .actions {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+    }
+
+    .quickBtn {
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,.92);
+        border-radius: var(--r-xl);
+        box-shadow: var(--shadow);
+        cursor: pointer;
+        padding: 12px 14px;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: transform .14s ease, box-shadow .14s ease;
+        text-decoration: none;
+        color: inherit;
+        height: 86px;
+        overflow: hidden;
+    }
+
+        .quickBtn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 18px 46px rgba(15,23,42,.12);
+        }
+
+    .qIcon {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        background: linear-gradient(135deg, rgba(34,197,94,.18), rgba(56,189,248,.14));
+        border: 1px solid var(--line);
+        flex: 0 0 auto;
+    }
+
+    /* ✅ FIX: qText를 column + gap으로 고정 => b/span 벌어짐 방지 */
+    .qText {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center; /* 가운데 정렬(원하면 flex-start로 변경) */
+        gap: 4px; /* 줄 간격 고정 */
+    }
+
+        .qText b {
+            display: block;
+            font-size: 14px;
+            font-weight: 950;
+            line-height: 1.15;
+            margin: 0;
+        }
+
+        .qText span {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 900;
+            margin-top: 0; /* 기존 2px 제거 */
+            line-height: 1.15; /* 줄간격 고정 */
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+    .section {
+        margin-top: 14px;
+        background: rgba(255,255,255,.72);
+        border: 1px solid var(--line);
+        border-radius: var(--r-xl);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+    }
+
+    .sectionHead {
+        padding: 14px 16px 10px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+        background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(34,197,94,.08));
+    }
+
+        .sectionHead h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 950;
+        }
+
+        .sectionHead .hint {
+            color: var(--muted);
+            font-weight: 900;
+            font-size: 12.5px;
+        }
+
+    @@media (max-width:520px) {
+        .sectionHead {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+            .sectionHead .hint {
+                width: 100%;
+                text-align: left;
+            }
+    }
+
+    .content {
+        margin-top: 14px;
+        padding: 0px;
+    }
+
+    .noticeBox {
+        background: rgba(255,255,255,.92);
+        border: 1px solid var(--line);
+        border-radius: var(--r-xl);
+        box-shadow: var(--shadow);
+        padding: 16px;
+        margin-top: 14px;
+        text-align: center;
+        font-weight: 950;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: rgba(255,255,255,.92);
+        cursor: pointer;
+        font-weight: 950;
+        box-shadow: 0 10px 22px rgba(15,23,42,.10);
+        transition: transform .12s ease, box-shadow .12s ease;
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        overflow: hidden;
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(15,23,42,.12);
+        }
+
+        .btn:disabled, .btn.disabled {
+            opacity: .45;
+            cursor: not-allowed;
+            pointer-events: none;
+            transform: none;
+            box-shadow: none;
+        }
+
+    .missionGrid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 14px;
+    }
+
+    @@media(min-width:760px) {
+        .missionGrid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    .foot {
+        margin-top: 16px;
+        text-align: center;
+        color: rgba(71,85,105,.85);
+        font-weight: 900;
+        font-size: 12.5px;
+    }
+
+    /* 🎁 상품 선택 버튼만 살짝 강조 */
+    .awardPickBtn {
+        grid-column: 1 / -1; /* 한 줄 전체 */
+        border: 1px solid rgba(245,158,11,.45);
+        background: linear-gradient(135deg, rgba(255,251,235,.95), rgba(254,243,199,.95));
+    }
+
+        .awardPickBtn .qIcon {
+            background: linear-gradient(135deg, rgba(245,158,11,.28), rgba(251,191,36,.20));
+        }
+
+    /* =========================================================
+           ✅ 개선/불편 접수 큰 버튼 (퍼져 보임 완전 해결 버전)
+           ========================================================= */
+    .feedbackBtn {
+        border: 2px solid rgba(56,189,248,.55);
+        background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(34,197,94,.14));
+        box-shadow: 0 18px 46px rgba(15,23,42,.12);
+        padding-top: 14px;
+    }
+
+        .feedbackBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 60px rgba(15,23,42,.14);
+        }
+
+        .feedbackBtn .qIcon {
+            width: 52px;
+            height: 52px;
+            border-radius: 18px;
+            font-size: 24px;
+            background: linear-gradient(135deg, rgba(56,189,248,.30), rgba(34,197,94,.22));
+            margin-top: 2px;
+        }
+
+        /* (기존에 이미 고정되어 있어도, 전역 qText 수정으로 충분) */
+        .feedbackBtn .qText {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 4px;
+            min-width: 0;
+        }
+
+            .feedbackBtn .qText b {
+                font-size: 16px;
+                font-weight: 1000;
+                margin: 0;
+                line-height: 1.05;
+            }
+
+            .feedbackBtn .qText span {
+                font-size: 13px;
+                margin: 0 !important;
+                line-height: 1.15;
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+            }
+
+    @@media (max-width:520px) {
+        .feedbackBtn {
+            height: 120px;
+        }
+    }
+
+    /* ===============================
+           🛠️ 관리자 전용 버튼 스타일
+           =============================== */
+    .adminBtn {
+        border: 2px solid rgba(239,68,68,.55);
+        background: linear-gradient(135deg, rgba(254,226,226,.95), rgba(254,242,242,.95));
+        box-shadow: 0 18px 46px rgba(239,68,68,.18);
+    }
+
+        .adminBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 24px 60px rgba(239,68,68,.22);
+        }
+
+        .adminBtn .qIcon {
+            background: linear-gradient(135deg, rgba(239,68,68,.28), rgba(251,113,133,.20));
+            font-size: 22px;
+        }
+</style>
+
+<div class="dm2Wrap">
+    <div class="shell">
+
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="toast">@toast</div>
+        }
+
+        <div class="hero">
+            <h1>@ConstatsCommon.MainKeyTitle</h1>
+
+            <h2>
+                👋 안녕하세요.<br />
+                <span style="font-weight:950; font-size:1.15em; color:#0b5cff;">@Model.UserName</span>님!
+            </h2>
+
+            <p>
+                <b>"거룩한 습관 만들기"</b><br />
+                프로그램에 오심을 환영해요.
+            </p>
+
+            @if (showScoreChips)
+            {
+                <div class="chipRow">
+                    <div class="chipGroup">
+                        <div class="chip">
+                            📌 오늘은
+                            <span style="font-size:18px; font-weight:900; color:#0b5cff;">
+                                @Model.SelectedDate.ToString("yyyy년 M월 d일(ddd)", new CultureInfo("ko-KR"))
+                            </span>
+                            <small>입니다.</small>
+                        </div>
+                        <div class="chip">
+                            ⭐ 모은 포인트 :
+                            <span style="margin-left:10px;font-size:28px; font-weight:900; color:#ff7a00;">
+                                @(total.ToString("N0"))
+                            </span>
+                            <small>점</small>
+                        </div>
+                    </div>
+
+                    @if (false)
+                    {
+                        <div class="chipGroup">
+                            <div class="chipGroupTitle">🎯 목표까지 얼마나 남았을까?</div>
+                            @foreach (var g in goals)
+                            {
+                                <div class="chip">
+                                    🎯 @g.ToString("N0")점까지
+                                    <small>@goalText(g)</small>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (!canAct)
+        {
+            <div class="lockBar">
+                <div class="lockIcon">🔒</div>
+                <div>
+                    오늘/어제/그저께만 수행할 수 있어요.
+                    <div class="mini">※ 읽기/기도/퀴즈/암송 수행은 최근 3일만 허용</div>
+                </div>
+            </div>
+        }
+
+        @await Html.PartialAsync("_Banner_4Mission_Notice_Once")
+
+        <div class="content">
+            @await Html.PartialAsync("~/Views/DailyMission2/_Calendar.cshtml", Model)
+        </div>
+
+        @if (Model.IsOtherDate)
+        {
+            <div class="noticeBox">
+                📢 알림<br />
+                @Model.SelectedDate.ToString("M월 d일", new CultureInfo("ko-KR"))자 미션을 보고 계시네요.<br /><br />
+                <a class="btn" href="/DailyMission2?date=@Model.Today.ToString("yyyy-MM-dd")">오늘 날짜로 이동</a>
+            </div>
+        }
+
+        <div class="missionGrid">
+            <!-- 1) 말씀 -->
+            @{
+                var done = st?.WordDone ?? false;
+                var hasContent = Model.Content?.TodayWordToReadId != null;
+                var pillClass = done ? "pill done" : "pill todo";
+                var pillText = done ? "✅ 미션 완료!" : "⏳ 미션 미완료!";
+
+                var btnWText = (pillText == "✅ 미션 완료!") ? "말씀 미션(다시보기)" : "말씀 미션";
+                var sticker = done ? "잘했어요! 🎉 오늘 말씀을 읽었어요!" : "지금 읽으면 마음이 반짝✨ 말씀 읽고 포인트도 쑥쑥!";
+                var disabled = (!canAct || !hasContent);
+            }
+            @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji = "📖",
+                        Title = "오늘의 말씀",
+                        PillClass = pillClass,
+                        PillText = pillText,
+                        Sticker = sticker,
+                        Desc = "성경 말씀을 읽고 마음을 채워요.",
+                        BtnClass = "word",
+                        BtnIcon = "📖",
+                        BtnText = btnWText,
+                        Href = UrlWithDate("/DailyMission2/Word"),
+                        Disabled = disabled,
+                        HasContent = hasContent,
+                        DateText = d,
+                        NoContentMsg = "TodayWordToRead 콘텐츠가 없어요.",
+                        IsDone = done
+                        })
+
+            <!-- 2) 퀴즈 -->
+            @{
+                var quiz = Model.Content?.Quiz;
+                bool hasQuiz = quiz?.QuestionId != null;
+
+                bool quizCorrect = st?.QuizCorrect ?? false;
+                int tryCntMax = st?.QuizTryCntMax ?? 0;
+                bool doneQuiz = st?.QuizDone ?? false;
+
+                bool quizHardFailedOne = (!quizCorrect && tryCntMax == 1);
+                bool quizHardFailed = (!quizCorrect && tryCntMax >= 2);
+
+                string pillQ;
+                string pillQClass;
+                var btnQText = "퀴즈 미션";
+
+                if (quizHardFailedOne) { pillQ = "한 번 더 생각해 볼까? 😊"; pillQClass = "pill fail"; }
+                else if (quizHardFailed) { pillQ = "❌ 오늘은 아쉽!"; pillQClass = "pill fail"; }
+                else if (!doneQuiz) { pillQ = "⏳ 미션 미완료!"; pillQClass = "pill todo"; }
+                else { pillQ = "✅ 미션 완료!"; pillQClass = "pill done"; btnQText = "퀴즈 미션(다시보기)"; }
+
+                var stickerQ =
+                quizHardFailed ? "앗! 오늘은 퀴즈가 조금 어려웠나봐요 🥲 내일 다시 도전!" :
+                doneQuiz ? "짠! 정답 맞혔어요 🎉 똑똑 스티커 붙이기! 🧠" :
+                "방금 읽은 말씀으로 퀴즈 풀면 더 쉬워요! 도전! ✨";
+
+                var disabledQ = (!canAct || !hasQuiz);
+            }
+            @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji = "❓",
+                        Title = "재미있는 퀴즈",
+                        PillClass = pillQClass,
+                        PillText = pillQ,
+                        Sticker = stickerQ,
+                        Desc = "성경 퀴즈를 풀어보세요!",
+                        BtnClass = "quiz",
+                        BtnIcon = "❓",
+                        BtnText = btnQText,
+                        Href = UrlWithDate("/DailyMission2/Quiz"),
+                        Disabled = disabledQ,
+                        HasContent = hasQuiz,
+                        DateText = d,
+                        NoContentMsg = "Quiz 콘텐츠가 없어요.",
+                        IsDone = doneQuiz
+                        })
+
+            <!-- 3) 기도 -->
+            @{
+                var hasP = Model.Content?.PrayPhraseId != null;
+                var doneP = finalPrayDone;
+
+                var pillPClass = doneP ? "pill done" : "pill todo";
+                var pillPText = doneP ? "✅ 미션 완료!" : "⏳ 미션 미완료!";
+                var stickerP = doneP ? "하나님께 마음을 드렸어요 💚 기도 스티커 붙이기!" : "짧게라도 좋아요! 🙏 "하나님 감사합니다" 한마디부터 시작!";
+                var disabledP = (!canAct || !hasP);
+
+                var btnPText = (pillPText == "✅ 미션 완료!") ? "기도 미션(다시보기)" : "기도 미션";
+                var btnPIcon = (pillPText == "✅ 미션 완료!") ? "👀" : "🙏";
+            }
+            @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji = "🙏",
+                        Title = "기도해요",
+                        PillClass = pillPClass,
+                        PillText = pillPText,
+                        Sticker = stickerP,
+                        Desc = "하나님께 마음을 드려요.",
+                        BtnClass = "pray",
+                        BtnIcon = btnPIcon,
+                        BtnText = btnPText,
+                        Href = UrlWithDate("/DailyMission2/Pray"),
+                        Disabled = disabledP,
+                        HasContent = hasP,
+                        DateText = d,
+                        NoContentMsg = "PrayPhrase 콘텐츠가 없어요.",
+                        IsDone = doneP
+                        })
+
+            <!-- 4) 암송 -->
+            @{
+                var doneR = st?.ReciteDone ?? false;
+                var hasR = Model.Content?.WeeklyWordToReadId != null;
+
+                var pillRClass = doneR ? "pill done" : "pill todo";
+                var pillRText = doneR ? "✅ 미션 완료!" : "⏳ 미션 미완료!";
+                var stickerR = doneR ? "우와! 말씀을 외웠어요 🌟 암송 마스터 스티커!" : "한 줄씩! 천천히! 🐢 가리고 말해보기로 쉽게 암송해요!";
+                var btnRText = (pillRText == "✅ 미션 완료!") ? "암송 미션(다시보기)" : "암송 미션";
+                var disabledR = (!canAct || !hasR);
+            }
+            @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji = "📝",
+                        Title = "말씀 암송",
+                        PillClass = pillRClass,
+                        PillText = pillRText,
+                        Sticker = stickerR,
+                        Desc = "하나님의 말씀을 외워보아요!",
+                        BtnClass = "recite",
+                        BtnIcon = "📝",
+                        BtnText = btnRText,
+                        Href = UrlWithDate("/DailyMission2/Recite"),
+                        Disabled = disabledR,
+                        HasContent = hasR,
+                        DateText = d,
+                        NoContentMsg = "WeeklyWordToRead 콘텐츠가 없어요.",
+                        IsDone = doneR
+                        })
+        </div>
+
+        <div class="hero">
+            <div class="actions">
+                @if (needPickAward)
+                {
+                    <a class="quickBtn awardPickBtn" onclick="location.href='@awardPickUrl'">
+                        <div class="qIcon">🎁</div>
+                        <div class="qText"><b>상품 선택</b><span>레벨 달성! 선물을 골라주세요</span></div>
+                    </a>
+                }
+
+                <a class="quickBtn" onclick="location.href='/StudentPointDashboard3/MyGiftBox3'">
+                    <div class="qIcon">🎁</div>
+                    <div class="qText"><b>선물함</b><span>나의 선물 이력보기</span></div>
+                </a>
+
+                <a class="quickBtn" onclick="location.href='/DailyMission2/ParticipantPersons'">
+                    <div class="qIcon">👥</div>
+                    <div class="qText"><b>참여자보기</b><span>현재 참여중인 개인/팀 보기</span></div>
+                </a>
+
+                <a class="quickBtn" onclick="location.href='/DailyMission2/ParticipantTeams'">
+                    <div class="qIcon">👨‍👩‍👧‍👦</div>
+                    <div class="qText"><b>가족팀 보기</b><span>가족팀(팀 참가자) 목록 보기</span></div>
+                </a>
+
+                <a class="quickBtn" onclick="location.href='/DailyMission2/UserMonthlyPoints?userName=@ViewData["UserName"]'">
+                    <div class="qIcon">📊</div>
+                    <div class="qText"><b>월별 보기</b><span>월별 수행이력 보기</span></div>
+                </a>
+
+                <a class="quickBtn" onclick="location.href='/DailyMission2/UserDailyPoints?userName=@ViewData["UserName"]'">
+                    <div class="qIcon">🗓️</div>
+                    <div class="qText"><b>일자별 보기</b><span>일자별 수행이력 보기</span></div>
+                </a>
+
+                @if (true)
+                {
+                    <a class="quickBtn adminBtn" onclick="location.href='/StudentPointDashboard3/AdminPurchaseList'">
+                        <div class="qIcon">🎁</div>
+                        <div class="qText">
+                            <b>친구들이 선택한 선물 목록</b>
+                            <span>친구들이 고른 선물이에요.</span>
+                        </div>
+                    </a>
+                }
+
+                <a class="quickBtn feedbackBtn" href="/Board/Create2?boardName=Anonymous">
+                    <div class="qIcon">💬</div>
+                    <div class="qText">
+                        <b>개선사항 / 불편사항 접수</b>
+                        <span>불편했던 점을 남겨주세요</span>
+                    </div>
+                </a>
+
+                @if (isSuperAdmin)
+                {
+                    <a class="quickBtn adminBtn" onclick="location.href='/DailyMission2/DeleteClickHistory'">
+                        <div class="qIcon">🛠️</div>
+                        <div class="qText"><b>관리자</b><span>나의 이력삭제</span></div>
+                    </a>
+                }
+
+                <a class="quickBtn" href="/">
+                    <div class="qIcon">🏠</div>
+                    <div class="qText"><b>홈</b><span>메인으로 이동</span></div>
+                </a>
+            </div>
+        </div>
+
+        @if (!canAct)
+        {
+            <div class="noticeBox">
+                🔒 수행 불가 날짜입니다.<br />
+                (오늘/어제/그저께만 수행 가능)<br /><br />
+                <a class="btn" href="/DailyMission2?date=@Model.Today.ToString("yyyy-MM-dd")">오늘로 가기</a>
+            </div>
+        }
+    </div>
+</div>
+
+<script src="/js/GlobalCookie.js"></script>
+
+@await Html.PartialAsync(
+"~/Views/DailyMission2/Partials/_OkPopup.cshtml",
+    new
+    {
+        Message = okPopupMsg,
+        RedirectUrl = awardUrl,
+        ReturnUrl = returnUrl,
+        AutoCloseSeconds = 10,
+        ShowActions = true
+    }
+)

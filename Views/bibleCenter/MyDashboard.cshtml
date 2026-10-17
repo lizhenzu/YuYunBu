@@ -1,0 +1,972 @@
+﻿@using BulletinBoard.Common;
+@model IEnumerable<BulletinBoard.Models.TestamentReading>
+
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    Testaments _Testaments = ViewBag.Testament as Testaments;
+    TestamentReadSpeed _TestamentReadSpeed = ViewBag.TestamentReadSpeed as TestamentReadSpeed;
+
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    BibleLastReadInfo _BibleLastReadInfo = ViewBag.BibleLastReadInfo as BibleLastReadInfo;
+
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as string;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as string;
+
+    decimal totalProgressRate = ViewBag.TotalProgressRate != null ? Convert.ToDecimal(ViewBag.TotalProgressRate) : 0;
+}
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ConstatsCommon.ReadBibleAllTitle</title>
+
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #f4f7fb;
+            --surface: rgba(255,255,255,0.92);
+            --surface-strong: #ffffff;
+            --text: #0f172a;
+            --text-soft: #64748b;
+            --text-faint: #94a3b8;
+            --line: #e2e8f0;
+            --primary: #4f46e5;
+            --primary-soft: #eef2ff;
+            --green: #10b981;
+            --green-soft: #ecfdf5;
+            --blue: #0ea5e9;
+            --blue-soft: #f0f9ff;
+            --amber: #f59e0b;
+            --amber-soft: #fffbeb;
+            --rose: #f43f5e;
+            --rose-soft: #fff1f2;
+            --violet-soft: #f5f3ff;
+            --shadow: 0 10px 28px rgba(15, 23, 42, 0.07);
+            --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.04);
+            --shadow-hover: 0 16px 34px rgba(15, 23, 42, 0.10);
+            --radius-2xl: 28px;
+            --radius-xl: 22px;
+            --radius-lg: 18px;
+            --radius-md: 14px;
+            --radius-sm: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            background: radial-gradient(circle at top left, rgba(79,70,229,0.08), transparent 24%), radial-gradient(circle at top right, rgba(16,185,129,0.08), transparent 22%), linear-gradient(180deg, #fbfdff 0%, #f4f7fb 100%);
+            color: var(--text);
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .page {
+            min-height: 100vh;
+            padding: 18px 14px 32px;
+        }
+
+        .shell {
+            max-width: 1120px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            padding: 24px 22px;
+            background: radial-gradient(circle at 15% 18%, rgba(255,255,255,0.30), transparent 24%), radial-gradient(circle at 84% 18%, rgba(255,255,255,0.16), transparent 24%), linear-gradient(135deg, #4f46e5 0%, #2563eb 45%, #14b8a6 100%);
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+            .hero::after {
+                content: "";
+                position: absolute;
+                right: -66px;
+                bottom: -66px;
+                width: 180px;
+                height: 180px;
+                background: rgba(255,255,255,0.08);
+                border-radius: 50%;
+                filter: blur(4px);
+            }
+
+        .hero-grid {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.8fr);
+            gap: 16px;
+            align-items: stretch;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.16);
+            backdrop-filter: blur(8px);
+            font-size: 0.84rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.8rem, 2.7vw, 2.6rem);
+            line-height: 1.15;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .hero p {
+            margin: 0;
+            color: rgba(255,255,255,0.93);
+            font-size: 0.95rem;
+            line-height: 1.68;
+            max-width: 680px;
+        }
+
+        .hero-user {
+            margin-top: 14px;
+            font-size: 0.94rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.96);
+        }
+
+        .hero-summary {
+            background: rgba(255,255,255,0.14);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 20px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hero-summary-label {
+            font-size: 0.84rem;
+            opacity: 0.9;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .hero-summary-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 12px;
+        }
+
+        .hero-progress-track {
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.24);
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .hero-progress-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ffffff 0%, #dbeafe 100%);
+            box-shadow: inset 0 0 8px rgba(255,255,255,0.28);
+        }
+
+        .hero-summary-sub {
+            font-size: 0.88rem;
+            color: rgba(255,255,255,0.92);
+            line-height: 1.55;
+        }
+
+        .content {
+            margin-top: 16px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .section-card {
+            background: var(--surface);
+            border: 1px solid rgba(255,255,255,0.68);
+            backdrop-filter: blur(12px);
+            border-radius: var(--radius-2xl);
+            box-shadow: var(--shadow);
+            padding: 18px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 1.18rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            line-height: 1.2;
+        }
+
+        .section-desc {
+            margin: 5px 0 0;
+            color: var(--text-soft);
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+
+        .quick-grid,
+        .stats-grid,
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .quick-card {
+            grid-column: span 6;
+            position: relative;
+            overflow: hidden;
+            border-radius: 18px;
+            padding: 18px;
+            color: white;
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease;
+            min-height: 118px;
+            box-shadow: var(--shadow);
+        }
+
+            .quick-card:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--shadow-hover);
+            }
+
+            .quick-card::before {
+                content: "";
+                position: absolute;
+                top: -28px;
+                right: -28px;
+                width: 108px;
+                height: 108px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.14);
+            }
+
+            .quick-card.old {
+                background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+            }
+
+            .quick-card.new {
+                background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+            }
+
+            .quick-card .mini {
+                position: relative;
+                z-index: 2;
+                font-size: 0.82rem;
+                opacity: 0.92;
+                margin-bottom: 8px;
+                font-weight: 700;
+            }
+
+            .quick-card .title {
+                position: relative;
+                z-index: 2;
+                font-size: 1.28rem;
+                font-weight: 800;
+                margin-bottom: 8px;
+                line-height: 1.2;
+            }
+
+            .quick-card .sub {
+                position: relative;
+                z-index: 2;
+                font-size: 0.9rem;
+                opacity: 0.95;
+                line-height: 1.5;
+            }
+
+        .last-read-card {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            border-radius: 18px;
+            padding: 16px;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-soft);
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+            .last-read-card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow);
+            }
+
+        .last-read-icon {
+            width: 56px;
+            height: 56px;
+            min-width: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #eef2ff 0%, #dbeafe 100%);
+            font-size: 1.4rem;
+        }
+
+        .last-read-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .last-read-label {
+            color: var(--text-soft);
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .last-read-title {
+            font-size: 1.08rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+            color: var(--text);
+            word-break: keep-all;
+            line-height: 1.35;
+        }
+
+        .last-read-sub {
+            color: var(--text-soft);
+            line-height: 1.55;
+            font-size: 0.88rem;
+        }
+
+        .stat-tile {
+            grid-column: span 4;
+            background: var(--surface-strong);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: var(--shadow-soft);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+
+            .stat-tile:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow);
+            }
+
+        .stat-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex: 0 0 auto;
+        }
+
+        .stat-name {
+            color: var(--text-soft);
+            font-size: 0.86rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .stat-number {
+            font-size: 1.38rem;
+            font-weight: 800;
+            line-height: 1.25;
+            color: var(--text);
+            word-break: keep-all;
+        }
+
+        .icon-blue {
+            background: var(--blue-soft);
+        }
+
+        .icon-green {
+            background: var(--green-soft);
+        }
+
+        .icon-amber {
+            background: var(--amber-soft);
+        }
+
+        .icon-rose {
+            background: var(--rose-soft);
+        }
+
+        .icon-violet {
+            background: var(--violet-soft);
+        }
+
+        .icon-indigo {
+            background: var(--primary-soft);
+        }
+
+        .book-card {
+            grid-column: span 4;
+            background: linear-gradient(180deg, #ffffff 0%, #fcfcff 100%);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: var(--shadow-soft);
+            cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .book-card:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--shadow-hover);
+                border-color: #c7d2fe;
+            }
+
+            .book-card::after {
+                content: "";
+                position: absolute;
+                right: -20px;
+                top: -20px;
+                width: 74px;
+                height: 74px;
+                border-radius: 50%;
+                background: rgba(79,70,229,0.06);
+            }
+
+        .book-name {
+            font-size: 1.04rem;
+            font-weight: 800;
+            margin: 0 0 12px;
+            color: var(--text);
+            position: relative;
+            z-index: 2;
+            line-height: 1.3;
+        }
+
+        .book-meta {
+            display: grid;
+            gap: 6px;
+            position: relative;
+            z-index: 2;
+        }
+
+            .book-meta div {
+                color: var(--text-soft);
+                font-size: 0.86rem;
+                line-height: 1.5;
+                word-break: keep-all;
+            }
+
+        .book-progress-wrap {
+            margin-top: 12px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .book-progress-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            gap: 8px;
+        }
+
+            .book-progress-top span {
+                font-size: 0.82rem;
+                font-weight: 700;
+                color: var(--text-soft);
+            }
+
+        .book-progress-track {
+            height: 8px;
+            background: #eef2f7;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .book-progress-bar {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #4f46e5 0%, #14b8a6 100%);
+        }
+
+        .verse-box {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, #fffdf0 0%, #fff7d6 100%);
+            border: 1px solid #fde68a;
+            border-radius: 22px;
+            padding: 20px 18px;
+            box-shadow: 0 10px 24px rgba(245, 158, 11, 0.08);
+        }
+
+            .verse-box::after {
+                content: "✦";
+                position: absolute;
+                right: 16px;
+                top: 12px;
+                font-size: 1.6rem;
+                color: rgba(245, 158, 11, 0.18);
+            }
+
+        .verse-label {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #b45309;
+            margin-bottom: 8px;
+        }
+
+        .verse-text {
+            font-size: 1.03rem;
+            line-height: 1.8;
+            font-weight: 700;
+            color: #78350f;
+            margin-bottom: 8px;
+            word-break: keep-all;
+        }
+
+        .verse-ref {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #92400e;
+        }
+
+        .action-bar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 2px;
+        }
+
+        .action-btn {
+            min-width: 150px;
+            padding: 13px 18px;
+            border-radius: 14px;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: white;
+            cursor: pointer;
+            box-shadow: var(--shadow);
+            transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+        }
+
+            .action-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-hover);
+                filter: brightness(1.02);
+            }
+
+        .btn-home {
+            background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+        }
+
+        .btn-old {
+            background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+        }
+
+        .btn-new {
+            background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+        }
+
+        .empty-box {
+            text-align: center;
+            padding: 24px 16px;
+            border: 1px dashed #cbd5e1;
+            background: #f8fafc;
+            border-radius: 16px;
+            color: var(--text-soft);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 6px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+
+        @@media (max-width: 1080px) {
+            .hero-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-tile {
+                grid-column: span 6;
+            }
+
+            .book-card {
+                grid-column: span 6;
+            }
+        }
+
+        @@media (max-width: 760px) {
+            .page {
+                padding: 12px 10px 22px;
+            }
+
+            .shell {
+                max-width: 100%;
+            }
+
+            .hero {
+                padding: 18px 16px;
+                border-radius: 22px;
+            }
+
+            .hero-summary {
+                padding: 16px;
+                border-radius: 16px;
+            }
+
+            .hero-summary-value {
+                font-size: 2rem;
+            }
+
+            .section-card {
+                padding: 14px;
+                border-radius: 20px;
+            }
+
+            .quick-card {
+                grid-column: span 12;
+                min-height: 104px;
+                border-radius: 16px;
+            }
+
+            .stat-tile {
+                grid-column: span 12;
+            }
+
+            .book-card {
+                grid-column: span 12;
+            }
+
+            .last-read-card {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .last-read-icon {
+                width: 50px;
+                height: 50px;
+                min-width: 50px;
+                border-radius: 14px;
+            }
+
+            .action-btn {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="shell">
+
+            <section class="hero">
+                <div class="hero-grid">
+                    <div>
+                        <div class="eyebrow">📖 성경 통독 대시보드</div>
+                        <h1>@ConstatsCommon.ReadBibleAllTitleButton</h1>
+                        <p>
+                            매일의 말씀 읽기를 정돈된 화면으로 확인하고,
+                            전체 진행률과 최근 기록, 현재 읽는 성경까지 한눈에 살펴볼 수 있어요.
+                        </p>
+                        <div class="hero-user">안녕하세요, <strong>@UserFullName</strong> 님</div>
+                    </div>
+
+                    <div class="hero-summary">
+                        <div class="hero-summary-label">전체 통독 진행률</div>
+                        <div class="hero-summary-value">@($"{totalProgressRate}%")</div>
+                        <div class="hero-progress-track">
+                            <div class="hero-progress-bar" style="width:@(Math.Min(totalProgressRate, 100))%;"></div>
+                        </div>
+                        <div class="hero-summary-sub">현재까지의 통독 여정을 꾸준히 이어가고 있습니다.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 통독 참여자 배너 -->
+            <a href="/bibleCenter/MyDashboardList"
+               style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                      margin-top:14px;
+                      padding:18px 24px;
+                      border-radius:20px;
+                      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 60%, #a78bfa 100%);
+                      color:#fff;
+                      box-shadow:0 8px 28px rgba(99,102,241,0.28);
+                      text-decoration:none;
+                      transition:filter .15s, transform .12s;">
+                <div style="display:flex; align-items:center; gap:14px;">
+                    <span style="font-size:1.8rem; line-height:1;">👥</span>
+                    <div>
+                        <div style="font-size:1.05rem; font-weight:800; letter-spacing:-0.02em;">현재 통독 참여자들</div>
+                        <div style="font-size:0.82rem; opacity:0.88; margin-top:2px;">함께 말씀을 읽고 있는 참여자 목록을 확인하세요</div>
+                    </div>
+                </div>
+                <span style="font-size:1.4rem; opacity:0.85;">→</span>
+            </a>
+
+            <div class="content">
+
+                <section class="section-card">
+                    <div class="section-head">
+                        <div>
+                            <h2 class="section-title">빠른 이동</h2>
+                            <p class="section-desc">구약과 신약의 완료 현황을 확인하고 바로 이동해 보세요.</p>
+                        </div>
+                    </div>
+
+                    <div class="quick-grid">
+                        @if (_Testaments != null)
+                        {
+                            <div class="quick-card old" onclick="location.href='/bibleCenter/IndexByAB?ab=a'">
+                                <div class="mini">Old Testament</div>
+                                <div class="title">구약 완료</div>
+                                <div class="sub"><strong>@_Testaments.OldTestamentRead</strong> / @_Testaments.OldTestamentAll 권 완료</div>
+                            </div>
+
+                            <div class="quick-card new" onclick="location.href='/bibleCenter/IndexByAB?ab=b'">
+                                <div class="mini">New Testament</div>
+                                <div class="title">신약 완료</div>
+                                <div class="sub"><strong>@_Testaments.NewTestamentRead</strong> / @_Testaments.NewTestamentAll 권 완료</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="quick-card old" onclick="location.href='/bibleCenter/IndexByAB?ab=a'">
+                                <div class="mini">Old Testament</div>
+                                <div class="title">구약 완료</div>
+                                <div class="sub"><strong>0</strong> / 39 권 완료</div>
+                            </div>
+
+                            <div class="quick-card new" onclick="location.href='/bibleCenter/IndexByAB?ab=b'">
+                                <div class="mini">New Testament</div>
+                                <div class="title">신약 완료</div>
+                                <div class="sub"><strong>0</strong> / 27 권 완료</div>
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                @if (_BibleLastReadInfo != null)
+                {
+                    string queryString = $"/DailyMission/BibleSheetJangByJang?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+                    queryString += $"&BibleText={_BibleLastReadInfo.BibleText}&FromJang={_BibleLastReadInfo.Jang}&FromZul=0&ToJang={_BibleLastReadInfo.Jang}&ToZul=0";
+
+                    <section class="section-card">
+                        <div class="section-head">
+                            <div>
+                                <h2 class="section-title">최근 통독 기록</h2>
+                                <p class="section-desc">가장 최근에 읽은 말씀으로 바로 이동할 수 있어요.</p>
+                            </div>
+                        </div>
+
+                        <div class="last-read-card" onclick="location.href='@queryString'">
+                            <div class="last-read-icon">📘</div>
+                            <div class="last-read-meta">
+                                <div class="last-read-label">최근 통독 일자</div>
+                                <div class="last-read-title">
+                                    @_BibleLastReadInfo.BibleText @(@_BibleLastReadInfo.Jang)장 @(@_BibleLastReadInfo.Zul)절
+                                </div>
+                                <div class="last-read-sub">
+                                    읽은 시간 :
+                                    @ViewBag.LastReadDate.ToString("yyyy년 M월 d일 tt h시 m분 s초", System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                }
+
+                <section class="section-card">
+                    <div class="section-head">
+                        <div>
+                            <h2 class="section-title">현재 진행 상세</h2>
+                            <p class="section-desc">통독 속도와 남은 분량, 예상 완독 시점을 확인해 보세요.</p>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">읽은 날짜 수</div>
+                                <div class="stat-icon icon-blue">📅</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.ReadDays.ToString("N0")일</div>
+                        </div>
+
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">총 읽은 절수</div>
+                                <div class="stat-icon icon-green">📖</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.TotalVerses.ToString("N0")절</div>
+                        </div>
+
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">하루 평균 절수</div>
+                                <div class="stat-icon icon-amber">📈</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.AvgPerDay.ToString("N0")절</div>
+                        </div>
+
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">전체 성경 절수</div>
+                                <div class="stat-icon icon-violet">📚</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.TotalBibleVerses.ToString("N0")절</div>
+                        </div>
+
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">남은 절수</div>
+                                <div class="stat-icon icon-rose">📉</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.RemainingVerses.ToString("N0")절</div>
+                        </div>
+
+                        <div class="stat-tile">
+                            <div class="stat-top">
+                                <div class="stat-name">예상 소요 일수</div>
+                                <div class="stat-icon icon-indigo">🕒</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.EstimatedDaysRemaining.ToString("N0")일</div>
+                        </div>
+
+                        <div class="stat-tile" style="grid-column: span 12; background: linear-gradient(135deg, #eff6ff 0%, #eef2ff 50%, #ecfeff 100%); border-color: #c7d2fe;">
+                            <div class="stat-top">
+                                <div class="stat-name">예상 완독 날짜</div>
+                                <div class="stat-icon icon-indigo">🎯</div>
+                            </div>
+                            <div class="stat-number">@_TestamentReadSpeed.ExpectedCompletionDate.ToString("yyyy년 MM월 dd일")</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="section-card">
+                    <div class="section-head">
+                        <div>
+                            <h2 class="section-title">읽기 진행 중인 성경</h2>
+                            <p class="section-desc">아직 완독하지 않았지만 현재 읽고 있는 성경 목록입니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="book-grid">
+                        @{
+                            bool hasReadingItems = false;
+                        }
+
+                        @foreach (var item in Model)
+                        {
+                            if (item.ProgressRate > 0)
+                            {
+                                hasReadingItems = true;
+
+                                decimal progressRate = Math.Ceiling(item.ProgressRate * 100) / 100;
+                                string queryString = $"/DailyMission/BibleSheetJangByJang?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+                                queryString += $"&BibleText={item.BibleText}&FromJang={item.LastReadJang}&FromZul=0&ToJang={item.LastReadJang}&ToZul=0";
+
+                                <div class="book-card" onclick="location.href='@queryString'">
+                                    <h3 class="book-name">📖 @item.BibleText</h3>
+
+                                    <div class="book-meta">
+                                        <div><strong>읽은 위치</strong> : @(@item.LastReadJang)장 @(@item.LastReadZul)절</div>
+                                        <div><strong>읽은 날짜</strong> : @item.LastReadDate.ToString("yyyy년 MM월 dd일")</div>
+                                    </div>
+
+                                    <div class="book-progress-wrap">
+                                        <div class="book-progress-top">
+                                            <span>진행률</span>
+                                            <span>@progressRate%</span>
+                                        </div>
+                                        <div class="book-progress-track">
+                                            <div class="book-progress-bar" style="width:@(Math.Min(progressRate, 100))%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+
+                        @if (!hasReadingItems)
+                        {
+                            <div class="empty-box" style="grid-column: span 12;">
+                                아직 진행 중인 성경 데이터가 없습니다.
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                <section class="verse-box">
+                    <div class="verse-label">오늘의 말씀</div>
+                    <div class="verse-text">“주의 말씀은 내 발에 등이요 내 길에 빛이니이다”</div>
+                    <div class="verse-ref">시편 119편 105절</div>
+                </section>
+
+                <div class="action-bar">
+                    <button type="button" class="action-btn btn-home" onclick="location.href='/'">홈으로</button>
+                    <button type="button" class="action-btn btn-old" onclick="location.href='/bibleCenter/IndexByAB?ab=a'">구약성경</button>
+                    <button type="button" class="action-btn btn-new" onclick="location.href='/bibleCenter/IndexByAB?ab=b'">신약성경</button>
+                </div>
+
+                <div class="footer">
+                    &copy; @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,91 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model NavigationButtoInfo
+
+@{
+
+    int maxLimit = 9;
+
+    var todayDate = DateHelper.GetTodayDateDayString(maxLimit);
+    TodayCollectQuestion todayCollectQuestion = ViewBag.todayCollectQuestion as TodayCollectQuestion;
+
+    string missioncompleted = $"/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_{todayDate}.png";
+    string backgroundColor = $"#000000";
+
+
+}
+
+
+<div class="navigation-card  no-select">
+    <div class="nav-title">📌 다른 공간으로 이동하기</div>
+    <div class="nav-buttons">
+        <div class="nav-btn colorBaseGoldenOrange buttonCommon no-select" onclick="redirectToPage('/Home/MissionMainBoard')">🏡미션홈 <span class="nav-status">미션홈으로</span></div>
+
+        @if (Model.Title != "말씀")
+        {
+            <div id="D" class="column" >
+                @if ((Model.TodayCheckCompositeDataData.TodayWordToReadCountToMe + Model.TodayCheckCompositeDataData.TodayWordToReadCountToParent) > 0)
+                {
+                    <div class="colorBaseMediumGreen buttonCommon no-select" onclick="redirectToPage('/DailyMission/TodayWordToRead')">📝 말씀<span class="nav-status">완료</span></div>
+                }
+                else
+                {
+                    <div class="colorBaseDeepBlue buttonCommon  no-select" onclick="redirectToPage('/DailyMission/TodayWordToRead')">📝 말씀 <span class="nav-status">진행중</span></div>
+                }
+            </div>
+        }
+        @if (Model.Title != "퀴즈")
+        {
+            @if (@todayCollectQuestion.questionProcessStatus.Result == "f" && @todayCollectQuestion.questionProcessStatus.TryCnt > 1)
+                {
+                <div class="btn-incomplete no-select" onclick="redirectToPage('/DailyMission/TodayQuestion')">🙋 퀴즈 <span class="nav-status">실패</span></div>
+                }
+                else if (Model.TodayCheckCompositeDataData.QuestionCount > 0)
+                {
+                <div class="colorBaseMediumGreen buttonCommon no-select" onclick="redirectToPage('/DailyMission/TodayQuestion')">🙋 퀴즈 <span class="nav-status">완료</span></div>
+            }
+                else
+                {
+                <div class="colorBaseDeepBlue buttonCommon no-select" onclick="redirectToPage('/DailyMission/TodayQuestion')">🙋‍ 퀴즈 <span class="nav-status">진행중</span></div>
+            }
+        }
+        @if (Model.Title != "기도")
+        {
+                @if ((Model.TodayCheckCompositeDataData.PrayPhraseCountToFriend + Model.TodayCheckCompositeDataData.PrayPhraseCountToMe + Model.TodayCheckCompositeDataData.PrayPhraseCountToParent) > 0)
+                {
+                <div class="colorBaseMediumGreen buttonCommon no-select" onclick="redirectToPage('/DailyMission/TodayPray')">🙏 기도 <span class="nav-status">완료</span></div>
+                }
+                else
+                {
+                <div class="colorBaseDeepBlue buttonCommon no-select" onclick="redirectToPage('/DailyMission/TodayPray')">🙏 기도 <span class="nav-status">진행중</span></div>
+                }
+        }
+        @if (Model.Title != "암송")
+        {
+                @if (Model.TodayCheckCompositeDataData.WeeklyWordToReadCount > 0)
+                {
+                <div class="colorBaseMediumGreen buttonCommon no-select" onclick="redirectToPage('/DailyMission/WeeklyWordToRead')">📋 암송 <span class="nav-status">완료</span></div>
+                }
+                else
+                {
+                <div class="colorBaseDeepBlue buttonCommon no-select" onclick="redirectToPage('/DailyMission/WeeklyWordToRead')">📋 암송 <span class="nav-status">진행중</span></div>
+                }
+        }
+        @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+        {
+            <div class="colorBaseRoseRed buttonCommon no-select" onclick="redirectToPage('/DailyMission/DeleteClickHistory')">삭제<span class="nav-status">소멸</span></div>
+            <div class="colorBaseRoseRed buttonCommon no-select" onclick="redirectToPage('/Question')">Quiz<span class="nav-status">퀴즈등록</span></div>
+            <div class="colorBaseRoseRed buttonCommon no-select" onclick="redirectToPage('/JuManNa/IndexGroupByYYYYMM')">Word<span class="nav-status">말씀등록</span></div>
+        }
+        <div class="colorBaseLightPurple buttonCommon  no-select" onclick="location.href='/bibleCenter/MyDashboard'">🎯 미션 <span class="nav-status">@ConstatsCommon.ReadBibleAllTitle</span></div>
+        <div class="colorBaseHome   buttonCommon  no-select" onclick="redirectToPage('/')">🏠 Home <span class="nav-status">Home으로</span></div>
+    </div>
+</div>
+
+                @*https://www.emojiall.com/ko/all-emojis*@

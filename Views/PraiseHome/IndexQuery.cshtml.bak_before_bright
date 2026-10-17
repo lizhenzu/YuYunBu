@@ -1,0 +1,278 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.PraiseContents> 
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        .container {
+            text-align: center;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            max-width: 800px;
+            margin: 0 auto; /* 가운데 정렬을 위한 코드 */
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-around;
+            background-color: #fff;
+            padding: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+            .navbar a {
+                text-align: center;
+                color: #555;
+                text-decoration: none;
+                font-size: 14px;
+            }
+
+        .profile {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+            .profile img {
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                margin-right: 15px;
+            }
+
+        .profile-info {
+            flex-grow: 1;
+        }
+
+            .profile-info h2 {
+                margin: 0;
+                font-size: 18px;
+            }
+
+            .profile-info p {
+                margin: 5px 0;
+                color: #888;
+            }
+
+        .subscribe-btn {
+            background-color: #cc0000;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .mission {
+            display: flex;
+            align-items: center;
+            /* margin: 10px;*/
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .video-thumbnail {
+            position: relative;
+            /* margin: 20px;*/
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+            .video-thumbnail img {
+                max-width: calc(100% - 6px);
+                border-radius: 5px;
+            }
+
+            .video-thumbnail .title {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                color: #fff;
+                font-size: 18px;
+                font-weight: bold;
+            }
+
+            .video-thumbnail .views {
+                position: absolute;
+                bottom: 10px;
+                right: 10px;
+                color: #fff;
+                font-size: 14px;
+            }
+
+        .uploads {
+            /* padding: 20px;*/
+        }
+
+            .uploads h3 {
+                margin: 0 0 10px 0;
+                font-size: 18px;
+            }
+
+            .uploads .video {
+                display: flex;
+                margin-bottom: 15px;
+            }
+
+                .uploads .video img {
+                    width: 120px;
+              /*      border-radius: 10px;*/
+                    margin-right: 15px;
+                }
+
+            .uploads .video-info {
+                flex-grow: 1;
+            }
+
+                .uploads .video-info h4 {
+                    margin: 0;
+                    font-size: 16px;
+                }
+
+                .uploads .video-info p {
+                    margin: 5px 0;
+                    color: #888;
+                }
+    </style>
+    <style>
+
+        .video-info a {
+            color: #ff867f;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+            .video-info a:hover {
+                color: #e57373;
+            }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="profile">
+            <img src="/images/ICON/praise/praise_02.webp" alt="Profile Picture">
+            <div class="profile-info">
+                @if (ViewBag.Kind == "conti")
+                {
+                    <h2>찬양(주일학교)</h2>
+                }
+                else if (ViewBag.Kind == "hymn")
+                {
+                    <h2>찬송가</h2>
+                }
+                else if (ViewBag.Kind == "ccm")
+                {
+                    <h2>CCM</h2>
+                }
+                else if (ViewBag.Kind == "bible")
+                {
+                    <h2>기독영상</h2>
+                }
+                else if (ViewBag.Kind == "private")
+                {
+                    <h2>개인영상</h2>
+                }
+                else if (ViewBag.Kind == "blessing")
+                {
+                    <h2>축복송</h2>
+                }
+                else
+                {
+                    <h2>기타</h2>
+                }
+                
+                <p>...K subscribers</p>
+            </div>
+            <button class="subscribe-btn">...</button>
+        </div>
+        <div class="uploads">
+            @foreach (var item in Model)
+            {
+                int counter = ((int)item.sequenceNo % 14);
+                string formattedSequenceNo = counter.ToString("D3");
+                @*string imgURLPath = $"/images/ICON/music/music_{formattedSequenceNo}.webp";*@
+                string imgURLPath = $"https://img.youtube.com/vi/{@item.contentsURL}/hqdefault.jpg";
+                string contentsText = $"{item.sequenceNo}.{item.contentsText}";
+                <div class="video mission">
+                    <a onclick="playVideo('@item.contentsURL')">
+                        <img src=@imgURLPath alt="Profile Picture">
+                    </a>
+                    <div class="video-info" style="text-align: left;">
+                        <h4>
+                            <a href="https://www.youtube.com/watch?v=@item.contentsURL" target="_blank">@contentsText</a>
+                        </h4>
+                        <p> @item.Singer</p>
+                       @* <p> ...M views</p>*@
+                        @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+                        {
+                            <p>
+                                <a href="/PraiseHome/DeleteView?Id=@item.Id&Kind=@ViewBag.Kind">삭제(@ViewBag.Kind)</a> |
+                                <a href="/PraiseHome/ModifyView?Id=@item.Id&Kind=@ViewBag.Kind">수정(@ViewBag.Kind)</a>
+                            </p>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+    <div class="navbar">
+        <a href="/">Home</a>
+        <a href="/PraiseBranch/Index">Home(찬양)</a>
+        @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+        {
+            <a href="/PraiseHome/EnrollView?Kind=@ViewBag.Kind">찬양등록(@ViewBag.Kind)</a>
+        }
+    </div>
+
+    <script>
+        function playVideo(videoId) {
+            window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+        }
+    </script>
+
+
+</body>
+</html>
+
+
+   @*         - **기본 대표 이미지**: `https://img.youtube.com/vi/[비디오 ID]/default.jpg`
+    - **중간 크기 이미지**: `https://img.youtube.com/vi/[비디오 ID]/mqdefault.jpg`
+    - **고화질 이미지**: `https://img.youtube.com/vi/JsqWE6yZxRs/hqdefault.jpg`
+    - **최고 화질 이미지**: `https://img.youtube.com/vi/[비디오 ID]/maxresdefault.jpg`
+*@

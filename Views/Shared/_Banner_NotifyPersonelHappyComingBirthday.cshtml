@@ -1,0 +1,395 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Services
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Helpers;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IStudentPointGiftService StudentPointGiftService
+@inject IPresentPickService PresentPickService
+
+@{
+    // ✅ 실제 유저 정보
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+
+    // ✅ 쿠키 섹션 키(원하시면 유지)
+    var cookieKey = "BirthdayBanner_2025_WeekView";
+
+    // ✅ 노출 판단
+    bool showBanner = false;
+    int daysLeft = -1;
+    DateTime nextBirthday = DateTime.MinValue;
+
+    if (__UserInfos != null)
+    {
+        // 1) 공개 여부: 'h'면 아예 숨김
+        var publish = (__UserInfos.birthDay_PublishYN ?? "").Trim().ToLowerInvariant();
+        bool isHidden = (publish == "h");
+
+        // 2) 생일 유효성
+        bool hasBirth = (__UserInfos.bMonth >= 1 && __UserInfos.bMonth <= 12 && __UserInfos.bDay >= 1 && __UserInfos.bDay <= 31);
+
+        // 생일 선물은 학생만 대상이라 본인이 학생일 때만 보여 준다
+        bool isStudent = !string.IsNullOrWhiteSpace(__UserInfos.UserName)
+                          && await StudentPointGiftService.IsStudentAsync(__UserInfos.UserName);
+
+        if (!isHidden && hasBirth && isStudent)
+        {
+            var today = DateHelper.GetKoreaNow();
+            int year = today.Year;
+
+            try
+            {
+                var thisYearBirth = new DateTime(year, __UserInfos.bMonth, __UserInfos.bDay);
+
+                // 이미 지났으면 내년 생일로
+                nextBirthday = (thisYearBirth < today) ? thisYearBirth.AddYears(1) : thisYearBirth;
+
+                daysLeft = (int)Math.Ceiling((nextBirthday - today).TotalDays);
+
+                // ✅ 0~30일 이내면 노출
+                if (daysLeft >= 0 && daysLeft <= 30)
+                {
+                    showBanner = true;
+                }
+            }
+            catch
+            {
+                showBanner = false;
+            }
+        }
+    }
+
+    // ✅ 이미 고른 선물이 있으면(활성 1개) 안내 문구와 이동 경로를 바꾼다
+    PresentItemPick? myPick = showBanner ? await PresentPickService.GetMyBirthPickAsync(__UserInfos.UserId) : null;
+    bool alreadyPicked = myPick != null;
+
+    // ✅ 선물 고르기 링크
+    //    이 배너는 로그인한 본인의 생일 안내라, 선물은 통합 선물함에서 고른다.
+    //    남의 생일을 대신 골라 주는 길은 '다가오는 생일' 배너에 그대로 있다.
+    //    이미 골랐으면 통합 선물함(MyGiftBox3)에서 바꾸게 한다.
+    var targetUserId = __UserInfos?.UserId ?? "";
+    var giftPickUrl = alreadyPicked
+        ? "/StudentPointDashboard4/MyGiftBox3"
+        : (string.IsNullOrWhiteSpace(targetUserId) ? "#" : "/StudentPointDashboard4/GiftSelect?type=birth");
+
+    // ✅ 표시용 이름
+    var fullName = string.IsNullOrWhiteSpace(__UserInfos?.FullName) ? "친구" : __UserInfos.FullName.Trim();
+
+    // ✅ 표시용 생일 문자열
+    var birthText = (__UserInfos == null) ? "" : $"{__UserInfos.bMonth}월 {__UserInfos.bDay}일";
+
+    // ✅ “한 달 남았네요” 문구를 너무 과장되지 않게 처리
+    var monthLine =
+        (daysLeft <= 0) ? "오늘이 생일이에요!" :
+        (daysLeft == 1) ? "내일이 생일이에요!" :
+        (daysLeft <= 30) ? "한 달 안에 생일이네요!" :
+        "";
+}
+
+@if (showBanner)
+{
+    <style>
+        /* =========================
+                   🎂 Birthday D-30 Gift Banner (CREAM + GOLD THEME)
+                   - 나의 선물함 · 가족 합산 시상 카드와 같은 톤
+                   ========================= */
+
+        .bd30-wrap {
+            margin: 1.6rem 0 2.4rem;
+        }
+
+        .bd30-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 26px;
+            padding: 1.15rem 1.15rem 1.1rem;
+            border: 1px solid #fcd34d;
+            box-shadow: 0 2px 12px rgba(217,119,6,.10);
+            background: linear-gradient(135deg, #fffbeb, #fef3c7);
+            color: #78350f;
+        }
+
+            /* soft blobs */
+            .bd30-card::before,
+            .bd30-card::after {
+                content: "";
+                position: absolute;
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 0;
+                opacity: .95;
+            }
+
+            .bd30-card::before {
+                width: 340px;
+                height: 340px;
+                right: -160px;
+                top: -190px;
+                background: radial-gradient(circle at 30% 30%, rgba(252,211,77,0.30), rgba(255,255,255,0.0) 70%);
+            }
+
+            .bd30-card::after {
+                width: 420px;
+                height: 420px;
+                left: -240px;
+                bottom: -260px;
+                background: radial-gradient(circle at 35% 35%, rgba(217,119,6,0.14), rgba(255,255,255,0.0) 72%);
+            }
+
+        .bd30-inner {
+            position: relative;
+            z-index: 1;
+            border-radius: 20px;
+            padding: 1.05rem 1.05rem 0.95rem;
+        @*     background: rgba(255,255,255,0.72); *@
+          @*   border: 1px solid rgba(16,185,129,0.18); *@
+            backdrop-filter: blur(8px);
+        }
+
+        .bd30-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .bd30-titlebox {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        .bd30-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            display: grid;
+            place-items: center;
+            font-size: 1.75rem;
+            background: #fde68a;
+            color: #78350f;
+            border: 1px solid #f0c169;
+            box-shadow: 0 2px 8px rgba(217,119,6,.14);
+        }
+
+        .bd30-title {
+            font-weight: 950;
+            font-size: 1.08rem;
+            letter-spacing: 0.01em;
+            line-height: 1.2;
+            color: #78350f;
+        }
+
+        .bd30-subtitle {
+            margin-top: 4px;
+            font-weight: 800;
+            font-size: 0.88rem;
+            color: #92400e;
+            line-height: 1.35;
+        }
+
+        .bd30-hide {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .bd30-hidebtn {
+            border: 1px solid #f0c169;
+            background: #fff;
+            color: #92400e;
+            border-radius: 999px;
+            padding: 0.34rem 0.76rem;
+            font-size: 0.78rem;
+            font-weight: 900;
+            cursor: pointer;
+            transition: transform .12s ease, background .12s ease, border-color .12s ease;
+            white-space: nowrap;
+        }
+
+            .bd30-hidebtn:hover {
+                transform: translateY(-1px);
+                background: #fffdf3;
+                border-color: #d97706;
+            }
+
+        .bd30-body {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .bd30-msg {
+            flex: 1 1 420px;
+            min-width: 260px;
+            font-size: 0.98rem;
+            line-height: 1.58;
+            font-weight: 850;
+            color: #92400e;
+        }
+
+            .bd30-msg b {
+                color: #78350f;
+            }
+
+        .bd30-cta {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .bd30-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 950;
+            color: #92400e;
+            background: #fff;
+            border: 1px solid #fde68a;
+            white-space: nowrap;
+        }
+
+        .bd30-btn {
+            border: 1px solid #78350f;
+            cursor: pointer;
+            border-radius: 999px;
+            padding: 0.68rem 1.08rem;
+            font-size: 0.88rem;
+            font-weight: 950;
+            color: #fff;
+            background: #78350f;
+            box-shadow: 0 2px 8px rgba(120,53,15,.25);
+            transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+            white-space: nowrap;
+        }
+
+            .bd30-btn:hover {
+                transform: translateY(-1px);
+                background: #92400e;
+                box-shadow: 0 6px 16px rgba(120,53,15,.28);
+            }
+
+        .bd30-foot {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #f0c169;
+            color: #a16207;
+            font-size: 0.78rem;
+            font-weight: 750;
+            line-height: 1.35;
+        }
+
+        @@media (max-width: 640px) {
+            .bd30-card {
+                padding: 1.02rem;
+                border-radius: 22px;
+            }
+
+            .bd30-inner {
+                padding: 0.95rem;
+                border-radius: 18px;
+            }
+
+            .bd30-titlebox {
+                min-width: 0;
+            }
+
+            .bd30-icon {
+                width: 52px;
+                height: 52px;
+                border-radius: 16px;
+            }
+
+            .bd30-msg {
+                flex-basis: 100%;
+            }
+
+            .bd30-cta {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .bd30-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+
+    <div class="bd30-wrap js-global-cookie-section" data-cookie-key="@cookieKey">
+        <section class="bd30-card" aria-label="생일 30일 이내 선물 선택 안내">
+            <div class="bd30-inner">
+
+                <div class="bd30-top">
+                    <div class="bd30-titlebox">
+                        <div class="bd30-icon">🎂</div>
+                        <div>
+                            <div class="bd30-title">@fullName 님 안녕하세요</div>
+                            <div class="bd30-subtitle">
+                                @if (alreadyPicked)
+                                {
+                                    <text>생일 선물을 이미 골랐어요 · 선물함에서 바꿀 수 있어요 🎁</text>
+                                }
+                                else
+                                {
+                                    <text>생일이 가까워요! 선생님이 미리 준비할 수 있어요 ✨</text>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ 숨기기 버튼: 선언만(전역 스크립트에서 처리) -->
+                    <div class="bd30-hide">
+                        <button type="button" class="bd30-hidebtn js-global-cookie-hide-btn" data-hide="today">오늘만 안보기</button>
+                        <button type="button" class="bd30-hidebtn js-global-cookie-hide-btn" data-hide="1week">1주일 숨기기</button>
+                        <button type="button" class="bd30-hidebtn js-global-cookie-hide-btn" data-hide="3week">3주 숨기기</button>
+                    </div>
+                </div>
+
+                <div class="bd30-body">
+                    <div class="bd30-msg">
+                        <b>@fullName</b> 님 생일이 <b>@birthText</b> 이군요.<br />
+                        <b>@monthLine</b><br />
+                        축하드려요 🎉<br />
+                        @if (alreadyPicked)
+                        {
+                            <text>고른 선물: <b>@myPick!.ProductName</b> · @(myPick.IsPurchased ? "선생님이 선물을 준비하고 있어요" : "바꾸고 싶으면 선물함에서 변경할 수 있어요")</text>
+                        }
+                        else
+                        {
+                            <text>선물을 미리 선택해 주시면 <b>선생님이 미리 준비</b>해 드릴게요.</text>
+                        }
+                    </div>
+
+                    <div class="bd30-cta">
+                        <span class="bd30-chip">🎂 D-@daysLeft</span>
+                        <button type="button"
+                                class="bd30-btn"
+                                onclick="location.href='@giftPickUrl'">
+                            @(alreadyPicked ? "선물 변경하기 › →" : "선물 고르기 ›")
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bd30-foot">
+                    ※ 선물 선택은 언제든지 변경할 수 있어요.
+                </div>
+
+            </div>
+        </section>
+    </div>
+}

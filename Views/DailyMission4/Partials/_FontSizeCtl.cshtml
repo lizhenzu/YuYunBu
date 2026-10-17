@@ -1,0 +1,53 @@
+@*  ── 글자 크기 (말씀·퀴즈·기도·암송 상단 바 오른쪽) — DailyMission4 (2026-10-03) ──
+    · 예전 4단계(가·가·가·가) 대신 [가 −] [100%] [가 +] — 누를 때마다 10%씩 계속 줄이고 · 늘린다 (70% ~ 200%)
+    · 가운데 % 를 누르면 보통(100%)으로 돌아간다.
+    · 네 화면이 같은 저장 키(dm4Fs)를 쓴다 — 한 곳에서 바꾸면 모두 같이 바뀐다.
+      처음 열 때 DailyMission3 에서 고른 단계(dm3Fs: s·m·l·xl)가 있으면 그 크기에서 시작한다.
+    · 실제 확대는 ".qz .qzBody > …{ zoom: var(--dm3fs) }" 규칙이 한다 (상단 바·진행선·아래 미션 탭은 확대하지 않는다) *@
+<style>
+    .qz .qzFs { display: flex; align-items: stretch; border: 1px solid var(--rule, #E2E0DB); flex: 0 0 auto; }
+    .qz .qzFs button { font-family: inherit; background: none; border: 0; color: var(--dim2, #5C5F66); padding: 3px 9px; cursor: pointer; line-height: 1.35;
+                       font-size: 13px; font-weight: 700; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+    .qz .qzFs button:active { background: var(--rule, #E2E0DB); }
+    .qz .qzFs button[disabled] { opacity: .35; cursor: default; }
+    .qz .qzFs button.dn small, .qz .qzFs button.up small { font-size: 15px; margin-left: 2px; }
+    .qz .qzFs .pc { min-width: 46px; font-family: "Inter", sans-serif; font-weight: 500; font-size: 11.5px; color: var(--dim, #83868C);
+                    border-left: 1px solid var(--rule, #E2E0DB); border-right: 1px solid var(--rule, #E2E0DB); font-variant-numeric: tabular-nums; }
+    .qz .qzBody > :not(.qzBar):not(.qzProg):not(.qzNav) { zoom: var(--dm3fs, 1); }
+</style><div class="qzFs" role="group" aria-label="글자 크기">
+    <button type="button" class="dn" data-fs="-1" aria-label="글자 작게">가<small>−</small></button>
+    <button type="button" class="pc" data-fs="0" aria-label="글자 크기 보통으로">100%</button>
+    <button type="button" class="up" data-fs="1" aria-label="글자 크게">가<small>+</small></button>
+</div>
+<script>
+(function () {
+    var KEY = 'dm4Fs', MIN = 0.7, MAX = 2.0, STEP = 0.1;
+    var OLD = { s: 0.90, m: 1, l: 1.18, xl: 1.36 };   // DailyMission3 4단계 → 처음 시작 크기
+    function clamp(v) { return Math.min(MAX, Math.max(MIN, Math.round(v * 100) / 100)); }
+    function read() {
+        var v = NaN;
+        try { v = parseFloat(localStorage.getItem(KEY)); } catch (e) { }
+        if (isNaN(v)) { try { v = OLD[localStorage.getItem('dm3Fs')] || 1; } catch (e) { v = 1; } }
+        return clamp(v);
+    }
+    var cur = read();
+    function apply(v, save) {
+        cur = clamp(v);
+        document.documentElement.style.setProperty('--dm3fs', cur);
+        document.querySelectorAll('.qzFs').forEach(function (g) {
+            var pc = g.querySelector('.pc'), dn = g.querySelector('.dn'), up = g.querySelector('.up');
+            if (pc) pc.textContent = Math.round(cur * 100) + '%';
+            if (dn) dn.disabled = cur <= MIN + 0.001;
+            if (up) up.disabled = cur >= MAX - 0.001;
+        });
+        if (save) { try { localStorage.setItem(KEY, String(cur)); } catch (e) { } }
+    }
+    document.querySelectorAll('.qzFs button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var d = parseInt(b.dataset.fs, 10);
+            apply(d === 0 ? 1 : cur + d * STEP, true);
+        });
+    });
+    apply(cur, false);
+})();
+</script>

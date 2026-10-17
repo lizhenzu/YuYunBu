@@ -1,0 +1,1213 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.TodayCheckCompositeData
+@{
+    Layout = null;
+}
+
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var sessionValue = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    @{
+        // 페이지 타이틀 조합
+        var pageTitle = $"{ChurchName} {DepartmentName}";
+        var seoTitle = $"{ChurchName} {DepartmentName}";
+        var seoDescription = $"{ChurchName} {DepartmentName} 홈페이지입니다. 말씀 읽기, 공과, 찬양, 기도, 앨범 등 어린이를 위한 신앙 프로그램을 제공합니다.";
+        var seoKeywords = $"{ChurchName} {DepartmentName}, 유년부, 어린이부, 교회학교, 성경읽기, 도전 성경말씀, 찬양, 공과, 기도";
+    }
+
+    <!-- 기본 제목/설명 (검색엔진용) -->
+    <title>@seoTitle</title>
+    <meta name="description" content="@seoDescription" />
+    <meta name="keywords" content="@seoKeywords" />
+
+    <!-- 네이버 서치어드바이저 사이트 인증 -->
+    <!-- content 값은 네이버 Search Advisor에서 발급받은 값으로 반드시 교체하세요 -->
+    <meta name="naver-site-verification" content="bb98fab82831db1dbb0439fa1686f7743f808191" />
+
+
+    <!-- Canonical URL (대표 주소) -->
+    <link rel="canonical" href="@ViewBag.FullURL" />
+
+    <!-- SNS/카카오톡 공유용 OG 태그 -->
+    <meta property="og:title" content="@seoTitle">
+    <meta property="og:description" content="@seoDescription">
+    <meta property="og:image" content="@ViewBag.FullURL/images/home/welcome/welcome_01.webp">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(function (registration) {
+                    console.log('Service Worker registered with scope:', registration.scope);
+                }).catch(function (error) {
+                    console.log('Service Worker registration failed:', error);
+                });
+        }
+    </script>
+
+    
+    <style>
+        :root {
+            --primary: #2f8f6a; /* 메인 깊은 그린(티리안 그린 느낌) */
+            --primary-soft: #d9f3ea; /* 아주 연한 민트/그린 */
+            --secondary: #ffc85c; /* 포인트용 따뜻한 옐로우 */
+            --bg: #eefaf5; /* 전체 배경: 힐링 느낌 연초록 톤 */
+            --card-bg: #ffffff;
+            --text-main: #243528; /* 살짝 녹색이 도는 진한 텍스트 */
+            --text-soft: #5c715f;
+            --accent-pink: #ff7fa5; /* 포인트 분홍 (너무 튀지 않게만 유지) */
+            --accent-green: #34b38a; /* 버튼용 산뜻한 그린 */
+            --radius-lg: 18px;
+            --shadow-soft: 0 8px 18px rgba(15, 35, 20, 0.08);
+        }
+
+
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(180deg, #e6f6f0 0%, #ffffff 45%, #f9fff5 100%);
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        header {
+            background: radial-gradient(circle at top left, #5bbf8c 0, #2f8f6a 40%, #5bbf8c 100%);
+            color: #fff;
+            padding: 1.5rem 1.2rem 1.8rem;
+            /*   position: sticky; */
+            top: 0;
+            z-index: 20;
+            box-shadow: 0 4px 14px rgba(8, 38, 20, 0.25);
+        }
+
+
+        .header-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column; /* ⭐ 세로 정렬 */
+            align-items: center; /* ⭐ 가운데 정렬 */
+            justify-content: center;
+            text-align: center;
+            gap: 1rem;
+        }
+
+
+        .logo-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            flex-shrink: 0;
+        }
+
+        .header-text {
+            text-align: center; /* 텍스트 가운데 */
+            display: flex;
+            flex-direction: column; /* 요소 세로 배치 */
+            align-items: center; /* ⭐ 이미지(아바타) 포함 모두 가운데 */
+            justify-content: center;
+        }
+
+            .header-text h1 h5 {
+                font-size: 1.6rem;
+                font-weight: 800;
+                letter-spacing: 0.02em;
+                margin-bottom: 0.2rem;
+                text-align: center;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .header-text p {
+                font-size: 0.9rem;
+                opacity: 0.95;
+                text-align: center;
+                align-items: center;
+                justify-content: center;
+            }
+
+        .tagline {
+            margin-top: 0.4rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.7rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            font-size: 0.78rem;
+        }
+
+        .main-wrapper {
+            max-width: 1100px;
+            margin: 1.5rem auto 3rem;
+            padding: 0 1rem 1rem;
+        }
+
+        /* Quick nav */
+        .quick-nav-wrapper {
+            margin-bottom: 1.5rem;
+        }
+
+        .quick-nav-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            color: var(--text-soft);
+        }
+
+        .quick-nav {
+            display: flex;
+            gap: 0.4rem;
+            overflow-x: auto;
+            padding: 0.5rem 0.1rem 0.3rem;
+            scrollbar-width: thin;
+        }
+
+            .quick-nav::-webkit-scrollbar {
+                height: 5px;
+            }
+
+            .quick-nav::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.15);
+                border-radius: 999px;
+            }
+
+        .quick-nav-btn {
+            flex: 0 0 auto;
+            padding: 0.45rem 0.75rem;
+            font-size: 1.08rem;
+            border-radius: 999px;
+            border: none;
+            background: #ffffff;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+            .quick-nav-btn span.emoji {
+                font-size: 1rem;
+            }
+
+            .quick-nav-btn:hover {
+                background: var(--primary-soft);
+            }
+
+        /* Sections & cards */
+        section {
+            margin-bottom: 1.8rem;
+        }
+
+        .section-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-soft);
+            margin-bottom: 0.15rem;
+        }
+
+        h1.section-title {
+            font-size: 1.45rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            padding : 10px;
+            border-radius: 10px;
+            gap: 0.4rem;
+        }
+
+        h2.section-title {
+            font-size: 1.15rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            padding : 10px;
+            border-radius: 10px;
+            gap: 0.4rem;
+        }
+
+        h1 .title-tag {
+            font-size: 0.75rem;
+            padding: 0.1rem 0.6rem;
+            border-radius: 999px;
+            background: var(--primary-soft);
+            color: #1f2933;
+        }
+
+        h2 .title-tag {
+            font-size: 0.75rem;
+            padding: 0.1rem 0.6rem;
+            border-radius: 999px;
+            background: var(--primary-soft);
+            color: #1f2933;
+        }
+
+        .section-description {
+            font-size: 0.85rem;
+            color: var(--text-soft);
+            margin-bottom: 0.75rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 0.85rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 0.9rem 0.95rem 0.95rem;
+            box-shadow: var(--shadow-soft);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.8), transparent 55%);
+                opacity: 0.7;
+                pointer-events: none;
+            }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #d9f3ea, #b8e4ce);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+
+        .card-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+        }
+
+        .card-text {
+            font-size: 0.83rem;
+            color: var(--text-soft);
+            margin-bottom: 0.6rem;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-bottom: 0.55rem;
+        }
+
+        .badge {
+            font-size: 0.73rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            background: #e4f3eb; /* 연한 그린 */
+            color: #355343;
+        }
+
+            .badge.badge-hero {
+                background: #ffe9f1;
+                color: #c14c7b;
+            }
+
+        .card-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .btn {
+            border-radius: 999px;
+            border: none;
+            font-size: 0.78rem;
+            padding: 0.35rem 0.65rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: #f3f4ff;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(99, 115, 255, 0.4);
+        }
+
+        .btn-soft-green {
+            background: var(--accent-green);
+            color: #fff;
+        }
+
+
+        .btn-soft-pink {
+            background: var(--accent-pink);
+            color: #fff;
+        }
+
+        .btn span.emoji {
+            font-size: 1rem;
+        }
+
+        .notice-highlight,
+        .board-highlight {
+            background: #fff4d9; /* 따뜻한 하이라이트 배경 */
+            border-left: 6px solid #ffb347; /* 강조 표시 */
+            padding: 0.7rem 1rem;
+            margin: 0.5rem 0 0.8rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #1f4633;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .my-message-highlight {
+            background: #fff4d9; /* 따뜻한 하이라이트 배경 */
+            border-left: 6px solid #ffb347; /* 강조 표시 */
+            padding: 0.8rem 1rem;
+            margin: 0.8rem 0 1rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #7a4b00; /* 눈에 띄는 강조 텍스트 */
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        }
+
+        footer {
+            margin-top: 2rem;
+            padding: 1.5rem 1rem 2rem;
+            background: #e9f5ef; /* 연한 힐링 그린 */
+            border-top: 1px solid #cde5d8;
+            font-size: 0.8rem;
+            color: var(--text-soft);
+        }
+
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .footer-shortcuts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-top: 0.3rem;
+        }
+
+        .footer-chip {
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            border: 1px dashed rgba(102, 126, 255, 0.5);
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .top-btn {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            border-radius: 999px;
+            border: none;
+            padding: 0.45rem 0.7rem;
+            font-size: 0.8rem;
+            background: #ffffff;
+            box-shadow: var(--shadow-soft);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+            opacity: 0.95;
+        }
+
+        @@media (min-width: 768px) {
+            header {
+                padding: 1.6rem 1.5rem 1.9rem;
+            }
+
+            .header-text h1 {
+                font-size: 1.9rem;
+            }
+
+            .header-text p {
+                font-size: 1rem;
+            }
+
+            .main-wrapper {
+                padding: 0 1.5rem 2rem;
+            }
+        }
+    </style>
+
+    <style>
+        .mission-status-box {
+            background: #e6f6f0; /* 힐링 초록 배경 */
+            border: 1px solid #cde7db;
+            padding: 1rem;
+            border-radius: 14px;
+            margin: 0.8rem 0 1.2rem;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+        }
+
+        .mission-item {
+            padding: 0.45rem 0.7rem;
+            margin-bottom: 0.4rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+            .mission-item:last-child {
+                margin-bottom: 0;
+            }
+
+            /* 완료 */
+            .mission-item.done {
+                background: #d0f3db; /* 부드러운 초록 */
+                color: #236b3d;
+                border-left: 6px solid #2f8f6a;
+            }
+
+            /* 미완료 */
+            .mission-item.not-done {
+                background: #fff3e6; /* 연한 오렌지 */
+                color: #a15a0a;
+                border-left: 6px solid #ffb347;
+            }
+
+    </style>
+
+    <style>
+
+        .bible-progress-box {
+            background: #e6f6f0; /* 힐링 초록 배경 */
+            border: 1px solid #cde7db;
+            padding: 0.9rem 1rem;
+            border-radius: 14px;
+            margin: 0.8rem 0 1.2rem;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+            font-size: 0.9rem;
+            color: #264735;
+        }
+
+        .bible-progress-header {
+            margin-bottom: 0.6rem;
+            font-weight: 700;
+        }
+
+        .bible-progress-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .bible-progress-bar {
+            flex: 1;
+            height: 10px;
+            border-radius: 999px;
+            background: #d5e8dd;
+            overflow: hidden;
+        }
+
+        .bible-progress-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #34b38a, #2f8f6a);
+            transition: width 0.4s ease;
+        }
+
+        .bible-progress-percent {
+            min-width: 2.5rem;
+            text-align: right;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #246247;
+        }
+
+    </style>
+
+    <style>
+
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .profile-avatar img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+    </style>
+
+    <style>
+        .card-header-text {
+            display: flex;
+            gap: 0.15rem;
+        }
+
+        .mission-status-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.55rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+            /* 완료 (말씀 읽기) */
+            .mission-status-badge.done {
+                background: #d0f3db;
+                color: #236b3d;
+                border: 1px solid #2f8f6a;
+            }
+
+            /* 미완료 (퀴즈/암송/기도) */
+            .mission-status-badge.not-done {
+                background: #fff3e6;
+                color: #a15a0a;
+                border: 1px solid #ffb347;
+            }
+
+            .mission-status-badge.fail {
+                background: #ffe4e4; /* 연한 빨간 배경 */
+                color: #b3261e; /* 진한 빨간 글자 */
+                border: 1px solid #ff6b6b; /* 살짝 강한 빨간 테두리 */
+            }
+    </style>
+
+    <style>
+        @@media (max-width: 640px) {
+            /* header 전체를 세로 정렬 */
+            .header-inner {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+            /* 프로필 박스를 세로 3단처럼 */
+            .profile-box {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 0.35rem;
+                width: 100%;
+            }
+
+            .profile-avatar {
+                align-items: center;
+                width: 120px;
+                height: 120px;
+            }
+
+            .profile-caption {
+                font-size: 0.75rem;
+                margin-top: 0.2rem;
+                opacity: 0.9;
+            }
+        }
+    </style>
+
+    <style>
+        .mission-total-point {
+            margin: 0.7rem 0 1.2rem;
+            padding: 0.75rem 1rem;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ffe9f1, #fff4d9);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #7a3b00;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        }
+
+            .mission-total-point .emoji {
+                font-size: 1.1rem;
+            }
+    </style>
+    <style>
+
+        .section-title.clickable {
+            cursor: pointer;
+            position: relative;
+            transition: color .25s ease;
+        }
+
+            .section-title.clickable:hover {
+                color: #1d5e46; /* 살짝 더 진한 그린톤 */
+            }
+
+            .section-title.clickable::after {
+                content: "➡️";
+                font-size: 1.1rem;
+                margin-left: 0.45rem;
+                opacity: 0.8;
+                transition: transform .25s ease, opacity .25s ease;
+            }
+
+            .section-title.clickable:hover::after {
+                transform: translateX(4px);
+                opacity: 1;
+            }
+    </style>
+
+    <style>
+        @@media (max-width: 640px) {
+            .quick-nav {
+                flex-wrap: wrap; /* 여러 줄로 줄바꿈 */
+                overflow-x: visible; /* 가로 스크롤 제거 */
+            }
+
+            .quick-nav-btn {
+                flex: 0 0 auto; /* ⭐ 텍스트 길이만큼만 너비 */
+                padding: 0.55rem; /* ⭐ 여백 확 줄이기 */
+                font-size: 1.08rem; /* 필요하면 0.75로 더 줄여도됨 */
+            }
+
+                .quick-nav-btn .emoji {
+                    margin-right: 0.15rem; /* 아이콘과 글자 간격 살짝만 */
+                }
+        }
+    </style>
+
+    <style>
+        <style >
+        /* 전체 텍스트 선택 방지 (PC + 모바일) */
+        html, body {
+            -webkit-user-select: none; /* 크롬/사파리/모바일 */
+            -moz-user-select: none; /* 파이어폭스 */
+            -ms-user-select: none; /* IE/엣지 구버전 */
+            user-select: none; /* 표준 */
+            -webkit-touch-callout: none; /* iOS 롱클릭 메뉴 방지 */
+        }
+
+        /* 혹시 입력창에서는 선택 가능하게 하고 싶으면 이렇게 예외 처리 */
+        input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+            -webkit-touch-callout: default !important;
+        }
+    </style>
+
+    </style>
+
+    <style>
+
+        .notice-inline {
+            margin: 0.45rem 0 0.7rem;
+            padding: 0.45rem 0.6rem;
+            border-radius: 10px;
+            background: #fff7e6; /* 카드 안이라 조금 더 부드럽게 */
+            border: 1px dashed #ffb347; /* 공지 느낌 나는 점선 테두리 */
+            font-size: 0.9rem;
+            color: #7a4b00;
+            display: flex;
+            font-weight: 700;
+            align-items: flex-start;
+            gap: 0.35rem;
+        }
+
+            .notice-inline .label {
+                font-weight: 700;
+                margin-right: 0.15rem;
+            }
+
+            .notice-inline .text {
+                flex: 1;
+                word-break: break-word;
+            }
+
+    </style>
+
+  
+    <script>
+        // 우클릭 메뉴 막기
+        // document.addEventListener('contextmenu', function (e) {
+        //     e.preventDefault();
+        // });
+
+        // 드래그 선택 시작 자체 막기 (일부 브라우저용)
+        document.addEventListener('selectstart', function (e) {
+            e.preventDefault();
+        });
+
+        // copy / cut / paste 이벤트 막기
+        ['copy', 'cut', 'paste'].forEach(function (evt) {
+            document.addEventListener(evt, function (e) {
+                e.preventDefault();
+            });
+        });
+
+        // 단축키 Ctrl + C / Ctrl + X / Ctrl + V 등 기본동작 막기 (원하시면 사용)
+        document.addEventListener('keydown', function (e) {
+            if (e.ctrlKey || e.metaKey) {
+                const key = e.key.toLowerCase();
+                if (key === 'c' || key === 'x' || key === 'v') {
+                    e.preventDefault();
+                }
+            }
+        });
+    </script>
+
+    <style>
+        .formatted-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+    </style>
+    <style>
+
+        .message-hint {
+    font-size: 0.75rem !important;
+    color: #a6757c !important;     /* 은은한 보라빛 톤 */
+    background: #fff0f5;           /* 가벼운 핑크톤 배경 */
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    text-align: center;
+    margin-bottom: 0.4rem;         /* 카드와의 간격 */
+    border: 1px dashed #ff89b3;    /* 포인트 테두리 */
+    opacity: 0.85;
+}
+/* 💌 메시지 카드 - home-summary 영역과 확실히 구분 */
+.message-card {
+    background: #fef6fa !important;      /* 은은한 핑크톤 배경 */
+    border: 2px dashed #ff89b3 !important; /* 진한 핑크 점선 테두리 */
+    padding: 0.7rem 0.9rem !important;
+    border-radius: 12px !important;
+    margin-top: 1.2rem !important;       /* 주변 요소와 간격 확보 */
+    font-size: 0.9rem !important;
+    color: #7a3d66 !important;           /* 텍스트도 분위기 맞춤 */
+    line-height: 1.4 !important;
+    box-shadow: 0px 2px 8px rgba(200, 50, 100, 0.08); /* 카드 느낌 */
+}
+
+.message-card .title {
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    margin-bottom: 0.3rem !important;
+}
+
+.message-card .body {
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+}
+
+.message-card .footer {
+    font-size: 0.75rem !important;
+    color: #7a3d66 !important;
+    text-align: right !important;
+    margin-top: 0.35rem !important;
+}
+
+
+    </style>
+    <style>
+        .blink-slow {
+  animation: blinkSlow 1.8s ease-in-out infinite;
+}
+
+/* 천천히 투명해졌다가 다시 나타나는 애니메이션 */
+@@keyframes blinkSlow {
+  0%   { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 1; }
+}
+    </style>
+    <style>
+
+        .header-cta {
+            display: flex;
+            justify-content: center;
+            margin: 14px 0 8px;
+        }
+
+        .header-cta-btn {
+            width: 100%;
+            max-width: 520px;
+            border: 0;
+            cursor: pointer;
+            text-align: left;
+            padding: 54px 16px;
+            border-radius: 18px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #1F6F5B 0%, #2f8f6a 45%, #5bbf8c 100%);
+            box-shadow: 0 12px 26px rgba(18,48,41,.18);
+            transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            align-items: center;
+            gap: 2px 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            /* 은은한 하이라이트 (촌스럽지 않게) */
+            .header-cta-btn::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at 25% 15%, rgba(255,255,255,.28), rgba(255,255,255,0) 55%);
+                pointer-events: none;
+            }
+
+            .header-cta-btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 16px 34px rgba(18,48,41,.22);
+                filter: saturate(1.05);
+            }
+
+            .header-cta-btn:active {
+                transform: translateY(0);
+                box-shadow: 0 10px 22px rgba(18,48,41,.18);
+            }
+
+        .cta-text {
+            grid-column: 1;
+            grid-row: 1;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: .2px;
+        }
+
+        .cta-sub {
+            grid-column: 1;
+            grid-row: 2;
+            font-size: 13px;
+            font-weight: 700;
+            opacity: .92;
+        }
+
+        .cta-arrow {
+            grid-column: 2;
+            grid-row: 1 / span 2;
+            font-size: 22px;
+            font-weight: 900;
+            opacity: .95;
+            padding-left: 6px;
+        }
+
+        /* 모바일에서 너무 커지지 않게 */
+        @@media (max-width:480px) {
+            .header-cta-btn
+
+        {
+            padding: 53px 14px;
+            border-radius: 16px;
+        }
+
+        .cta-text {
+            font-size: 17px;
+        }
+
+        .cta-sub {
+            font-size: 12.5px;
+        }
+
+        }
+    </style>
+
+    <style>
+
+        /* 🌸 웜 코랄 레드 */
+.red-soft{
+    background: linear-gradient(
+        135deg,
+        #C94A4A 0%,   /* 로즈 레드 */
+        #D86060 45%,  /* 코랄 레드 */
+        #E88A8A 100%  /* 소프트 핑크 레드 */
+    );
+    color:#fff;
+    box-shadow: 0 12px 26px rgba(201,74,74,.28);
+}
+
+.red-soft:hover{
+    filter: saturate(1.05) brightness(1.02);
+    box-shadow: 0 16px 34px rgba(201,74,74,.34);
+}
+
+/* 하이라이트 */
+.red-soft::before{
+    background: radial-gradient(
+        circle at 25% 15%,
+        rgba(255,255,255,.30),
+        rgba(255,255,255,0) 55%
+    );
+}
+
+    </style>
+
+</head>
+<body>
+
+    @await Html.PartialAsync("_Publish_Homeontents_Header_N")
+
+    <!-- ✅ 헤더 바로 아래: 상단 큰 버튼 -->
+<div class="header-cta">
+    <button class="header-cta-btn red-soft" onclick="location.href='/Home/Index';">
+        <span class="cta-text">새로운 화면으로 이동하기</span>
+        <span class="cta-sub">더 간단하고 보기 편하게</span>
+        <span class="cta-arrow">→</span>
+    </button>
+</div>
+
+
+
+    <main class="main-wrapper">
+        <!-- 빠른 이동 -->
+        @await Html.PartialAsync("_Home_QuickLink")
+
+        
+         
+        @await Html.PartialAsync("_Banner_PresentDashboard")
+                 
+   
+ 
+
+      
+        <!-- 4. 도전 성경 66권 완독 -->
+   
+
+ 
+
+        <!-- 12. 생활영어 -->
+        <section id="english">
+            <h1 class="section-title btn-soft-green">🗣️ 생활영어</h1>
+            <p class="section-description">말씀과 함께 쉽게 외울 수 있는 생활 영어를 배워요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏠</div>
+                        <div class="card-title">메인 이동</div>
+                    </div>
+                    <p class="card-text">
+                        오늘 배울 생활 영어 표현을 한눈에 모아 놓은 메인 페이지예요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/Main -->
+                        <button class="btn " onclick="location.href='/Shorts/Main';">
+                            <span class="emoji">▶️</span><span>메인</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🧒</div>
+                        <div class="card-title">어린이 영어</div>
+                    </div>
+                    <p class="card-text">
+                        초등학생 눈높이에 맞춘 짧고 쉬운 영어 표현을 배워요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/Kids -->
+                        <button class="btn" onclick="location.href='/Shorts/Index?param=Child';">
+                            <span class="emoji">📘</span><span>어린이 영어 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📗</div>
+                        <div class="card-title">일반 영어</div>
+                    </div>
+                    <p class="card-text">
+                        부모님도 함께 볼 수 있는
+                        조금 더 긴 영어 표현이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/General -->
+                        <button class="btn" onclick="location.href='/Shorts/Index?param=Adult';">
+                            <span class="emoji">📗</span><span>일반 영어 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+     
+
+        <!-- 18. 기타 공간 & 핫플레이스 -->
+        <section id="etc">
+            <h1 class="section-title btn-soft-green">⭐ 기타 공간 & 핫플레이스</h1>
+            <p class="section-description">다른 재미있는 링크와 추천 공간들을 모아 두었어요.</p>
+
+            <div class="card-grid">
+              
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📌</div>
+                        <div class="card-title">핫플레이스</div>
+                    </div>
+                    <p class="card-text">
+                        요즘 우리 반에서 인기 있는 컨텐츠를
+                        모아 보여주는 공간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Etc/Hot -->
+                        <button class="btn" onclick="location.href='/Places/Main';">
+                            <span class="emoji">🔥</span><span>핫플레이스 보기</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💪</div>
+                        <div class="card-title">생활운동</div>
+                    </div>
+                    <p class="card-text">
+                        말씀대로 살아보기 위한
+                        작은 실천들을 모아 놓았어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Life12 -->
+                        <button class="btn" onclick="location.href='/Fit';">
+                            <span class="emoji">🚶</span><span>생활운동 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚡</div>
+                        <div class="card-title">유용한기능</div>
+                    </div>
+                    <p class="card-text">
+                        핸드폰에 바로가기 설치해 보세요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Life12 -->
+                        <button class="btn" onclick="location.href='/Home/HowToInstall';">
+                            <span class="emoji">🚶</span><span>설치가이드 보기</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚡</div>
+                        <div class="card-title">기존 화면</div>
+                    </div>
+                    <p class="card-text">
+                        기존 화면으로 이동합니다.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Life12 -->
+                        <button class="btn" onclick="location.href='/Home/IndexOld';">
+                            <span class="emoji">🚶</span><span>기존화면 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+
+            </div>
+        </section>
+
+  
+
+
+
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <div>© 우리 반 믿음 포털 · 초등부 어린이들을 위한 말씀 & 기도 & 찬양 공간</div>
+            <div class="footer-shortcuts">
+                <div class="footer-chip" onclick="location.hash='#top'">⬆️ 맨 위로</div>
+                <div class="footer-chip" onclick="location.hash='#challenge'">🔥 @ConstatsCommon.MainKeyTitle</div>
+                <div class="footer-chip" onclick="location.hash='#bible66'">📚 @ConstatsCommon.ReadBibleAllTitleButton</div>
+                <div class="footer-chip" onclick="location.hash='#album'">📸 사진첩</div>
+                <div class="footer-chip" onclick="location.hash='#prayer-click'">🙏 기도 똑딱이</div>
+            </div>
+        </div>
+    </footer>
+
+    <button class="top-btn" onclick="location.hash='#top'">
+        ⬆️ <span>TOP</span>
+    </button>
+
+   <script src="/js/GlobalCookie.js"></script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 유형 선택 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 주소는 그대로.  주관식 · O/X 는 예전처럼 숨겨 둔다(아래 주석을 풀면 다시 보인다)
+    · 이전 화면은 BranchQuestionType.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string whenRaw = ViewBag.WhenDate as string ?? "";
+    DateTime when;
+    bool hasWhen = DateTime.TryParse(whenRaw, out when);
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>퀴즈 유형 선택</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/Index">퀴즈</a><span class="sep">›</span>유형</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k">NEW QUIZ</div>
+    <h1 class="qb-h1">퀴즈 유형 선택</h1>
+    <div class="qb-sub">출제할 퀴즈 유형을 선택해 주세요</div>
+
+    @if (hasWhen)
+    {
+        <div class="qb-date"><span class="c"><small>@(when.Month)월</small><b>@when.Day</b></span><span class="t">출제일<b>@when.ToString("M월 d일") @(dayKor[(int)when.DayOfWeek])요일</b></span></div>
+    }
+
+    <div class="qb-sec">유형</div>
+    <a class="qb-row" href="/Question/CreateQuizBlank?QuestionType=o&WhenDate=@whenRaw">
+        <span class="n">01</span>
+        <span class="t"><b>객관식 퀴즈</b><small>4개의 보기 중 정답을 고르는 문제</small></span>
+        <span class="g">›</span>
+    </a>
+
+    @* 주관식, OX 퀴즈 — 필요시 주석 해제
+    <a class="qb-row" href="/Question/CreateQuizBlank?QuestionType=s&WhenDate=@whenRaw">
+        <span class="n">02</span>
+        <span class="t"><b>주관식 퀴즈</b><small>직접 답을 입력하는 서술형 문제</small></span>
+        <span class="g">›</span>
+    </a>
+    <a class="qb-row" href="/Question/CreateQuizBlank?QuestionType=a&WhenDate=@whenRaw">
+        <span class="n">03</span>
+        <span class="t"><b>O/X 퀴즈</b><small>맞다 또는 틀리다를 판단하는 문제</small></span>
+        <span class="g">›</span>
+    </a>
+    *@
+
+    <div class="qb-ft">
+        <span>퀴즈 출제</span>
+        <span><a href="/Question/Index">퀴즈 달력</a><a href="#" onclick="history.back(); return false;">뒤로</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+</body>
+</html>

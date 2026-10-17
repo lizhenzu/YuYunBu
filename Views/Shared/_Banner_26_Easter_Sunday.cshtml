@@ -1,0 +1,540 @@
+﻿@* Views/Shared/_Banner_27_Easter.cshtml *@
+
+<style>
+    .ea-banner-root,
+    .ea-banner-root * {
+        box-sizing: border-box;
+    }
+
+    .ea-banner-root {
+        width: 100%;
+        padding: 10px 0;
+        font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    .ea-banner-link {
+        display: block;
+        width: 100%;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .ea-banner-wrapper {
+        width: 100%;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(108deg, #1a0a3e 0%, #3b1572 16%, #7c3fa0 30%, #c06090 44%, #e8935a 58%, #f5c540 75%, #fef5d0 100%);
+        min-height: 220px;
+        border-radius: 0;
+        box-shadow: 0 30px 80px rgba(2,6,23,.18), 0 12px 28px rgba(2,6,23,.12);
+    }
+
+    /* Atmospheric glow layers */
+    .ea-glow-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
+
+        .ea-glow-layer::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 55% 70% at 68% 33%, rgba(255,220,80,0.55) 0%, transparent 65%), radial-gradient(ellipse 30% 40% at 82% 22%, rgba(255,175,40,0.38) 0%, transparent 55%);
+        }
+
+        .ea-glow-layer::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse 70% 35% at 50% 0%, rgba(180,120,255,0.22) 0%, transparent 60%), radial-gradient(ellipse 48% 60% at 0% 42%, rgba(18,5,58,0.6) 0%, transparent 55%);
+        }
+
+    /* SVG light rays — sits above glow, below hills/objects */
+    .ea-rays-svg {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* Hill silhouettes */
+    .ea-hills {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 55%;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    .ea-hill {
+        position: absolute;
+        bottom: 0;
+        border-radius: 50% 50% 0 0;
+    }
+
+    .ea-hill-1 {
+        left: -8%;
+        width: 50%;
+        height: 65%;
+        background: linear-gradient(180deg, rgba(30,10,62,0.88) 0%, rgba(12,3,30,0.96) 100%);
+    }
+
+    .ea-hill-2 {
+        left: 22%;
+        width: 46%;
+        height: 80%;
+        background: linear-gradient(180deg, rgba(42,14,80,0.82) 0%, rgba(18,5,40,0.94) 100%);
+    }
+
+    .ea-hill-3 {
+        left: 48%;
+        width: 55%;
+        height: 58%;
+        background: linear-gradient(180deg, rgba(75,42,28,0.72) 0%, rgba(40,18,8,0.9) 100%);
+    }
+
+    .ea-hill-4 {
+        right: -5%;
+        width: 35%;
+        height: 44%;
+        background: linear-gradient(180deg, rgba(95,60,30,0.62) 0%, rgba(60,30,10,0.82) 100%);
+    }
+
+    /* Golden ground mist */
+    .ea-mist {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 22%;
+        background: linear-gradient(0deg, rgba(255,205,70,0.42) 0%, rgba(255,185,50,0.18) 45%, transparent 100%);
+        pointer-events: none;
+        z-index: 3;
+    }
+
+    /* Solitary empty cross */
+    .ea-cross-wrap {
+        position: absolute;
+        left: 20%;
+        bottom: 28%;
+        z-index: 5;
+        pointer-events: none;
+        filter: drop-shadow(0 0 16px rgba(255,210,50,0.75)) drop-shadow(0 0 40px rgba(255,170,20,0.3));
+    }
+
+    .ea-cross-beam {
+        background: rgba(18, 6, 46, 0.93);
+        border-radius: 1.5px;
+    }
+
+    .ea-cross-v-main {
+        width: 7px;
+        height: 90px;
+        position: relative;
+        margin: 0 auto;
+    }
+
+    .ea-cross-h-main {
+        position: absolute;
+        width: 46px;
+        height: 6px;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    /* Empty tomb */
+    .ea-tomb-wrap {
+        position: absolute;
+        right: 6%;
+        bottom: 16%;
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* Easter lily cluster */
+    .ea-lily-wrap {
+        position: absolute;
+        left: 8%;
+        bottom: 14%;
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* Dove */
+    .ea-dove-wrap {
+        position: absolute;
+        right: 28%;
+        top: 11%;
+        z-index: 6;
+        pointer-events: none;
+        opacity: 0.78;
+    }
+
+    /* Church info */
+    .ea-church-info {
+        position: absolute;
+        top: 8%;
+        right: 4%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 10;
+    }
+
+    .ea-church-sub {
+        font-size: 7px;
+        color: rgba(255, 236, 185, 0.78);
+        letter-spacing: 0.5px;
+        text-align: right;
+        line-height: 1.3;
+        font-weight: 400;
+    }
+
+    .ea-church-name {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 22px;
+        font-weight: 900;
+        color: rgba(255, 248, 220, 0.96);
+        letter-spacing: -1px;
+        text-shadow: 0 1px 8px rgba(0,0,0,0.28);
+    }
+
+    .ea-logo-icon {
+        width: 36px;
+        height: 36px;
+        position: relative;
+        flex: 0 0 auto;
+    }
+
+        .ea-logo-icon svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+    /* Main title */
+    .ea-title-area {
+        position: absolute;
+        top: 10%;
+        left: 5%;
+        z-index: 10;
+    }
+
+    .ea-title-eyebrow {
+        font-family: 'Noto Sans KR', sans-serif;
+        font-size: 11px;
+        font-weight: 400;
+        color: rgba(255, 228, 135, 0.82);
+        letter-spacing: 4px;
+        margin-bottom: 4px;
+    }
+
+    .ea-title-main {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 54px;
+        font-weight: 900;
+        color: #fffae6;
+        line-height: 1.05;
+        letter-spacing: -2px;
+        text-shadow: 0 2px 18px rgba(190,120,8,0.5), 0 0 55px rgba(255,195,35,0.22);
+        font-style: italic;
+    }
+
+    .ea-title-sub {
+        font-family: 'Noto Serif KR', serif;
+        font-size: 28px;
+        font-weight: 700;
+        color: rgba(255, 234, 155, 0.93);
+        letter-spacing: -0.5px;
+        margin-top: 0;
+        text-shadow: 0 1px 10px rgba(150,85,0,0.42);
+    }
+
+    /* Date & venue info */
+    .ea-info-line {
+        position: absolute;
+        bottom: 9%;
+        left: 0;
+        right: 0;
+        text-align: center;
+        z-index: 10;
+        padding: 0 16px;
+    }
+
+    .ea-info-text {
+        font-family: 'Noto Sans KR', sans-serif;
+        font-size: 14px;
+        font-weight: 400;
+        color: rgba(255, 240, 192, 0.95);
+        letter-spacing: 2px;
+        text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+    }
+
+        .ea-info-text .ea-date {
+            font-family: 'Noto Serif KR', serif;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: 0;
+            color: #ffe450;
+            text-shadow: 0 0 14px rgba(255,215,30,0.55);
+        }
+
+    /* Grain texture overlay */
+    .ea-grain {
+        position: absolute;
+        inset: 0;
+        opacity: 0.055;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+        background-size: 128px 128px;
+    }
+
+    .ea-ink-edge {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        box-shadow: inset 0 0 60px rgba(18,4,55,0.28), inset 0 0 120px rgba(8,2,28,0.14);
+    }
+
+    @@media (max-width: 768px) {
+        .ea-banner-wrapper {
+            min-height: 180px;
+        }
+
+        .ea-title-main {
+            font-size: 30px;
+        }
+
+        .ea-title-sub {
+            font-size: 18px;
+        }
+
+        .ea-title-eyebrow {
+            font-size: 9px;
+            letter-spacing: 2px;
+        }
+
+        .ea-church-name {
+            font-size: 14px;
+        }
+
+        .ea-church-sub {
+            font-size: 5px;
+        }
+
+        .ea-info-text {
+            font-size: 10px;
+            letter-spacing: 1px;
+        }
+
+            .ea-info-text .ea-date {
+                font-size: 12px;
+            }
+
+        .ea-logo-icon {
+            width: 24px;
+            height: 24px;
+        }
+
+        .ea-cross-v-main {
+            height: 55px;
+            width: 5px;
+        }
+
+        .ea-cross-h-main {
+            width: 30px;
+            height: 4px;
+            top: 13px;
+        }
+
+        .ea-tomb-wrap {
+            right: 4%;
+            bottom: 14%;
+        }
+
+        .ea-dove-wrap {
+            display: none;
+        }
+    }
+</style>
+
+<div class="ea-banner-root">
+    <a href="https://www.youtube.com/watch?v=BMdne966lY0"
+       class="ea-banner-link"
+       rel="noopener"
+       title="부활절 주일예배">
+        <div class="ea-banner-wrapper">
+
+            <div class="ea-glow-layer"></div>
+
+            <!-- Radial light rays from sunrise source -->
+            <svg class="ea-rays-svg" viewBox="0 0 800 220" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <radialGradient id="ea-ray-grad" cx="68%" cy="33%" r="54%">
+                        <stop offset="0%" stop-color="rgba(255,232,85,0.5)" />
+                        <stop offset="55%" stop-color="rgba(255,175,30,0.15)" />
+                        <stop offset="100%" stop-color="rgba(255,140,0,0)" />
+                    </radialGradient>
+                </defs>
+                <g fill="rgba(255,218,55,0.15)">
+                    <polygon points="544,73, 370,220, 340,220" />
+                    <polygon points="544,73, 420,220, 400,220" />
+                    <polygon points="544,73, 462,220, 448,220" />
+                    <polygon points="544,73, 504,220, 492,220" />
+                    <polygon points="544,73, 546,220, 534,220" />
+                    <polygon points="544,73, 588,220, 574,220" />
+                    <polygon points="544,73, 640,220, 622,220" />
+                    <polygon points="544,73, 700,220, 680,220" />
+                    <polygon points="544,73, 760,220, 740,220" />
+                    <polygon points="544,73, 800,210, 800,185" />
+                    <polygon points="544,73, 800,155, 800,130" />
+                    <polygon points="544,73, 800,105, 800,80" />
+                    <polygon points="544,73, 800,58, 800,34" />
+                    <polygon points="544,73, 775,0, 748,0" />
+                    <polygon points="544,73, 718,0, 695,0" />
+                    <polygon points="544,73, 660,0, 638,0" />
+                    <polygon points="544,73, 602,0, 582,0" />
+                    <polygon points="544,73, 545,0, 526,0" />
+                    <polygon points="544,73, 485,0, 466,0" />
+                    <polygon points="544,73, 422,0, 404,0" />
+                    <polygon points="544,73, 305,220, 275,220" />
+                    <polygon points="544,73, 245,220, 214,220" />
+                </g>
+                <!-- Core halo -->
+                <ellipse cx="544" cy="73" rx="130" ry="88" fill="url(#ea-ray-grad)" opacity="0.85" />
+                <ellipse cx="544" cy="73" rx="65" ry="44" fill="rgba(255,242,125,0.38)" />
+                <ellipse cx="544" cy="73" rx="30" ry="20" fill="rgba(255,255,210,0.48)" />
+            </svg>
+
+            <!-- Silhouette hills -->
+            <div class="ea-hills">
+                <div class="ea-hill ea-hill-1"></div>
+                <div class="ea-hill ea-hill-2"></div>
+                <div class="ea-hill ea-hill-3"></div>
+                <div class="ea-hill ea-hill-4"></div>
+            </div>
+
+            <!-- Solitary, illuminated empty cross -->
+            <div class="ea-cross-wrap">
+                <div class="ea-cross-beam ea-cross-v-main">
+                    <div class="ea-cross-beam ea-cross-h-main"></div>
+                </div>
+            </div>
+
+            <!-- Empty tomb with rolled-away stone -->
+            <div class="ea-tomb-wrap">
+                <svg width="115" height="92" viewBox="0 0 115 92" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Outer glow from tomb mouth -->
+                    <ellipse cx="43" cy="54" rx="40" ry="30" fill="rgba(255,218,70,0.32)" />
+                    <ellipse cx="43" cy="54" rx="26" ry="20" fill="rgba(255,232,115,0.42)" />
+                    <!-- Rock face of tomb -->
+                    <path d="M6 90 Q6 30 43 26 Q80 30 80 90 Z" fill="rgba(48,36,68,0.78)" />
+                    <!-- Tomb arch opening — filled with warm light -->
+                    <path d="M17 90 Q17 36 43 32 Q69 36 69 90 Z" fill="rgba(255,198,62,0.62)" />
+                    <!-- Inner warm core -->
+                    <ellipse cx="43" cy="66" rx="18" ry="14" fill="rgba(255,248,185,0.52)" />
+                    <!-- Ground line -->
+                    <line x1="6" y1="90" x2="80" y2="90" stroke="rgba(28,8,50,0.5)" stroke-width="1.5" />
+                    <!-- Interior light shafts -->
+                    <line x1="43" y1="56" x2="26" y2="90" stroke="rgba(255,238,118,0.28)" stroke-width="1.5" />
+                    <line x1="43" y1="50" x2="43" y2="90" stroke="rgba(255,242,140,0.32)" stroke-width="2" />
+                    <line x1="43" y1="56" x2="60" y2="90" stroke="rgba(255,238,118,0.28)" stroke-width="1.5" />
+                    <!-- Rolled stone (displaced right) -->
+                    <circle cx="95" cy="74" r="19" fill="rgba(86,74,98,0.88)" />
+                    <circle cx="90" cy="69" r="6.5" fill="rgba(125,112,138,0.38)" />
+                    <circle cx="100" cy="80" r="3.5" fill="rgba(55,44,65,0.5)" />
+                    <!-- Stone crack detail -->
+                    <line x1="94" y1="62" x2="88" y2="75" stroke="rgba(60,50,72,0.45)" stroke-width="1" />
+                    <line x1="96" y1="63" x2="103" y2="74" stroke="rgba(60,50,72,0.35)" stroke-width="0.8" />
+                </svg>
+            </div>
+
+            <!-- Easter lily cluster -->
+            <div class="ea-lily-wrap">
+                <svg width="72" height="68" viewBox="0 0 72 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Stems -->
+                    <line x1="36" y1="67" x2="36" y2="30" stroke="rgba(58,116,38,0.82)" stroke-width="2" />
+                    <line x1="23" y1="67" x2="20" y2="40" stroke="rgba(58,116,38,0.72)" stroke-width="1.5" />
+                    <!-- Leaves -->
+                    <path d="M36 50 Q20 44 17 39 Q28 39 36 46 Z" fill="rgba(68,128,48,0.72)" />
+                    <path d="M36 43 Q52 38 54 33 Q43 36 36 41 Z" fill="rgba(68,128,48,0.66)" />
+                    <path d="M20 52 Q10 48 9 44 Q17 44 20 50 Z" fill="rgba(68,128,48,0.6)" />
+                    <!-- Main lily petals -->
+                    <ellipse cx="36" cy="21" rx="5" ry="12" fill="rgba(255,253,242,0.93)" transform="rotate(-24,36,21)" />
+                    <ellipse cx="36" cy="21" rx="5" ry="12" fill="rgba(255,253,242,0.93)" transform="rotate(24,36,21)" />
+                    <ellipse cx="36" cy="21" rx="4.5" ry="12" fill="rgba(255,253,242,0.91)" transform="rotate(0,36,21)" />
+                    <ellipse cx="36" cy="21" rx="4" ry="11" fill="rgba(255,253,242,0.87)" transform="rotate(-48,36,21)" />
+                    <ellipse cx="36" cy="21" rx="4" ry="11" fill="rgba(255,253,242,0.87)" transform="rotate(48,36,21)" />
+                    <ellipse cx="36" cy="21" rx="3.5" ry="10" fill="rgba(255,253,242,0.82)" transform="rotate(72,36,21)" />
+                    <!-- Stamen -->
+                    <circle cx="36" cy="19" r="3.2" fill="rgba(255,208,38,0.92)" />
+                    <circle cx="36" cy="19" r="1.5" fill="rgba(200,140,20,0.7)" />
+                    <!-- Side lily -->
+                    <ellipse cx="19" cy="33" rx="4" ry="9.5" fill="rgba(255,253,242,0.88)" transform="rotate(-18,19,33)" />
+                    <ellipse cx="19" cy="33" rx="4" ry="9.5" fill="rgba(255,253,242,0.88)" transform="rotate(18,19,33)" />
+                    <ellipse cx="19" cy="33" rx="3.5" ry="9" fill="rgba(255,253,242,0.84)" transform="rotate(0,19,33)" />
+                    <ellipse cx="19" cy="33" rx="3" ry="8" fill="rgba(255,253,242,0.8)" transform="rotate(-38,19,33)" />
+                    <circle cx="19" cy="31" r="2.5" fill="rgba(255,208,38,0.88)" />
+                    <circle cx="19" cy="31" r="1.2" fill="rgba(200,140,20,0.65)" />
+                </svg>
+            </div>
+
+            <!-- Dove -->
+            <div class="ea-dove-wrap">
+                <svg width="40" height="30" viewBox="0 0 40 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 16 C15 11, 4 9, 2 13 C4 15, 9 14, 11 16 L2 17 C7 22, 15 20, 20 18 C25 20, 33 22, 38 17 L29 16 C31 14, 36 15, 38 13 C36 9, 25 11, 20 16Z" fill="rgba(255,252,232,0.92)" />
+                    <path d="M20 16 L20 4 C22 7, 24 10, 22 14Z" fill="rgba(255,252,232,0.86)" />
+                    <circle cx="16" cy="12" r="1.6" fill="rgba(70,52,18,0.7)" />
+                    <!-- Olive branch suggestion -->
+                    <path d="M11 17 Q8 20 6 18 Q9 17 11 17Z" fill="rgba(68,128,48,0.65)" />
+                </svg>
+            </div>
+
+            <div class="ea-mist"></div>
+
+            <!-- Church info (top-right) -->
+            <div class="ea-church-info">
+                <div>
+                    <div class="ea-church-sub">대한예수교장로회</div>
+                    <div class="ea-church-name">잠실새내교회</div>
+                </div>
+                <div class="ea-logo-icon">
+                    <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="30" cy="30" r="28" fill="rgba(255,200,55,0.22)" />
+                        <circle cx="30" cy="30" r="28" fill="none" stroke="rgba(255,218,95,0.58)" stroke-width="1.5" />
+                        <path d="M30 10 C30 10, 22 22, 22 30 C22 38, 26 44, 30 48 C34 44, 38 38, 38 30 C38 22, 30 10, 30 10Z" fill="rgba(255,248,218,0.92)" />
+                        <path d="M30 18 L30 40" stroke="rgba(175,125,18,0.8)" stroke-width="2" />
+                        <path d="M24 28 L36 28" stroke="rgba(175,125,18,0.8)" stroke-width="2" />
+                        <path d="M20 24 C16 20, 18 14, 24 16 C26 16, 28 18, 30 22" stroke="rgba(255,228,112,0.72)" stroke-width="1.5" fill="none" />
+                        <path d="M40 24 C44 20, 42 14, 36 16 C34 16, 32 18, 30 22" stroke="rgba(255,228,112,0.72)" stroke-width="1.5" fill="none" />
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Title area (top-left) -->
+            <div class="ea-title-area">
+                <div class="ea-title-eyebrow">2026 · EASTER SUNDAY</div>
+                <div class="ea-title-main">부활절</div>
+                <div class="ea-title-sub">주일 예배</div>
+            </div>
+
+            <!-- Date & service info -->
+            <div class="ea-info-line">
+                <span class="ea-info-text">
+                    일시 <span class="ea-date">4.5</span>(일)
+                    1부 <span class="ea-date">7:00</span>
+                    2부 <span class="ea-date">10:00</span>
+                    3부 <span class="ea-date">12:00</span>
+                     본당 대예배실
+                </span>
+            </div>
+
+            <div class="ea-grain"></div>
+            <div class="ea-ink-edge"></div>
+        </div>
+    </a>
+</div>

@@ -1,0 +1,379 @@
+﻿@model BulletinBoard.Models.RhapsodyOfRealityComposite
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@using System.Text
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    오늘의 5분 말씀 — 평문 (?methodTEXT=TEXT, 카카오톡에 붙일 글)
+    · 2026-10-05 시안 확정 — 카드 · 이모지를 걷어내고 글만 (DetailWords 와 같은 밝은 흰색 결)
+    · 복사하면 카톡용 원문(textCopyContent)이 나가는 동작은 그대로 + "전체 복사" 버튼
+    · 이전 화면은 DetailWordsP.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"preach_{todayDate}.webp";
+    string formattedModResultDataOG = $"{ViewBag.Domain}/images/preach/{formattedModResultData}";
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    bool methodTEXT = false;
+    if (ViewBag.methodTEXT != null && ViewBag.methodTEXT == "TEXT")
+    {
+        methodTEXT = true;
+    }
+}
+
+@{
+    int Year = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(0, 4));
+    int Month = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(5, 2));
+    int Day = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(8, 2));
+    string DateString = $"{Year}년 {Month}월 {Day}일 {Model.RhapsodyOfRealitysData.WeekDayKor}요일";
+
+    var videoId = Model?.RhapsodyOfRealitysData?.YouTuBuURL ?? "";
+    var endMin = Model?.RhapsodyOfRealitysData?.EndMinute ?? 0;
+    var endSec = Model?.RhapsodyOfRealitysData?.EndSecond ?? 0;
+    var total = endMin * 60 + endSec;
+    var hasRange = (endMin > 0 || endSec > 0);
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && (await AuthService.IsInRole(user, nameof(Roles.SuperAdmin)) || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));   // 2026-10-05: "Basic" 계정도 SuperAdmin 과 동일
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+@{
+    var sb = new StringBuilder();
+
+    var titleText = (Model?.RhapsodyOfRealitysData?.WordTitle ?? "").Trim();
+    var phraseForCopy = Model?.RhapsodyOfRealitysData?.WordPhrase ?? "";
+    var prayerText = (Model?.RhapsodyOfRealitysData?.WordPray ?? "").Trim();
+    var refList = Model?.eBibleDatas ?? Enumerable.Empty<eBibles>();
+
+    var phraseLines = phraseForCopy
+        .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Select(x => x.Trim())
+        .ToList();
+
+    sb.AppendLine($"📅 {DateString}");
+    sb.AppendLine();
+    sb.AppendLine(titleText);
+    sb.AppendLine();
+    sb.AppendLine("📖오늘의 말씀");
+
+    if (phraseLines.Any())
+    {
+        sb.AppendLine(phraseLines[0]);
+
+        for (int i = 1; i < phraseLines.Count; i++)
+        {
+            sb.AppendLine();
+            sb.AppendLine(phraseLines[i]);
+        }
+    }
+
+    if (!string.IsNullOrWhiteSpace(prayerText))
+    {
+        sb.AppendLine();
+        sb.AppendLine("🙏기도");
+        sb.AppendLine(prayerText);
+    }
+
+    if (refList.Any())
+    {
+        sb.AppendLine();
+        sb.AppendLine("📝 참고 성경");
+        sb.AppendLine();
+
+        foreach (var va in refList)
+        {
+            if (va == null) { continue; }
+
+            var janZul = (va.JanZulString ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(janZul))
+            {
+                sb.AppendLine(janZul);
+            }
+
+            if (va.eBibleDatas != null && va.eBibleDatas.Any())
+            {
+                foreach (var v in va.eBibleDatas)
+                {
+                    if (v == null) { continue; }
+
+                    sb.AppendLine($"{v.zul}절");
+                    sb.AppendLine((v.BibleData ?? "").Trim());
+                    sb.AppendLine();
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(va.BibleText))
+            {
+                sb.AppendLine(va.BibleText.Trim());
+                sb.AppendLine();
+            }
+        }
+    }
+
+    if (isSuperAdmin)
+    {
+        sb.AppendLine("https://www.jamsilkids.com/RhapsodyOfReality/DetailWords");
+    }
+
+    var textCopyContent = sb.ToString().Trim();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@ChurchName · @DepartmentName</title>
+    <meta property="og:title" content="@ChurchName · @DepartmentName" />
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다." />
+    <meta property="og:image" content="@formattedModResultDataOG" />
+    <meta property="og:url" content="@ViewBag.FullURL" />
+    <meta property="og:type" content="website" />
+
+    @if (!methodTEXT && !string.IsNullOrEmpty(videoId))
+    {
+        <script src="https://www.youtube.com/iframe_api"></script>
+    }
+    <partial name="_RrStyle" />
+    <style>
+        /* 평문 안내 · 전체 복사 */
+        .tip { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: var(--soft); font-size: 12.5px; color: var(--acc); }
+        .tip .msg { font-weight: 700; }
+
+        /* 본문 — 꾸밈 없이 글만 */
+        .plain { margin-top: 18px; color: var(--read); }
+        .plain .dt { font-size: 13px; color: var(--dim2); }
+        .plain h1 { margin: 6px 0 0; font-size: 20px; font-weight: 800; line-height: 1.4; color: var(--tx); word-break: keep-all; text-wrap: balance; }
+        .plain h2 { margin: 22px 0 8px; font-size: 14px; font-weight: 800; color: var(--acc); }
+        .plain p { margin: 0 0 10px; font-size: 15px; line-height: 1.9; word-break: keep-all; }
+        .plain .pray { white-space: pre-line; }
+        .plain .ref b { display: block; margin-top: 12px; font-size: 13px; font-weight: 800; color: var(--tx); }
+        .plain .ref p { margin: 4px 0 0; font-size: 14px; color: var(--dim2); }
+        .plain .ref p i { font-style: normal; font-weight: 700; color: var(--num); margin-right: 6px; font-variant-numeric: tabular-nums; }
+        .plain .link { margin-top: 14px; font-size: 11px; color: var(--dim); word-break: break-all; }
+
+        /* 영상 (평문이 아닐 때만) */
+        .player { position: relative; width: 100%; aspect-ratio: 16 / 9; margin-top: 16px; border-radius: 14px; overflow: hidden; background: #1F2937; }
+        .player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+        .ctl .nb.play { background: var(--soft); color: var(--acc); }
+        .ctl .rng { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .ctl .loop { margin-left: auto; font-size: 11.5px; color: var(--acc); }
+
+        /* 복사용 원문 — 화면에는 안 보임 */
+        .text-copy-source { position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+        @@media print { .bar, .prog, .tip, .act, .player, .ctl { display: none !important; } }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/RhapsodyOfReality/DetailWords?Id=@Model?.RhapsodyOfRealitysData?.Id">오늘의 5분 말씀</a><span class="sep">›</span>@(methodTEXT ? "평문" : "말씀")</span>
+        @if (isSuperAdmin)
+        {
+            <span class="grp">
+                <a class="nb" href="/RhapsodyOfReality/ModifyView?Id=@Model?.RhapsodyOfRealitysData?.Id">수정</a>
+                <a class="nb" href="/RhapsodyOfReality/DetailList">목록</a>
+            </span>
+        }
+    </div>
+    <div class="prog"></div>
+
+    @if (methodTEXT)
+    {
+        <div class="tip">
+            <span class="msg" id="cpMsg">카카오톡에 붙일 글이에요. 꾸밈 없이 글만 복사돼요.</span>
+            <button type="button" class="nb pri" onclick="copyAll()">전체 복사</button>
+        </div>
+    }
+
+    @if (!methodTEXT && !string.IsNullOrEmpty(videoId))
+    {
+        <div class="player">
+            <iframe id="ytplayer"
+                    src="https://www.youtube.com/embed/@videoId?start=0@(hasRange ? $"&end={total}" : "")&enablejsapi=1&rel=0"
+                    title="설교영상"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen></iframe>
+        </div>
+        <div class="ctl">
+            <button type="button" class="nb play" onclick="ytPlay()">재생</button>
+            <button type="button" class="nb" onclick="ytPause()">일시정지</button>
+            <button type="button" class="nb" onclick="ytReplay()">처음부터</button>
+            @if (isSuperAdmin && hasRange)
+            {
+                <span class="rng">0:00 ~ @endMin:@endSec.ToString("D2")</span>
+            }
+            <span class="loop">구간 반복 중</span>
+        </div>
+    }
+
+    <div class="plain" id="copyScope">
+        <div class="dt">@DateString</div>
+        <h1>@Model?.RhapsodyOfRealitysData?.WordTitle</h1>
+
+        <h2>오늘의 말씀</h2>
+        @foreach (var ln in phraseLines)
+        {
+            <p>@ln</p>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(prayerText))
+        {
+            <h2>기도</h2>
+            <p class="pray">@prayerText</p>
+        }
+
+        @if (refList.Any())
+        {
+            <h2>참고 성경</h2>
+            <div class="ref">
+                @foreach (var va in refList)
+                {
+                    if (va == null) { continue; }
+                    <b>@va.JanZulString</b>
+                    @if (va.eBibleDatas != null && va.eBibleDatas.Any())
+                    {
+                        foreach (var v in va.eBibleDatas)
+                        {
+                            if (v == null) { continue; }
+                            <p><i>@v.zul</i>@v.BibleData</p>
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(va.BibleText))
+                    {
+                        <p>@va.BibleText</p>
+                    }
+                }
+            </div>
+        }
+
+        @if (isSuperAdmin)
+        {
+            <div class="link">https://www.jamsilkids.com/RhapsodyOfReality/DetailWords</div>
+        }
+    </div>
+
+    <textarea id="textCopySource" class="text-copy-source" aria-hidden="true" tabindex="-1" readonly>@textCopyContent</textarea>
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/RhapsodyOfReality/DetailWords?Id=@Model?.RhapsodyOfRealitysData?.Id">오늘의 5분 말씀</a>
+    </div>
+
+</div>
+
+<!-- ═══ 복사 — 평문일 때는 카톡용 원문(textCopySource)으로 바꿔서 복사 ═══ -->
+<script>
+    var isTextMode = @Html.Raw(methodTEXT ? "true" : "false");
+
+    function normalizeCopyText(text) {
+        return (text || '')
+            .replace(/\r/g, '')
+            .replace(/[ \t]+\n/g, '\n')
+            .replace(/\n[ \t]+\n/g, '\n\n')
+            .replace(/\n{4,}/g, '\n\n\n')
+            .trim();
+    }
+    function getTextModeCopyText() {
+        var el = document.getElementById('textCopySource');
+        return el ? normalizeCopyText(el.value || '') : '';
+    }
+
+    /* 손으로 골라 복사해도 카톡용 원문이 나가게 (예전 동작 그대로) */
+    document.addEventListener('copy', function (e) {
+        if (!isTextMode) return;
+        var cleanText = getTextModeCopyText();
+        if (!cleanText) return;
+        if (e.clipboardData) { e.preventDefault(); e.clipboardData.setData('text/plain', cleanText); }
+        else if (window.clipboardData) { e.preventDefault(); window.clipboardData.setData('Text', cleanText); }
+    });
+
+    /* 전체 복사 버튼 */
+    function copyAll() {
+        var t = getTextModeCopyText();
+        var msg = document.getElementById('cpMsg');
+        var base = msg ? msg.textContent : '';
+        function done(ok) {
+            if (!msg) return;
+            msg.textContent = ok ? '복사했어요. 카카오톡에 붙여 넣으세요.' : '복사하지 못했어요. 글을 길게 눌러 복사해 주세요.';
+            setTimeout(function () { msg.textContent = base; }, 2200);
+        }
+        function fallback() {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = t; ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed'; ta.style.top = '-1000px';
+                document.body.appendChild(ta); ta.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) { return false; }
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(t).then(function () { done(true); }, function () { done(fallback()); });
+        } else {
+            done(fallback());
+        }
+    }
+</script>
+
+@if (!methodTEXT && !string.IsNullOrEmpty(videoId))
+{
+<!-- ═══ YouTube 구간 무한 반복 (DetailWords 와 같은 방식) ═══ -->
+<script>
+    var ytStartSecs = 0, ytEndSecs = @total, ytHasRange = @(hasRange ? "true" : "false");
+    var player = null, playerReady = false, actionQueue = [], ytLastEnded = 0, loopTimer = null;
+
+    function ytLoopRestart() {
+        if (!player) return;
+        try {
+            if (ytHasRange && ytEndSecs > 0) player.loadVideoById({ videoId: '@videoId', startSeconds: ytStartSecs, endSeconds: ytEndSecs });
+            else { player.seekTo(ytStartSecs, true); player.playVideo(); }
+        } catch (e) { }
+    }
+    function createYTPlayer() {
+        if (!document.getElementById('ytplayer')) return;
+        player = new YT.Player('ytplayer', {
+            events: {
+                'onReady': function () { playerReady = true; while (actionQueue.length) { (actionQueue.shift())(); } },
+                'onStateChange': function (e) {
+                    if (e.data === YT.PlayerState.ENDED) {
+                        var now = Date.now();
+                        if (now - ytLastEnded < 600) return;
+                        ytLastEnded = now;
+                        clearTimeout(loopTimer);
+                        loopTimer = setTimeout(ytLoopRestart, 120);
+                    }
+                }
+            }
+        });
+    }
+    (function () {
+        if (window.YT && window.YT.Player) createYTPlayer();
+        else window.onYouTubeIframeAPIReady = createYTPlayer;
+    })();
+    function doWhenReady(fn) { playerReady ? fn() : actionQueue.push(fn); }
+    function ytPlay()   { doWhenReady(function () { player.playVideo(); }); }
+    function ytPause()  { doWhenReady(function () { player.pauseVideo(); }); }
+    function ytReplay() { doWhenReady(ytLoopRestart); }
+</script>
+}
+</body>
+</html>

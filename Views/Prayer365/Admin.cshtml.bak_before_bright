@@ -1,0 +1,139 @@
+@model BulletinBoard.Models.Prayer365.Prayer365AdminVM
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using Cfg = BulletinBoard.Models.Prayer365.Prayer365Config
+
+@*  365일 기도문 관리 — 달력판 (관리자).  빈 날(흰) · 검수할 것(주황) · 검수 완료(초록).  칸을 누르면 편집. *@
+
+@{
+    Layout = null;
+    string[] monthNames = { "1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월" };
+    string F(string f) => "/Prayer365/Admin" + (f == "all" ? "" : "?f=" + f);
+    bool Show(string md)
+    {
+        bool has = Model.Map.TryGetValue(md, out var s);
+        return Model.Filter switch
+        {
+            "empty" => !has,
+            "check" => has && !s!.IsReviewed,
+            "done"  => has && s!.IsReviewed,
+            _       => true,
+        };
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>365일 기도문 관리</title>
+    <partial name="_Prayer365Style" />
+    <style>
+        .h1 { font-family: "Noto Serif KR", serif; font-size: 21px; margin-top: 6px; }
+        .sum { display: flex; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 16px; }
+        .sum > div { flex: 1; text-align: center; padding: 14px 0 12px; border-right: 1px solid var(--rule); }
+        .sum > div:last-child { border-right: 0; }
+        .sum .k { font-size: 10px; letter-spacing: .14em; color: var(--dim); }
+        .sum .v { font-family: Inter, sans-serif; font-weight: 300; font-size: 24px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+        .sum .v.acc { color: var(--acc); }
+        .sum .v u { text-decoration: none; font-size: 11px; color: var(--dim); margin-left: 2px; }
+        .flt { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; align-items: center; }
+        .flt form { display: flex; gap: 6px; flex: 1; min-width: 220px; margin: 0; }
+        .flt input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 9px 11px; border: 1px solid var(--rule); background: #fff; }
+        .found { margin-top: 12px; border-top: 1px solid var(--rule); }
+        .found a { display: flex; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--rule); text-decoration: none; font-size: 13px; }
+        .found a b { flex: none; width: 64px; font-family: "Noto Serif KR", serif; font-weight: 500; color: var(--acc2); }
+        .found a span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .found a i { flex: none; font-style: normal; font-size: 11px; color: var(--dim); }
+        .months { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+        @@media (max-width: 900px) { .months { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .mo h3 { margin: 0 0 6px; font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 14px; display: flex; justify-content: space-between; }
+        .mo h3 span { font-family: Inter, sans-serif; font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .d { aspect-ratio: 1 / 1; display: grid; place-items: center; font-family: Inter, sans-serif; font-size: 10.5px; border: 1px solid var(--rule);
+             background: #fff; color: var(--dim); text-decoration: none; }
+        .d:hover { border-color: var(--acc); color: var(--acc2); }
+        .d.ok { background: var(--okbg); border-color: #B9D2C2; color: var(--ok); font-weight: 600; }
+        .d.chk { background: var(--warnbg); border-color: #E7D2C4; color: var(--warn); font-weight: 600; }
+        .d.today { outline: 2px solid var(--acc); outline-offset: 1px; }
+        .d.off { opacity: .18; }
+        .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 11.5px; color: var(--dim2); }
+        .legend i { display: inline-block; width: 12px; height: 12px; border: 1px solid var(--rule); vertical-align: -2px; margin-right: 5px; background: #fff; }
+        .legend i.ok { background: var(--okbg); border-color: #B9D2C2; }
+        .legend i.chk { background: var(--warnbg); border-color: #E7D2C4; }
+        .note { margin-top: 18px; font-size: 12px; color: var(--dim2); line-height: 1.8; border-top: 1px solid var(--rule); padding-top: 12px; }
+    </style>
+</head>
+<body>
+<div class="pz wide">
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Admin/TeacherOnly">교사전용</a><span class="sep">›</span>365일 기도문 관리</span>
+        <span><a href="/Prayer365">오늘의 기도 보기 →</a></span>
+    </div>
+
+    <div class="kk" style="margin-top:20px">PRAYER 365 · ADMIN</div>
+    <div class="h1">365일 기도문 관리</div>
+
+    <div class="sum">
+        <div><div class="k">입력됨</div><div class="v acc">@Model.Filled<u>/@Cfg.TotalDays</u></div></div>
+        <div><div class="k">검수 완료</div><div class="v">@Model.Reviewed<u>편</u></div></div>
+        <div><div class="k">검수할 것</div><div class="v">@Model.ToCheck<u>편</u></div></div>
+        <div><div class="k">빈 날</div><div class="v">@Model.Empty<u>일</u></div></div>
+    </div>
+
+    <div class="flt">
+        <a class="nb @(Model.Filter == "all" ? "on" : "")" href="@F("all")">전체</a>
+        <a class="nb @(Model.Filter == "empty" ? "on" : "")" href="@F("empty")">빈 날</a>
+        <a class="nb @(Model.Filter == "check" ? "on" : "")" href="@F("check")">검수할 것</a>
+        <a class="nb @(Model.Filter == "done" ? "on" : "")" href="@F("done")">검수 완료</a>
+        <form method="get" action="/Prayer365/Admin">
+            <input name="q" value="@Model.Q" placeholder="제목 · 본문 · 구절로 찾기" />
+            <button class="nb" type="submit">찾기</button>
+        </form>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.Q))
+    {
+        <div class="found">
+            @if (Model.Found.Count == 0) { <div style="padding:12px 2px;font-size:13px;color:var(--dim)">“@Model.Q” 이(가) 들어간 기도문이 없어요.</div> }
+            @foreach (var s in Model.Found)
+            {
+                <a href="/Prayer365/Edit?md=@s.MonthDay"><b>@Cfg.Label(s.MonthDay)</b><span>@s.Title</span><i>@(s.IsReviewed ? "검수 완료" : "검수할 것")</i></a>
+            }
+        </div>
+    }
+
+    <div class="months">
+        @for (int m = 1; m <= 12; m++)
+        {
+            int len = Cfg.MonthLen[m - 1];
+            int filled = 0;
+            for (int d = 1; d <= len; d++) { if (Model.Map.ContainsKey(Cfg.Md(m, d))) filled++; }
+            <div class="mo">
+                <h3>@monthNames[m - 1]<span>@filled/@len</span></h3>
+                <div class="days">
+                    @for (int d = 1; d <= len; d++)
+                    {
+                        string md = Cfg.Md(m, d);
+                        bool has = Model.Map.TryGetValue(md, out var s);
+                        string cls = !has ? "" : s!.IsReviewed ? "ok" : "chk";
+                        if (md == Model.TodayMd) { cls += " today"; }
+                        if (!Show(md)) { cls += " off"; }
+                        <a class="d @cls" href="/Prayer365/Edit?md=@md" title="@(m)월 @(d)일@(has ? " · " + s!.Title : " · 비어 있음")">@d</a>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="legend"><span><i class="ok"></i>검수 완료</span><span><i class="chk"></i>입력됨 · 검수할 것</span><span><i></i>빈 날</span><span><i style="outline:2px solid #9A7B4F;outline-offset:1px"></i>오늘</span><span>· 칸을 누르면 편집</span></div>
+
+    <div class="note">
+        기도문은 <b>대화창에 날짜와 텍스트를 올리면</b> Claude 가 오타 · 이상한 문구만 고쳐서 넣어요 (있는 그대로, 다듬지 않음).
+        여기서는 내용을 확인하고, 필요하면 다시 고친 뒤 <b>검수 완료</b>를 체크하세요.<br />
+        출처 : @Cfg.Author 지음, 「@Cfg.BookTitle」, @Cfg.Publisher
+    </div>
+</div>
+</body>
+</html>

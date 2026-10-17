@@ -1,0 +1,1003 @@
+@model BulletinBoard.Models.DailyMission2.ParticipantCardsVM
+@using BulletinBoard.Common
+@using Microsoft.Extensions.Configuration
+@using System.IO
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject IConfiguration Configuration
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+
+@{
+    var user        = await AuthService.GetSignedUser(User);
+    var isSignedIn  = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    var isBasic     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool isStaff    = (isAdmin || isSuperAdmin || isModerator);
+}
+
+@{
+    ViewData["Title"] = "개인 참여자";
+    Layout = null;
+
+    string Safe(string? s) => (s ?? "").Trim();
+    string FmtDate(DateTime? dt) => dt.HasValue ? dt.Value.ToString("MM.dd") : "—";
+    string FmtDateFull(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy.MM.dd") : "—";
+
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var phys = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+            if (System.IO.File.Exists(phys)) return $"/images/profile/{uid}.png";
+        }
+        return "/images/icon/people/people_01.webp";
+    }
+
+    // 부모 → 자녀 정보 딕셔너리
+    var _parentChildInfo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    try
+    {
+        var cs = Configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrWhiteSpace(cs))
+        {
+            using var conn = new System.Data.SqlClient.SqlConnection(cs);
+            conn.Open();
+            const string sql = @"
+SELECT p.UserName AS ParentUserName,
+       ISNULL(NULLIF(LTRIM(RTRIM(pm.FullName)), ''), c.UserName) AS ChildName,
+       ci.ClassYear, ci.ClassBan
+FROM dbo.DM2_FamilyMember p WITH(NOLOCK)
+JOIN dbo.DM2_FamilyTeam t  WITH(NOLOCK) ON t.FamilyTeamId = p.FamilyTeamId AND t.IsActive = 1
+JOIN dbo.DM2_FamilyMember c  WITH(NOLOCK) ON c.FamilyTeamId = p.FamilyTeamId AND c.IsActive = 1 AND c.RoleCode = 0
+LEFT JOIN [Identity].[User] u  WITH(NOLOCK) ON u.UserName = c.UserName
+LEFT JOIN dbo.view_PersonMaster_2026 pm WITH(NOLOCK) ON pm.UserId = u.Id
+LEFT JOIN dbo.ClassInfo_2026 ci WITH(NOLOCK) ON ci.PersonId = pm.PersonId
+WHERE p.IsActive = 1 AND p.RoleCode IN (1,2)
+ORDER BY p.UserName, ci.ClassYear, ci.ClassBan, ChildName;";
+            using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
+            using var rd  = cmd.ExecuteReader();
+            var tmp = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            while (rd.Read())
+            {
+                var pu = (rd.IsDBNull(0) ? "" : rd.GetString(0))?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(pu)) continue;
+                var cn = (rd.IsDBNull(1) ? "" : rd.GetString(1))?.Trim() ?? "";
+                var cy = rd.IsDBNull(2) ? (int?)null : Convert.ToInt32(rd.GetValue(2));
+                var cb = rd.IsDBNull(3) ? (int?)null : Convert.ToInt32(rd.GetValue(3));
+                var txt = (cy.HasValue && cb.HasValue) ? $"{cy}학년 {cb}반 {cn}" : (!string.IsNullOrWhiteSpace(cn) ? cn : "자녀정보확인필요");
+                if (!tmp.TryGetValue(pu, out var lst)) { lst = new(); tmp[pu] = lst; }
+                if (!lst.Any(x => string.Equals(x, txt, StringComparison.OrdinalIgnoreCase))) lst.Add(txt);
+            }
+            foreach (var kv in tmp) _parentChildInfo[kv.Key] = string.Join(" / ", kv.Value);
+        }
+    }
+    catch { }
+
+    var rows = Model?.Rows ?? new();
+    int totalCount = rows.Count;
+
+    // 역할 분류 헬퍼
+    string GetRoleKey(BulletinBoard.Models.DailyMission2.ParticipantCardRow r)
+    {
+        if (r.IsStudent) return "student";
+        if (r.IsTeacher && !r.IsParent) return "teacher";
+        return "needcheck";
+    }
+}
+
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@ViewData["Title"] — @ConstatsCommon.MainKeyTitle</title>
+<style>
+/* ─── CSS 변수 ─────────────────────────────────────────── */
+:root {
+    --bg:        #f0f4ff;
+    --bg2:       #e4ecff;
+    --card:      rgba(255,255,255,.96);
+    --card2:     rgba(255,255,255,.80);
+    --border:    rgba(30,41,98,.10);
+    --txt:       #1a1f3c;
+    --txt2:      #5a6382;
+    --txt3:      #94a3c0;
+    --primary:   #4f6fff;
+    --primary2:  #6c8aff;
+    --good:      #22c55e;
+    --warn:      #f59e0b;
+    --danger:    #ef4444;
+    --gold:      #f59e0b;
+    --silver:    #94a3b8;
+    --bronze:    #b45309;
+    --shadow-sm: 0 2px 8px rgba(30,41,98,.08);
+    --shadow-md: 0 8px 24px rgba(30,41,98,.12);
+    --shadow-lg: 0 16px 48px rgba(30,41,98,.16);
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --ctrl-h:    64px;
+}
+[data-theme="dark"] {
+    --bg:        #0f1423;
+    --bg2:       #151c30;
+    --card:      rgba(21,30,52,.96);
+    --card2:     rgba(21,30,52,.80);
+    --border:    rgba(255,255,255,.10);
+    --txt:       #e8edff;
+    --txt2:      #8b96b8;
+    --txt3:      #4a5578;
+    --primary:   #6c8aff;
+    --primary2:  #8fa5ff;
+    --good:      #4ade80;
+    --warn:      #fbbf24;
+    --danger:    #f87171;
+    --gold:      #fbbf24;
+    --silver:    #94a3b8;
+    --bronze:    #d97706;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+    --shadow-md: 0 8px 24px rgba(0,0,0,.4);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.5);
+}
+
+/* ─── 리셋 & 기본 ─────────────────────────────────────── */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body {
+    font-family: "Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+    background: var(--bg);
+    color: var(--txt);
+    min-height: 100vh;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 10% 0%, color-mix(in srgb, var(--primary) 12%, transparent), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 10%, color-mix(in srgb, var(--good) 8%, transparent), transparent 50%);
+    background-attachment: fixed;
+}
+
+/* ─── 컨트롤 바 (고정) ──────────────────────────────── */
+.ctrl-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+.ctrl-inner {
+    max-width: 1280px; margin: 0 auto;
+    padding: 10px 16px;
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+}
+.ctrl-group { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ctrl-group:last-child { margin-left: auto; }
+
+.pill-input {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 16px;
+    box-shadow: var(--shadow-sm);
+    transition: border-color .2s, box-shadow .2s;
+}
+.pill-input:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.pill-input input, .pill-input select {
+    background: none; border: none; outline: none;
+    color: var(--txt); font-size: .875rem; font-weight: 600;
+}
+.pill-input input { min-width: 180px; }
+.pill-input select { cursor: pointer; min-width: 140px; }
+
+.seg {
+    display: flex; background: var(--card); border: 1px solid var(--border);
+    border-radius: 999px; overflow: hidden; box-shadow: var(--shadow-sm);
+}
+.seg a, .seg button {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 14px; font-size: .8rem; font-weight: 800;
+    color: var(--txt2); text-decoration: none; border: none; background: none;
+    cursor: pointer; white-space: nowrap;
+    transition: background .15s, color .15s;
+}
+.seg a.active, .seg button.active,
+.seg a:hover, .seg button:hover {
+    background: color-mix(in srgb, var(--primary) 16%, transparent);
+    color: var(--primary);
+}
+
+.theme-btn {
+    width: 38px; height: 38px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm); cursor: pointer; font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .2s;
+}
+.theme-btn:hover { transform: rotate(20deg); }
+
+/* ─── 컨텐츠 래퍼 ─────────────────────────────────── */
+.wrap {
+    max-width: 1280px; margin: 0 auto;
+    padding: 24px 16px 48px;
+}
+
+/* ─── 헤더 ────────────────────────────────────────── */
+.page-header {
+    text-align: center; margin-bottom: 32px;
+}
+.page-header h1 {
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 900; letter-spacing: -.5px;
+    background: linear-gradient(135deg, var(--primary), var(--primary2), var(--good));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+}
+.page-header .sub {
+    font-size: .875rem; color: var(--txt2); font-weight: 600;
+}
+.page-header .badge-count {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+    color: var(--primary); font-size: .8rem; font-weight: 800;
+    padding: 4px 14px; border-radius: 999px; margin-top: 10px;
+}
+
+/* ─── 시상대 (Top 3) ──────────────────────────────── */
+.podium-section { margin-bottom: 36px; }
+.podium-section h2 {
+    font-size: .8rem; font-weight: 800; color: var(--txt3);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    text-align: center; margin-bottom: 16px;
+}
+.podium-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.18fr 1fr;
+    gap: 12px; align-items: end;
+}
+@@media (max-width: 600px) {
+    .podium-grid { grid-template-columns: 1fr; align-items: start; }
+}
+
+.podium-card {
+    position: relative; border-radius: var(--radius-lg);
+    background: var(--card); border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden; text-align: center;
+    padding: 24px 16px 20px;
+    animation: cardIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+.podium-card::before {
+    content: ''; position: absolute; inset: 0;
+    border-radius: inherit; pointer-events: none;
+}
+.podium-card.rank-1 { padding-top: 32px; }
+.podium-card.rank-1::before { background: linear-gradient(160deg, rgba(245,158,11,.08), transparent 50%); }
+.podium-card.rank-2::before { background: linear-gradient(160deg, rgba(148,163,184,.07), transparent 50%); }
+.podium-card.rank-3::before { background: linear-gradient(160deg, rgba(180,83,9,.07), transparent 50%); }
+
+.podium-medal {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    font-size: 1.6rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,.2));
+}
+.rank-1 .podium-medal { font-size: 2rem; top: 8px; }
+
+.avatar-ring {
+    display: inline-block; position: relative;
+    margin: 8px auto 12px; border-radius: 50%;
+}
+.avatar-ring::before {
+    content: ''; position: absolute; inset: -3px; border-radius: 50%;
+    background: conic-gradient(var(--ring-c1), var(--ring-c2), var(--ring-c1));
+    animation: ringRotate 4s linear infinite;
+}
+.rank-1 { --ring-c1: #f59e0b; --ring-c2: #fde68a; }
+.rank-2 { --ring-c1: #94a3b8; --ring-c2: #e2e8f0; }
+.rank-3 { --ring-c1: #b45309; --ring-c2: #fcd34d; }
+@@keyframes ringRotate { to { transform: rotate(360deg); } }
+
+.avatar-ring img {
+    display: block; border-radius: 50%; object-fit: cover;
+    position: relative; z-index: 1;
+    border: 3px solid var(--bg);
+}
+.rank-1 .avatar-ring img { width: 88px; height: 88px; }
+.rank-2 .avatar-ring img { width: 76px; height: 76px; }
+.rank-3 .avatar-ring img { width: 72px; height: 72px; }
+
+.podium-name {
+    font-size: 1rem; font-weight: 900; margin-bottom: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rank-1 .podium-name { font-size: 1.15rem; }
+
+.podium-role-badge {
+    display: inline-block; font-size: .72rem; font-weight: 800;
+    padding: 2px 10px; border-radius: 999px; margin-bottom: 14px;
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.podium-score {
+    font-size: 2.2rem; font-weight: 900; line-height: 1;
+    margin-bottom: 2px; color: var(--txt);
+}
+.rank-1 .podium-score { font-size: 2.8rem; color: var(--gold); }
+.podium-score-label { font-size: .72rem; color: var(--txt3); font-weight: 700; margin-bottom: 12px; }
+
+/* SVG 링 진행률 */
+.ring-wrap { position: relative; margin: 0 auto 10px; }
+.ring-wrap svg { display: block; }
+.ring-track { fill: none; stroke: var(--bg2); }
+.ring-fill  { fill: none; stroke-linecap: round; transition: stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1); }
+.rank-1 .ring-fill { stroke: url(#grad1); }
+.rank-2 .ring-fill { stroke: url(#grad2); }
+.rank-3 .ring-fill { stroke: url(#grad3); }
+.ring-center {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+}
+.ring-pct  { font-size: 1.1rem; font-weight: 900; color: var(--txt); }
+.ring-lbl  { font-size: .65rem; font-weight: 700; color: var(--txt3); }
+
+.streak-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: color-mix(in srgb, #f59e0b 14%, transparent);
+    border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+    color: #b45309; font-size: .75rem; font-weight: 800;
+    padding: 3px 10px; border-radius: 999px; margin-top: 8px;
+}
+[data-theme="dark"] .streak-badge { color: #fcd34d; }
+
+.podium-date {
+    margin-top: 8px; font-size: .72rem; color: var(--txt3); font-weight: 700;
+}
+
+/* ─── 일반 카드 그리드 ─────────────────────────────── */
+.section-label {
+    font-size: .8rem; font-weight: 800; color: var(--txt3);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 12px; margin-top: 4px;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+@@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2,1fr); } }
+@@media (max-width: 640px)  { .grid { grid-template-columns: 1fr; } }
+
+.card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+    overflow: hidden; display: flex; flex-direction: column;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+    animation: cardIn .5s cubic-bezier(.22,1,.36,1) both;
+    opacity: 0;
+}
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+@@keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.card-header {
+    display: flex; gap: 12px; padding: 14px 14px 10px; align-items: flex-start;
+}
+.c-avatar {
+    position: relative; flex-shrink: 0;
+    width: 62px; height: 62px;
+}
+.c-avatar img {
+    width: 50px; height: 50px; border-radius: 50%; object-fit: cover;
+    border: 2.5px solid var(--bg); display: block;
+    background: var(--bg2);
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+/* 카드 아바타 SVG 링 */
+.ca-ring-svg {
+    position: absolute; inset: 0;
+    display: block; overflow: visible;
+    transform: rotate(-90deg);
+}
+.ca-ring-track {
+    fill: none;
+    stroke: color-mix(in srgb, var(--txt3) 20%, transparent);
+}
+.ca-ring-fill {
+    fill: none; stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1);
+    stroke: url(#grad-card);
+}
+.c-avatar .rank-no {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    font-size: .65rem; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--bg); z-index: 2;
+}
+.c-info { flex: 1; min-width: 0; }
+.c-name {
+    font-size: .95rem; font-weight: 900; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px;
+}
+.c-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag {
+    font-size: .7rem; font-weight: 800; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid transparent;
+}
+.tag-student { background: color-mix(in srgb,var(--good) 12%,transparent); color: var(--good);
+               border-color: color-mix(in srgb,var(--good) 25%,transparent); }
+.tag-teacher { background: color-mix(in srgb,var(--primary) 12%,transparent); color: var(--primary);
+               border-color: color-mix(in srgb,var(--primary) 25%,transparent); }
+.tag-check   { background: color-mix(in srgb,var(--warn) 12%,transparent); color: var(--warn);
+               border-color: color-mix(in srgb,var(--warn) 25%,transparent); }
+.tag-family  { background: color-mix(in srgb,var(--good) 10%,transparent); color: var(--good);
+               border-color: color-mix(in srgb,var(--good) 20%,transparent); }
+.tag-neutral { background: color-mix(in srgb,var(--txt3) 12%,transparent); color: var(--txt2);
+               border-color: color-mix(in srgb,var(--txt3) 20%,transparent); }
+.tag-uid     { background: color-mix(in srgb,#8b5cf6 11%,transparent); color: #7c3aed;
+               border-color: color-mix(in srgb,#8b5cf6 24%,transparent);
+               font-family: "JetBrains Mono","Fira Mono","Cascadia Code",monospace,"Pretendard";
+               letter-spacing: -.2px; }
+[data-theme="dark"] .tag-uid { color: #a78bfa; }
+
+/* 시상대 카드 아이디 뱃지 */
+.podium-uid {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: .72rem; font-weight: 800;
+    padding: 2px 10px; border-radius: 999px; margin-bottom: 10px;
+    background: color-mix(in srgb, #8b5cf6 11%, transparent);
+    color: #7c3aed;
+    border: 1px solid color-mix(in srgb, #8b5cf6 25%, transparent);
+    font-family: "JetBrains Mono","Fira Mono","Cascadia Code",monospace,"Pretendard";
+    letter-spacing: -.2px;
+}
+[data-theme="dark"] .podium-uid { color: #a78bfa; }
+
+.card-body { padding: 0 14px 14px; }
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.stat-box {
+    background: var(--bg2); border-radius: var(--radius-sm);
+    padding: 8px 10px;
+}
+.stat-box .sk { font-size: .68rem; color: var(--txt3); font-weight: 800; margin-bottom: 3px; }
+.stat-box .sv { font-size: 1.1rem; font-weight: 900; color: var(--txt); }
+.stat-box .sv.score-val { color: var(--primary); }
+
+.bar-wrap { background: var(--bg2); border-radius: var(--radius-sm); padding: 8px 10px; }
+.bar-top  { display: flex; justify-content: space-between; align-items: center;
+            font-size: .7rem; font-weight: 800; color: var(--txt3); margin-bottom: 6px; }
+.bar-top span b { color: var(--txt); }
+.bar {
+    height: 7px; border-radius: 999px;
+    background: color-mix(in srgb,var(--txt3) 20%,transparent);
+    overflow: hidden;
+}
+.bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--primary), var(--primary2), var(--good));
+    width: 0; transition: width 1.2s cubic-bezier(.22,1,.36,1);
+}
+
+.streak-mini {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: .7rem; font-weight: 800; color: var(--warn);
+}
+
+/* ─── 빈 상태 ──────────────────────────────────────── */
+.empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--txt3); font-size: .9rem; font-weight: 700;
+}
+
+/* ─── 네비 버튼 ────────────────────────────────────── */
+.nav-btns { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 32px; }
+.nav-btn {
+    flex: 1 1 220px; display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; border-radius: var(--radius-md);
+    background: var(--card); border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm); text-decoration: none; color: var(--txt);
+    transition: transform .15s, box-shadow .15s;
+}
+.nav-btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.nav-btn .ni { font-size: 1.3rem; width: 42px; height: 42px; border-radius: var(--radius-sm);
+               background: color-mix(in srgb,var(--primary) 12%,transparent); display: flex;
+               align-items: center; justify-content: center; flex-shrink: 0; }
+.nav-btn .nt b  { font-size: .9rem; font-weight: 900; display: block; }
+.nav-btn .nt span { font-size: .75rem; color: var(--txt2); font-weight: 700; }
+
+/* ─── 이미지 lazy 로드 ──────────────────────────────── */
+img[data-src] { opacity: 0; transition: opacity .4s; }
+img.loaded { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- 컨트롤 바 -->
+<nav class="ctrl-bar" aria-label="필터 및 검색">
+    <div class="ctrl-inner">
+        <!-- 개인 / 가족팀 전환 -->
+        <div class="seg">
+            <a class="active" href="/DailyMission2/ParticipantPersons">👤 개인</a>
+            <a href="/DailyMission2/ParticipantTeams">👨‍👩‍👧 가족팀</a>
+        </div>
+
+        <!-- 역할 필터 -->
+        <div class="seg" id="roleSeg">
+            <button class="active" data-role="all">전체</button>
+            <button data-role="student">학생</button>
+            <button data-role="teacher">교사</button>
+            <button data-role="needcheck">확인필요</button>
+        </div>
+
+        <!-- 정렬 -->
+        <div class="pill-input" title="정렬">
+            <span>↕️</span>
+            <select id="sortSel">
+                <option value="score_desc" selected>점수순</option>
+                <option value="streak_desc">연속일수순</option>
+                <option value="name_asc">이름순</option>
+                <option value="last_desc">최근수행순</option>
+            </select>
+        </div>
+
+        <!-- 검색 -->
+        <div class="pill-input">
+            <span>🔎</span>
+            <input id="q" type="search" placeholder="이름 / 아이디 검색" autocomplete="off" />
+        </div>
+
+        <!-- 다크모드 토글 -->
+        <button class="theme-btn" id="themeBtn" title="테마 전환" aria-label="테마 전환">🌙</button>
+    </div>
+</nav>
+
+<div class="wrap">
+
+    <!-- 페이지 헤더 -->
+    <div class="page-header">
+        <h1>🏆 @ConstatsCommon.MainKeyTitle</h1>
+        <div class="sub">@(@Model.Year)년 달성율 목표 <strong>@Model.TargetPoint</strong> 점</div>
+        <div class="badge-count">👥 총 <span id="totalCount">@totalCount</span> 명 참여</div>
+    </div>
+
+    @{
+        var top3  = rows.Take(3).ToList();
+        var rest  = rows.Skip(3).ToList();
+        string[] medals = { "🥇", "🥈", "🥉" };
+        string[] rankClass = { "rank-1", "rank-2", "rank-3" };
+        // SVG 링 반지름과 둘레
+        int[] R    = { 44, 38, 36 };
+        // 2πr
+        double[] Circ = { 2*Math.PI*44, 2*Math.PI*38, 2*Math.PI*36 };
+    }
+
+    <!-- SVG 그라디언트 defs -->
+    <svg width="0" height="0" style="position:absolute">
+        <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#f59e0b"/>
+                <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#94a3b8"/>
+                <stop offset="100%" stop-color="#6c8aff"/>
+            </linearGradient>
+            <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#b45309"/>
+                <stop offset="100%" stop-color="#f59e0b"/>
+            </linearGradient>
+            <!-- 일반 카드 아바타 링 그라디언트 -->
+            <linearGradient id="grad-card" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#4f6fff"/>
+                <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- ── TOP 3 시상대 ── -->
+    @if (top3.Count > 0)
+    {
+        <section class="podium-section" id="podiumSection">
+            <h2>🏆 TOP RANKING</h2>
+            <div class="podium-grid">
+                @{
+                    // 2등 → 1등 → 3등 순서로 배치
+                    int[] order = top3.Count == 1 ? new[]{0} : top3.Count == 2 ? new[]{1,0} : new[]{1,0,2};
+                }
+                @foreach (var oi in order)
+                {
+                    if (oi >= top3.Count) continue;
+                    var r  = top3[oi];
+                    var ri = oi;      // 실제 순위 인덱스 (0=1등)
+                    var photo = ProfileOrDefault(r.UserId);
+                    var pct  = r.AchievePercent;
+                    var circ = Circ[ri];
+                    var dash = circ;
+                    var offset = circ - (circ * pct / 100.0);
+                    var svgSize = ri == 0 ? 108 : (ri == 1 ? 96 : 90);
+                    var strokeW = 7;
+                    var cx = svgSize / 2;
+
+                    _parentChildInfo.TryGetValue(Safe(r.UserName), out var pci);
+                    var roleKey = GetRoleKey(r);
+                    var roleLabel = r.IsStudent ? $"{r.ClassYear}학년 {r.ClassBan}반" : (!string.IsNullOrWhiteSpace(r.RoleName) ? r.RoleName : "교사");
+                    if (roleKey == "needcheck") roleLabel = !string.IsNullOrWhiteSpace(pci) ? $"부모 / {pci}" : "확인필요";
+
+                    <div class="podium-card @rankClass[ri]"
+                         data-role="@roleKey"
+                         data-name="@($"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.DisplayRoleText)} {Safe(pci)}".ToLowerInvariant())"
+                         data-sort-score="@r.YearPoint"
+                         data-sort-streak="@r.ConsecutiveDays"
+                         data-sort-name="@(string.IsNullOrWhiteSpace(r.FullName) ? r.UserName : r.FullName).ToLowerInvariant()"
+                         data-sort-last="@(r.LastActionDate.HasValue ? r.LastActionDate.Value.ToString("yyyy-MM-dd") : "")"
+                         style="animation-delay: @(oi * 0.12)s">
+                        <div class="podium-medal">@medals[ri]</div>
+
+                        <div class="avatar-ring @rankClass[ri]">
+                            <img data-src="@photo" src="/images/icon/people/people_01.webp"
+                                 alt="@r.FullName" width="@(ri==0?88:ri==1?76:72)" height="@(ri==0?88:ri==1?76:72)"
+                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                        </div>
+
+                        <div class="podium-name">@(!string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName)</div>
+                        @if (!string.IsNullOrWhiteSpace(r.UserName))
+                        {
+                            @if(isSuperAdmin)
+                            {
+                            <div class="podium-uid">@@@r.UserName</div>
+                            }
+                        }
+                        <div class="podium-role-badge">@roleLabel</div>
+
+                        <div class="podium-score" data-count="@r.YearPoint">0</div>
+                        <div class="podium-score-label">점수</div>
+
+                        <!-- SVG 링 -->
+                        <div class="ring-wrap" style="width:@(svgSize)px; height:@(svgSize)px;">
+                            <svg width="@svgSize" height="@svgSize" style="transform:rotate(-90deg)">
+                                <circle class="ring-track" cx="@cx" cy="@cx" r="@R[ri]" stroke-width="@strokeW"/>
+                                <circle class="ring-fill" cx="@cx" cy="@cx" r="@R[ri]" stroke-width="@strokeW"
+                                        stroke-dasharray="@circ.ToString("F2")"
+                                        stroke-dashoffset="@circ.ToString("F2")"
+                                        data-target-offset="@offset.ToString("F2")"/>
+                            </svg>
+                            <div class="ring-center">
+                                <span class="ring-pct" data-pct="@pct">0%</span>
+                                <span class="ring-lbl">달성율</span>
+                            </div>
+                        </div>
+
+                        @if (r.ConsecutiveDays > 0)
+                        {
+                            <div class="streak-badge">🔥 @(@r.ConsecutiveDays)일 연속</div>
+                        }
+                        <div class="podium-date">마지막 수행: @FmtDateFull(r.LastActionDate)</div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+
+    <!-- ── 4위 이하 카드 ── -->
+    @if (rest.Count > 0)
+    {
+        <div class="section-label">ALL PARTICIPANTS</div>
+        <div class="grid" id="cardGrid">
+            @for (int i = 0; i < rest.Count; i++)
+            {
+                var r = rest[i];
+                var rankNum = i + 4;
+                var photo = ProfileOrDefault(r.UserId);
+                _parentChildInfo.TryGetValue(Safe(r.UserName), out var pci);
+                var roleKey = GetRoleKey(r);
+                var sortName = string.IsNullOrWhiteSpace(r.FullName) ? r.UserName.ToLowerInvariant() : r.FullName.ToLowerInvariant();
+                var dataName = $"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.DisplayRoleText)} {Safe(pci)} {Safe(r.FamilyTeamName)}".ToLowerInvariant();
+                // 아바타 링 계산 (r=26, circumference≈163.36)
+                var _caCirc   = 2.0 * Math.PI * 26.0;
+                var _caOffset = _caCirc * (1.0 - Math.Clamp(r.AchievePercent, 0, 100) / 100.0);
+
+                <div class="card"
+                     data-role="@roleKey"
+                     data-name="@dataName"
+                     data-sort-score="@r.YearPoint"
+                     data-sort-streak="@r.ConsecutiveDays"
+                     data-sort-name="@sortName"
+                     data-sort-last="@(r.LastActionDate.HasValue ? r.LastActionDate.Value.ToString("yyyy-MM-dd") : "")"
+                     style="animation-delay: @(Math.Min(i, 15) * 0.05)s">
+                    <div class="card-header">
+                        <div class="c-avatar">
+                            <svg class="ca-ring-svg" width="62" height="62">
+                                <circle class="ca-ring-track" cx="31" cy="31" r="26" stroke-width="4"/>
+                                <circle class="ring-fill ca-ring-fill" cx="31" cy="31" r="26" stroke-width="4"
+                                        stroke-dasharray="@_caCirc.ToString("F2")"
+                                        stroke-dashoffset="@_caCirc.ToString("F2")"
+                                        data-target-offset="@_caOffset.ToString("F2")"/>
+                            </svg>
+                            <img data-src="@photo" src="/images/icon/people/people_01.webp"
+                                 alt="@r.FullName"
+                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                            <span class="rank-no">@rankNum</span>
+                        </div>
+                        <div class="c-info">
+                            <div class="c-name">@(!string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName)</div>
+                            <div class="c-meta">
+                                @if (!string.IsNullOrWhiteSpace(r.UserName))
+                                {
+                                    <span class="tag tag-uid" title="아이디">@@@r.UserName</span>
+                                }
+                                @if (r.IsStudent)
+                                {
+                                    <span class="tag tag-student">학생</span>
+                                    <span class="tag tag-neutral">@(@r.ClassYear)학년 @(@r.ClassBan)반</span>
+                                }
+                                else if (roleKey == "teacher")
+                                {
+                                    <span class="tag tag-teacher">교사</span>
+                                    @if (!string.IsNullOrWhiteSpace(r.RoleName))
+                                    {
+                                        <span class="tag tag-neutral">@r.RoleName</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="tag tag-check">부모/확인</span>
+                                    @if (!string.IsNullOrWhiteSpace(pci))
+                                    {
+                                        <span class="tag tag-neutral" title="@pci">자녀있음</span>
+                                    }
+                                }
+                                @if (!string.IsNullOrWhiteSpace(r.FamilyTeamName))
+                                {
+                                    <span class="tag tag-family" title="@r.FamilyTeamName">👨‍👩‍👧</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="stat-row">
+                            <div class="stat-box">
+                                <div class="sk">점수</div>
+                                <div class="sv score-val" data-count="@r.YearPoint">@r.YearPoint</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="sk">연속 수행</div>
+                                <div class="sv">
+                                    @if (r.ConsecutiveDays > 0)
+                                    { <span class="streak-mini">🔥 @(@r.ConsecutiveDays)일</span> }
+                                    else
+                                    { <span style="color:var(--txt3)">—</span> }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bar-wrap">
+                            <div class="bar-top">
+                                <span>달성율</span>
+                                <span><b>@r.AchievePercent%</b> · @FmtDate(r.LastActionDate)</span>
+                            </div>
+                            <div class="bar">
+                                <div class="bar-fill" data-pct="@r.AchievePercent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (top3.Count == 0)
+    {
+        <div class="empty">😔 표시할 참여자가 없습니다.</div>
+    }
+
+    <!-- 네비 버튼 -->
+    <div class="nav-btns">
+        <a class="nav-btn" href="/">
+            <div class="ni">🏠</div>
+            <div class="nt"><b>홈으로</b><span>메인 화면으로 이동</span></div>
+        </a>
+        <a class="nav-btn" href="/DailyMission2/Index">
+            <div class="ni">📖</div>
+            <div class="nt"><b>도전 성경으로</b><span>말씀 미션 수행하기</span></div>
+        </a>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── 다크모드 ──────────────────────────── */
+    const html  = document.documentElement;
+    const saved = localStorage.getItem('pp-theme');
+    if (saved) html.dataset.theme = saved;
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) html.dataset.theme = 'dark';
+
+    document.getElementById('themeBtn').addEventListener('click', () => {
+        const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+        html.dataset.theme = next;
+        localStorage.setItem('pp-theme', next);
+        document.getElementById('themeBtn').textContent = next === 'dark' ? '☀️' : '🌙';
+    });
+    document.getElementById('themeBtn').textContent = html.dataset.theme === 'dark' ? '☀️' : '🌙';
+
+    /* ── 이미지 Lazy Load ─────────────────── */
+    const imgIO = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            const img = e.target;
+            const src = img.dataset.src;
+            if (src) {
+                img.src = src;
+                img.addEventListener('load',  () => img.classList.add('loaded'), { once: true });
+                img.addEventListener('error', () => { img.src = '/images/icon/people/people_01.webp'; img.classList.add('loaded'); }, { once: true });
+                delete img.dataset.src;
+            }
+            imgIO.unobserve(img);
+        });
+    }, { rootMargin: '300px' });
+
+    document.querySelectorAll('img[data-src]').forEach(img => imgIO.observe(img));
+
+    /* ── 숫자 카운팅 애니메이션 ─────────────── */
+    function countUp(el, target, dur) {
+        let start = 0, startTime = null;
+        const step = (ts) => {
+            if (!startTime) startTime = ts;
+            const pct = Math.min((ts - startTime) / dur, 1);
+            const ease = 1 - Math.pow(1 - pct, 3);
+            el.textContent = Math.round(start + (target - start) * ease).toLocaleString();
+            if (pct < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    }
+
+    /* ── SVG 링 + 카운트 + 바 애니메이션 ───── */
+    const animIO = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            animIO.unobserve(e.target);
+
+            // 바
+            e.target.querySelectorAll('.bar-fill[data-pct]').forEach(fill => {
+                fill.style.width = fill.dataset.pct + '%';
+            });
+
+            // SVG 링
+            e.target.querySelectorAll('.ring-fill[data-target-offset]').forEach(circle => {
+                circle.style.strokeDashoffset = circle.dataset.targetOffset;
+            });
+
+            // % 텍스트
+            e.target.querySelectorAll('.ring-center .ring-pct[data-pct]').forEach(el => {
+                const target = parseInt(el.dataset.pct, 10);
+                countUp(el, target, 1400);
+                el.dataset.done = '1';
+            });
+
+            // 점수 카운팅
+            e.target.querySelectorAll('[data-count]').forEach(el => {
+                const target = parseInt(el.dataset.count, 10);
+                if (!isNaN(target)) countUp(el, target, 1200);
+            });
+        });
+    }, { threshold: 0.1 });
+
+    // 시상대 카드
+    document.querySelectorAll('.podium-card').forEach(c => animIO.observe(c));
+    // 일반 카드
+    document.querySelectorAll('.card').forEach(c => animIO.observe(c));
+
+    // % 텍스트 포맷 (카운팅 끝날 때 '%' 붙이기)
+    const origCountUp = countUp;
+
+    /* ── 필터·정렬 ───────────────────────── */
+    const qInput   = document.getElementById('q');
+    const sortSel  = document.getElementById('sortSel');
+    const roleBtns = Array.from(document.querySelectorAll('#roleSeg button'));
+    const countEl  = document.getElementById('totalCount');
+    const grid     = document.getElementById('cardGrid');
+    let   activeRole = 'all';
+
+    function getAllCards() {
+        const all = [];
+        document.querySelectorAll('.podium-card, .card').forEach(c => all.push(c));
+        return all;
+    }
+
+    function parseNum(s) { const n = parseInt(s, 10); return isNaN(n) ? 0 : n; }
+    function parseDate(s) { if (!s) return 0; const t = Date.parse(s + 'T00:00:00'); return isNaN(t) ? 0 : t; }
+
+    function compare(a, b, mode) {
+        switch (mode) {
+            case 'name_asc':
+                return (a.dataset.sortName || '').localeCompare(b.dataset.sortName || '', 'ko') ||
+                       parseNum(b.dataset.sortScore) - parseNum(a.dataset.sortScore);
+            case 'streak_desc':
+                return parseNum(b.dataset.sortStreak) - parseNum(a.dataset.sortStreak) ||
+                       parseNum(b.dataset.sortScore) - parseNum(a.dataset.sortScore);
+            case 'last_desc':
+                return parseDate(b.dataset.sortLast) - parseDate(a.dataset.sortLast) ||
+                       parseNum(b.dataset.sortScore) - parseNum(a.dataset.sortScore);
+            default: // score_desc
+                return parseNum(b.dataset.sortScore) - parseNum(a.dataset.sortScore) ||
+                       (a.dataset.sortName || '').localeCompare(b.dataset.sortName || '', 'ko');
+        }
+    }
+
+    function apply() {
+        const term = (qInput.value || '').trim().toLowerCase();
+        const mode = sortSel.value || 'score_desc';
+        const cards = getAllCards();
+
+        const vis = [];
+        cards.forEach(c => {
+            const okRole = activeRole === 'all' || c.dataset.role === activeRole;
+            const okTerm = !term || (c.dataset.name || '').includes(term);
+            c.style.display = (okRole && okTerm) ? '' : 'none';
+            if (okRole && okTerm) vis.push(c);
+        });
+
+        vis.sort((a, b) => compare(a, b, mode));
+
+        if (grid) {
+            const frag = document.createDocumentFragment();
+            vis.filter(c => c.classList.contains('card')).forEach(c => frag.appendChild(c));
+            grid.appendChild(frag);
+        }
+
+        // 순위 번호 갱신 (일반 카드만)
+        let idx = top3vis(vis) + 1;
+        vis.filter(c => c.classList.contains('card')).forEach(c => {
+            const el = c.querySelector('.rank-no');
+            if (el) el.textContent = idx++;
+        });
+
+        if (countEl) countEl.textContent = vis.length;
+    }
+
+    function top3vis(vis) {
+        return vis.filter(c => c.classList.contains('podium-card')).length;
+    }
+
+    roleBtns.forEach(btn => btn.addEventListener('click', () => {
+        roleBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeRole = btn.dataset.role || 'all';
+        apply();
+    }));
+
+    qInput.addEventListener('input', apply);
+    sortSel.addEventListener('change', apply);
+
+    // 최초 기본 정렬 적용 (DOM은 이미 점수순으로 서버서 정렬됨)
+    // 애니메이션 stagger 적용을 위해 약간의 지연 후 실행
+    setTimeout(() => {
+        document.querySelectorAll('.card, .podium-card').forEach((c, i) => {
+            c.style.animationDelay = (i * 0.04) + 's';
+        });
+    }, 0);
+
+})();
+</script>
+</body>
+</html>

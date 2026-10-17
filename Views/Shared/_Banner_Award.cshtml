@@ -1,0 +1,654 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    // 이번 주 시상 대상자 리스트
+    var awardUsersRaw = ViewBag.PointAwardUser as List<PointAwardUser>;
+
+    // ✅ Total 기준 내림차순 정렬 (null 안전)
+    var awardUsers = (awardUsersRaw ?? new List<PointAwardUser>())
+        .OrderByDescending(x => x.Total)
+        .ToList();
+
+    int awardCount = awardUsers.Count;
+
+    // 미리보기(상단 요약)용 이름 3명
+    var topNames = new List<string>();
+    foreach (var u in awardUsers.Take(3))
+    {
+        if (!string.IsNullOrWhiteSpace(u.FullName)) topNames.Add(u.FullName);
+        else if (!string.IsNullOrWhiteSpace(u.UserName)) topNames.Add(u.UserName);
+    }
+    string previewNames = string.Join(", ", topNames);
+}
+
+@if (awardUsers != null && awardUsers.Any())
+{
+    <!--
+      ✅ 적용 내용(이전과 동일)
+      1) 쿠키 판정 결과에 따라 "배너 + 스타일 + 로딩 UI" 전체를 통째로 보이거나/DOM 제거
+      2) 판정 중에는 “결정 중…” 부트 UI가 먼저 보임
+      - cookieKey: ThisWeekAwardBanner_v1 그대로 사용
+    -->
+
+    <div id="award-banner-root"
+         class="award-root js-global-cookie-section"
+         data-cookie-key="ThisWeekAwardBanner_v1"
+         data-state="checking">
+
+        <!-- ✅ (2) 판정중 UI: 먼저 보임 -->
+        <div class="award-boot" aria-live="polite">
+            <div class="award-boot-card">
+                <div class="award-boot-row">
+                    <div class="award-boot-spinner" aria-hidden="true"></div>
+                    <div class="award-boot-title">시상 배너 표시 여부를 확인 중이에요…</div>
+                </div>
+                <div class="award-boot-sub">잠시만요 ✨ (숨김 설정이 있으면 자동으로 감춰져요)</div>
+            </div>
+        </div>
+
+        <!-- ✅ 실제 배너(Show일 때만 표시) -->
+        <div class="award-content" hidden>
+            <div class="award-hero-wrap">
+                <div class="award-hero"
+                     onclick="location.href='/CheckPoint/GetThisWeekRewardingAward?viewOption=v';"
+                     role="button"
+                     tabindex="0">
+
+                    <div class="award-badge" onclick="location.href='/CheckPoint/GetThisWeekRewardingAward?viewOption=v';">🏅 @awardCount 명</div>
+
+                    <div class="award-head">
+                        <div class="award-titlebox">
+                            <div class="award-kicker">
+                                <span class="dot"></span>
+                                <span>@ConstatsCommon.MainKeyTitle 시상 대상자</span>
+                            </div>
+
+                            <div class="award-title">이번 주 시상 대상자를 확인해요</div>
+
+                            <div class="award-sub">
+                                미리보기:
+                                <span class="award-preview-names">
+                                    @previewNames
+                                    @if (awardCount > topNames.Count)
+                                    {
+                                        @: 외 @((awardCount - topNames.Count))명
+                                    }
+                                </span>
+                            </div>
+                        </div>
+
+                        @* 버튼 클릭은 배너 이동 막기 *@
+                        <div class="award-actions" onclick="event.stopPropagation();">
+                            <button type="button" class="award-btn ghost js-global-cookie-hide-btn" data-hide="today">
+                                오늘만 숨기기
+                            </button>
+                            <button type="button" class="award-btn ghost js-global-cookie-hide-btn" data-hide="1week">
+                                1주 숨기기
+                            </button>
+                            <button type="button" class="award-btn ghost js-global-cookie-hide-btn" data-hide="3week">
+                                3주 숨기기
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="award-grid">
+                        @for (int i = 0; i < awardUsers.Count; i++)
+                        {
+                            var u = awardUsers[i];
+
+                            var displayName = !string.IsNullOrWhiteSpace(u.FullName) ? u.FullName : u.UserName;
+                            var initial = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1);
+
+                            // 메타(학년/반/역할/부서)
+                            var metaParts = new List<string>();
+                            if (u.ClassYear > 0) metaParts.Add($"{u.ClassYear}학년");
+                            if (u.ClassBan > 0) metaParts.Add($"{u.ClassBan}반");
+                            if (!string.IsNullOrWhiteSpace(u.RoleNM)) metaParts.Add(u.RoleNM);
+                            var meta = string.Join(" · ", metaParts);
+
+                            // ⭐ Total 기준 레벨
+                            bool is1500 = u.Total >= 1500;
+                            bool is1000 = u.Total >= 1000;
+
+                            string celebrateClass = "";
+                            if (is1500) celebrateClass = "celebrate celebrate-1500";
+                            else if (is1000) celebrateClass = "celebrate";
+
+                            string scoreClass = "";
+                            if (is1500) scoreClass = "level-1500";
+                            else if (is1000) scoreClass = "level-1000";
+
+                            var levelText = is1500 ? "1500+ 달성" : (is1000 ? "1000+ 달성" : "시상 대상");
+
+                            // ✅ 상품 선택 여부 + 상품 이미지 경로
+                            var productIdStr = "";
+                            try
+                            {
+                                productIdStr = (u.ProductID == null) ? "" : u.ProductID.ToString();
+                            }
+                            catch { productIdStr = ""; }
+
+                            bool hasProduct = !string.IsNullOrWhiteSpace(productIdStr) && productIdStr != "0";
+                            var productImg = hasProduct ? $"/images/AwardItem/{productIdStr}.jpg" : "";
+
+                            <article class="award-card @celebrateClass">
+                                <div class="award-avatar-wrap">
+                                    <div class="award-avatar">
+                                        @if (!string.IsNullOrEmpty(u.ProfilePicturePath))
+                                        {
+                                            <img src="@u.ProfilePicturePath"
+                                                 alt="@displayName 프로필 사진" loading="lazy" />
+                                        }
+                                        else
+                                        {
+                                            <span class="award-initial">@initial</span>
+                                        }
+                                    </div>
+
+                                    @* ✅ 배지를 avatar 내부가 아니라 wrap에 붙여서, 바깥으로 나가도 안 잘리게 *@
+                                    @if (hasProduct)
+                                    {
+                                        <span class="award-item-badge" title="선택한 상품">
+                                            <img src="@productImg"
+                                                 alt="선택 상품"
+                                                 loading="lazy"
+                                                 onerror="this.onerror=null;this.style.display='none';" />
+                                        </span>
+                                    }
+                                </div>
+
+                                <div class="award-info">
+                                    <div class="award-name">@displayName</div>
+                                    <div class="award-meta">@meta</div>
+
+                                    @if (u.Total > 0)
+                                    {
+                                        <div class="award-score-row">
+                                            <span class="award-score-pill @scoreClass">
+                                                <span class="emoji">⭐</span>
+                                                <span>총점</span>
+                                                <span class="value">@u.Total.ToString("N0")</span>
+                                            </span>
+                                        </div>
+                                    }
+
+                                    <div class="award-tag">🏆 @levelText</div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ✅ 스타일도 “Show 상태”에서만 적용되도록 스코프 처리 + Boot 스타일 포함 -->
+        <style id="award-banner-style">
+            /* ==========================================
+                           ✅ Boot(판정중) UI: 먼저 보임
+                           ========================================== */
+            .award-root {
+                margin: 1.2rem 0 2rem;
+            }
+
+            .award-boot {
+                display: block;
+            }
+
+            .award-boot-card {
+                border-radius: 18px;
+                padding: .95rem 1rem;
+                background: rgba(2, 6, 23, .06);
+                border: 1px solid rgba(2, 6, 23, .10);
+                box-shadow: 0 14px 34px rgba(2, 6, 23, .08);
+                backdrop-filter: blur(10px);
+            }
+
+            .award-boot-row {
+                display: flex;
+                align-items: center;
+                gap: .65rem;
+            }
+
+            .award-boot-title {
+                font-weight: 900;
+                font-size: .98rem;
+                color: rgba(2,6,23,.88);
+            }
+
+            .award-boot-sub {
+                margin-top: .35rem;
+                font-size: .86rem;
+                color: rgba(2,6,23,.60);
+                font-weight: 700;
+            }
+
+            .award-boot-spinner {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                border: 3px solid rgba(2,6,23,.18);
+                border-top-color: rgba(52,211,153,.95);
+                animation: awardSpin .8s linear infinite;
+            }
+
+            @@keyframes awardSpin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            /* ==========================================
+                           ✅ 배너 스타일: Show 상태에서만 적용
+                           (중요) 전부 .award-root[data-state="shown"] 아래로 스코프
+                           ========================================== */
+
+            .award-root[data-state="shown"] .award-hero-wrap {
+                margin: 1.2rem 0 2rem;
+            }
+
+            .award-root[data-state="shown"] .award-hero {
+                position: relative;
+                border-radius: 26px;
+                padding: 1.4rem 1.6rem 1.6rem;
+                background: linear-gradient(135deg, #e0f7fa 0%, #e8f5e9 45%, #fffde7 100%);
+                border: 3px solid #81d4fa;
+                box-shadow: 0 14px 30px rgba(129, 212, 250, 0.35);
+                overflow: hidden;
+                color: #134e4a;
+                cursor: pointer;
+                transition: transform .12s ease, box-shadow .12s ease;
+            }
+
+                .award-root[data-state="shown"] .award-hero:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 18px 36px rgba(129, 212, 250, 0.45);
+                }
+
+            .award-root[data-state="shown"] .award-badge {
+                position: absolute;
+                top: 14px;
+                right: 14px;
+                padding: 0.4rem 0.9rem;
+                border-radius: 999px;
+                background: #fff8e1;
+                border: 2px solid #ffd54f;
+                font-size: 0.85rem;
+                font-weight: 900;
+                color: #8d6e00;
+                box-shadow: 0 4px 10px rgba(255, 213, 79, 0.45);
+                white-space: nowrap;
+                z-index: 2;
+            }
+
+            .award-root[data-state="shown"] .award-head {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                gap: 1rem;
+                margin-bottom: 1rem;
+                position: relative;
+                z-index: 1;
+            }
+
+            .award-root[data-state="shown"] .award-titlebox {
+                display: flex;
+                flex-direction: column;
+                gap: 0.35rem;
+                min-width: 240px;
+            }
+
+            .award-root[data-state="shown"] .award-kicker {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.45rem;
+                font-weight: 800;
+                font-size: 0.85rem;
+                color: #0f766e;
+            }
+
+                .award-root[data-state="shown"] .award-kicker .dot {
+                    width: 9px;
+                    height: 9px;
+                    border-radius: 50%;
+                    background: #34d399;
+                    box-shadow: 0 0 8px rgba(52, 211, 153, 0.7);
+                }
+
+            .award-root[data-state="shown"] .award-title {
+                font-size: 1.1rem;
+                font-weight: 900;
+                color: #064e3b;
+                letter-spacing: 0.02em;
+            }
+
+            .award-root[data-state="shown"] .award-sub {
+                font-size: 0.92rem;
+                color: #065f46;
+                line-height: 1.4;
+            }
+
+            .award-root[data-state="shown"] .award-preview-names {
+                display: inline-block;
+                padding: 0.35rem 0.75rem;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.85);
+                border: 2px solid #b3e5fc;
+                color: #0f172a;
+                font-weight: 900;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            }
+
+            .award-root[data-state="shown"] .award-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.45rem;
+                align-items: center;
+            }
+
+            .award-root[data-state="shown"] .award-btn {
+                border-radius: 999px;
+                border: 0;
+                padding: 0.45rem 0.9rem;
+                font-size: 0.82rem;
+                font-weight: 800;
+                cursor: pointer;
+                background: #34d399;
+                color: #064e3b;
+                box-shadow: 0 4px 12px rgba(52, 211, 153, 0.5);
+                transition: background .12s ease, transform .12s ease;
+                white-space: nowrap;
+            }
+
+                .award-root[data-state="shown"] .award-btn:hover {
+                    background: #6ee7b7;
+                    transform: translateY(-1px);
+                }
+
+                .award-root[data-state="shown"] .award-btn.ghost {
+                    background: rgba(255, 255, 255, 0.9);
+                    border: 1px solid #81d4fa;
+                    color: #0369a1;
+                    box-shadow: none;
+                }
+
+                    .award-root[data-state="shown"] .award-btn.ghost:hover {
+                        background: #e0f2fe;
+                    }
+
+            .award-root[data-state="shown"] .award-grid {
+                margin-top: 1rem;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+                gap: 0.9rem;
+                position: relative;
+                z-index: 1;
+            }
+
+            .award-root[data-state="shown"] .award-card {
+                position: relative;
+                border-radius: 18px;
+                background: #ffffff;
+                border: 2px solid #e0f2fe;
+                padding: 0.85rem 0.9rem;
+                display: flex;
+                align-items: center;
+                box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+                overflow: visible;
+            }
+
+            .award-root[data-state="shown"] .award-avatar-wrap {
+                position: relative;
+                width: 70px;
+                height: 70px;
+                flex-shrink: 0;
+                overflow: visible;
+            }
+
+            .award-root[data-state="shown"] .award-avatar {
+                position: relative;
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #bbdefb, #c8e6c9);
+                border: 2px solid #81d4fa;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                overflow: hidden;
+            }
+
+                .award-root[data-state="shown"] .award-avatar img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+
+            .award-root[data-state="shown"] .award-initial {
+                font-size: 1.3rem;
+                font-weight: 900;
+                color: #0369a1;
+            }
+
+            .award-root[data-state="shown"] .award-item-badge {
+                position: absolute;
+                right: -10px;
+                bottom: -10px;
+                width: 36px;
+                height: 36px;
+                border-radius: 999px;
+                background: #fff;
+                border: 2px solid rgba(129, 212, 250, 0.95);
+                box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 5;
+            }
+
+                .award-root[data-state="shown"] .award-item-badge img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+
+            .award-root[data-state="shown"] .award-info {
+                display: flex;
+                flex-direction: column;
+                gap: 0.15rem;
+                min-width: 0;
+                flex: 1;
+            }
+
+            .award-root[data-state="shown"] .award-name {
+                font-size: 1rem;
+                font-weight: 900;
+                color: #0f172a;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                padding-left: 2.4rem;
+            }
+
+            .award-root[data-state="shown"] .award-meta {
+                font-size: 0.82rem;
+                color: #475569;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                padding-left: 2.4rem;
+            }
+
+            .award-root[data-state="shown"] .award-score-row {
+                margin-top: 0.35rem;
+                padding-left: 2.4rem;
+            }
+
+            .award-root[data-state="shown"] .award-score-pill {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.28rem 0.7rem;
+                border-radius: 999px;
+                font-size: 0.82rem;
+                font-weight: 900;
+                white-space: nowrap;
+                border: 2px solid #e2e8f0;
+                background: #f8fafc;
+                color: #0f172a;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+            }
+
+                .award-root[data-state="shown"] .award-score-pill .emoji {
+                    font-size: 1rem;
+                }
+
+                .award-root[data-state="shown"] .award-score-pill .value {
+                    font-size: 0.9rem;
+                }
+
+                .award-root[data-state="shown"] .award-score-pill.level-1000 {
+                    background: #ecfdf5;
+                    border-color: #6ee7b7;
+                    color: #065f46;
+                    box-shadow: 0 3px 10px rgba(16,185,129,0.22);
+                }
+
+                .award-root[data-state="shown"] .award-score-pill.level-1500 {
+                    background: #fffbeb;
+                    border-color: #fcd34d;
+                    color: #8d6e00;
+                    box-shadow: 0 3px 10px rgba(234,179,8,0.22);
+                }
+
+            .award-root[data-state="shown"] .award-card.celebrate::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: linear-gradient(90deg, rgba(56,189,248,0.0), rgba(56,189,248,0.35), rgba(52,211,153,0.35), rgba(250,204,21,0.35), rgba(56,189,248,0.0));
+                filter: blur(10px);
+                animation: glowSweep 2.2s ease-in-out infinite;
+                pointer-events: none;
+            }
+
+            .award-root[data-state="shown"] .award-card.celebrate::after {
+                content: "🎉";
+                position: absolute;
+                right: 12px;
+                top: 10px;
+                font-size: 1.15rem;
+                opacity: 0.75;
+                animation: pop 1.4s ease-in-out infinite;
+                pointer-events: none;
+            }
+
+            @@keyframes glowSweep {
+                0% {
+                    transform: translateX(-30%);
+                    opacity: 0.45;
+                }
+
+                50% {
+                    transform: translateX(30%);
+                    opacity: 0.85;
+                }
+
+                100% {
+                    transform: translateX(-30%);
+                    opacity: 0.45;
+                }
+            }
+
+            @@keyframes pop {
+                0% {
+                    transform: translateY(0) scale(1);
+                }
+
+                50% {
+                    transform: translateY(-2px) scale(1.06);
+                }
+
+                100% {
+                    transform: translateY(0) scale(1);
+                }
+            }
+
+            .award-root[data-state="shown"] .award-card.celebrate-1500::after {
+                content: "👑🎉";
+                opacity: 0.85;
+            }
+
+            .award-root[data-state="shown"] .award-tag {
+                font-size: 0.78rem;
+                font-weight: 900;
+                color: #ca8a04;
+                padding-left: 2.4rem;
+                margin-top: 0.15rem;
+            }
+
+            @@media (min-width: 768px) {
+                .award-root[data-state="shown"] .award-title {
+                    font-size: 1.75rem;
+                }
+            }
+        </style>
+
+        <!-- ✅ 쿠키 판정 스크립트: 숨김이면 "배너+스타일" 전체 제거, 아니면 Show -->
+        <script>
+            (function () {
+                var root = document.getElementById("award-banner-root");
+                if (!root) return;
+
+                var cookieKey = root.getAttribute("data-cookie-key") || "ThisWeekAwardBanner_v1";
+
+                function getCookie(name) {
+                    var m = document.cookie.match(new RegExp("(^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+                    return m ? decodeURIComponent(m[2]) : null;
+                }
+
+                function showContent() {
+                    root.setAttribute("data-state", "shown");
+
+                    var boot = root.querySelector(".award-boot");
+                    var content = root.querySelector(".award-content");
+
+                    if (boot) boot.style.display = "none";
+                    if (content) { content.hidden = false; content.style.display = "block"; }
+
+                    // ✅ 글로벌 훅이 display:none을 걸어둔 경우 대비
+                    root.style.display = "block";
+                }
+
+                function hideAll() {
+                    root.setAttribute("data-state", "hidden");
+
+                    // ✅ 스타일 제거
+                    var st = document.getElementById("award-banner-style");
+                    if (st && st.parentNode) st.parentNode.removeChild(st);
+
+                    // ✅ 배너 DOM 통째로 제거 (boot 포함)
+                    if (root && root.parentNode) root.parentNode.removeChild(root);
+                }
+
+                // 판정중 UI는 이미 보이는 상태(data-state="checking")
+                var v = getCookie(cookieKey);
+
+                if (v) hideAll();
+                else showContent();
+            })();
+        </script>
+    </div>
+}
+else
+{
+    @* 필요하면 “없을 때”도 보여주고 싶으면 아래 주석 해제 *@
+    @*
+    <div class="award-hero-wrap">
+        <div class="award-empty">이번 주 시상 대상자 없어요 😊</div>
+    </div>
+    *@
+}

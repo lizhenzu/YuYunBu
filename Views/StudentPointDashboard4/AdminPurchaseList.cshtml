@@ -1,0 +1,409 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Services.GiftAdmin;
+@using System.Linq;
+@model UnifiedGiftAdminPageVM
+
+@*  ══════════════════════════════════════════════════════════════
+    선물 관리 통합 화면 — Bone 스킨
+
+    네 가지 선물을 한 곳에서 다룬다.
+      · 도토리 · 가족팀 · 가족 합산  (StudentPointGiftOrder)
+      · 성경통독 완독              (BibleGiftOrders)
+
+    상태는 하나로 맞췄다 — 아직 안 고름 → 신청중 → 구매완료 → 전달완료
+      (도토리·가족의 HIDDEN 을 전달완료로 본다)
+
+    줄을 누르면 받는 사람·상품 설명·일시가 펼쳐진다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    string N(int v) => v.ToString("N0");
+
+    var vm        = Model ?? new UnifiedGiftAdminPageVM();
+    var pending   = vm.PendingRows   ?? new List<UnifiedGiftAdminRowVM>();
+    var delivered = vm.DeliveredRows ?? new List<UnifiedGiftAdminRowVM>();
+
+    string kindQ = vm.KindFilter.HasValue ? vm.KindFilter.Value.ToString() : "";
+
+    // 거르개는 전달 완료 묶음에만 건다
+    string Url(string? k) => $"/StudentPointDashboard4/AdminPurchaseList?kind={k ?? ""}#done";
+
+    const string GiftFallback = "/images/gift-placeholder.png";
+
+    var toast = TempData["GiftToast"] as string;
+
+    // 한 줄 그리기
+    async Task Row(UnifiedGiftAdminRowVM r)
+    {
+        <div class="apRow">
+            <details>
+                <summary>
+                    <img class="apImg" src="@(r.ImageUrl ?? GiftFallback)" alt="@r.ProductName" loading="lazy"
+                         onerror="this.src='@GiftFallback'" />
+                    <span class="apTx">
+                        <span class="apN">
+                            @(string.IsNullOrWhiteSpace(r.ProductName) ? "아직 안 골랐어요" : r.ProductName)
+                        </span>
+                        <span class="apS" style="display:block">
+                            <b class="apKind k@((int)r.Kind)">@r.KindLabel</b>
+                            @r.FullName
+                            @if (!string.IsNullOrWhiteSpace(r.ContextLabel))
+                            {
+                                <text> · @r.ContextLabel</text>
+                            }
+                            @if (r.UnitPrice > 0)
+                            {
+                                <text> · @(N(r.UnitPrice))원</text>
+                            }
+                        </span>
+                    </span>
+                    <span class="apMore apDetBtn"></span>
+                </summary>
+
+                <div class="apDet">
+                    <div class="apWho">
+                        <img class="apWhoPh" src="@r.PhotoUrl" alt="@r.FullName" loading="lazy"
+                             onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp'" />
+                        <span class="apWhoN">@r.FullName<span class="apWhoR">@r.UserName</span></span>
+                        <span class="apWhoPt">@r.StateLabel</span>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(r.ProductDescription))
+                    {
+                        <div class="apDesc">
+                            <span data-copy>@r.ProductDescription</span>
+                            <button type="button" class="apCopy" onclick="apCopy(this)">복사</button>
+                        </div>
+                    }
+
+                    <div class="apMeta">
+                        @if (r.SelectedAt.HasValue)  { <text>고른 날 @r.SelectedAt.Value.ToString("yyyy-MM-dd HH:mm")<br /></text> }
+                        @if (r.PurchasedAt.HasValue) { <text>구매 @r.PurchasedAt.Value.ToString("yyyy-MM-dd HH:mm")<br /></text> }
+                        @if (r.DeliveredAt.HasValue) { <text>전달 @r.DeliveredAt.Value.ToString("yyyy-MM-dd HH:mm")<br /></text> }
+                    </div>
+
+                    <div class="apActs">
+                        @if (!string.IsNullOrWhiteSpace(r.ExternalUrl))
+                        {
+                            <a class="apBtn brass" href="@r.ExternalUrl" target="_blank" rel="noopener">쿠팡에서 보기</a>
+                        }
+
+                        @if (r.CanPurchase)     { await ActionForm(r, "purchase",     "구매 완료", "ink",  null); }
+                        @if (r.CanDeliver)      { await ActionForm(r, "deliver",      "전달 완료", "ink",  null); }
+                        @if (r.CanUndoPurchase) { await ActionForm(r, "undoPurchase", "구매 취소", "undo", "구매 완료를 되돌릴까요?"); }
+                        @if (r.CanUndoDeliver)  { await ActionForm(r, "undoDeliver",  "전달 취소", "undo", "전달 완료를 되돌릴까요?"); }
+                    </div>
+                </div>
+            </details>
+        </div>
+    }
+
+    async Task ActionForm(UnifiedGiftAdminRowVM r, string op, string label, string cls, string? confirmMsg)
+    {
+        <form method="post" action="/StudentPointDashboard4/AdminGiftAction" style="margin:0;"
+              class="apActForm" data-confirm="@confirmMsg">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="op" value="@op" />
+            <input type="hidden" name="kind" value="@r.Kind" />
+            <input type="hidden" name="orderId" value="@r.OrderId" />
+            <input type="hidden" name="kindFilter" value="@kindQ" />
+            <button type="submit" class="apBtn @cls">@label</button>
+        </form>
+        await Task.CompletedTask;
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>통합 선물 관리 — @ConstatsCommon.MainKeyTitle</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap">
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) — 색은 직접 지정한다 ── */
+        body { margin: 0; background: #FFFFFF; }
+        .qz.ap { padding-bottom: 0; background: #FFFFFF; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: #374151; }
+        .qz.ap .qzBody { background: #FFFFFF; }
+        .qz.ap .qzBar { border-bottom-color: #EEF0F3; }
+        .qz.ap .qzProg { display: none; }
+
+        .qz .apPgm { padding: 20px 0 0; border-bottom: 0; }
+        .qz .apPgmK { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; margin: 0; }
+        .qz .apPgmT { margin-top: 6px; font-family: inherit; font-weight: 800; font-size: 24px; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+        .qz .apPgmS { margin-top: 5px; font-size: 12.5px; color: #6B7280; line-height: 1.7; word-break: keep-all; }
+
+        /* 요약 */
+        .qz .apSum { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 18px; padding-top: 14px; border-top: 1px solid #EEF0F3; border-bottom: 0; }
+        .qz .apSum > div { text-align: center; padding: 0; border-right: 0; flex: none; }
+        .qz .apSum > div + div { border-left: 1px solid #EEF0F3; }
+        .qz .apSum .k { font-size: 11.5px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; margin-bottom: 3px; }
+        .qz .apSum .v { font-family: inherit; font-weight: 300; font-size: 22px; color: #111827; font-variant-numeric: tabular-nums; }
+        .qz .apSum .v.acc { color: #2F80ED; }
+        .qz .apSum .v u { text-decoration: none; font-size: 11px; color: #9CA3AF; margin-left: 1px; }
+
+        /* 탭 (종류 거르개) */
+        .qz .apTabs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px; }
+        .qz .apTabs a { font-size: 12.5px; font-weight: 400; letter-spacing: 0; text-decoration: none; padding: 7px 12px; border: 0; background: #F4F6F9; color: #6B7280; border-radius: 999px; white-space: nowrap; }
+        .qz .apTabs a.on { background: #2F80ED; color: #fff; }
+        .qz .apTabsK { font-size: 12px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; padding: 2px 0 0; }
+
+        /* 한 줄 */
+        .qz .apRow { display: block; padding: 0; border-bottom: 1px solid #EEF0F3; }
+        .qz .apRow details { min-width: 0; }
+        .qz .apRow summary { display: flex; gap: 11px; align-items: center; list-style: none; cursor: pointer; padding: 12px 0; -webkit-tap-highlight-color: transparent; }
+        .qz .apRow summary::-webkit-details-marker { display: none; }
+        .qz .apImg { width: 46px; height: 46px; border-radius: 12px; object-fit: cover; flex: 0 0 auto; background: #F4F6F9; display: block; cursor: zoom-in; }
+
+        /* 선물 사진 크게 보기 — 사진을 누르면 (줄은 펼치지 않는다) */
+        .apZoom { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(17,24,39,.6); align-items: center; justify-content: center; padding: 18px; }
+        .apZoom.on { display: flex; }
+        .apZoomBox { background: #FFFFFF; max-width: 420px; width: 100%; padding: 12px; border-radius: 16px; box-shadow: 0 20px 50px rgba(17,24,39,.35); }
+        .apZoomBox img { width: 100%; height: auto; display: block; background: #F4F6F9; border-radius: 12px; }
+        .apZoomN { font-size: 14px; font-weight: 700; color: #111827; text-align: center; padding: 12px 6px 2px; word-break: keep-all; }
+        .apZoomX { width: 100%; margin-top: 10px; padding: 12px; border: 0; border-radius: 12px; background: #111827; color: #fff; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .qz .apTx { flex: 1 1 auto; min-width: 0; }
+        .qz .apN { font-size: 14.5px; font-weight: 700; color: #111827; line-height: 1.35; word-break: keep-all; }
+        .qz .apS { font-size: 11.5px; color: #6B7280; margin-top: 2px; font-variant-numeric: tabular-nums; }
+
+        /* 종류 딱지 */
+        .qz .apKind { font-family: inherit; font-size: 10.5px; font-weight: 800; letter-spacing: 0; border: 0; border-radius: 999px; padding: 1px 8px; margin-right: 5px; white-space: nowrap; }
+        .qz .apKind.k0 { background: #FFF4DB; color: #8A6410; }   /* 도토리 */
+        .qz .apKind.k1 { background: #E6F5EC; color: #1E7A45; }   /* 가족팀 */
+        .qz .apKind.k2 { background: #E6F5EC; color: #1E7A45; }   /* 가족 합산 */
+        .qz .apKind.k3 { background: #EAF2FD; color: #2B5FA8; }   /* 성경통독 */
+
+        .qz .apMore { padding: 0; }
+        .qz .apDetBtn { font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; padding: 0; line-height: normal; border: 0; color: #2F80ED; white-space: nowrap; display: inline-block; }
+        .qz .apDetBtn::after { content: "자세히"; }
+        .qz .apRow > details[open] > summary .apDetBtn { color: #2F80ED; }
+        .qz .apRow > details[open] > summary .apDetBtn::after { content: "닫기"; }
+
+        .qz .apBtn { font-family: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: 0; padding: 9px 15px; border: 0; color: #2F80ED; background: #FFFFFF; white-space: nowrap; cursor: pointer; border-radius: 999px; text-decoration: none; display: inline-block; }
+        .qz .apBtn.ink { background: #2F80ED; color: #fff; }
+        .qz .apBtn.undo { background: #FBEFE7; color: #B4531F; }
+        .qz .apBtn.undo:hover { background: #F7E3D5; }
+        .qz .apBtn.brass { background: #FFFFFF; color: #2F80ED; }
+        .qz .apBtn:hover { filter: brightness(.97); }
+
+        /* 펼친 내용 */
+        .qz .apDet { margin: 0 0 12px 0; padding: 12px 14px; border-top: 0; border-radius: 12px; background: #F4F6F9; }
+        .qz .apWho { display: flex; align-items: center; gap: 9px; }
+        .qz .apWhoPh { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex: 0 0 auto; box-shadow: none; background: #fff; }
+        .qz .apWhoN { font-size: 13px; font-weight: 700; color: #111827; }
+        .qz .apWhoR { font-size: 11px; font-weight: 400; color: #9CA3AF; margin-left: 4px; }
+        .qz .apWhoPt { margin-left: auto; font-family: inherit; font-size: 12px; font-weight: 700; color: #6B7280; white-space: nowrap; }
+        .qz .apDesc { display: flex; gap: 8px; align-items: flex-start; margin-top: 9px; font-size: 12px; color: #6B7280; line-height: 1.6; }
+        .qz .apDesc span { flex: 1; min-width: 0; white-space: pre-line; word-break: break-word; }
+        .qz .apCopy { flex: 0 0 auto; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; color: #6B7280; border: 0; background: #FFFFFF; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+        .qz .apMeta { margin-top: 8px; font-family: inherit; font-size: 11px; color: #9CA3AF; line-height: 1.8; font-variant-numeric: tabular-nums; }
+        .qz .apActs { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+        .qz .apActs form { margin: 0; }
+        .qz .apNone { padding: 22px 0; font-size: 13px; color: #9CA3AF; border-bottom: 1px solid #EEF0F3; }
+
+        /* 묶음 머리 */
+        .qz .apLaneH { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; padding: 16px 0 0; border-top: 1px solid #EEF0F3; border-bottom: 0; }
+        .qz .apLaneT { font-family: inherit; font-size: 16px; font-weight: 800; color: #111827; }
+        .qz .apLaneN { font-size: 11.5px; font-weight: 600; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+
+        .qz .apDone { margin-top: 6px; }
+        .qz .apDoneH { display: flex; justify-content: space-between; align-items: baseline; cursor: pointer; padding: 16px 0 12px; border-top: 1px solid #EEF0F3; border-bottom: 0; color: #9CA3AF; list-style: none; }
+        .qz .apDoneH::-webkit-details-marker { display: none; }
+        .qz .apDone .apLaneT { font-size: 16px; }
+        .qz .apDoneList .apRow { opacity: .85; }
+        .qz .apFoldHint { color: #2F80ED; font-weight: 700; }
+        .qz .apFoldHint::after { content: "펼치기"; }
+        .qz .apDone[open] .apFoldHint::after { content: "닫기"; }
+        .qz .apWarn { margin-top: 14px; padding: 10px 12px; border: 0; border-radius: 12px; background: #FBEFE7; font-size: 12px; color: #B4531F; line-height: 1.7; }
+
+        .qz .apTot { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #EEF0F3; padding: 12px 0 14px; background: #FFFFFF; }
+        .qz .apTot > div { text-align: center; }
+        .qz .apTot .k { font-size: 11.5px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; margin-bottom: 2px; }
+        .qz .apTot .v { font-family: inherit; font-size: 17px; font-weight: 300; color: #111827; font-variant-numeric: tabular-nums; }
+        .qz .apTot .v.acc { color: #2F80ED; }
+        .qz .apTot.sticky { position: sticky; bottom: 0; z-index: 5; margin: 22px calc(var(--pad, 0px) * -1) 0; padding-left: var(--pad, 0px); padding-right: var(--pad, 0px); box-shadow: 0 -6px 18px rgba(17,24,39,.05); }
+
+        .qz .apToast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: #111827; color: #fff; font-size: 12.5px; padding: 10px 16px; border-radius: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+        .qz .apToast.on { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="qz ap">
+        <div class="qzBody">
+
+            <div class="qzBar">
+                <div>
+                    <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/StudentPointDashboard4/Index">@ConstatsCommon.myDoToRi</a>
+                </div>
+                <div class="qzDate">관리자</div>
+            </div>
+            <div class="qzProg"><i style="width:100%"></i></div>
+
+            <div class="apPgm">
+                <div class="apPgmK">잠실새내 유년부 입니다.</div>
+                <div class="apPgmT">통합 선물 관리</div>
+                <div class="apPgmS">@ConstatsCommon.myDoToRi · @ConstatsCommon.MainKeyTitle 가족합산 · @ConstatsCommon.ReadBibleAllTitleButton 완독 선물을 한 곳에서 처리해요. 줄을 누르면 자세한 내용이 펼쳐져요</div>
+            </div>
+
+            @if (vm.LoadErrors.Any())
+            {
+                <div class="apWarn">
+                    @foreach (var e in vm.LoadErrors)
+                    {
+                        <div>@e</div>
+                    }
+                </div>
+            }
+
+            <div class="apSum">
+                <div>
+                    <div class="k">처리할 것</div>
+                    <div class="v acc">@N(vm.PickedCount)<u>건</u></div>
+                </div>
+                <div>
+                    <div class="k">전달할 것</div>
+                    <div class="v">@N(vm.PurchasedCount)<u>건</u></div>
+                </div>
+                <div>
+                    <div class="k">쓴 금액</div>
+                    <div class="v">@N(vm.PurchasedSum)<u>원</u></div>
+                </div>
+            </div>
+
+            @* ── 미처리 — 거르지 않고 전부 ── *@
+            <div class="apLaneH">
+                <span class="apLaneT">미처리</span>
+                <span class="apLaneN">@(pending.Count)건 · 전부 보여줘요</span>
+            </div>
+
+            @if (pending.Count == 0)
+            {
+                <div class="apNone">처리할 선물이 없어요</div>
+            }
+            else
+            {
+                foreach (var r in pending)
+                {
+                    await Row(r);
+                }
+            }
+
+            @* ── 전달 완료 — 접어 두고, 종류 거르개는 여기에만 건다 ── *@
+            @if (vm.DeliveredTotalCount > 0)
+            {
+                <details class="apDone" id="done" @(vm.KindFilter.HasValue ? "open" : "")>
+                    <summary class="apDoneH">
+                        <span class="apLaneT">전달 완료</span>
+                        <span class="apLaneN">@(vm.DeliveredTotalCount)건 · <span class="apFoldHint"></span></span>
+                    </summary>
+
+                    <div class="apTabsK">지난 내역에서 찾기</div>
+                    <div class="apTabs">
+                        <a class="@(vm.KindFilter == null ? "on" : "")" href="@Url(null)">전체 @vm.DeliveredTotalCount</a>
+                        <a class="@(vm.KindFilter == GiftKind.Point ? "on" : "")" href="@Url("Point")">@ConstatsCommon.myDoToRi @vm.DeliveredPointCount</a>
+                        <a class="@(vm.KindFilter == GiftKind.FamilyCombined ? "on" : "")" href="@Url("FamilyCombined")">@ConstatsCommon.MainKeyTitle 가족합산 @vm.DeliveredFamilyCombinedCount</a>
+                        <a class="@(vm.KindFilter == GiftKind.Bible ? "on" : "")" href="@Url("Bible")">@ConstatsCommon.ReadBibleAllTitleButton @vm.DeliveredBibleCount</a>
+                    </div>
+
+                    <div class="apDoneList">
+                        @if (delivered.Count == 0)
+                        {
+                            <div class="apNone">이 종류는 지난 내역이 없어요</div>
+                        }
+                        else
+                        {
+                            foreach (var r in delivered)
+                            {
+                                await Row(r);
+                            }
+                        }
+                    </div>
+                </details>
+            }
+
+            <div class="apTot sticky">
+                <div>
+                    <div class="k">미처리</div>
+                    <div class="v acc">@N(pending.Count)</div>
+                </div>
+                <div>
+                    <div class="k">미처리 금액</div>
+                    <div class="v">@N(pending.Sum(r => r.UnitPrice))</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="apToast" id="apToast" role="status" aria-live="polite"></div>
+    </div>
+
+    @* 선물 사진 크게 보기 *@
+    <div class="apZoom" id="apZoom" onclick="apZoomClose()">
+        <div class="apZoomBox" onclick="event.stopPropagation()">
+            <img id="apZoomImg" src="" alt="" />
+            <div class="apZoomN" id="apZoomN"></div>
+            <button type="button" class="apZoomX" onclick="apZoomClose()">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        // 상품 설명 복사
+        async function apCopy(btn) {
+            var src = btn.parentElement.querySelector('[data-copy]');
+            var text = src ? src.textContent.trim() : '';
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (e) {
+                var ta = document.createElement('textarea');
+                ta.value = text; document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); } catch (e2) { }
+                document.body.removeChild(ta);
+            }
+            apToast('설명을 복사했어요');
+        }
+
+        function apToast(msg) {
+            var t = document.getElementById('apToast');
+            if (!t || !msg) return;
+            t.textContent = msg;
+            t.classList.add('on');
+            setTimeout(function () { t.classList.remove('on'); }, 1800);
+        }
+
+        // 선물 사진을 누르면 크게 보기 — 줄(details)은 펼치지 않는다
+        function apZoomClose() { document.getElementById('apZoom').classList.remove('on'); }
+        document.querySelectorAll('.apRow .apImg').forEach(function (img) {
+            img.addEventListener('click', function (e) {
+                e.preventDefault(); e.stopPropagation();
+                document.getElementById('apZoomImg').src = img.getAttribute('src');
+                document.getElementById('apZoomImg').alt = img.alt || '';
+                document.getElementById('apZoomN').textContent = img.alt || '';
+                document.getElementById('apZoom').classList.add('on');
+            });
+        });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') apZoomClose(); });
+
+        // 버튼을 눌렀을 때 줄이 같이 펼쳐지지 않게
+        document.querySelectorAll('.apRow summary .apBtn, .apRow summary form').forEach(function (el) {
+            el.addEventListener('click', function (e) { e.stopPropagation(); });
+        });
+
+        // 되돌리기처럼 한 번 더 묻는 것들
+        document.querySelectorAll('.apActForm').forEach(function (f) {
+            var msg = f.getAttribute('data-confirm');
+            if (!msg) return;
+            f.addEventListener('submit', function (e) {
+                if (!confirm(msg)) e.preventDefault();
+            });
+        });
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <text>apToast(@Html.Raw(Json.Serialize(toast)));</text>
+    }
+    </script>
+</body>
+</html>

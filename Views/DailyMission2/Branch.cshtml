@@ -1,0 +1,160 @@
+@{
+    Layout = null;
+}
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@*  ══════════════════════════════════════════════════════════════
+    성경미션 속으로 (갈림길) — 2026-10-05 시안 확정 A안 (DailyMission4 밝은 흰색 · quiz-bright.css)
+    · 홈의 "말씀·미션"(/DailyMission2/Branch)이 여는 화면.  큰 숫자(점수 · 완독률) + 번호 목록.
+    · 연결 주소를 최신으로 바꿨다:
+        미션홈            /DailyMission2/index              → /DailyMission4/Index
+        성경말씀 참여자   /DailyMission2/ParticipantPersons → /DailyMission4/ParticipantPersons
+        성경 대시보드     /Bible/Welcome                    → /Bible2
+        성경통독 참여자   /bibleCenter/MyDashboardList      → /Bible2/Participants
+    · 2026-10-05 추가 수정: 성경노트 → /Bible2/Bookmarks · 최근 읽은 곳 이어 읽기 → /Bible2/Read(Bible2 "이어 읽기"와 같은 방식)
+      · 바로가기의 SuperAdmin 테스트 2개(미션 2025 · 2026 시상) 삭제
+    · 선물 보기 · 유튜브 2개는 그대로
+    · 예전에 있던 "통합 대시보드 숨기기"(쿠키 TotalDashBoard) 칸은 없앴다 — 보이고 숨기는 선택 없이 늘 보인다
+    · 이전 화면은 Branch.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+
+    // 올해 내 점수 (홈 · 미션홈과 같은 계산)
+    int totalPoint = 0;
+    if (ViewBag.YearTotalPoint is int ytp)
+    {
+        totalPoint = ytp;
+    }
+    else if (ViewBag.TodayCheckCompositeData != null)
+    {
+        dynamic data = ViewBag.TodayCheckCompositeData;
+        try { totalPoint = data.Total_All == null ? 0 : Convert.ToInt32(data.Total_All); } catch { totalPoint = 0; }
+    }
+
+    // 성경 66권 완독률
+    double speed = 0;
+    if (ViewBag.TotalProgressRate != null)
+    {
+        double.TryParse(ViewBag.TotalProgressRate.ToString(), out speed);
+        if (speed <= 1) speed *= 100;
+    }
+    int readPct = (int)Math.Round(Math.Clamp(speed, 0, 100));
+
+    // 최근 읽은 성경 (있을 때만 한 줄 더)
+    string ActionSource     = HttpContextAccessor.HttpContext?.Session.GetString(MVCInfomation.ActionSource.ToString()) ?? "";
+    string ControllerSource = HttpContextAccessor.HttpContext?.Session.GetString(MVCInfomation.ControllerSource.ToString()) ?? "";
+    var lastRead = ViewBag.BibleLastReadInfo as BibleLastReadInfo;
+    string lastReadUrl = null, lastReadLabel = null;
+    if (lastRead != null)
+    {
+        // /Bible2 의 "이어 읽기"와 같은 방식 — 마지막으로 읽은 책 · 장으로 새 성경 읽기 화면(/Bible2/Read)을 열고, 읽던 절(#vc-책장절)로 내려간다
+        var bookName = (lastRead.BibleText ?? "").Trim();
+        lastReadUrl = $"/Bible2/Read?bookName={Uri.EscapeDataString(bookName)}&jang={lastRead.Jang}"
+                    + (lastRead.Zul > 0 ? $"#vc-{Uri.EscapeDataString(bookName + lastRead.Jang + lastRead.Zul)}" : "");
+        var bt = bookName;
+        lastReadLabel = (!string.IsNullOrEmpty(bt) && lastRead.Jang > 0) ? $"{bt} · {lastRead.Jang}장"
+                      : !string.IsNullOrEmpty(bt) ? bt : (lastRead.Jang > 0 ? $"{lastRead.Jang}장" : "");
+    }
+    int n1 = 0, n2 = 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>성경미션 속으로</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .mb-big { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 14px; border-radius: 8px; background: var(--soft); }
+        .mb-big .l small { display: block; font-size: 11.5px; font-weight: 700; color: var(--blue); }
+        .mb-big .l b { display: block; margin-top: 2px; font-size: 32px; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .mb-big .l b em { margin-left: 3px; font-style: normal; font-size: 13px; font-weight: 700; letter-spacing: 0; color: var(--dim2); }
+        .qb a.mb-go { flex: none; border-radius: 999px; padding: 9px 15px; font-size: 13px; font-weight: 800; background: var(--blue); color: #fff; white-space: nowrap; }
+        .qb a.mb-go:hover { background: #1F6FDB; color: #fff; }
+        .mb-bar { height: 7px; margin-top: 12px; border-radius: 7px; background: #fff; overflow: hidden; }
+        .mb-bar i { display: block; height: 100%; border-radius: 7px; background: var(--blue); }
+        .mb-col { display: block; }
+        .qb-row .g.ext { font-size: 14px; font-weight: 700; color: var(--blue); }
+        .qb-row.adm .t b { color: var(--warn); }
+        .qb-row .t b { word-break: keep-all; }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>불러오는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>성경미션 속으로</span>
+        <span>MISSION</span>
+    </div>
+
+    <div class="qb-k">BIBLE MISSION</div>
+    <h1 class="qb-h1">성경미션 속으로</h1>
+    <div class="qb-sub">말씀으로 하루를 시작해요</div>
+
+    @* ── ① 도전! 성경말씀 ── *@
+    <div class="qb-sec">@ConstatsCommon.MainKeyTitle<small>오늘의 말씀 · 퀴즈 · 암송 · 기도</small></div>
+    <div class="mb-big">
+        <div class="l"><small>올해 내 점수</small><b>@totalPoint.ToString("N0")<em>점</em></b></div>
+        <a class="mb-go" href="/DailyMission4/Index">미션홈 ›</a>
+    </div>
+    <a class="qb-row" href="/DailyMission4/ParticipantPersons"><span class="n">@((++n1).ToString("00"))</span><span class="t"><b>참여자 보기</b><small>함께하는 친구들과 가족팀</small></span><span class="g">›</span></a>
+    <a class="qb-row" href="/Present/ListPresent?productDisplayOpton=display"><span class="n">@((++n1).ToString("00"))</span><span class="t"><b>선물 보기</b><small>도토리로 받을 수 있는 선물</small></span><span class="g">›</span></a>
+    <a class="qb-row" href="https://www.youtube.com/watch?v=nmEH3FeHk3A" target="_blank" rel="noopener noreferrer"><span class="n">@((++n1).ToString("00"))</span><span class="t"><b>소개 영상</b><small>유튜브로 이동해요</small></span><span class="g ext">↗</span></a>
+    <a class="qb-row" href="https://www.youtube.com/watch?v=s6os4aGVKCY" target="_blank" rel="noopener noreferrer"><span class="n">@((++n1).ToString("00"))</span><span class="t"><b>관련 영상 모음</b><small>유튜브로 이동해요</small></span><span class="g ext">↗</span></a>
+
+    @* ── ② 도전! 성경통독 ── *@
+    <div class="qb-sec">@ConstatsCommon.ReadBibleAllTitleButton<small>66권 완독에 도전해요</small></div>
+    <div class="mb-big mb-col">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px">
+            <div class="l"><small>전체 성경 완독률</small><b>@readPct<em>%</em></b></div>
+            <a class="mb-go" href="/Bible2">성경 대시보드 ›</a>
+        </div>
+        <div class="mb-bar" role="progressbar" aria-valuenow="@readPct" aria-valuemin="0" aria-valuemax="100"><i style="width:@(readPct)%"></i></div>
+    </div>
+    @if (!string.IsNullOrEmpty(lastReadUrl))
+    {
+        <a class="qb-row" href="@lastReadUrl"><span class="n">@((++n2).ToString("00"))</span><span class="t"><b>최근 읽은 곳 이어 읽기</b>@if (!string.IsNullOrWhiteSpace(lastReadLabel)) {<small>@lastReadLabel</small>}</span><span class="g">›</span></a>
+    }
+    <a class="qb-row" href="/Bible2/Participants"><span class="n">@((++n2).ToString("00"))</span><span class="t"><b>참여자 보기</b><small>완독에 도전하는 친구들</small></span><span class="g">›</span></a>
+    <a class="qb-row" href="/Bible2/Bookmarks"><span class="n">@((++n2).ToString("00"))</span><span class="t"><b>성경노트</b><small>읽으며 남긴 노트 모아보기</small></span><span class="g">›</span></a>
+
+    @* ── 바로가기 ── *@
+    <div class="qb-sec">바로가기</div>
+    <a class="qb-row" href="/"><span class="n">·</span><span class="t"><b>@(ConstatsCommon.ToHome)</b></span><span class="g">›</span></a>
+    @* SuperAdmin 테스트 메뉴 2개(미션 2025 · 미션 2026 시상)는 2026-10-05 삭제 *@
+
+    <div class="qb-ft">
+        <span>성경미션 속으로</span>
+        <span><a href="#" onclick="history.back(); return false;">뒤로</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/GlobalCookie.js"></script>
+<script>
+    // 같은 사이트 안으로 이동할 때만 대기 카드 (유튜브처럼 새 창은 제외)
+    document.addEventListener('click', function (e) {
+        var a = e.target.closest('a[href]');
+        if (!a || a.target === '_blank' || /^(https?:)?\/\//.test(a.getAttribute('href')) || a.getAttribute('href').charAt(0) === '#') return;
+        document.getElementById('loadingOverlay').classList.add('on');
+    });
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.eBibles
+
+@{
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+
+    DateTime ExposeDate = DateHelper.GetKoreaNow();
+
+    if (ViewBag.ExposeDate != null && DateTime.TryParse(ViewBag.ExposeDate.ToString(), out ExposeDate))
+    {
+        ExposeDate = ViewBag.ExposeDate;
+    }
+
+    string dayString_Y = ExposeDate.AddDays(-1).ToString("yyyy-MM-dd");
+    string dayString_T = ExposeDate.ToString("yyyy-MM-dd");
+    string dayString_N = ExposeDate.AddDays(1).ToString("yyyy-MM-dd");
+
+}
+
+@{
+    string queryString = string.Empty;
+    @if (@ActionSource == MissionKinds.TodayWordToRead.ToString())
+    {
+        queryString = $"/DailyMission/BibleSheet?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+    }
+    else
+    {
+        queryString = $"/DailyMission/BibleSheet3?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+        queryString = queryString + SharedComm.MakeBibleQueryString(Model.BibleText, Model.FromJang, Model.FromZul, Model.ToJang, Model.ToZul);
+    }
+}
+@if (@ActionSource == MissionKinds.TodayWordToRead.ToString())
+{
+    <div class="button-bar  no-select">
+        <div class="buttonCommon  colorBaseMossGreen   " id="closeDiv" onclick="redirectToPage('@queryString&WorkDT=@dayString_Y')">이전</div>
+        <div class="buttonCommon  colorBaseAmber       " id="closeDiv" onclick="redirectToPage('@queryString&WorkDT=@dayString_N')">이후</div>
+        <div class="buttonCommon  colorBaseSoftMint    " id="closeDiv" onclick="redirectToPage('/')">홈으로</div>
+        <div class="buttonCommon  colorBaseSoftLavender" id="closeDiv" onclick="redirectToPage('/Home/MissionMainBoard')">미션홈</div>
+    </div>
+}

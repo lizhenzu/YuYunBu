@@ -1,0 +1,388 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.PresentBirthGiftVM
+
+@*  ══════════════════════════════════════════════════════════════
+    생일 선물 고르기 — Bone 스킨
+    가족 합산 선물 화면(FamilyGiftSelect)과 같은 구성이다.
+    · 카드를 누르면 아래 확인 상자에 고른 선물이 뜨고, "이 선물로 선택"으로 보낸다
+    · 가격은 관리자에게만 보인다
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    ViewData["Title"] = "생일 선물 고르기";
+
+    var pickSuccessMsg    = TempData["PickSuccess"] as string;
+    var purchaseLockedMsg = TempData["PurchaseLockedMessage"] as string;
+    var isPurchased       = Model?.MyPick?.IsPurchased ?? false;
+
+    var currentUserId      = HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString()) ?? "";
+    var targetUserId       = ViewBag.TargetUserId as string ?? currentUserId;
+    var targetUserFullName = ViewBag.TargetUserFullName as string ?? "";
+    // 대상자 이름이 없으면 로그인한 본인 이름 (BaseController 가 ViewData 에 넣어 둔다)
+    var myFullName         = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string ?? "";
+    var whoName            = string.IsNullOrWhiteSpace(targetUserFullName) ? myFullName : targetUserFullName;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isSuperAdmin || isAdmin;
+    bool canSeePrice = ViewBag.CanSeePrice is bool _csp && _csp;
+
+    var items = Model?.Items ?? new List<BulletinBoard.Models.AwardItem>();
+
+    // 종류 = 상품명(문구세트·장난감·키캡 …). 많은 순으로 꼬리표를 만든다.
+    string Kind(BulletinBoard.Models.AwardItem x) => string.IsNullOrWhiteSpace(x.ProductName) ? "기타" : x.ProductName.Trim();
+    var kinds = items.GroupBy(Kind).Select(g => new { Name = g.Key, Count = g.Count() })
+                     .OrderByDescending(g => g.Count).ThenBy(g => g.Name).ToList();
+
+    // 헤더에 보여 줄 가격 범위 — 지금 목록의 실제 최저~최고. 단위는 credit.
+    var priceList = items.Where(x => x.UnitPrice > 0).Select(x => x.UnitPrice).ToList();
+    string rangeText = priceList.Count == 0
+        ? ""
+        : (priceList.Min() == priceList.Max()
+            ? $"{priceList.Min():N0}"
+            : $"{priceList.Min():N0} ~ {priceList.Max():N0}");
+
+    int ruleMin = ViewBag.PriceRuleMin is int _a ? _a : 0;
+    int ruleMax = ViewBag.PriceRuleMax is int _b ? _b : 0;
+    string limitText = (canSeePrice && ruleMax > 0) ? $"기준 {ruleMin:N0} ~ {ruleMax:N0}" : "";
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@ViewData["Title"] — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap">
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    /* ── DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 ── */
+    body { margin: 0; background: #FFFFFF; padding-bottom: 150px; }
+    .qz { background: #FFFFFF; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: #374151; }
+    .qz .qzBody { background: #FFFFFF; }
+    .qz .qzBar { border-bottom-color: #EEF0F3; }
+    .qz .qzDate { letter-spacing: 0; font-size: 12px; color: #9CA3AF; }
+
+    /* ── 머리 ── */
+    .qz .bgHead { margin: 0; padding: 20px 0 0; background: none; color: inherit; }
+    .qz .bgK { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .qz .bgH1 { margin: 6px 0 0; font-family: inherit; font-weight: 800; font-size: 24px; line-height: 1.35; letter-spacing: -.02em; color: #111827; word-break: keep-all; }
+    .qz .bgH1 b { font-weight: 800; color: inherit; }
+
+    /* 선물 조건 — 가는 선 아래 별도 줄. 금액은 누구에게나 보인다. */
+    .qz .bgCond { margin-top: 16px; padding-top: 12px; border-top: 1px solid #EEF0F3;
+                  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    .qz .bgCondK { font-size: 12px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; }
+    .qz .bgCondV { font-family: inherit; font-size: 15px; font-weight: 300; color: #2F80ED; font-variant-numeric: tabular-nums; }
+    .qz .bgCondV u { text-decoration: none; font-size: 11px; color: #6B7280; margin-left: 3px; }
+    .qz .bgCondV em { font-style: normal; font-family: inherit; font-size: 11.5px; color: #9CA3AF; margin-left: 8px; }
+
+    .qz .bgNote { font-size: 13px; color: #6B7280; margin-top: 6px; line-height: 1.7; word-break: keep-all; }
+    .qz .bgMsg { margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: #EAF2FD; font-size: 12.5px; color: #2B5FA8; line-height: 1.6; }
+    .qz .bgLock { margin-top: 16px; padding: 10px 12px; border: 0; border-radius: 12px; background: #F4F6F9; font-size: 12.5px; color: #6B7280; line-height: 1.6; }
+
+    .qz .bgSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; padding: 16px 0 0; border-top: 1px solid #EEF0F3; border-bottom: 0; }
+    .qz .bgSecT { font-family: inherit; font-size: 16px; font-weight: 800; color: #111827; }
+    .qz .bgSecS { font-size: 11.5px; font-weight: 600; color: #9CA3AF; }
+
+    /* 지금 고른 선물 */
+    .qz .bgCur { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 12px; background: #F4F6F9; margin-top: 12px; }
+    .qz .bgCurImg { width: 84px; height: 84px; border-radius: 12px; object-fit: cover; background: #E8ECF2; flex: 0 0 auto; display: block; }
+    .qz .bgCurTx { flex: 1 1 auto; min-width: 0; }
+    .qz .bgCurN { font-family: inherit; font-size: 15px; font-weight: 700; line-height: 1.4; color: #111827; word-break: keep-all; }
+    .qz .bgCurD { font-size: 12px; color: #6B7280; margin-top: 3px; line-height: 1.6; word-break: keep-all; }
+    .qz .bgCurM { font-size: 11.5px; color: #9CA3AF; margin-top: 6px; font-variant-numeric: tabular-nums; }
+    .qz .bgCurBtn { border: 0; background: #FBEFE7; color: #B4531F; padding: 8px 14px; font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; border-radius: 999px; cursor: pointer; }
+    .qz .bgCurBtn:hover { background: #F7E3D5; }
+
+    /* 종류 거르기 */
+    .qz .bgHint { font-size: 12px; color: #6B7280; margin-top: 6px; line-height: 1.6; }
+    .qz .bgHint b { color: #2F80ED; font-weight: 700; }
+    .qz .bgChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .qz .bgChip { font-family: inherit; font-size: 12.5px; padding: 7px 12px; border: 0; border-radius: 999px;
+                  background: #F4F6F9; color: #6B7280; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .qz .bgChip b { font-family: inherit; font-weight: 400; color: #9CA3AF; margin-left: 4px; }
+    .qz .bgChip.on { background: #2F80ED; color: #fff; }
+    .qz .bgChip.on b { color: #D6E6FB; }
+
+    /* 격자 : 모바일 2열 → 넓어지면 3·4열 */
+    .qz .bgGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px;
+                  background: none; border: 0; margin-top: 16px; }
+    .qz .bgCard { position: relative; background: none; padding: 0; text-align: left; border: 0;
+                  font-family: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; -webkit-tap-highlight-color: transparent; }
+    .qz .bgCard[hidden] { display: none; }
+    .qz .bgCard:hover .bgNm { color: #2F80ED; }
+    .qz .bgCard.sel { background: none; outline: 0; }
+    .qz .bgImg { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 14px; background: #F4F6F9; overflow: hidden; }
+    .qz .bgCard.sel .bgImg { box-shadow: inset 0 0 0 3px #2F80ED; }
+    .qz .bgImg img { width: 100%; height: 100%; object-fit: cover; display: block; background: transparent; }
+    .qz .bgPrice { position: absolute; right: 6px; bottom: 6px; font-family: inherit; font-size: 11px; font-weight: 700;
+                   background: rgba(17,24,39,.78); color: #fff; padding: 2px 8px; border-radius: 999px; }
+    .qz .bgCheck { position: absolute; left: 8px; top: 8px; width: 24px; height: 24px; border-radius: 50%;
+                   background: #2F80ED; color: #fff; font-size: 13px; font-weight: 800; display: none; place-items: center; }
+    .qz .bgCard.sel .bgCheck { display: grid; }
+    .qz .bgNm { font-family: inherit; font-size: 14.5px; font-weight: 700; line-height: 1.35; color: #111827; margin-top: 8px; word-break: keep-all; }
+    .qz .bgDs { font-size: 11.5px; color: #6B7280; margin-top: 2px; line-height: 1.5;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+    .qz .bgPickTag { margin-top: auto; padding-top: 6px; font-size: 12px; font-weight: 700; letter-spacing: 0; color: #2F80ED; }
+    .qz .bgCard.sel .bgPickTag { color: #111827; }
+    .qz .bgEmpty { padding: 40px 0; text-align: center; font-size: 13px; color: #9CA3AF; }
+
+    @@media (min-width: 560px) { .qz .bgGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @@media (min-width: 860px) { .qz .bgGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+    /* 아래 확인 상자 — 항상 보인다. 고르기 전에는 무엇을 해야 하는지 안내만 띄운다. */
+    .bgSheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff;
+               border-top: 1px solid #EEF0F3; padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+               box-shadow: 0 -8px 24px rgba(17,24,39,.06); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; }
+    .bgSheetIn { max-width: 760px; margin: 0 auto; }
+    .bgIdle { font-size: 13px; color: #6B7280; text-align: center; padding: 8px 0; line-height: 1.6; }
+    .bgPicked { display: none; }
+    .bgSheet.open .bgPicked { display: block; }
+    .bgSheet.open .bgIdle { display: none; }
+    .bgSheetK { font-size: 12px; font-weight: 800; letter-spacing: 0; color: #2F80ED; }
+    .bgSheetN { font-family: inherit; font-size: 16px; font-weight: 700; margin-top: 3px; color: #111827;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bgSheetI { font-size: 12px; color: #6B7280; line-height: 1.7; margin-top: 5px; }
+    .bgSheetI b { color: #111827; }
+    .bgActs { display: flex; gap: 8px; margin-top: 12px; }
+    .bgActs form { flex: 2; display: flex; margin: 0; }
+    .bgBtn { flex: 1; font-family: inherit; font-size: 14px; font-weight: 700; letter-spacing: 0;
+             padding: 13px 0; border: 0; background: #F4F6F9; color: #6B7280;
+             cursor: pointer; border-radius: 12px; }
+    .bgBtn.ok { width: 100%; background: #2F80ED; color: #fff; font-size: 14.5px; font-weight: 800; }
+    .bgBtn.ok:hover { background: #1F6FDB; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">← @ConstatsCommon.ToHome</a>
+                @if (isStaff)
+                {
+                    <span class="qzHomeSep">·</span><a class="qzHome" href="/Present/AdminUpcomingBirthdays">관리자</a>
+                }
+            </div>
+            <div class="qzDate">생일 선물</div>
+        </div>
+
+        <header class="bgHead">
+            <div class="bgK">생일 선물</div>
+            <h1 class="bgH1"><b>@whoName</b> 님, 생일 축하해요!</h1>
+            @if (!string.IsNullOrWhiteSpace(rangeText))
+            {
+                <div class="bgCond">
+                    <span class="bgCondK">고를 수 있는 선물 가격</span>
+                    <span class="bgCondV">
+                        @rangeText<u>credit</u>
+                        @if (!string.IsNullOrWhiteSpace(limitText))
+                        {
+                            <em>@limitText</em>
+                        }
+                    </span>
+                </div>
+            }
+        </header>
+
+        <div class="bgNote">선물을 고르면 선생님이 준비해 드려요. 다시 고르면 먼저 고른 선물은 바뀌어요.</div>
+
+        @if (!string.IsNullOrWhiteSpace(pickSuccessMsg))
+        {
+            <div class="bgMsg">@pickSuccessMsg</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(purchaseLockedMsg))
+        {
+            <div class="bgMsg">@purchaseLockedMsg</div>
+        }
+
+        @* ── 지금 고른 선물 ── *@
+        @if (Model?.MyPick != null)
+        {
+            <div class="bgSec">
+                <span class="bgSecT">지금 고른 선물</span>
+                <span class="bgSecS">@(isPurchased ? "바꿀 수 없어요" : "바꾸려면 아래에서 다시 고르세요")</span>
+            </div>
+            <div class="bgCur">
+                <img class="bgCurImg" src="/images/AwardItem/@(Model.MyPick.ProductId).jpg" alt="@Model.MyPick.ProductName"
+                     onerror="bgImgFail(this)" />
+                <div class="bgCurTx">
+                    <div class="bgCurN">@Model.MyPick.ProductName</div>
+                    @if (!string.IsNullOrWhiteSpace(Model.MyPick.ProductDescription))
+                    {
+                        <div class="bgCurD">@Model.MyPick.ProductDescription</div>
+                    }
+                    <div class="bgCurM">@Model.MyPick.PickedAt.ToString("yyyy-MM-dd") 선택</div>
+                    @if (!isPurchased)
+                    {
+                        <form method="post" action="/Present/CancelBirth"
+                              onsubmit="return confirm('고른 선물을 취소할까요?');" style="margin-top:11px">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="targetUserId" value="@targetUserId" />
+                            <button type="submit" class="bgCurBtn">선택 취소</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (isPurchased)
+        {
+            <div class="bgLock">이미 주문한 선물이에요. 더 이상 바꿀 수 없어요.</div>
+        }
+        else
+        {
+            <div class="bgSec">
+                <span class="bgSecT">@(Model?.MyPick != null ? "다른 선물로 바꾸기" : "고를 수 있는 선물")</span>
+                <span class="bgSecS"><span id="bgCount">@items.Count</span>종</span>
+            </div>
+
+            @if (items.Count == 0)
+            {
+                <div class="bgEmpty">지금 고를 수 있는 선물이 없어요</div>
+            }
+            else
+            {
+                <div class="bgHint">선물을 눌러 고른 뒤, 화면 아래에서 <b>이 선물로 선택</b>을 누르세요.</div>
+
+                <div class="bgChips" id="bgChips">
+                    <button type="button" class="bgChip on" data-kind="">전체<b>@items.Count</b></button>
+                    @foreach (var k in kinds)
+                    {
+                        <button type="button" class="bgChip" data-kind="@k.Name">@k.Name<b>@k.Count</b></button>
+                    }
+                </div>
+
+                <div class="bgGrid" id="bgGrid">
+                    @foreach (var item in items)
+                    {
+                        var desc = (item.ProductDescription ?? "").Trim();
+                        <button type="button" class="bgCard"
+                                data-pid="@item.ProductID"
+                                data-kind="@Kind(item)"
+                                data-name="@(string.IsNullOrWhiteSpace(desc) ? item.ProductName : $"{item.ProductName} · {desc}")">
+                            <span class="bgImg">
+                                <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" loading="lazy" decoding="async"
+                                     onerror="bgImgFail(this)" />
+                                <span class="bgCheck" aria-hidden="true">✓</span>
+                                @if (canSeePrice)
+                                {
+                                    <span class="bgPrice">@(item.UnitPrice.ToString("N0")) credit</span>
+                                }
+                            </span>
+                            <span class="bgNm">@item.ProductName</span>
+                            @if (!string.IsNullOrWhiteSpace(desc))
+                            {
+                                <span class="bgDs">@desc</span>
+                            }
+                            <span class="bgPickTag">고르기</span>
+                        </button>
+                    }
+                </div>
+            }
+        }
+
+    </div>
+</div>
+
+@if (!isPurchased && items.Count > 0)
+{
+    @* ── 아래 확인 상자 ── *@
+    <div class="bgSheet" id="bgSheet" role="dialog" aria-live="polite" aria-label="고른 선물 확인">
+        <div class="bgSheetIn">
+            <div class="bgIdle">위에서 선물을 눌러 고르면, 여기에서 선택할 수 있어요</div>
+            <div class="bgPicked">
+                <div class="bgSheetK">고른 선물</div>
+                <div class="bgSheetN" id="bgSheetName"></div>
+                <div class="bgSheetI"><b>@whoName</b> 님의 생일 선물로 선택돼요. 선생님이 확인 후 준비해 드려요.</div>
+                <div class="bgActs">
+                    <button type="button" class="bgBtn" onclick="bgClear()">다시 고르기</button>
+                    <form method="post" action="/Present/PickBirth">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="productId"    id="bgPid" value="" />
+                        <input type="hidden" name="targetUserId" value="@targetUserId" />
+                        <button type="submit" class="bgBtn ok">이 선물로 선택</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+    // 선물 사진이 없을 때 — 대체 이미지를 또 요청하면 그것마저 없을 때 onerror 가 무한히 돈다.
+    // 요청 없는 투명 픽셀로 바꾸고 핸들러를 끊는다.
+    function bgImgFail(el) {
+        el.onerror = null;
+        el.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    }
+
+    (function () {
+        var grid = document.getElementById('bgGrid');
+        if (!grid) return;
+
+        var cards   = Array.prototype.slice.call(grid.querySelectorAll('.bgCard'));
+        var sheet   = document.getElementById('bgSheet');
+        var pid     = document.getElementById('bgPid');
+        var nameEl  = document.getElementById('bgSheetName');
+        var countEl = document.getElementById('bgCount');
+
+        function tagOf(c) { return c.querySelector('.bgPickTag'); }
+        function resetTags() {
+            cards.forEach(function (x) {
+                x.classList.remove('sel');
+                var t = tagOf(x); if (t) { t.textContent = '고르기'; }
+            });
+        }
+
+        cards.forEach(function (c) {
+            c.addEventListener('click', function () {
+                resetTags();
+                c.classList.add('sel');
+                var t = tagOf(c); if (t) { t.textContent = '고른 선물'; }
+                if (pid)    { pid.value = c.dataset.pid; }
+                if (nameEl) { nameEl.textContent = c.dataset.name; }
+                if (sheet)  { sheet.classList.add('open'); }
+            });
+        });
+
+        window.bgClear = function () {
+            resetTags();
+            if (pid)   { pid.value = ''; }
+            if (sheet) { sheet.classList.remove('open'); }
+        };
+
+        document.querySelectorAll('#bgChips .bgChip').forEach(function (b) {
+            b.addEventListener('click', function () {
+                document.querySelectorAll('#bgChips .bgChip').forEach(function (x) { x.classList.remove('on'); });
+                b.classList.add('on');
+
+                var k = b.dataset.kind, n = 0;
+                cards.forEach(function (c) {
+                    var show = !k || c.dataset.kind === k;
+                    c.hidden = !show;
+                    if (show) { n++; }
+                    if (!show && c.classList.contains('sel')) { bgClear(); }
+                });
+                if (countEl) { countEl.textContent = n; }
+            });
+        });
+
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { bgClear(); } });
+    })();
+</script>
+</body>
+</html>

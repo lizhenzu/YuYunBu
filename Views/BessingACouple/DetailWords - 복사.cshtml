@@ -1,0 +1,312 @@
+﻿@model BulletinBoard.Models.BessingChildDatas
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+
+    <style>
+
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #F9F9F9;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 10px auto;
+            padding: 10px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+
+        .content-header {
+            padding: 5px;
+            text-align: center;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+            margin: 0px;
+            color: white;
+            background-color: #009900;
+        }
+
+        .content-header-1 {
+            padding: 5px;
+            text-align: center; /*
+                    border-top-left-radius: 8px;
+                    border-top-right-radius: 8px;
+                    border-bottom-left-radius: 8px;
+                    border-bottom-right-radius: 8px;*/
+            margin: 5px;
+            color: black;
+            background-color: coral;
+        }
+
+        .header h1 {
+            font-size: 20px;
+        }
+
+        .header h2 {
+            margin: 5px 0 0 0;
+            font-size: 32px;
+        }
+
+        .header h4 {
+            margin: 5px;
+            font-size: 16px;
+        }
+
+
+        .event {
+            background-color: #E8E8FF;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+            .event.green {
+                background-color: #D7FFD9;
+            }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px 0;
+        }
+
+        .buttons2 {
+            display: flex;
+            gap: 10px;
+            padding: 20px 0;
+        }
+
+
+        .buttons, .buttons2 {
+            justify-content: space-between;
+            padding: 20px 0;
+            margin-bottom: 5.5px;
+        }
+
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin: 0 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .button.new-task {
+                background-color: #E8E8FF;
+            }
+
+            .button.new-reminder {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.new-reminder-delete {
+                background-color: #CC0000;
+                color: white;
+            }
+
+
+            .button.choice {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.subjective {
+                background-color: #FFC107;
+            }
+
+            .button.back {
+                background-color: #FF5722; /* Orange */
+                color: white;
+            }
+
+            .button.main {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+
+            .button.home {
+                background-color: #00BCD4; /* Cyan */
+                color: white;
+            }
+
+        .guide {
+            padding: 5px;
+            background-color: coral;
+            color: black;
+        }
+
+    </style>
+
+    <style>
+        .malgun-gothic {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+        }
+
+        .preTag {
+            font-size: 18px;
+            background-color: transparent;
+            border: none;
+            white-space: pre-wrap;
+            overflow: auto;
+            padding: 5px;
+        }
+    </style>
+    <style>
+
+        .button {
+            margin: 5px 0;
+        }
+
+        .buttons {
+            display: flex;
+            padding: 20px 0;
+            flex-direction: column;
+            margin-bottom: 5.5px;
+        }
+
+        .buttons2 {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 0;
+            margin: 3px;
+            margin-bottom: 5.5px;
+            gap: 7px;
+        }
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin-left: 5px;
+            margin-right: 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #E8E8FF;
+        }
+
+            .button.choice {
+                background-color: #FFEB3B; /* Yellow */
+            }
+
+            .button.subjective {
+                background-color: #2196F3; /* Blue */
+                color: white;
+            }
+
+            .button.back {
+                background-color: #E8E8FF;
+                color: black;
+            }
+
+            .button.main {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+
+            .button.home {
+                background-color: #00BCD4; /* Cyan */
+                color: white;
+            }
+
+        .error {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        @@media (max-width: 600px) {
+
+            .button {
+                margin: 5px 0;
+            }
+        }
+    </style>
+
+
+</head>
+
+
+<body>
+    @{
+
+        int YearFrom = int.Parse(Model.FromDate.Substring(0, 4));
+        string YearFromString = $"{YearFrom}년";
+        int MonthFrom = int.Parse(Model.FromDate.Substring(5, 2));
+        int DayFrom = int.Parse(Model.FromDate.Substring(8, 2));
+        string DateStringFrom = $"{MonthFrom}월 {DayFrom}일 {Model.FromDateWeekDayKor}";
+
+
+        int YearTo = int.Parse(Model.ToDate.Substring(0, 4));
+        string YearToString = $"{YearTo}년";
+        int MonthTo = int.Parse(Model.ToDate.Substring(5, 2));
+        int DayTo = int.Parse(Model.ToDate.Substring(8, 2));
+        string DateStringTo = $"{MonthTo}월 {DayTo}일 {Model.ToDateWeekDayKor}";
+
+    }
+    <div class="container">
+        <div class="header">
+            <h3 id="year">@YearFromString</h3>
+            <h5 >@DateStringFrom ~ @DateStringTo</h5>
+        </div>
+        <div class="content-header ">
+            <h2>@Model.PrayTitle</h2>
+        </div> 
+    
+        <pre class="malgun-gothic preTag">@Model.PrayText</pre>
+
+        <div class="buttons2">
+            <div class="button main" onclick="location.href='/BessingChild/DetailList'">기도 홈으로</div>
+            <div class="button home" onclick="location.href='/'">Home</div>
+            @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.Admin)) || await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+            {
+                <div class="button back" onclick="location.href='/BessingChild/ModifyView?Id=@Model.Id'">수정</div>
+            }
+
+        </div>
+    </div>
+</body>
+
+</html>

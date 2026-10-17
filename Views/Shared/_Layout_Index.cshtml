@@ -1,0 +1,562 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+ @{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var sessionValue = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+
+ }
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <meta property="og:title" content="@ChurchName · @DepartmentName">
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다.">
+    <meta property="og:image" content="@ViewBag.FullURL/images/home/welcome/welcome_01.webp">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(function (registration) {
+                    console.log('Service Worker registered with scope:', registration.scope);
+                }).catch(function (error) {
+                    console.log('Service Worker registration failed:', error);
+                });
+        }
+    </script>
+    <style>
+         @@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
+        body {
+            /* font-family: 'Jua', sans-serif; */
+            display: block;
+            margin: 0px;
+            text-align: center;
+            background-color: #E0E0E0;
+        }
+
+        .container {
+            color: #333;
+            padding-top: 0px;
+            /* display: flex;*/
+            justify-content: center;
+            align-items: center;
+        }
+
+        .content {
+            text-align: center;
+            color: #43A047;
+            background-color: #E8F5E9; /* #9e1a20; /* #198754;  rgba(0, 0, 0, 0.8); Semi-transparent black background */
+            padding: 5px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.8); /* 어두운 배경색에 약간의 투명도 추가 */
+            width: 320px;
+            z-index: 1001;
+            box-shadow: 0 4px 6px rgba(0,0,0,.8);
+            border-radius: 8px; /* 모서리 둥글게 */
+        }
+
+            .modal h2 {
+                margin-top: 0;
+                color: #333; /* 제목 색상 */
+            }
+
+            .modal button {
+                padding: 8px 16px;
+                margin-right: 11px; /* 버튼 간격 */
+                background-color: #4CAF50; /* 버튼 배경색 */
+                color: white;
+                border: none;
+                border-radius: 4px; /* 버튼 모서리 둥글게 */
+                cursor: pointer;
+            }
+
+                .modal button:last-child {
+                    margin-right: 0;
+                }
+
+            .modal div.controls {
+                text-align: center;
+                margin-top: 20px;
+            }
+
+            .modal div.checkbox-group {
+                margin-top: 10px;
+                text-align: center;
+            }
+
+            .modal input[type="checkbox"] {
+                margin-right: 5px;
+            }
+    </style>
+
+    <style>
+        .no-margin {
+            margin: 1px;
+            padding: 1px;
+        }
+    </style>
+
+    <style>
+        .modalBox {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0,0.9);
+        }
+
+        .modal-content-box {
+            margin: auto;
+            display: block;
+            width: 320px;
+            max-width: 1200px;
+        }
+
+        .captionBox {
+            color: black;
+            font-size: 20px;
+            color: white;
+            text-align: center;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .closeBox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        @@media screen and (max-width: 700px) {
+            .modal-content {
+                width: 95%;
+            }
+        }
+    </style>
+    <style>
+        table {
+            margin: 0 auto; /* 테이블을 수평으로 가운데 정렬 */
+            border-collapse: collapse; /* 셀 간의 간격 제거 */
+            border-spacing: 0; /* 테두리 사이 간격 제거 */
+        }
+
+            table th, table td {
+                font-family: 'Tahoma', sans-serif;
+                font-size: 11px;
+                padding: 5px 10px; /* 셀 내부 여백 추가 */
+                border: 1px solid #ddd; /* 셀 테두리 추가 */
+            }
+
+        td {
+            text-align: left;
+        }
+    </style>
+    <style>
+        /* 팝업 백그라운드 */
+        .popup-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* 배경 어둡게 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999; /* 화면에서 최상단에 표시되도록 설정 */
+        }
+
+        /* 팝업 스타일 */
+        .popup {
+            background-color: white;
+            text-align: center;
+            width: 90%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 팝업에 약간의 그림자 추가 */
+        }
+    </style>
+    <style>
+        /* 영역 1 스타일 */
+        .popup-header {
+            background-color: #f0f4c3; /* 부드러운 연한 녹색 */
+            padding: 10px;
+            text-align: center;
+        }
+
+        /* 영역 2 스타일 */
+        .popup-content {
+            background-color: #fffde7; /* 연한 크림색 */
+            padding: 20px;
+            text-align: left;
+            border-bottom: 1px solid #eeeeee; /* 구분선 */
+        }
+
+        /* 영역 3 스타일 */
+        .popup-checkboxes {
+            background-color: #f1f8e9; /* 연한 그린 계열 */
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 공통 스타일 */
+        .popup p {
+            margin: 5px 0;
+        }
+
+        .popup-checkboxes label {
+            font-weight: bold;
+        }
+    </style>
+    <style> 
+        .scoreboard {
+            font-size: 48px;
+            color: #ff4500;
+            margin: 30px 0;
+            text-shadow: 2px 2px #ffd700;
+        }
+
+        .missions-container {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            padding: 20px;
+        }
+
+   
+        .mission-description {
+            margin: 10px 0;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .mission-button {
+            padding: 5px;
+            padding-left: 10px;
+            padding-right: 10px;
+            margin: 3px;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 18px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+        }
+        /* Assigning different colors to each button */
+        .mission-button-color-1 {
+            background-color: #ff6666;
+        }
+
+        .mission-button-color-2 {
+            background-color: #ffa07a;
+        }
+
+        .mission-button-color-3 {
+            background-color: #90ee90;
+        }
+
+        .mission-button-color-4 {
+            background-color: #add8e6;
+        }
+
+        .mission-button-color-5 {
+            background-color: #F9E79F;
+        }
+
+        .mission-button-color-6 {
+            background-color: #F5F5DC;
+        }
+
+        .mission-button-color-7 {
+            background-color: #F08080;
+        }
+
+        .mission-button-color-8 {
+            background-color: #D3D3D3;
+        }
+
+        .mission-button-color-9 {
+            background-color: #E6E6FA;
+        }
+
+        .mission-button-color-10 {
+            background-color: #FFDAB9;
+        }
+
+        .mission-button-color-11 {
+            background-color: #AFEEEE;
+        }
+
+        .mission-button-color-12 {
+            background-color: #F5FFFA;
+        }
+
+        .mission-button-color-13 {
+            background-color: #87CEEB;
+        }
+
+        .mission-button-color-14 {
+            background-color: #FFFFE0;
+        }
+
+        .mission-button-color-15 {
+            background-color: #FFE4E1;
+        }
+
+        .mission-button:hover {
+            filter: brightness(110%);
+        }
+
+        .score-container {
+          
+            margin: 0 auto;
+            background-color: white;
+          
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .score-header {
+            background-color: #9e1a20;
+            color: white;
+            padding: 5px;
+            text-align: center;
+        }
+
+        .score-rule {
+            background-color: #ecf0f1;
+            border-bottom: 1px solid #eee;
+            /*padding: 5px;*/
+            display: flex;
+            color: black;
+            align-items: center;
+        }
+
+            .score-rule:last-child {
+                border-bottom: none;
+            }
+
+        .score-icon {
+            flex: 0 0 50px;
+            margin-right: 15px;
+        }
+
+        .score-text {
+            flex: 1;
+        }
+
+        .score-text {
+            margin: 0 0 0 0;
+            /* color: #ff6f61; */
+            text-align: center;
+        }
+
+            .score-text ul {
+                list-style: none;
+                margin: 0;
+                padding: 0;
+            }
+
+                .score-text ul li {
+                    margin-bottom: 5px;
+                }
+
+
+        .number-circle {
+            background-color: #009999;
+            color: white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .completed-mission {
+            position: relative;
+        }
+
+        .completed-stamp {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 100px;
+            height: auto;
+        }
+
+
+        .completed-stamp-left {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 50px;
+            height: auto;
+        }
+
+
+        .completed-text {
+            font-size: 20px;
+            font-weight: bold;
+            color: green;
+        }
+
+
+  
+        /*body, html {
+            margin: 0;
+            padding: 0;
+            background-size: cover;
+            background-color: tomato;
+        }*/
+
+        .dashboard header {
+            margin-top: 100px;
+            background-color: rgba(255, 255, 255, 0.8);
+            text-align: center;
+            padding: 20px;
+        }
+
+        .resize-image {
+            width: 200px; /* ���ϴ� ���� ũ�� */
+            height: 300px; /* ���� ũ��� ���� ũ���� 1.5�� (2:3 ����) */
+            object-fit: cover; /* �����̳� ũ�⿡ �°� �̹��� ���� */
+        }
+
+        .missions .mission {
+            display: flex;
+            align-items: center;
+            margin: 5px;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+
+        .mission {
+            margin: 5px;
+            padding: 15px;
+            /*border: 2px solid #ccc;*/
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
+            border-radius: 7px;
+            display: flex;
+            transition: transform 0.2s ease-in-out, background 0.3s;
+        }
+
+            .mission:active {
+                border-color: #ff7043;
+            }
+
+            .mission:hover {
+                border-color: #ff7043;
+            }
+
+
+
+        .mission-photo img {
+            /*border: 1.0px solid #006633;*/
+            width: 100px;
+            height: 150px;
+            border-radius: 7px;
+            object-fit: cover; /* �����̳� ũ�⿡ �°� �̹��� ���� */
+            margin-right: 20px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .mission-info {
+            flex-grow: 1;
+            padding: 10px;
+        }
+
+    </style>
+    <script src="/js/common2.js"></script>
+</head>
+<body>
+      @RenderBody()
+
+
+    <script>
+        // Function to automatically execute submitRequest after the page has loaded
+        document.addEventListener('DOMContentLoaded', function () {
+            submitRequest();
+        });
+
+        async function submitRequest() {
+        @{
+
+            if (ViewData["PM"] != null)
+            {
+                string pm = ViewData["PM"].ToString();
+                pm = pm.Replace("\r", "").Replace("\n", "");
+                ViewData["PM"] = pm;
+            }
+            else
+            {
+                ViewData["PM"] = string.Empty;
+            }
+
+        }
+
+            var content = "@Html.Raw(ViewData["PM"] ?? "")"; // This ensures ViewData["PM"] renders correctly as a JavaScript string
+            var contentID = "@Html.Raw(ViewData["PMID"] ?? "")"; // This ensures ViewData["PM"] renders correctly as a JavaScript string
+
+            if (content.trim()) {
+
+                let result = await confirmMessage(true, ["@Html.Raw(@sessionValue)님~", "새로운 문자가 도착했어요."], null, "지금 보기", "다음에"); // 취소 버튼 표시
+                if (result === 'y') {
+                    //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                    // 여기에 다음 작업을 넣습니다
+                    goToPage('/MessageCenter/ReadPopMessage?PopMessageReadMehod=@PopMessageReadMehod.ReadMyAllMessage.ToString()');
+                } else if (result === 'c') {
+                    //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                    // 작업 취소 로직
+                }
+            }
+        }
+        function goToPage(url) {
+            window.location.href = url;
+        }
+    </script>
+
+</body>
+</html>
+

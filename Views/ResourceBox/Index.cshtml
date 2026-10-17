@@ -1,0 +1,377 @@
+﻿@{
+    Layout = null;
+}
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract;
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+}
+
+@{
+    // ✅ 컨트롤러(Home/Index)에서 ViewBag.ShowVBSParticipationSurveyGuide를 내려주면 그것이 "정답"
+    bool showVBSParticipationSurveyGuide = false;
+
+    var bagVal = ViewBag.ShowVBSParticipationSurveyGuide;
+    if (bagVal is bool b)
+    {
+        showVBSParticipationSurveyGuide = b;
+    }
+    else if (bagVal != null)
+    {
+        bool parsed;
+        showVBSParticipationSurveyGuide = bool.TryParse(bagVal.ToString(), out parsed) ? parsed : false;
+    }
+}
+
+@{
+    var ChurchName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var userFullName =
+        (ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string)
+        ?? (HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) ?? "");
+
+    var userId = (ViewData["UserId"] as string)
+        ?? (HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString()) ?? "");
+
+    var profilePicturePath = (ViewData["ProfilePicturePath"] as string) ?? "";
+
+    // ✅ URL 매핑(=정책 키)
+    var urlWorldView2025 = "/ResourceBox/worldView2025";
+    var urlHome = "/Home/Index"; // ✅ 홈으로 가기
+
+    var profileClickUrl = string.IsNullOrWhiteSpace(userFullName)
+        ? "/HumanResource/ManageUserInfo"
+        : $"/HumanResource/ManageUserInfo?UserId={Uri.EscapeDataString(userId ?? "")}";
+
+    var profileImgSrc = string.IsNullOrWhiteSpace(userFullName)
+        ? ConstatsCommon.representFaceImage
+        : profilePicturePath;
+
+    var pageTitle = (string.IsNullOrWhiteSpace(ChurchName) && string.IsNullOrWhiteSpace(DepartmentName))
+        ? "자료실"
+        : $"{ChurchName} {DepartmentName} · 자료실";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+
+    <!-- ✅ PWA Manifest -->
+    <link rel="manifest" href="/manifest.json?v=1">
+    <meta name="theme-color" content="#2563eb">
+
+    <!-- ✅ iOS: 홈화면 추가 시 아이콘 / 표시 설정 -->
+    <link rel="apple-touch-icon" href="/images/ICON/church/pwa-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <style>
+        :root {
+            --bg0: #ffffff;
+            --stroke: rgba(2, 6, 23, .08);
+            --ink: #0b1220;
+            --muted: rgba(11, 18, 32, .62);
+            --shadow1: 0 18px 50px rgba(2, 6, 23, .08);
+            --r22: 22px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background: linear-gradient(180deg, #ffffff 0%, #f7fafc 50%, #f2fbff 100%);
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 18px 14px 28px;
+        }
+
+        /* ===== Hero ===== */
+        .hero {
+            position: relative;
+            border-radius: 26px;
+            padding: 18px 18px 14px;
+            background: linear-gradient(135deg, rgba(255,255,255,.72), rgba(255,255,255,.92));
+            border: 1px solid var(--stroke);
+            box-shadow: var(--shadow1);
+            overflow: hidden;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(520px 240px at 0% 0%, rgba(37,99,235,.22), transparent 60%), radial-gradient(520px 240px at 100% 0%, rgba(34,197,94,.18), transparent 62%), radial-gradient(520px 240px at 60% 120%, rgba(168,85,247,.16), transparent 62%);
+                pointer-events: none;
+                opacity: .9;
+            }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brandBlock {
+            min-width: 0;
+        }
+
+        .brandTitle {
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            font-size: 18px;
+            opacity: .92;
+        }
+
+        .hello {
+            margin-top: 6px;
+            font-weight: 900;
+            font-size: 22px;
+            letter-spacing: -0.4px;
+        }
+
+        /* ===== Grid + Cards ===== */
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .cardBtn {
+            grid-column: span 6;
+            width: 100%;
+            border: 1px solid rgba(2,6,23,.08);
+            background: rgba(255,255,255,.74);
+            border-radius: var(--r22);
+            padding: 16px 16px 14px;
+            box-shadow: var(--shadow1);
+            cursor: pointer;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+            transition: transform .12s ease, filter .12s ease;
+            transform: translateZ(0);
+        }
+
+            .cardBtn::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(280px 160px at 0% 0%, rgba(37,99,235,.14), transparent 60%), radial-gradient(280px 160px at 100% 0%, rgba(34,197,94,.12), transparent 62%);
+                opacity: .9;
+                pointer-events: none;
+            }
+
+            .cardBtn:hover {
+                transform: translateY(-2px);
+                filter: brightness(1.01);
+            }
+
+            .cardBtn:active {
+                transform: translateY(0);
+                filter: brightness(.99);
+            }
+
+            .cardBtn:focus {
+                outline: 3px solid rgba(37,99,235,.25);
+                outline-offset: 3px;
+            }
+
+        .cardInner {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .pict {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            background: rgba(255,255,255,.78);
+            border: 1px solid rgba(2,6,23,.08);
+            box-shadow: 0 10px 20px rgba(2,6,23,.06);
+            flex: 0 0 auto;
+        }
+
+        .title {
+            font-weight: 950;
+            font-size: 18px;
+            letter-spacing: -.2px;
+        }
+
+        .desc {
+            margin-top: 6px;
+            font-size: 13.5px;
+            color: var(--muted);
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .meta {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(2,6,23,.08);
+            background: rgba(255,255,255,.72);
+            font-size: 12.5px;
+            font-weight: 850;
+            color: rgba(11,18,32,.86);
+        }
+
+        .obsolete {
+            grid-column: span 12;
+            background: rgba(255,255,255,.66);
+            border-style: dashed;
+            opacity: .95;
+        }
+
+            .obsolete .desc {
+                color: rgba(11,18,32,.62);
+            }
+
+        .foot {
+            margin-top: 14px;
+            text-align: center;
+            color: rgba(11,18,32,.50);
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        @@media (max-width: 840px) {
+            .container
+
+        {
+            padding: 14px 12px 24px;
+        }
+
+        }
+
+        @@media (max-width: 640px) {
+            .cardBtn
+
+        {
+            grid-column: span 12;
+        }
+
+        .hello {
+            font-size: 20px;
+        }
+
+        .brandTitle {
+            font-size: 16px;
+        }
+
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <header class="hero">
+            <div class="heroInner">
+                <div class="brandBlock">
+                    <div class="brandTitle">안녕하세요 👋</div>
+                    <div class="hello">유년부 자료실 입니다.</div>
+                </div>
+            </div>
+        </header>
+
+                    @await Html.PartialAsync("_Banner_26_Easter_Sunday")
+
+            @await Html.PartialAsync("_Banner_TeacherSeminarfortheFirstHalfof2026")
+
+        @await Html.PartialAsync("_Banner_2026_Summer_Camp_Video")
+
+        @await Html.PartialAsync("_Banner_26_summerCamp")
+        @await Html.PartialAsync("_Banner_26_semina")
+        @await Html.PartialAsync("_Banner_26_winter_camp")
+        @await Html.PartialAsync("_Banner_26_winterCamp")
+        @await Html.PartialAsync("_Banner_26_summerCamp")
+        @await Html.PartialAsync("_Banner_26_NewWavePrayerMeeting")
+        @await Html.PartialAsync("_Banner_26_Palm_Sunday")
+        @await Html.PartialAsync("_Banner_26_Palm_Sunday_Edu")
+        @await Html.PartialAsync("_Banner_26_Daily_Prayer")
+
+
+        <section class="grid">
+
+            <!-- ✅ 기존 버튼(유지) -->
+            <button class="cardBtn obsolete" onclick="location.href='@urlWorldView2025'" type="button">
+                <div class="cardInner">
+                    <div class="pict">📦</div>
+                    <div>
+                        <div class="title">2025 세계관 자료함</div>
+                        <div class="desc">작년(2025) 세계관 교육 자료를 한 곳에 모아둔 보관함이에요. 참고/복습이 필요할 때 바로 이동하세요.</div>
+                        <div class="meta">
+                            <span class="pill">자료 아카이브</span>
+                            <span class="pill">2025 전용</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+            <!-- ✅ 동등 버튼: 홈으로 가기 -->
+            <button class="cardBtn" onclick="location.href='@urlHome'" type="button" aria-label="홈으로 가기">
+                <div class="cardInner">
+                    <div class="pict">🏠</div>
+                    <div>
+                        <div class="title">홈으로 가기</div>
+                        <div class="desc">메인(홈) 화면으로 돌아가요. </div>
+                        <div class="meta">
+                            <span class="pill">메인 이동</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+        </section>
+
+        @* 추석맞이 우리 가족 사진 콘테스트 — 홈에서 옮겨 옴 (2026-10-11) · 기간 동안만 보인다 *@
+        @await Html.PartialAsync("_Banner_FamilyPhotoContest")
+
+        <div class="foot">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+    </div>
+</body>
+</html>

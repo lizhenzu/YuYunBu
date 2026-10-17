@@ -1,0 +1,93 @@
+@model BulletinBoard.Models.EntranceExamPrays.EntranceExamPray
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>기도문 삭제 · 수험생을 위한 기도문</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; --red: #D9534F; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 680px; margin: 0 auto; padding: 0 16px 40px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop > span:last-child { color: var(--dim); }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; color: var(--red); }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); word-break: keep-all; }
+
+        .warn { margin-top: 16px; padding: 13px 15px; border-radius: 14px; background: #FDEEEE; font-size: 13.5px; line-height: 1.8; color: var(--tx); word-break: keep-all; }
+        .warn b { font-weight: 800; color: var(--red); }
+
+        .pv { margin-top: 14px; padding: 14px 16px; border-radius: 14px; background: var(--grey); }
+        .pv-hd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+        .pv-tt { font-size: 15.5px; font-weight: 800; color: var(--ink); }
+        .pv-sub { flex: none; font-size: 11.5px; color: var(--dim); }
+        .pv-body { margin: 8px 0 0; font-size: 13px; line-height: 1.85; color: var(--dim2); white-space: pre-line; word-break: keep-all; max-height: 260px; overflow: auto; }
+        .pv-ref { margin-top: 10px; padding-left: 10px; border-left: 3px solid #D6E4FA; }
+        .pv-ref b { display: block; font-size: 12px; font-weight: 800; color: var(--blue); }
+        .pv-ref p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.8; color: var(--dim2); }
+
+        .da { display: grid; gap: 8px; margin-top: 20px; }
+        .btn { display: grid; place-items: center; height: 48px; border: 0; border-radius: 14px; background: var(--grey); color: var(--dim2); font: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+        .btn-danger { background: var(--red); color: #fff; font-weight: 800; }
+        .btn-danger:hover { background: #C9443F; }
+    </style>
+</head>
+<body>
+
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/EntranceExamPray/List">목록</a></span>
+        <span>관리자</span>
+    </div>
+
+    <div class="hdK">삭제 확인</div>
+    <h1 class="hdT">이 기도문을 삭제할까요?</h1>
+
+    <div class="warn">
+        <b>되돌릴 수 없어요.</b>
+        삭제하면 기도문과 함께 조회수 <b>@Model.ClickCount.ToString("N0")회</b>,
+        좋아요 <b>@Model.LikeCount.ToString("N0")회</b> 기록도 사라집니다.<br />
+        잠시 감추기만 원하신다면, 수정 화면에서 <b>사용 여부를 “숨김”</b>으로 바꿔 주세요.
+    </div>
+
+    <article class="pv">
+        <div class="pv-hd">
+            <span class="pv-tt">@Model.Title</span>
+            <span class="pv-sub">순서 @Model.SortOrder</span>
+        </div>
+        <p class="pv-body">@Model.PrayText</p>
+        @if (!string.IsNullOrWhiteSpace(Model.BibleRef) || !string.IsNullOrWhiteSpace(Model.BibleText))
+        {
+            <div class="pv-ref">
+                @if (!string.IsNullOrWhiteSpace(Model.BibleRef)) { <b>@Model.BibleRef</b> }
+                @if (!string.IsNullOrWhiteSpace(Model.BibleText)) { <p>@Model.BibleText</p> }
+            </div>
+        }
+    </article>
+
+    <form method="post" action="/EntranceExamPray/DeleteConfirmed">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="PrayId" value="@Model.PrayId" />
+        <div class="da">
+            <button type="submit" class="btn btn-danger">삭제합니다</button>
+            <a class="btn" href="/EntranceExamPray/Edit?PrayId=@Model.PrayId">숨김으로 바꾸기</a>
+            <a class="btn" href="/EntranceExamPray/List">취소하고 목록으로</a>
+        </div>
+    </form>
+
+</div>
+
+</body>
+</html>

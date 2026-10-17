@@ -1,0 +1,321 @@
+﻿@model IEnumerable<BulletinBoard.Models.RhapsodyOfRealitys>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+ 
+@{
+    Layout = "_Layout_Mission";
+    string keyWordTitle = "QT";
+    // 2026-10-05: SuperAdmin 롤 + "Basic" 계정이 같은 권한
+    bool isSuperAdmin = await AuthService.IsSignedIn(User)
+        && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))
+            || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));
+    var todayDate = DateHelper.GetTodayDateDayString();
+
+    // 문자열을 생성합니다.
+    string formattedModResultData = $"preach_{todayDate}.webp"; 
+
+}
+<link rel="stylesheet" href="/css/missionCommon.css">
+<link rel="stylesheet" href="/css/missionC.css">
+<link rel="stylesheet" href="/css/common.layer.css">
+<style>
+    body {
+        background-size: cover;
+        margin: 0;
+        padding: 0;
+        color: #333;
+        display: flex;
+    }
+
+</style>
+
+<style>
+    .icon-container {
+        margin-top: 40px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .icon-background {
+        background: white;
+        width: 65px;
+        height: 65px;
+        position: absolute;
+        top: -36px;
+        left: 50%;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        transform: translateX(-35px);
+        z-index: 1; /* Behind the icon but in front of card background */
+    }
+
+    .icon-foreground {
+        background: #0d792d;
+        width: 59px;
+        height: 59px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        position: absolute;
+        top: -33px;
+        left: 50%;
+        transform: translateX(-32px);
+        z-index: 3; /* Above all */
+    }
+
+    .button-hyperlink {
+        border: none;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        display: block; /* Makes the button expand to the width of the container */
+        font-size: 18px;
+        margin: 10px 0; /* Adds space between buttons */
+        cursor: pointer;
+    }
+</style>
+
+<style>
+
+    .image-container {
+        border: 3.5px solid #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        width: 100%; /* 컨테이너의 너비에 맞춥니다 */
+        height: auto; /* 이미지의 비율에 따라 높이 조정 */
+        display: block; /* 이미지를 블록 요소로 만듭니다 */
+        align-items: center;
+        justify-content: center;
+        margin: auto; /* 자동 마진을 사용하여 중앙 정렬 */
+        margin-bottom: 10px; /* 자동 마진을 사용하여 중앙 정렬 */
+        max-width: 800px;
+    }
+</style>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #e6f7ff;
+    }
+
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 20px;
+        background-color: #ffcccb;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+
+        .header p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+    .card {
+        display: flex;
+        flex-direction: row;
+        background-color: #ffffff;
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .card img {
+            max-width: 100px;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+        }
+
+    .card-content {
+        margin-left: 15px;
+        flex: 1;
+    }
+
+        .card-content h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .card-content p {
+            margin: 5px 0;
+            color: #666;
+        }
+
+    .card-content2 p {
+        margin: 5px 0;
+    }
+    .button-group {
+        margin-top: 10px;
+        display: flex; 
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .button {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 3px;
+        background-color: #007bff;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+    .details {
+        display: none;
+        background-color: #ffffff;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .details p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+    .back-button {
+        text-align: center;
+        margin: 10px;
+    }
+
+        .back-button a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+            .back-button a:hover {
+                background-color: #0056b3;
+            }
+
+    @@media (max-width: 600px) {
+        .card {
+            flex-direction: row;
+            align-items: flex-start;
+        }
+
+        .card-content {
+            margin-left: 0;
+            text-align: center;
+        }
+    }
+</style>
+<style>
+    .no-select {
+        user-select: none; /* 기본 브라우저 지원 */
+        -moz-user-select: none; /* Firefox */
+        -webkit-user-select: none; /* Safari 및 Chrome */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+    }
+</style>
+
+
+<div class="container">
+    <div class="icon-container">
+        <div class="icon-background"></div>
+        <div class="icon-foreground">
+            <span class="material-icons">@keyWordTitle</span>
+        </div>
+    </div>
+    <div class="image-container">
+        <img src="/images/preach/@formattedModResultData" alt="Descriptive Alt Text" style="width: 100%; height: auto;">
+    </div>
+
+     
+    @if (isSuperAdmin)
+    {
+        <div class="back-button">
+            <a href="/">Home</a>
+            <a href="/RhapsodyOfReality/EnrollView">등록</a>
+        </div>
+    }
+    else
+    {
+        <div class="back-button">
+            <a href="/">Home</a>
+            <a href="/Identity/Account/Login">로그인</a>
+        </div>
+    }
+    <div class="card" style="margin:3px;background: #0d792d;color:white">
+
+        <div class="card-content2">
+            <p>본 QT를 위한 설교는 다음 말씀의 실재(http://rorkr.com/) 사이트에서 발췌 합니다.</p>
+
+        </div>
+    </div>
+    @foreach (var item in Model)
+    {   
+            <div class="card" style="margin:3px;">
+             
+                <div class="card-content"> 
+                    <p>@item.ExposeDate (@item.WeekDayKor)요일</p>
+                @if (isSuperAdmin)
+                {
+                    <p class="no-select"><a onclick="redirectToPage('/RhapsodyOfReality/DetailWords?Id=@item.Id')">@item.WordTitle (@item.Visited)</a></p>
+                }
+                else
+                {
+                    <p class="no-select"><a onclick="redirectToPage('/RhapsodyOfReality/DetailWords?Id=@item.Id')">@item.WordTitle</a></p>
+                }
+                    
+                <div class="button-group"> 
+                    @if (isSuperAdmin)
+                    {
+                        <span class="button no-select" onclick="redirectToPage('/RhapsodyOfReality/ModifyView?Id=@item.Id')">수정</span>
+                        <span class="button no-select" onclick="redirectToPage('/RhapsodyOfReality/DeleteView?Id=@item.Id')">삭제</span> 
+                    }
+                </div>
+            </div>
+        </div>
+         
+    }
+    <!-- Add more month cards here following the same structure -->
+ 
+
+
+</div>
+
+
+<script>
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+</script>

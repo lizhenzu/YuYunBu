@@ -1,0 +1,175 @@
+@model IEnumerable<BulletinBoard.Models.RhapsodyOfRealitys>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+@*  ══════════════════════════════════════════════════════════════
+    오늘의 5분 말씀 — QT 목록
+    · 2026-10-05 시안 확정 — 밝은 흰색 · 오늘 칸(달력) + 달마다 묶은 날짜 줄 목록 (최근 날짜부터)
+    · 누구나 : 줄을 눌러 읽는다 / SuperAdmin · "Basic" 계정 : 등록 · 수정 · 삭제 · 조회수
+    · 이전 화면(_Layout_Mission · 큰 이미지 · 파랑 카드)은 DetailList.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    // 2026-10-05: SuperAdmin 롤 + "Basic" 계정이 같은 권한
+    bool isSuperAdmin = isSignedIn
+        && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))
+            || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));
+
+    var kToday = DateHelper.GetKoreaNow().Date;
+
+    // 날짜를 읽을 수 있는 것만 날짜순(최근 먼저)으로, 읽지 못하면 맨 뒤에 그대로
+    var rows = (Model ?? Enumerable.Empty<BulletinBoard.Models.RhapsodyOfRealitys>())
+        .Select(x => new { Item = x, Ok = DateTime.TryParse(x.ExposeDate, out var d), Date = d })
+        .OrderByDescending(x => x.Ok).ThenByDescending(x => x.Date)
+        .ToList();
+    int total = rows.Count;
+    var todayRow = rows.FirstOrDefault(x => x.Ok && x.Date.Date == kToday);
+    var groups = rows.GroupBy(x => x.Ok ? $"{x.Date.Year}년 {x.Date.Month}월" : "날짜 없음").ToList();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>QT 목록 · 오늘의 5분 말씀</title>
+    <partial name="_RrStyle" />
+    <style>
+        /* 오늘 칸 — 기도홈 · 5분 말씀과 같은 달력 칸 */
+        .today { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--soft); transition: background .15s; }
+        .today:hover { background: var(--soft2); }
+        .cal { flex: none; width: 52px; border-radius: 10px; overflow: hidden; background: #fff; text-align: center; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
+        .cal small { display: block; padding: 3px 0; background: var(--acc); color: #fff; font-size: 10.5px; font-weight: 800; }
+        .cal b { display: block; padding: 2px 0 5px; font-size: 22px; font-weight: 300; line-height: 1.1; color: var(--tx); }
+        .today .tx { flex: 1; min-width: 0; }
+        .today .tx i { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--acc); }
+        .today .tx b { display: block; margin-top: 2px; font-size: 15.5px; font-weight: 800; color: var(--tx); line-height: 1.4; word-break: keep-all; }
+        .today .go { flex: none; font-size: 20px; font-weight: 300; color: var(--acc); }
+        .src { margin-top: 12px; font-size: 11.5px; line-height: 1.7; color: var(--dim); }
+
+        /* 달 묶음 · 날짜 줄 */
+        .sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rule); }
+        .sec b { font-size: 16px; font-weight: 800; color: var(--tx); }
+        .sec span { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+        .row { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--rule); }
+        .row:last-child { border-bottom: 0; }
+        .row .hit { position: absolute; inset: 0; z-index: 1; }        /* 줄 전체를 눌러 읽기 — 관리 버튼은 이 위로 */
+        .row .d { flex: none; width: 44px; text-align: center; line-height: 1.15; }
+        .row .d b { display: block; font-size: 17px; font-weight: 800; color: var(--num); font-variant-numeric: tabular-nums; }
+        .row .d small { display: block; font-size: 11px; color: var(--dim); }
+        .row.on .d b { color: var(--acc); }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t b { display: block; font-size: 15px; font-weight: 800; color: var(--tx); word-break: keep-all; transition: color .15s; }
+        .row .ad { position: relative; z-index: 2; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; align-items: center; }
+        .row .ad em { font-style: normal; font-size: 11px; color: var(--dim); margin-right: 4px; font-variant-numeric: tabular-nums; }
+        .row .ad .nb { font-size: 11.5px; padding: 5px 10px; }
+        .row .ad .nb.del:hover { color: var(--del); background: var(--delbg); }
+        .row .tg { flex: none; font-size: 11px; font-weight: 800; color: var(--acc); background: var(--soft); border-radius: 999px; padding: 2px 8px; }
+        .row .g { flex: none; font-size: 18px; font-weight: 300; color: var(--num); }
+        .row:hover .t b, .row:hover .g { color: var(--acc); }
+        .ask { position: relative; z-index: 2; margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--delbg); font-size: 12px; color: var(--del); }
+        .ask .nb { font-size: 11.5px; padding: 5px 10px; background: #fff; }
+        .ask .nb.yes { background: var(--del); color: #fff; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/RhapsodyOfReality/DetailWords">오늘의 5분 말씀</a><span class="sep">›</span>QT 목록</span>
+        @if (isSuperAdmin)
+        {
+            <a class="nb gold" href="/RhapsodyOfReality/EnrollView">＋ 등록</a>
+        }
+        else if (!isSignedIn)
+        {
+            <a class="nb" href="/Identity/Account/Login">로그인</a>
+        }
+    </div>
+    <div class="prog"></div>
+
+    <div class="kk" style="margin-top:20px">오늘의 5분 말씀@(isSuperAdmin ? " · 관리" : "")</div>
+    <h1 class="h1">QT 목록</h1>
+    <div class="sub">@(total > 0 ? $"모두 {total}편 · 최근 날짜부터" : "아직 등록된 말씀이 없어요")</div>
+
+    @if (todayRow != null)
+    {
+        <a class="today" href="/RhapsodyOfReality/DetailWords?Id=@todayRow.Item.Id">
+            <span class="cal"><small>@(kToday.Month)월</small><b>@kToday.Day</b></span>
+            <span class="tx"><i>오늘의 5분 말씀</i><b>@todayRow.Item.WordTitle</b></span>
+            <span class="go">›</span>
+        </a>
+    }
+    <div class="src">설교는 "말씀의 실재" 사이트(rorkr.com)에서 발췌합니다.</div>
+
+    @if (total == 0)
+    {
+        <div class="none">아직 등록된 말씀이 없어요</div>
+    }
+
+    @foreach (var g in groups)
+    {
+        <div class="sec"><b>@g.Key</b><span>@(g.Count())편</span></div>
+        @foreach (var r in g)
+        {
+            var it = r.Item;
+            bool isToday = r.Ok && r.Date.Date == kToday;
+            string href = $"/RhapsodyOfReality/DetailWords?Id={it.Id}";
+            <div class="row@(isToday ? " on" : "")">
+                <a class="hit" href="@href" aria-label="@it.WordTitle 읽기"></a>
+                <span class="d"><b>@(r.Ok ? r.Date.Day.ToString() : "—")</b><small>@it.WeekDayKor</small></span>
+                <span class="t">
+                    <b>@it.WordTitle</b>
+                    @if (isSuperAdmin)
+                    {
+                        <span class="ad">
+                            <em>조회 @it.Visited.ToString("N0")</em>
+                            <a class="nb" href="/RhapsodyOfReality/ModifyView?Id=@it.Id">수정</a>
+                            <button type="button" class="nb del" data-del="@it.Id" data-ttl="@it.WordTitle">삭제</button>
+                        </span>
+                        <span class="askBox"></span>
+                    }
+                </span>
+                @if (isToday)
+                {
+                    <span class="tg">오늘</span>
+                }
+                <span class="g">›</span>
+            </div>
+        }
+    }
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/RhapsodyOfReality/DetailWords">오늘의 5분 말씀</a>
+    </div>
+
+</div>
+
+<script>
+    /* 삭제는 되돌릴 수 없으므로 줄 안에서 한 번 더 묻는다 */
+    document.addEventListener('click', function (e) {
+        var del = e.target.closest('[data-del]');
+        if (del) {
+            var box = del.closest('.t').querySelector('.askBox');
+            var ask = document.createElement('div');
+            ask.className = 'ask';
+            ask.appendChild(document.createTextNode('「' + del.getAttribute('data-ttl') + '」을 지울까요? 되돌릴 수 없어요.'));
+            var yes = document.createElement('a');
+            yes.className = 'nb yes'; yes.textContent = '삭제';
+            yes.href = '/RhapsodyOfReality/DeleteView?Id=' + encodeURIComponent(del.getAttribute('data-del'));
+            var no = document.createElement('button');
+            no.type = 'button'; no.className = 'nb'; no.textContent = '그대로 두기'; no.setAttribute('data-keep', '');
+            ask.appendChild(yes); ask.appendChild(no);
+            box.innerHTML = ''; box.appendChild(ask);
+            return;
+        }
+        if (e.target.closest('[data-keep]')) e.target.closest('.askBox').innerHTML = '';
+    });
+</script>
+</body>
+</html>

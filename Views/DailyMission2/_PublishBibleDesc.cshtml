@@ -1,0 +1,360 @@
+﻿@model BulletinBoard.Models.eBibles
+@using System
+@using System.Collections.Generic
+@using System.Linq
+
+@{
+    // ✅ 안전장치
+    var ov = Model?._BibleBookOverviewDetail;
+    var bi = Model?._BibleBasicInfos2;
+
+    // 콘텐츠 요약 파싱(기존 방식 응용하되, 보기 좋게 변환)
+    var content = ov?.ContentSummary ?? "";
+    var lines = content.Split(new[] { "\\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+                       .Select(x => x.Trim())
+                       .Where(x => !string.IsNullOrWhiteSpace(x))
+                       .ToList();
+
+    var bullets = new List<string>();
+    var oneLine = "";
+
+    foreach (var item in lines)
+    {
+        // "1. ~~" 같은 번호 제거
+        if (System.Text.RegularExpressions.Regex.IsMatch(item, @"^\d+\.\s"))
+        {
+            var clean = System.Text.RegularExpressions.Regex.Replace(item, @"^\d+\.\s*", "");
+            if (!string.IsNullOrWhiteSpace(clean)) bullets.Add(clean);
+        }
+        else
+        {
+            // 숫자 없는 마지막 한줄 요약 후보
+            oneLine = item;
+        }
+    }
+
+    // 펼침 기본값: 접힘(요청사항)
+    var panelId = "bb_overview_panel";
+}
+
+<style>
+    .bbWrap {
+        margin-top: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        border-radius: 18px;
+        background: rgba(255,255,255,.92);
+        box-shadow: 0 10px 22px rgba(15,23,42,.10);
+        overflow: hidden;
+    }
+
+    .bbTop {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 12px;
+        cursor: pointer;
+        user-select: none;
+        background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(34,197,94,.10));
+        border-bottom: 1px solid rgba(226,232,240,.95);
+    }
+
+    .bbTopLeft {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .bbIcon {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,.9);
+        border: 1px solid rgba(226,232,240,.95);
+        box-shadow: 0 8px 18px rgba(15,23,42,.08);
+        font-size: 18px;
+        flex: 0 0 auto;
+    }
+
+    .bbTitleArea { min-width: 0; }
+    .bbTitle {
+        font-weight: 950;
+        font-size: 15px;
+        line-height: 1.15;
+        color: rgba(15,23,42,.92);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bbSub {
+        margin-top: 3px;
+        font-weight: 900;
+        font-size: 12px;
+        color: rgba(71,85,105,.92);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .bbBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        font-weight: 950;
+        box-shadow: 0 8px 18px rgba(15,23,42,.08);
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    .bbChevron {
+        transition: transform .18s ease;
+        display: inline-block;
+    }
+    .bbWrap.isOpen .bbChevron { transform: rotate(180deg); }
+
+    .bbPanel {
+        display: none;
+        padding: 14px 12px 16px;
+        background: rgba(255,255,255,.96);
+    }
+    .bbWrap.isOpen .bbPanel { display: block; }
+
+    .bbGrid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .bbCard {
+        border: 1px solid rgba(226,232,240,.95);
+        border-radius: 16px;
+        padding: 12px;
+        background: rgba(248,250,252,.9);
+        box-shadow: 0 8px 18px rgba(15,23,42,.06);
+    }
+
+    .bbH {
+        font-weight: 950;
+        font-size: 13px;
+        color: rgba(15,23,42,.92);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .bbP {
+        margin: 0;
+        font-weight: 900;
+        font-size: 13px;
+        line-height: 1.55;
+        color: rgba(71,85,105,.92);
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .bbBadgeRow {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+    }
+
+    .bbBadge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+        font-weight: 950;
+        font-size: 12px;
+        color: rgba(15,23,42,.86);
+    }
+
+    .bbList {
+        margin: 8px 0 0;
+        padding-left: 18px;
+    }
+    .bbList li {
+        margin: 6px 0;
+        font-weight: 900;
+        color: rgba(71,85,105,.92);
+        line-height: 1.55;
+        font-size: 13px;
+    }
+
+    .bbOneLine {
+        margin-top: 10px;
+        border: 1px dashed rgba(148,163,184,.65);
+        background: rgba(241,245,249,.75);
+        border-radius: 16px;
+        padding: 10px 12px;
+        font-weight: 950;
+        color: rgba(15,23,42,.86);
+    }
+
+    @@media (max-width: 720px) {
+        .bbGrid { grid-template-columns: 1fr; }
+        .bbTitle { font-size: 14px; }
+        .bbSub { font-size: 12px; }
+    }
+</style>
+
+@if (ov != null || bi != null)
+{
+    <div class="bbWrap" id="bbWrapRoot">
+        <!-- ✅ 버튼(헤더)만 노출 -->
+        <div class="bbTop" role="button" aria-controls="@panelId" aria-expanded="false" onclick="BB_OV.toggle()">
+            <div class="bbTopLeft">
+                <div class="bbIcon">📚</div>
+                <div class="bbTitleArea">
+                    <div class="bbTitle">성경요약 보기</div>
+                    <div class="bbSub">
+                        @(ov?.BookName ?? bi?.BibleText ?? "성경 개요/요약")
+                    </div>
+                </div>
+            </div>
+
+            <div class="bbBtn">
+                <span id="bbBtnText">펼치기</span>
+                <span class="bbChevron">▼</span>
+            </div>
+        </div>
+
+        <!-- ✅ 펼침 패널 -->
+        <div class="bbPanel" id="@panelId">
+            <div class="bbGrid">
+                <div class="bbCard">
+                    <div class="bbH">📘 책 이름</div>
+                    <p class="bbP">@((ov?.BookName ?? "").Trim())</p>
+
+                    @if (!string.IsNullOrWhiteSpace(ov?.Keywords))
+                    {
+                        <div class="bbBadgeRow">
+                            @foreach (var k in (ov.Keywords ?? "").Split(new[] { ",", "·", "•" }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).Take(10))
+                            {
+                                <span class="bbBadge">🔑 @k</span>
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="bbCard">
+                    <div class="bbH">✍️ 저자</div>
+                    <p class="bbP">
+                        <strong>@(ov?.Author ?? "")</strong>
+                        @if (!string.IsNullOrWhiteSpace(ov?.AuthorDescription))
+                        {
+                            <span> — @ov.AuthorDescription</span>
+                        }
+                    </p>
+                </div>
+
+                <div class="bbCard">
+                    <div class="bbH">📅 기록 시기</div>
+                    <p class="bbP">
+                        @if (!string.IsNullOrWhiteSpace(ov?.WrittenDateFrom) || !string.IsNullOrWhiteSpace(ov?.WrittenDateTo))
+                        {
+                            <span>@ov?.WrittenDateFrom ~ @ov?.WrittenDateTo</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov?.AlternativeDate))
+                        {
+                            <span><br />@ov?.AlternativeDate</span>
+                        }
+                    </p>
+                </div>
+
+                <div class="bbCard">
+                    <div class="bbH">📍 장소 / 🎯 대상</div>
+                    <p class="bbP">
+                        @if (!string.IsNullOrWhiteSpace(ov?.WrittenPlace))
+                        {
+                            <span>장소: @ov.WrittenPlace</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov?.WrittenTarget))
+                        {
+                            <span><br />대상: @ov.WrittenTarget</span>
+                        }
+                    </p>
+                </div>
+
+                <div class="bbCard">
+                    <div class="bbH">🕰️ 역사적 배경</div>
+                    <p class="bbP">
+                        @if (!string.IsNullOrWhiteSpace(ov?.HistoricalPeriod))
+                        {
+                            <span>@ov.HistoricalPeriod</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov?.HistoricalBackground))
+                        {
+                            <span><br />@ov.HistoricalBackground</span>
+                        }
+                    </p>
+                </div>
+
+                <div class="bbCard">
+                    <div class="bbH">📜 핵심 내용 요약</div>
+
+                    @if (bullets.Any())
+                    {
+                        <ul class="bbList">
+                            @foreach (var b in bullets.Take(12))
+                            {
+                                <li>@b</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="bbP" style="opacity:.8;">요약 데이터를 찾지 못했어요.</p>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(oneLine))
+                    {
+                        <div class="bbOneLine">✨ 한줄 요약: @oneLine</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const root = document.getElementById('bbWrapRoot');
+            const btnText = document.getElementById('bbBtnText');
+
+            function setState(open) {
+                if (!root) return;
+                root.classList.toggle('isOpen', !!open);
+                if (btnText) btnText.textContent = open ? '접기' : '펼치기';
+
+                const top = root.querySelector('.bbTop');
+                if (top) top.setAttribute('aria-expanded', open ? 'true' : 'false');
+            }
+
+            // ✅ 전역 토글 (BibleRead에서 여러 번 로딩되더라도 안전)
+            window.BB_OV = window.BB_OV || {};
+            window.BB_OV.toggle = function () {
+                if (!root) return;
+                const isOpen = root.classList.contains('isOpen');
+                setState(!isOpen);
+            };
+
+            // 기본: 접힘
+            setState(false);
+        })();
+    </script>
+}

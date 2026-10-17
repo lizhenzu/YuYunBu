@@ -1,0 +1,75 @@
+@model BulletinBoard.Models.AwardItem
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+
+    var returnUrl = ViewBag.ReturnUrl as string ?? "/Present/ListPresent?productDisplayOpton=display";
+
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+
+    bool canSeePrice = isSuperAdmin || isAdmin;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>상품 상세</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+    <style>.pw { max-width: 920px; }</style>
+</head>
+
+<body>
+    <div class="pw">
+        <div class="pbar">
+            <a href="@returnUrl">‹ 돌아가기</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </div>
+
+        <div class="pK">잠실새내 유년부 입니다.</div>
+        <h1 class="pT">상품 상세</h1>
+
+        <div class="pdGrid">
+            <div class="pdImg">
+                <img src="/images/AwardItem/@(@Model.ProductID).jpg"
+                     onerror="this.onerror=null;this.src='/images/common/no-image.jpg';"
+                     alt="상품 이미지" />
+            </div>
+
+            <div>
+                <h2 class="pdName">@Model.ProductName</h2>
+
+                <p class="pdDesc">@Model.ProductDescription</p>
+
+                <div class="pdRows">
+                    <div class="pdRow"><span>상품 ID</span><span>@Model.ProductID</span></div>
+                    @if (canSeePrice)
+                    {
+                        <div class="pdRow"><span>Source</span><span>@Model.SourceType</span></div>
+                    }
+                    <div class="pdRow"><span>필요 포인트</span><span>@Model.PointRequirement</span></div>
+                    @if (canSeePrice)
+                    {
+                        <div class="pdRow"><span>가격</span><span>@Model.UnitPrice.ToString("N0") 원</span></div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="pacts">
+            <a class="pbtn pri" href="@returnUrl">목록으로 돌아가기</a>
+        </div>
+
+        <div class="pft"><span>© 유년부 · 선물</span><a href="/Present/Kind">선물 목록</a></div>
+    </div>
+</body>
+</html>

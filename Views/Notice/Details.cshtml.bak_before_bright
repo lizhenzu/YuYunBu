@@ -1,0 +1,114 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System
+@using System.Linq
+@using System.Collections.Generic
+@using BulletinBoard.Models   @* NoticeAttachment 네임스페이스가 다르면 여기만 맞춰주세요 *@
+@model BulletinBoard.ViewModels.Notice.Notice
+
+@{
+    Layout = null;
+    ViewData["Title"] = "공지 상세";
+
+    // ✅ List로 캐스팅하지 말고 IEnumerable로 받기 (List/Array/IEnumerable 모두 안전)
+    var attachments = (ViewBag.Attachments as IEnumerable<NoticeAttachment>)?.ToList() ?? new List<NoticeAttachment>();
+    var author = !string.IsNullOrWhiteSpace(Model.AuthorName) ? Model.AuthorName : "관리자";
+
+    string FormatBytes(long bytes)
+    {
+        if (bytes <= 0) return "0 B";
+        string[] units = { "B", "KB", "MB", "GB" };
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1) { size /= 1024; unit++; }
+        return unit == 0 ? $"{(long)size} {units[unit]}" : $"{size:0.#} {units[unit]}";
+    }
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.Title - 공지사항</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .tb { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+        .tb form { margin: 0; display: contents; }
+        .tb .grow { flex: 1; }
+
+        .body { margin-top: 26px; background: var(--card); border: 1px solid var(--rule); padding: 26px 24px; }
+        .ct { font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.95; color: var(--tx); word-break: keep-all; overflow-wrap: anywhere; }
+        .ct :is(img, video, iframe) { max-width: 100%; height: auto; }
+        .ct a { color: var(--acc); border-bottom: 1px solid var(--acc); }
+        .ct p { margin: 0 0 1em; }
+        @@media (max-width: 480px) { .body { padding: 20px 16px; margin-left: calc(var(--pad) * -1); margin-right: calc(var(--pad) * -1); border-left: 0; border-right: 0; } }
+
+        .pop { margin-top: 14px; padding: 10px 14px; background: var(--mark); border-left: 2px solid var(--acc); font-size: 13.5px; color: var(--dim2); }
+        .pop b { color: var(--tx); font-weight: 600; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="@Url.Action("Index", "Notice")">공지사항</a></span>
+                <span>No. @Model.Id</span>
+            </div>
+            <div class="hdK">NOTICE · @Model.CreatedAt.ToString("yyyy.MM.dd")</div>
+            <h1 class="hdT">@Model.Title</h1>
+            <div class="hdS"><b>@author</b><span class="sep"> · </span>조회 @Model.ViewCount.ToString("N0")</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="tb">
+            <a class="nbtn" href="@Url.Action("Index", "Notice")">← 목록</a>
+            <span class="grow"></span>
+            <a class="nbtn" href="@Url.Action("Edit", "Notice", new { id = Model.Id })">수정</a>
+            <form asp-controller="Notice" asp-action="Delete" method="post" onsubmit="return confirm('이 공지를 삭제하시겠습니까?');">
+                <input name="id" type="hidden" value="@Model.Id" />
+                <button type="submit" class="nbtn dan">삭제</button>
+            </form>
+        </div>
+
+        @if (Model.IsPopup && Model.PopupUntil.HasValue)
+        {
+            <div class="pop">팝업 표시 기간 · <b>@Model.PopupUntil.Value.ToString("yyyy.MM.dd")</b> 까지</div>
+        }
+
+        <article class="body">
+            <div class="ct">@Html.Raw((Model.Content ?? string.Empty).Replace("\n", "<br />"))</div>
+        </article>
+
+        <section class="sec">
+            <div class="secH">
+                <div><div class="secK">ATTACHMENTS</div><div class="secT">첨부파일</div></div>
+                <span class="secN">@attachments.Count 개</span>
+            </div>
+            @if (attachments.Any())
+            {
+                <ul class="fl" style="border-top:0; margin-top:0">
+                    @foreach (var att in attachments)
+                    {
+                        <li>
+                            <a class="n" href="@Url.Action("DownloadAttachment", "Notice", new { id = att.Id })" title="@att.OriginalName">↓ @att.OriginalName</a>
+                            <span class="s">@FormatBytes(att.FileSize)</span>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="empty">첨부파일이 없습니다.</div>
+            }
+        </section>
+
+        <div class="ft">
+            <a href="@Url.Action("Index", "Notice")">← 공지 목록</a>
+            <a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a>
+        </div>
+    </main>
+</body>
+</html>

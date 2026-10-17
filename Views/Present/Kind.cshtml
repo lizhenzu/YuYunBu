@@ -1,0 +1,73 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@*  ══════════════════════════════════════════════════════════════
+    선물 목록 — 종류 다섯 가지를 목차처럼 늘어놓는다.  고르면 그 목록 화면으로 간다.
+    Bone(호텔 인쇄물) 스킨을 /ApplyEvent/Branch 와 같이 쓴다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var urlGiftChallenge = "/Present/ListPresent?productDisplayOpton=display";   // 도전! 성경통독 선물
+    var urlGiftNewcomer  = "/Present/PresentForNewFriend";                       // 새친구 선물
+    var urlGiftInvite    = "/Present/PresentForInvitFriend";                     // 전도 선물
+    var urlGiftBirth     = "/Present/ListPresent?productDisplayOpton=birth";     // 생일 선물
+    var urlGiftSpecial   = "/Present/ListPresent?productDisplayOpton=Special";   // 특별 선물
+    var urlHome          = "/";
+
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    var items = new[]
+    {
+        (Title: $"{ConstatsCommon.ReadBibleAllTitleButton} 선물", Desc: $"{ConstatsCommon.myDoToRi} 단계별로 받을 수 있는 선물 목록", Url: urlGiftChallenge),
+        (Title: "새친구 선물",  Desc: "새로 온 친구에게 드리는 선물",            Url: urlGiftNewcomer),
+        (Title: "전도 선물",    Desc: "친구를 데려온 어린이에게 드리는 선물",     Url: urlGiftInvite),
+        (Title: "생일 선물",    Desc: "생일을 맞은 어린이가 고르는 선물",         Url: urlGiftBirth),
+        (Title: "특별 선물",    Desc: "특별한 날을 위한 선물",                    Url: urlGiftSpecial),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>선물 목록 — @ConstatsCommon.MainKeyTitle</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+</head>
+<body>
+
+<div class="pw">
+    <div class="pbar">
+        <a href="@urlHome">← @ConstatsCommon.ToHome</a>
+        <span>@dateText</span>
+    </div>
+
+    <div class="pK">잠실새내 유년부 입니다.</div>
+    <h1 class="pT">선물 목록</h1>
+
+    <section class="psec">
+        <div class="psecT">종류</div>
+
+        @for (int i = 0; i < items.Length; i++)
+        {
+            var it = items[i];
+            <a class="pidx" href="@it.Url">
+                <span class="pidxNo">@((i + 1).ToString("00"))</span>
+                <span class="pidxTx">
+                    <span class="pidxT">@it.Title</span>
+                    <span class="pidxD">@it.Desc</span>
+                </span>
+                <span class="pidxA">›</span>
+            </a>
+        }
+    </section>
+
+    <div class="pft"><span>© 유년부 · 선물</span><a href="@urlHome">@ConstatsCommon.ToHome</a></div>
+</div>
+
+</body>
+</html>

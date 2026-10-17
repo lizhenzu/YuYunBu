@@ -1,0 +1,219 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model IEnumerable<BulletinBoard.Models.StoryElementary123s>
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 활동 영상 관리 (교사) — 유튜브 링크 붙여 넣기로 추가 · 제목/주소 고치기 · 지우기
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.StoryElementary123s>();
+    string? Vid(string? u) => BulletinBoard.Controllers.StoryController.ExtractVideoId(u);
+    var err = TempData["err"] as string;
+    var msg = TempData["msg"] as string;
+    var keepUrl = TempData["url"] as string ?? "";
+    var keepTitle = TempData["title"] as string ?? "";
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>활동 영상 관리</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .sh { max-width: 900px; }
+        .st { display: flex; gap: 26px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headk); font-variant-numeric: tabular-nums; }
+        .note { margin-top: 18px; padding: 11px 14px; font-size: 14px; background: var(--card); border-left: 2px solid var(--ok); color: var(--tx); }
+        .note.err { border-left-color: var(--danger); color: var(--danger); }
+
+        .blk { margin-top: 26px; }
+        .bK { font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .2em; color: var(--acc); font-weight: 600; }
+        .bT { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 2px; padding-bottom: 7px; border-bottom: 1px solid var(--tx); font-family: "Noto Serif KR", serif; font-size: 18px; }
+        .bT small { font-family: "Gothic A1", sans-serif; font-size: 12px; color: var(--dim); }
+
+        /* 추가 */
+        .add { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; padding: 18px; background: var(--card); border: 1px solid var(--rule); }
+        @@media (min-width: 720px) { .add { grid-template-columns: 220px 1fr; } }
+        .pvw { aspect-ratio: 16 / 9; background: var(--mark); display: grid; place-items: center; overflow: hidden; position: relative; font-size: 12.5px; color: var(--dim); text-align: center; padding: 8px; }
+        .pvw img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+        .fld label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--dim2); margin-bottom: 6px; }
+        .fld + .fld { margin-top: 12px; }
+        .fld input { width: 100%; height: 46px; padding: 0 12px; border: 1px solid var(--rule); background: var(--bg); font-family: inherit; font-size: 15px; color: var(--tx); border-radius: 0; outline: none; }
+        .fld input:focus { border-color: var(--tx); }
+        .fld .h { margin-top: 5px; font-size: 12px; color: var(--dim); min-height: 18px; }
+        .fld .h.ok { color: var(--ok); }
+        .fld .h.bad { color: var(--danger); }
+        .addF { display: flex; justify-content: flex-end; margin-top: 14px; }
+        .btn { height: 44px; padding: 0 20px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); font-family: inherit; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; }
+        .btn:hover { border-color: var(--acc); color: var(--acc); }
+        .btn.pri { background: var(--tx); border-color: var(--tx); color: var(--bg); font-weight: 600; }
+        .btn.pri:hover { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .btn.pri:disabled { opacity: .35; cursor: not-allowed; background: var(--tx); border-color: var(--tx); color: var(--bg); }
+        .btn.sm { height: 34px; padding: 0 12px; font-size: 13px; }
+        .btn.dan { color: var(--danger); }
+        .btn.dan:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* 목록 */
+        .row { display: flex; gap: 14px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+        .row .th { flex: none; width: 120px; aspect-ratio: 16 / 9; background: var(--mark); overflow: hidden; position: relative; }
+        .row .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .row .th .no { position: absolute; top: 0; left: 0; font-family: "Inter", sans-serif; font-size: 10.5px; font-weight: 600; padding: 2px 6px; background: rgba(22,24,28,.8); color: #fff; }
+        .row .bd { flex: 1; min-width: 0; }
+        .row .tt { font-size: 15px; font-weight: 600; line-height: 1.4; }
+        .row .id { margin-top: 3px; font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); overflow-wrap: anywhere; }
+        .row .id .bad { color: var(--danger); font-family: "Gothic A1", sans-serif; }
+        .row .ac { flex: none; display: flex; gap: 6px; }
+        .row .ac form { margin: 0; }
+        @@media (max-width: 560px) {
+            .row { flex-wrap: wrap; }
+            .row .th { width: 104px; }
+            .row .ac { width: 100%; justify-content: flex-end; }
+        }
+        .none { padding: 36px 0; text-align: center; font-size: 14px; color: var(--dim); }
+
+        /* 고치기 창 */
+        .scrim { position: fixed; inset: 0; z-index: 950; background: rgba(22,24,28,.45); opacity: 0; pointer-events: none; transition: opacity .18s; }
+        .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 960; max-width: 640px; margin: 0 auto; background: var(--card); border-top: 1px solid var(--rule);
+                 padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; }
+        .open .scrim { opacity: 1; pointer-events: auto; }
+        .open .sheet { transform: none; }
+        .grab { width: 40px; height: 4px; background: var(--rule); margin: 0 auto 10px; }
+        .shH { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .shH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 19px; }
+        .shH button { width: 36px; height: 36px; border: 1px solid var(--rule); background: var(--card); color: var(--dim2); font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Albums/Branch">사진 · 영상</a><span class="sep">›</span><a href="/Story/Index">활동 영상</a><span class="sep">›</span>영상 관리</span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdK">VIDEO MANAGER</div>
+            <h1 class="hdT">활동 영상 관리</h1>
+            <div class="hdS">유튜브 링크를 붙여 넣어 영상을 추가하고, 제목을 고치거나 지워요.</div>
+            <div class="st"><div>등록된 영상<b>@list.Count</b></div></div>
+        </div>
+    </header>
+
+    <main class="sh">
+        @if (!string.IsNullOrEmpty(msg)) { <div class="note">@msg</div> }
+        @if (!string.IsNullOrEmpty(err)) { <div class="note err">@err</div> }
+
+        <section class="blk">
+            <div class="bK">ADD</div>
+            <div class="bT">새 영상 추가<small>가장 최근에 추가한 영상이 1번</small></div>
+            <form class="add" method="post" action="/Story/Add" id="addF" autocomplete="off">
+                @Html.AntiForgeryToken()
+                <div class="pvw" id="aPv">링크를 넣으면<br />썸네일이 보여요</div>
+                <div>
+                    <div class="fld">
+                        <label for="aUrl">유튜브 링크</label>
+                        <input id="aUrl" name="url" value="@keepUrl" placeholder="https://youtu.be/… 또는 https://www.youtube.com/watch?v=…" inputmode="url" />
+                        <div class="h" id="aH">유튜브 앱·사이트에서 <b>공유 → 링크 복사</b> 한 주소를 붙여 넣어 주세요.</div>
+                    </div>
+                    <div class="fld">
+                        <label for="aTitle">영상 제목</label>
+                        <input id="aTitle" name="title" value="@keepTitle" maxlength="200" placeholder="예: 2026년 여름 성경학교" />
+                    </div>
+                    <div class="addF"><button type="submit" class="btn pri" id="aBtn" disabled>영상 추가</button></div>
+                </div>
+            </form>
+        </section>
+
+        <section class="blk">
+            <div class="bK">LIST</div>
+            <div class="bT">등록된 영상<small>활동 영상 화면에 이 순서로 나와요 (최대 100개)</small></div>
+            @if (list.Count == 0) { <div class="none">아직 등록된 영상이 없어요.</div> }
+            @foreach (var v in list)
+            {
+                var vid = Vid(v.contentsURL);
+                var t = string.IsNullOrWhiteSpace(v.contentsText) ? "(제목 없음)" : v.contentsText.Trim();
+                <div class="row">
+                    <div class="th">
+                        @if (vid != null) { <img src="https://img.youtube.com/vi/@vid/mqdefault.jpg" alt="" loading="lazy" /> }
+                        <span class="no">@v.sequenceNo</span>
+                    </div>
+                    <div class="bd">
+                        <div class="tt">@t</div>
+                        <div class="id">@if (vid != null) {<span>@vid</span>} else {<span class="bad">주소를 알아볼 수 없어요 · 고쳐 주세요 (@v.contentsURL)</span>}</div>
+                    </div>
+                    <div class="ac">
+                        @if (vid != null) { <a class="btn sm" href="https://www.youtube.com/watch?v=@vid" target="_blank" rel="noopener">보기 ↗</a> }
+                        <button type="button" class="btn sm js-edit" data-id="@v.Id" data-url="@(vid != null ? "https://youtu.be/" + vid : v.contentsURL)" data-title="@t">고치기</button>
+                        <form method="post" action="/Story/Delete" class="js-del" data-title="@t">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="title" value="@t" />
+                            <button type="submit" class="btn sm dan">지우기</button>
+                        </form>
+                    </div>
+                </div>
+            }
+        </section>
+
+        <div class="ft"><span>지워도 유튜브의 원래 영상은 그대로 있어요</span><a href="/Story/Index">활동 영상 보기 →</a></div>
+    </main>
+
+    @* 고치기 *@
+    <div class="scrim" id="scrim"></div>
+    <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="eT" aria-hidden="true">
+        <div class="grab"></div>
+        <form method="post" action="/Story/Edit" id="eF" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="eId" />
+            <div class="shH"><b id="eT">영상 고치기</b><button type="button" id="eX" aria-label="닫기">✕</button></div>
+            <div class="fld"><label for="eUrl">유튜브 링크</label><input id="eUrl" name="url" /><div class="h" id="eH"></div></div>
+            <div class="fld"><label for="eTitle">영상 제목</label><input id="eTitle" name="title" maxlength="200" /></div>
+            <div class="addF"><button type="submit" class="btn pri" id="eBtn">저장</button></div>
+        </form>
+    </section>
+
+<script>
+(function () {
+    // 서버(StoryController.ExtractVideoId)와 같은 규칙
+    function vidOf(s) {
+        const u = (s || '').trim(); if (!u) return null;
+        for (const p of [/[?&]v=([A-Za-z0-9_-]{11})/, /youtu\.be\/([A-Za-z0-9_-]{11})/, /\/embed\/([A-Za-z0-9_-]{11})/, /\/shorts\/([A-Za-z0-9_-]{11})/, /\/live\/([A-Za-z0-9_-]{11})/]) { const m = u.match(p); if (m) return m[1]; }
+        return /^[A-Za-z0-9_-]{11}$/.test(u) ? u : null;
+    }
+    function watch(urlEl, hintEl, pvEl, btn, titleEl) {
+        const upd = () => {
+            const raw = urlEl.value.trim(), v = vidOf(raw);
+            if (!raw) { hintEl.className = 'h'; hintEl.innerHTML = '유튜브 앱·사이트에서 <b>공유 → 링크 복사</b> 한 주소를 붙여 넣어 주세요.'; }
+            else if (v) { hintEl.className = 'h ok'; hintEl.textContent = '✓ 영상을 찾았어요 · ' + v; }
+            else { hintEl.className = 'h bad'; hintEl.textContent = '유튜브 주소가 아닌 것 같아요. 다시 확인해 주세요.'; }
+            if (pvEl) pvEl.innerHTML = v ? '<img src="https://img.youtube.com/vi/' + v + '/mqdefault.jpg" alt="">' : '링크를 넣으면<br>썸네일이 보여요';
+            btn.disabled = !(v && titleEl.value.trim());
+        };
+        urlEl.addEventListener('input', upd); titleEl.addEventListener('input', upd); upd();
+    }
+    watch(document.getElementById('aUrl'), document.getElementById('aH'), document.getElementById('aPv'), document.getElementById('aBtn'), document.getElementById('aTitle'));
+    watch(document.getElementById('eUrl'), document.getElementById('eH'), null, document.getElementById('eBtn'), document.getElementById('eTitle'));
+
+    // 지우기 확인 (제목에 ' 가 있어도 안전하게 data 속성에서 읽음)
+    document.querySelectorAll('form.js-del').forEach(f => f.addEventListener('submit', e => {
+        if (!confirm('「' + f.dataset.title + '」 영상을 목록에서 지울까요?\n유튜브의 원래 영상은 그대로 있어요.')) e.preventDefault();
+    }));
+    // 두 번 눌러 두 번 저장되지 않게
+    document.querySelectorAll('form').forEach(f => f.addEventListener('submit', e => { if (e.defaultPrevented) return; const b = f.querySelector('button[type=submit]'); if (b) setTimeout(() => b.disabled = true, 0); }));
+
+    const root = document.documentElement, sheet = document.getElementById('sheet');
+    let opener = null;
+    function open(b) {
+        opener = b;
+        document.getElementById('eId').value = b.dataset.id;
+        const u = document.getElementById('eUrl'), t = document.getElementById('eTitle');
+        u.value = b.dataset.url; t.value = b.dataset.title;
+        u.dispatchEvent(new Event('input'));
+        root.classList.add('open'); sheet.setAttribute('aria-hidden', 'false');
+        setTimeout(() => t.focus(), 60);
+    }
+    function close() { root.classList.remove('open'); sheet.setAttribute('aria-hidden', 'true'); if (opener) opener.focus({ preventScroll: true }); }
+    document.querySelectorAll('.js-edit').forEach(b => b.addEventListener('click', () => open(b)));
+    document.getElementById('scrim').addEventListener('click', close);
+    document.getElementById('eX').addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('open')) close(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+@model BulletinBoard.Models.BessingChildData
+@*  자녀 축복 기도 — 수정 · 등록 공통 입력칸 (2026-10-05 시안 확정).  ViewData["IdPfx"] : 칸 id 앞글자 *@
+@{
+    string pfx = ViewData["IdPfx"] as string ?? "f";
+    // date 칸은 yyyy-MM-dd 만 받으므로, 저장된 값이 다른 꼴이면 맞춰 준다
+    string D(string raw) => DateTime.TryParse(raw, out var dt) ? dt.ToString("yyyy-MM-dd") : (raw ?? "");
+}
+<div class="row2">
+    <div><label class="l" for="@(pfx)-from">보이는 기간 · 시작</label><input class="in" id="@(pfx)-from" type="date" name="FromDate" value="@D(Model?.FromDate)" /></div>
+    <div><label class="l" for="@(pfx)-to">보이는 기간 · 끝</label><input class="in" id="@(pfx)-to" type="date" name="ToDate" value="@D(Model?.ToDate)" /></div>
+</div>
+<div><label class="l" for="@(pfx)-title">제목</label><input class="in" id="@(pfx)-title" name="PrayTitle" value="@Model?.PrayTitle" placeholder="예) 마음을 성결케 하게 하옵소서" /></div>
+<div>
+    <label class="l" for="@(pfx)-body">기도문 본문</label>
+    <textarea class="in" id="@(pfx)-body" name="PrayText" placeholder="사랑의 하나님 아버지,&#10;오늘도 **00(이)**의 하루를 주님께 올려 드립니다.">@Model?.PrayText</textarea>
+    <div class="hint">문단은 줄바꿈으로 나눠요. 아이 이름 자리는 <code>**00(이)**</code> 로 적으면 화면에서 연파랑으로 보여요. 짧고 쉼표로 끝나는 줄은 굵은 호칭이 돼요.</div>
+</div>
+<div><label class="l" for="@(pfx)-word">함께 읽는 말씀</label><textarea class="in short" id="@(pfx)-word" name="HolyWord" placeholder="말씀 (책 장:절)">@Model?.HolyWord</textarea></div>
+<details class="opt" @(string.IsNullOrWhiteSpace(Model?.PrayText_Eng) ? "" : "open")>
+    <summary>영문 기도문<span></span></summary>
+    <textarea class="in short" id="@(pfx)-eng" name="PrayText_Eng" aria-label="영문 기도문">@Model?.PrayText_Eng</textarea>
+</details>

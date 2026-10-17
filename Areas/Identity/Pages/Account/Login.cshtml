@@ -1,0 +1,183 @@
+@page
+@model LoginModel
+@using BulletinBoard.Common
+@using Microsoft.AspNetCore.Http
+@*  ══════════════════════════════════════════════════════════════
+    로그인
+    · 2026-10-11 A안 확정 — 최신 밝은 테마(DailyMission4)의 흰 화면 한 장
+      "홈으로 · 로그인" 한 줄 · 연파랑 동그라미 + 교회 이름 머리 · 회색 입력칸 · 파란 로그인
+      "또는" 아래 연파랑 구경하기 · 회원가입은 맨 아래 글자 링크
+    · 로그인 처리 · 구경하기(guest 계정) · ReturnUrl 은 이전과 같다
+    · 이전 화면(어두운 남색 · 그라데이션)은 Login.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+
+    string church = "잠실새내교회 유년부";
+    try
+    {
+        var s = ViewContext.HttpContext.Session;
+        var cn = s.GetString(CommonMetaDataCategory.ChurchName.ToString());
+        var dn = s.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+        if (!string.IsNullOrWhiteSpace(cn)) church = $"{cn} {dn}".Trim();
+    }
+    catch { /* 세션이 없으면 기본 이름 */ }
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>로그인 · @church</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --blue:#2F80ED; --blueDk:#1F6FDB; --soft:#EAF2FD; --softH:#DCEAFB; --ink:#111827; --tx:#374151; --dim:#6B7280; --dim2:#9CA3AF; --line:#EEF0F3; --grey:#F4F6F9; --err:#B42318; --errBg:#FDECEC; }
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        button, input { font: inherit; }
+        .pz { max-width: 440px; min-height: 100vh; margin: 0 auto; padding: 0 16px 28px; display: flex; flex-direction: column; }
+
+        /* 맨 위 한 줄 */
+        .bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; font-size: 13px; color: var(--dim2); }
+        .bar a { color: var(--tx); font-weight: 700; }
+        .bar a:hover { color: var(--blue); }
+        .bar .sep { margin: 0 6px; color: #D1D5DB; }
+        .prog { height: 3px; border-radius: 99px; background: var(--grey); }
+
+        /* 머리 */
+        .mark { margin-top: 24px; width: 56px; height: 56px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+        .mark svg { width: 28px; height: 28px; }
+        .kk { margin-top: 14px; font-size: 12px; font-weight: 800; color: var(--blue); }
+        .h1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 1.3; color: var(--ink); text-wrap: balance; }
+        .sub { margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--dim); }
+
+        /* 입력 */
+        .fm { display: grid; gap: 12px; margin-top: 22px; }
+        label.l { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
+        .in { width: 100%; height: 48px; font-size: 15px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--grey); color: var(--ink); }
+        .in:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .pw { position: relative; }
+        .pw .in { padding-right: 70px; }
+        .pw .eye { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--dim); font-size: 12px; font-weight: 700; padding: 6px 8px; cursor: pointer; }
+        .pw .eye:hover { color: var(--blue); }
+        .fe { display: block; margin-top: 4px; font-size: 12px; color: var(--err); }
+        .fe:empty { display: none; }
+
+        /* 로그인 실패 안내 — 오류가 없으면 숨는다 */
+        .errBox { padding: 10px 12px; border-radius: 12px; background: var(--errBg); color: var(--err); font-size: 13px; font-weight: 600; }
+        .errBox ul { margin: 0; padding: 0; list-style: none; }
+        .errBox.validation-summary-valid { display: none; }
+        .infoBox { padding: 10px 12px; border-radius: 12px; background: var(--soft); color: var(--blue); font-size: 13px; font-weight: 600; }
+
+        .btn { width: 100%; height: 50px; border: 0; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
+        .btn.pri { background: var(--blue); color: #fff; }
+        .btn.pri:hover { background: var(--blueDk); }
+        .btn.soft { height: 56px; background: var(--soft); color: var(--blue); line-height: 1.3; }
+        .btn.soft:hover { background: var(--softH); }
+        .btn.soft small { display: block; font-size: 11.5px; font-weight: 500; color: var(--dim); }
+        .or { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-size: 12px; color: var(--dim2); }
+        .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+        .join { margin-top: 16px; text-align: center; font-size: 13px; color: var(--dim); }
+        .join a { color: var(--blue); font-weight: 800; margin-left: 4px; }
+        .foot { margin-top: auto; padding-top: 28px; text-align: center; font-size: 11.5px; color: var(--dim2); }
+        :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>로그인</span>
+    </div>
+    <div class="prog"></div>
+
+    <div class="mark" aria-hidden="true">
+        <svg viewBox="0 0 28 28" fill="none" stroke="#2F80ED" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v20M7 11h14" /></svg>
+    </div>
+    <div class="kk">@church</div>
+    <h1 class="h1">반가워요, 로그인해 주세요</h1>
+    <div class="sub">로그인하면 출석, 미션, 기도 기록을 이어서 볼 수 있어요.</div>
+
+    <form id="account" method="post" class="fm" autocomplete="off">
+        @if (Request.Query["stale"] == "1")
+        {
+            <div class="infoBox" role="status">화면을 연 지 오래되어 새로 열었어요. 한 번 더 로그인해 주세요.</div>
+        }
+        @* 입력 오류가 어떤 것이든 말없이 지나가지 않도록 전체 오류를 보여 준다 *@
+        <div asp-validation-summary="All" class="errBox" role="alert"></div>
+
+        <div>
+            @* 아이디(예: Basic)로도 로그인하므로 type="email" 을 쓰지 않는다 — 브라우저가 아이디 입력을 막는다 *@
+            <label class="l" for="Input_Email">이메일 또는 아이디</label>
+            @* 처음 열면 빈 칸으로 시작한다 — 브라우저가 저장해 둔 로그인 정보를 미리 채우지 않도록 autocomplete 를 끈다 (2026-10-11) *@
+            <input asp-for="Input.Email" class="in" type="text" placeholder="name@example.com" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <span asp-validation-for="Input.Email" class="fe"></span>
+        </div>
+
+        <div>
+            <label class="l" for="Input_Password">비밀번호</label>
+            <div class="pw">
+                <input asp-for="Input.Password" class="in" type="password" placeholder="비밀번호" autocomplete="new-password" value="" />
+                <button type="button" class="eye" id="pwEye" aria-controls="Input_Password" aria-label="비밀번호 보기">보기</button>
+            </div>
+            <span asp-validation-for="Input.Password" class="fe"></span>
+        </div>
+
+        @* 로그인 정보 기억 칸은 두지 않는다 — 서버가 항상 "기억함"으로 로그인하고(RememberMe 값을 쓰지 않음),
+           숨은 칸이 빈 값("")으로 가면 참/거짓 변환 오류로 로그인이 조용히 막힌다 (2026-10-11 수정) *@
+
+        <button type="submit" class="btn pri">로그인</button>
+
+        <div class="or">또는</div>
+
+        <button type="button" class="btn soft" onclick="goGuest()">
+            <span>구경하기<small>회원 정보 없이 둘러보기</small></span>
+        </button>
+    </form>
+
+    <div class="join">아직 회원이 아니신가요?<a href="./Register">회원가입</a></div>
+
+    <div class="foot">@church</div>
+
+</div>
+
+<script>
+    // 구경하기 — 이전과 같은 guest 계정으로 로그인
+    function goGuest() {
+        document.querySelector('input[name="Input.Email"]').value = "guest@gmail.com";
+        document.querySelector('input[name="Input.Password"]').value = "1234";
+        document.getElementById('account').submit();
+    }
+
+    // 처음 열었을 때(오류 안내가 없을 때)만, 브라우저가 몰래 채운 값을 한 번 비운다.
+    // 뒤로 가기·새로고침으로 돌아온 화면도 빈 칸으로 시작한다. 로그인에 실패한 뒤에는 입력한 아이디를 그대로 둔다.
+    (function () {
+        var failed = document.querySelector('.errBox') && !document.querySelector('.errBox').classList.contains('validation-summary-valid');
+        function clearAuto() {
+            if (failed) return;
+            var e = document.getElementById('Input_Email'), p = document.getElementById('Input_Password');
+            if (e) e.value = '';
+            if (p) p.value = '';
+        }
+        clearAuto();
+        window.addEventListener('pageshow', clearAuto);   // 뒤로 가기 캐시
+        setTimeout(clearAuto, 300);                        // 브라우저 자동 채움이 늦게 들어오는 경우
+    })();
+
+    // 비밀번호 보기 / 숨기기
+    (function () {
+        var b = document.getElementById('pwEye'), p = document.getElementById('Input_Password');
+        if (!b || !p) return;
+        b.addEventListener('click', function () {
+            var show = p.type === 'password';
+            p.type = show ? 'text' : 'password';
+            b.textContent = show ? '숨기기' : '보기';
+            b.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 보기');
+        });
+    })();
+</script>
+</body>
+</html>

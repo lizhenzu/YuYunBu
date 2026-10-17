@@ -1,0 +1,382 @@
+﻿@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+@inject IGlobalCookieService GlobalCookieService
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@{
+    var cookieKey = "INT_Mission_NewNotce_20260217";
+    var showBanner = await GlobalCookieService.ShouldShowAsync(cookieKey, HttpContextAccessor.HttpContext);
+}
+
+@if (showBanner)
+{
+    <style>
+        /* ================== Banner ================== */
+
+        .bd30-wrap {
+            margin: 1.4rem 0 2rem;
+        }
+
+        .bd30-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 1.15rem;
+            color: #fff;
+            background: radial-gradient(700px 360px at 12% -10%, rgba(59,130,246,.35), transparent 60%), radial-gradient(680px 340px at 110% 110%, rgba(16,185,129,.22), transparent 62%), linear-gradient(135deg,#0b1220 0%,#0f172a 45%,#020617 100%);
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: 0 28px 70px rgba(2,6,23,.62);
+        }
+
+            .bd30-card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: 22px;
+                background: linear-gradient(90deg, rgba(59,130,246,.42), rgba(16,185,129,.30), rgba(99,102,241,.34));
+                opacity: .10;
+            }
+
+        .bd30-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== TOP ===== */
+
+        .bd30-top {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .bd30-titlebox {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        .bd30-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            font-size: 1.4rem;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+        }
+
+        .bd30-title {
+            font-weight: 950;
+            font-size: 1.1rem;
+            letter-spacing: -0.01em;
+        }
+
+        .bd30-subtitle {
+            margin-top: 2px;
+            font-size: .86rem;
+            color: rgba(255,255,255,.78);
+            font-weight: 700;
+        }
+
+        /* ===== 숨기기 버튼 ===== */
+
+        .bd30-hide {
+            display: flex;
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        .bd30-hidebtn {
+            border: 0;
+            border-radius: 999px;
+            padding: .52rem 1.02rem;
+            font-size: .82rem;
+            font-weight: 900;
+            color: #fff;
+            background: linear-gradient(135deg,#2563eb,#0ea5e9);
+            cursor: pointer;
+        }
+
+        /* ===== BODY ===== */
+
+        .bd30-body {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .bd30-msg {
+            flex: 1 1 520px;
+            line-height: 1.75;
+        }
+
+        .bd30-lead {
+            font-size: .9rem;
+            color: rgba(255,255,255,.92);
+            font-weight: 800;
+            margin-bottom: .65rem;
+        }
+
+        .bd30-pills {
+            margin-top: .5rem;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .bd30-pill {
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: .82rem;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+        }
+
+        .bd30-panel {
+            margin-top: .85rem;
+            padding: .9rem .95rem;
+            border-radius: 16px;
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.12);
+        }
+
+            .bd30-panel h4 {
+                margin: 0 0 .55rem 0;
+                font-size: .92rem;
+                font-weight: 950;
+                letter-spacing: -0.01em;
+            }
+
+        .bd30-steps {
+            margin: 0;
+            padding-left: 1.05rem;
+        }
+
+            .bd30-steps li {
+                margin: .35rem 0;
+                color: rgba(255,255,255,.90);
+            }
+
+        .bd30-note {
+            margin-top: .6rem;
+            font-size: .82rem;
+            color: rgba(255,255,255,.72);
+            line-height: 1.55;
+        }
+
+        .bd30-strong {
+            font-weight: 950;
+            color: #fff;
+        }
+
+        .bd30-kbd {
+            display: inline-block;
+            padding: .1rem .1rem;
+        }
+
+        /* ===== CTA 버튼 ===== */
+
+        .bd30-cta {
+            display: flex;
+            align-items: center;
+        }
+
+        .bd30-btn {
+            border: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            padding: .9rem 1.15rem;
+            font-size: .95rem;
+            font-weight: 950;
+            letter-spacing: -0.01em;
+            font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+            color: #0b1220;
+            background: linear-gradient(135deg,#3b82f6,#10b981);
+            box-shadow: 0 18px 36px rgba(59,130,246,.35);
+            white-space: nowrap;
+        }
+
+        .bd30-foot {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,.12);
+            font-size: .8rem;
+            color: rgba(255,255,255,.72);
+            line-height: 1.6;
+        }
+
+        /* ===== 모바일 ===== */
+
+        @@media (max-width:640px) {
+            .bd30-msg {
+                flex-basis: 100%;
+            }
+
+            .bd30-cta {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .bd30-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+        .bd30-warning {
+    margin-top: 4px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-size: .88rem;
+    font-weight: 900;
+    color: #111827;
+    background: linear-gradient(135deg,#fde68a,#fbbf24);
+    display: inline-block;
+}
+
+
+    </style>
+
+    <div class="bd30-wrap js-global-cookie-section"
+         data-cookie-key="@cookieKey">
+
+        <section class="bd30-card">
+            <div class="bd30-inner">
+
+                <div class="bd30-top">
+                    <div class="bd30-titlebox">
+                        <div class="bd30-icon">🏆</div>
+                        <div>
+                            <div class="bd30-title">@ConstatsCommon.myDoToRi 통합 시상 안내</div>
+                        </div>
+                    </div>
+ 
+                </div>
+                <div class="bd30-top">
+                   <div class="bd30-hide">
+                        <button type="button"
+                                class="bd30-hidebtn js-global-cookie-hide-btn"
+                                data-hide="99year">
+                            공지 숨기기
+                        </button>
+                    </div>
+                </div>
+                <div class="bd30-body">
+
+                    <div class="bd30-msg">
+                        <div class="bd30-lead bd30-warning">
+                            ※ 아래 안내 내용은 운영상 일부 변경될 수 있으며, 변경 시 다시 공지하겠습니다.
+                        </div>
+                        <div class="bd30-lead">
+                            📌 <span class="bd30-kbd">세 가지 활동 포인트를 합산하여 시상합니다.
+                        </div>
+
+                        <div class="bd30-pills">
+                            <span class="bd30-pill">📖 @ConstatsCommon.MainKeyTitle</span>
+                            <span class="bd30-pill">📘 @ConstatsCommon.MissionBibleWithparent</span>
+                            <span class="bd30-pill">📝 @ConstatsCommon.HolyWordAndRead</span>
+                        </div>
+
+       
+
+                        <div class="bd30-panel">
+                            <h4>🎁 학생 시상 안내</h4>
+                            <ol class="bd30-steps">
+                                <li>
+                                    세 가지 활동을 할수록 <span class="bd30-strong">포인트</span>가 계속 쌓여요.
+                                    <div class="bd30-note">
+                                    <span class="bd30-strong"> 📘 @ConstatsCommon.HolyWordAndRead</span> 점수가 내가 한 것과 다르면 담임 선생님께 알려 주세요.
+                                    </div>
+                                </li>
+                                <li>
+                                    <span class="bd30-strong">포인트가 100의 배수 포인트가 될 때마다</span> 선물을 신청할 수 있어요.
+                                    <div class="bd30-note">
+                                    (예, 100점, 200점, 300점,... 처럼 100의 배수 포인트마다 가능해요!)
+                                    </div>
+                                </li>
+
+                                <li>
+                                    선물을 받을 수 있는지는 <span class="bd30-strong">내부 Credit</span>이라는 기준으로 정해져요.
+                                    <div class="bd30-note">
+                                        ※ Credit은 선물을 받을 때 사용하는 특별 점수예요.<br />
+                                        ⭐ 처음 100포인트가 되면 보너스 Credit을 한 번 받아요.<br />
+                                        ⭐ Credit은 포인트와 달라요.<br />
+                                        ⭐ Credit은 사용자에게 보이지 않아요.<br />
+                                    </div>
+                                </li>
+                                <li>선물을 받으면 <span class="bd30-strong">내부 Credit은 다시 0부터 시작</span>해요.</li>
+                                <li><span class="bd30-strong">활동을 많이 할수록</span> 더 다양하고 좋은 선물을 고를 수 있어요.</li>
+                                <li>
+                                    <span class="bd30-strong">포인트를 모아 두었다가 나중에 한 번에</span> 사용할 수도 있어요.<br />
+                                    <div class="bd30-note">
+                                    ⭐ 연말까지 모으면 더 크고 멋진 선물을 받을 수 있어요!
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div class="bd30-panel">
+                            <h4>👨‍👩‍👧 가족팀 시상 안내</h4>
+                            <div style="color: rgba(255,255,255,.90); line-height: 1.75;">
+                                👉 가족팀은 <span class="bd30-strong">100포인트별 단계별 시상</span> 대상에 포함되지 않아요.<br />
+                                ➡️ 가족팀의 포인트는 <span class="bd30-strong">연말까지 누적</span>되며,
+                                <span class="bd30-strong">누적 포인트 기준으로 가족팀 시상</span>예정 입니다.
+                            </div>
+                        </div>
+
+                        <div class="bd30-panel">
+                            <h4>🧑‍🏫 교사 시상 안내</h4>
+                            <div style="color: rgba(255,255,255,.90); line-height: 1.75;">
+                                👉 교사는  <span class="bd30-strong">100포인트별 단계별 시상</span> 대상에 포함되지 않아요.<br />
+                                ➡️ 단, 교사 포인트는 <span class="bd30-strong">연말까지 누적</span>되며,
+                                <span class="bd30-strong">연말에 한 번에 시상</span>예정 입니다.
+                            </div>
+                        </div>
+
+                        <div class="bd30-foot">
+                            ❓ 문의 사항이 있으시면
+                            <a href="https://bit2001-001-site3.atempurl.com/Board/Create2?boardName=Anonymous"
+                               target="_blank"
+                               style="color:#93c5fd; font-weight:900; text-decoration:underline;">
+                                👉 익명 게시판에 등록해 주세요.
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener("click", async (e) => {
+            const btn = e.target.closest(".js-global-cookie-hide-btn");
+            if (!btn) return;
+
+            const section = btn.closest(".js-global-cookie-section");
+            const cookieKey = section.dataset.cookieKey;
+
+            await fetch("/GlobalCookie/Hide", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    cookieKey: cookieKey,
+                    durationCode: "99year"
+                })
+            });
+
+            section.style.display = "none";
+        });
+    </script>
+}

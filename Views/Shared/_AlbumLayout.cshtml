@@ -1,0 +1,130 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Enums
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*
+    앨범 공통 레이아웃 — DailyMission4 밝은 흰색 버전 (색은 직접 지정한다)
+    · 위쪽: 경로(사진 · 영상 › …) + 각 화면의 PageHeader
+    · 예전 Details 복사본의 업로드/선택/뷰어 스크립트가 Bootstrap 보조 클래스(d-none, d-flex, spinner-border …)를 쓰므로
+      Bootstrap 은 그대로 두고, 버튼 · 입력창 모양만 덮어쓴다.
+    · 폼 모양(.fm .fRow .fLbl .fIn .fAct)은 이 레이아웃이 직접 정의한다. (공용 board-bone.css 는 쓰지 않는다)
+    · ViewData["Crumb"] : 경로 마지막 이름 (기본 "앨범")
+*@
+@{
+    Layout = null;
+    var pageTitle = ViewData["Title"] as string ?? "앨범";
+    var crumb = ViewData["Crumb"] as string ?? "앨범";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@pageTitle · 사진 앨범</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --danger: #B4531F; }
+        /* ── 판 ── */
+        body.alb { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; }
+        .alb a { color: inherit; text-decoration: none; }
+        .alb .sh { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+        .alb main.sh { padding-top: 6px; }
+
+        /* 머리 */
+        .alb .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .alb .hdTop a:hover { color: #2F80ED; }
+        .alb .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .alb .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .alb .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+        .alb .hdS { margin-top: 4px; font-size: 13px; color: #9CA3AF; }
+        .albH { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+        .albAct { display: flex; flex-wrap: wrap; gap: 6px; }
+
+        /* ── 폼 ── */
+        .alb .fm { margin-top: 20px; }
+        .alb .fRow { margin-bottom: 18px; }
+        .alb .fLbl { display: block; margin-bottom: 6px; font-size: 12.5px; font-weight: 700; color: #6B7280; }
+        .alb .fIn { display: block; width: 100%; padding: 12px 18px; border: 0; border-radius: 999px; background: #F4F6F9; font-family: inherit; font-size: 15px; color: #111827; outline: none; }
+        .alb .fIn::placeholder { color: #9CA3AF; }
+        .alb .fIn:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+        .alb textarea.fIn { border-radius: 12px; padding: 12px 16px; }
+        .alb .fAct { display: flex; gap: 8px; margin-top: 22px; }
+        .alb .fAct .btn { flex: 1; }
+        .alb .fAct .btn-brand { flex: 2; }
+
+        /* ── Bootstrap 버튼 → 밝은 알약 ── */
+        .alb .btn { border: 0; border-radius: 999px !important; font-family: inherit; font-size: 14px; font-weight: 700; padding: 12px 18px; background: #F4F6F9; color: #6B7280; box-shadow: none !important; text-align: center; }
+        .alb .btn:hover { color: #2F80ED; background: #F4F6F9; }
+        .alb .btn-sm { font-size: 12.5px; padding: 6px 14px; }
+        .alb .btn-brand { background: #2F80ED; color: #fff; font-weight: 800; }
+        .alb .btn-brand:hover { background: #1F6FDB; color: #fff; }
+        .alb .btn-outline-danger { background: #FBEFE7; color: #B4531F; }
+        .alb .btn-outline-danger:hover { background: #F7E3D5; color: #B4531F; }
+        .alb .btn-light { background: #F4F6F9; color: #6B7280; }
+        .alb .rounded-4 { border-radius: 16px !important; }
+        .alb .rounded-pill { border-radius: 999px !important; }
+
+        /* ── 카드 · 표식 (Bootstrap 보조) ── */
+        .alb .glass { background: #FFFFFF; border: 1px solid #EEF0F3; border-radius: 16px !important; box-shadow: none; backdrop-filter: none; }
+        .alb .badge-soft { background: #EAF2FD; border: 0; color: #2B5FA8; font-weight: 700; }
+        .alb .text-secondary, .alb .text-muted { color: #9CA3AF !important; }
+        .alb .alert { border-radius: 12px; border: 0; background: #EAF2FD; color: #2B5FA8; }
+        .alb .form-check-input:checked { background-color: #2F80ED; border-color: #2F80ED; }
+        .alb .form-check-input:focus { box-shadow: none; border-color: #2F80ED; }
+        .alb .spinner-border { color: #2F80ED; }
+        .alb .form-control { border-radius: 12px !important; border-color: #EEF0F3; font-family: inherit; }
+        .alb .form-control:focus { border-color: #2F80ED; box-shadow: none; }
+
+        /* 업로드 끌어놓기 칸 (예전 Details 복사본) */
+        .alb .dz { border: 0; border-radius: 16px; padding: 28px; text-align: center; cursor: pointer; background: #F4F6F9; color: #6B7280; transition: background .15s; }
+        .alb .dz:hover { background: #EAF2FD; }
+        .alb .preview img { height: 84px; object-fit: cover; margin: .25rem; border-radius: 8px; }
+
+        /* 사진 격자 (예전 Details 복사본) */
+        .alb .grid { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+        @@media (min-width: 768px) { .alb .grid { grid-template-columns: repeat(3, 1fr); } }
+        @@media (min-width: 1100px) { .alb .grid { grid-template-columns: repeat(4, 1fr); } }
+        .alb .photo { position: relative; overflow: hidden; background: #FFFFFF; border: 1px solid #EEF0F3; border-radius: 12px; }
+        .alb .photo img { width: 100%; height: 230px; object-fit: cover; display: block; background: #F4F6F9; }
+        @@media (max-width: 560px) { .alb .photo img { height: 160px; } }
+        .alb .photo .top-actions { position: absolute; top: .5rem; left: .5rem; right: .5rem; display: flex; justify-content: space-between; align-items: center; z-index: 2; }
+        .alb .checkbox { background: rgba(17,24,39,.7); color: #fff; padding: .2rem .55rem; border: 0; border-radius: 999px; }
+        .alb .bottom { display: flex; justify-content: space-between; align-items: center; padding: .6rem .75rem .8rem; }
+        .alb .cover-tag { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: #2F80ED; color: #fff; }
+
+        /* 아래 */
+        .albFt { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .albFt a { color: #6B7280; }
+        .albFt a:hover { color: #2F80ED; }
+    </style>
+
+    @RenderSection("Head", required: false)
+</head>
+<body class="alb">
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="/Albums/Branch">‹ 사진 · 영상</a><span class="sep">·</span>@crumb</span>
+            <span style="display:flex;gap:14px;align-items:center">@RenderSection("NavRight", required: false)<a href="/">@ConstatsCommon.ToHome</a></span>
+        </div>
+        @RenderSection("PageHeader", required: false)
+    </header>
+
+    <main class="sh">
+        @RenderBody()
+    </main>
+
+    <div class="sh">
+        <div class="albFt"><span>© @DateHelper.GetKoreaNow().Year 유년부 사진 앨범</span><span><a href="/Albums">앨범 목록</a> · <a href="/Albums/Branch">사진 · 영상</a></span></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

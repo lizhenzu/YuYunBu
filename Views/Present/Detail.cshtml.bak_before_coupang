@@ -1,0 +1,99 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Models.AwardItem
+
+@{
+    Layout = null;
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? "/";
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool canSeePrice = isSuperAdmin || isAdmin;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>상품 상세</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+    <style>.pw { max-width: 920px; }</style>
+</head>
+<body>
+    <div class="pw">
+        <div class="pbar">
+            <a href="@returnUrl">‹ 목록으로</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </div>
+
+        <div class="pK">잠실새내 유년부 입니다.</div>
+        <h1 class="pT">상품 상세</h1>
+
+        @* ✅ Model이 null이면 안내만 출력 *@
+        @if (Model == null)
+        {
+            <div class="pdEmpty">
+                <b>상품 정보를 찾을 수 없습니다.</b><br />
+                목록으로 돌아가 다시 선택해 주세요.
+                <div class="pacts" style="justify-content:center">
+                    <a class="pbtn pri" href="@returnUrl">목록으로</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            var imgUrl = $"/images/AwardItem/{Model.ProductID}.jpg";
+            int pointReq = 0;
+            int.TryParse(Model.PointRequirement ?? "", out pointReq);
+
+            <div class="pdGrid">
+                <div class="pdImg">
+                    <img src="@imgUrl"
+                         alt="상품 이미지"
+                         loading="lazy"
+                         onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                </div>
+
+                <div>
+                    <h2 class="pdName">@Model.ProductName</h2>
+
+                    <div class="pdPills">
+                        <span class="pdPill">#@Model.ProductID</span>
+                        @if (canSeePrice && !string.IsNullOrWhiteSpace(Model.SourceType))
+                        {
+                            <span class="pdPill">@Model.SourceType</span>
+                        }
+                        @if (pointReq > 0)
+                        {
+                            <span class="pdPill pt">포인트 @pointReq</span>
+                        }
+                        @if (canSeePrice)
+                        {
+                            <span class="pdPill price">@Model.UnitPrice.ToString("N0")원</span>
+                        }
+                    </div>
+
+                    <p class="pdDesc">@(!string.IsNullOrWhiteSpace(Model.ProductDescription) ? Model.ProductDescription : "설명이 없습니다.")</p>
+                </div>
+            </div>
+
+            <div class="pacts">
+                <a class="pbtn pri" href="@returnUrl">목록으로</a>
+            </div>
+        }
+
+        <div class="pft"><span>© 유년부 · 선물</span><a href="/Present/Kind">선물 목록</a></div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject IAttendanceService AttendanceService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    생일자 · 다가오는 행사 — 안내 책자의 목차처럼 번호 · 제목 · 설명 · 열기 로 늘어놓는다.
+    Bone(호텔 인쇄물) 스킨을 선물함(MyGiftBox3) · 선물 고르기(GiftSelect) 와 같이 쓴다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = (isAdmin || isSuperAdmin);
+
+    var urlBirthDay  = "/Birthdays";
+    var urlEventList = "/ApplyEvent/EventList";
+    var urlGiftKind  = "/Present/Kind";
+    var urlHome      = "/";
+
+    var coupangItems = ViewBag.CoupangItems as List<AwardItem> ?? new List<AwardItem>();
+    int birthCount   = (int?)ViewBag.BirthDayTotalCount ?? 0;
+    int withinDays   = (int?)ViewBag.BirthDayWithinDays ?? 30;
+
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    string N(int v) => v.ToString("N0");
+    var priced = coupangItems.Where(x => x.UnitPrice > 0).ToList();
+    string cpRange = priced.Count == 0 ? $"{coupangItems.Count}종"
+                   : $"{coupangItems.Count}종 · {N(priced.Min(x => x.UnitPrice))} ~ {N(priced.Max(x => x.UnitPrice))}원";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>생일자 · 다가오는 행사 — @ConstatsCommon.MainKeyTitle</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+    /* 머리 */
+    .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+    .hdTop a { color: #374151; }
+    .hdTop a:hover { color: #2F80ED; }
+    .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+    /* 구역 */
+    .sec { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+    .secT { font-size: 16px; font-weight: 800; color: #111827; }
+
+    /* 생일 배너(partial)가 이 자리에 들어온다 */
+    .brBanner:empty { display: none; }
+
+    /* 바로가기 줄 */
+    .mn { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid #EEF0F3; }
+    .mn:last-child { border-bottom: 0; }
+    .mnNo { flex: none; width: 26px; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+    .mnTx { flex: 1; min-width: 0; }
+    .mnL { display: block; font-size: 16px; font-weight: 700; color: #111827; line-height: 1.4; }
+    .mnD { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; word-break: keep-all; }
+    .mnA { flex: none; font-size: 20px; font-weight: 300; color: #D1D5DB; transition: transform .15s, color .15s; }
+    .mn:hover .mnA { color: #2F80ED; transform: translateX(3px); }
+    .mn:hover .mnL { color: #2F80ED; }
+    .badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11px; font-weight: 700; vertical-align: 2px; white-space: nowrap; }
+
+    .ft { margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+</style>
+</head>
+<body>
+
+<header class="sh">
+    <div class="hdTop">
+        <a href="@urlHome">← @ConstatsCommon.ToHome</a>
+        <span>@dateText</span>
+    </div>
+    <div class="hdK">잠실새내 유년부 입니다.</div>
+    <h1 class="hdT">생일자 · 이벤트</h1>
+</header>
+
+<main class="sh">
+    <div class="brBanner">
+        @await Html.PartialAsync("_Banner_AlarmHappyBirthday")
+    </div>
+
+    <section class="sec">
+        <div class="secT">바로가기</div>
+
+        <a class="mn" href="@urlBirthDay">
+            <span class="mnNo">01</span>
+            <span class="mnTx">
+                <span class="mnL">
+                    생일자 보기
+                    @if (birthCount > 0)
+                    {
+                        <span class="badge">@(withinDays)일 내 @(birthCount)명</span>
+                    }
+                </span>
+                <span class="mnD">다가오는 생일자를 한 번에 확인하고 연락까지</span>
+            </span>
+            <span class="mnA">›</span>
+        </a>
+
+        <a class="mn" href="@urlGiftKind">
+            <span class="mnNo">02</span>
+            <span class="mnTx">
+                <span class="mnL">선물 목록</span>
+                <span class="mnD">도전 · 새친구 · 생일 선물을 한 번에 확인</span>
+            </span>
+            <span class="mnA">›</span>
+        </a>
+    </section>
+</main>
+
+</body>
+</html>

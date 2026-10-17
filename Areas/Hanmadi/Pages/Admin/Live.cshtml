@@ -1,0 +1,591 @@
+@page "/hanmadi/admin/sessions/{id:int}/live"
+@model BulletinBoard.Areas.Hanmadi.Pages.Admin.LiveModel
+@{
+    Layout = null;
+    ViewData["Title"] = "라이브 진행";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>라이브 · 한마디</title>
+<style>
+:root {
+  --accent: #6366f1; --accent2: #4f46e5;
+  --bg: #f1f5f9; --surface: #fff;
+  --border: #e2e8f0; --text: #0f172a;
+  --muted: #64748b; --faint: #94a3b8;
+  --live-bg:#dcfce7; --live-fg:#16a34a;
+  --done-bg:#fee2e2; --done-fg:#dc2626;
+  --wait-bg:#f1f5f9; --wait-fg:#64748b;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column;
+}
+
+/* ════ TOPBAR ════ */
+.topbar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; height: 52px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.back { color: var(--faint); text-decoration: none; font-size: 13px; font-weight: 600; }
+.back:hover { color: var(--accent); }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #ef4444; flex-shrink: 0;
+  animation: blink 1.2s ease-in-out infinite;
+}
+@@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.session-name {
+  font-size: 14px; font-weight: 900; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.conn-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: #fef3c7; color: #92400e; flex-shrink: 0;
+}
+.conn-badge.ok { background: var(--live-bg); color: var(--live-fg); }
+.end-btn {
+  flex-shrink: 0;
+  background: var(--surface); border: 1.5px solid #fecaca; color: #ef4444;
+  font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 8px;
+  cursor: pointer; transition: all .15s;
+}
+.end-btn:hover { background: #fef2f2; }
+
+/* ════ 모바일 TAB BAR ════ */
+.tab-bar {
+  display: none;
+  flex-shrink: 0;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.tab-bar button {
+  flex: 1; padding: 11px 0;
+  font-size: 13px; font-weight: 700; color: var(--faint);
+  background: none; border: none; cursor: pointer;
+  border-bottom: 2.5px solid transparent; transition: all .15s;
+}
+.tab-bar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ════ 메인 BODY ════ */
+.body-wrap {
+  flex: 1; display: flex; overflow: hidden;
+  min-height: 0;
+}
+
+/* ════ SIDEBAR ════ */
+.sidebar {
+  width: 230px; flex-shrink: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto; padding: 14px 11px;
+  gap: 3px;
+}
+.sb-top { margin-bottom: 10px; }
+.sb-code {
+  display: inline-flex; align-items: center;
+  background: #ede9fe; color: var(--accent);
+  font-size: 14px; font-weight: 900;
+  padding: 3px 10px; border-radius: 7px;
+  letter-spacing: 3px; margin-bottom: 6px;
+}
+.sb-stats {
+  display: flex; gap: 14px;
+  font-size: 11px; color: var(--faint);
+}
+.sb-stats b { font-size: 14px; font-weight: 900; color: var(--text); }
+
+.q-item {
+  padding: 8px 9px; border-radius: 9px;
+  border: 1.5px solid transparent; cursor: pointer;
+  transition: all .14s;
+}
+.q-item:hover { background: #f8fafc; border-color: var(--border); }
+.q-item.sel   { border-color: var(--accent); background: #f0effe; }
+.q-num  { font-size: 10px; font-weight: 700; color: var(--faint); margin-bottom: 1px; }
+.q-text { font-size: 12px; font-weight: 700; line-height: 1.35; color: #1e293b; }
+.s-chip {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 999px;
+  display: inline-block; margin-top: 3px;
+}
+.c-wait { background: var(--wait-bg); color: var(--wait-fg); }
+.c-live { background: var(--live-bg); color: var(--live-fg); }
+.c-done { background: var(--done-bg); color: var(--done-fg); }
+
+.sb-footer {
+  margin-top: auto; padding-top: 12px;
+  border-top: 1px solid #f0f4f8;
+  font-size: 11px; color: var(--faint); line-height: 1.7;
+}
+.sb-footer a { color: var(--accent); text-decoration: none; }
+
+/* ════ 결과 PANEL ════ */
+.result-panel {
+  flex: 1; display: flex; flex-direction: column;
+  overflow: hidden; min-width: 0;
+  background: #fafbff;
+}
+
+/* 문항 헤더 */
+.q-header {
+  display: none; flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.q-question { font-size: 14px; font-weight: 800; color: var(--text); line-height: 1.45; margin-bottom: 8px; word-break: keep-all; white-space: pre-wrap; }
+.q-bottom-row {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 8px;
+}
+.resp-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #ede9fe; color: var(--accent);
+  font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.action-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.btn { padding: 8px 14px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; transition: all .14s; font-family: inherit; white-space: nowrap; }
+.btn-open  { background: #22c55e; color: #fff; }
+.btn-open:hover  { background: #16a34a; }
+.btn-close { background: #ef4444; color: #fff; }
+.btn-close:hover { background: #dc2626; }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* 빈 상태 */
+.hint {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: #c7d0de; font-size: 14px; gap: 10px;
+}
+.hint-icon { font-size: 38px; opacity: .35; }
+
+/* Canvas 영역 */
+.canvas-wrap { flex: 1; display: none; overflow: hidden; position: relative; }
+canvas { display: block; width: 100%; height: 100%; }
+
+/* 차트 영역 */
+.chart-wrap { flex: 1; padding: 18px; overflow-y: auto; display: none; }
+
+/* 막대 그래프 */
+.bar-chart { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { display: flex; align-items: center; gap: 10px; }
+.bar-label { width: 120px; font-size: 13px; font-weight: 700; color: #475569; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bar-track { flex:1; background:#f0f4f8; border-radius:6px; height:28px; overflow:hidden; }
+.bar-fill { height:100%; background: linear-gradient(90deg,#6366f1,#818cf8); border-radius:6px; transition:width .5s cubic-bezier(.4,0,.2,1); }
+.bar-cnt { width:32px; text-align:right; font-size:13px; font-weight:900; font-variant-numeric:tabular-nums; color:var(--text); }
+
+/* 척도 */
+.scale-area { display:flex; align-items:flex-end; gap:8px; height:160px; }
+.scale-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; }
+.scale-track { width:100%; flex:1; display:flex; align-items:flex-end; background:#f0f4f8; border-radius:10px; overflow:hidden; }
+.scale-fill { width:100%; background:linear-gradient(180deg,#818cf8,#5b5bd6); border-radius:10px; transition:height .5s cubic-bezier(.4,0,.2,1); }
+.scale-lbl  { font-size:12px; font-weight:900; color:var(--faint); }
+.scale-cnt  { font-size:13px; font-weight:900; color:var(--text); }
+
+/* 자유서술 */
+.cards-stream { display:flex; flex-direction:column; gap:8px; }
+.ans-card {
+  background:var(--surface); border:1.5px solid var(--border);
+  border-radius:11px; padding:11px 15px;
+  font-size:14px; color:#1e293b; line-height:1.5;
+  animation:slideUp .3s ease;
+}
+@@keyframes slideUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.empty-msg { text-align:center; color:#c7d0de; font-size:14px; padding:40px 0; }
+
+/* ════ 반응형 ════ */
+        @@media (max-width: 640px) {
+  .tab-bar { display: flex; }
+  .sidebar {
+    width: 100%; border-right: none;
+    /* 탭 전환으로 숨김/표시 */
+  }
+  .body-wrap { flex-direction: column; overflow: visible; }
+  .result-panel { min-height: 60vh; }
+  .sidebar, .result-panel { display: none; }
+  .sidebar.tab-active, .result-panel.tab-active { display: flex; flex-direction: column; }
+  .canvas-wrap { min-height: 55vw; }
+  .bar-label { width: 80px; }
+}
+
+        @@media (min-width: 641px) {
+  .sidebar, .result-panel { display: flex !important; flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- 상단바 -->
+<header class="topbar">
+  <a href="/hanmadi/admin/sessions/@Model.Session!.Id/questions" class="back">←</a>
+  <span class="live-dot"></span>
+  <span class="session-name">@Model.Session!.Title</span>
+  <span class="conn-badge" id="conn-badge">⏳ 연결 중</span>
+  <button class="end-btn" onclick="doEnd()">종료</button>
+</header>
+
+<!-- 모바일 탭 -->
+<div class="tab-bar" id="tab-bar">
+  <button class="active" onclick="switchTab('q')">📋 문항 선택</button>
+  <button onclick="switchTab('r')">📊 결과 보기</button>
+</div>
+
+<!-- 바디 -->
+<div class="body-wrap" id="body-wrap">
+
+  <!-- 사이드바 (문항 목록) -->
+  <aside class="sidebar tab-active" id="panel-q">
+    <div class="sb-top">
+      <div class="sb-code">@Model.Session.Code</div>
+      <div class="sb-stats">
+        <span>
+          <a href="/hanmadi/admin/sessions/@Model.Session.Id/participants"
+             style="color:inherit;text-decoration:none;cursor:pointer;"
+             title="참여자 목록 보기">
+            참여자 <b id="part-count">@Model.ParticipantCount</b>명 →
+          </a>
+        </span>
+        <span>응답 <b id="submit-count">-</b></span>
+      </div>
+    </div>
+
+    @{ int qi = 1; }
+    @foreach (var q in Model.Session.Questions.OrderBy(q => q.Order))
+    {
+      var sc = q.Status == 1 ? "c-live" : q.Status == 2 ? "c-done" : "c-wait";
+      var sl = q.Status == 1 ? "🔴 진행중" : q.Status == 2 ? "마감" : "대기";
+      <div class="q-item" id="qi-@q.Id"
+           data-id="@q.Id" data-type="@q.Type" data-title="@q.Title"
+           onclick="selectQEl(this)">
+        <div class="q-num">Q@(qi++)</div>
+        <div class="q-text">@q.Title</div>
+        <span class="s-chip @sc" id="chip-@q.Id">@sl</span>
+      </div>
+    }
+
+    <div class="sb-footer">
+      참여: <a href="/hanmadi/join" target="_blank">/hanmadi/join</a><br/>
+      코드 <strong style="color:var(--accent);letter-spacing:3px">@Model.Session.Code</strong>
+    </div>
+  </aside>
+
+  <!-- 결과 패널 -->
+  <section class="result-panel" id="panel-r">
+
+    <div class="hint" id="hint">
+      <span class="hint-icon">🎤</span>
+      <span>문항을 선택하세요</span>
+    </div>
+
+    <div class="q-header" id="q-header">
+      <div class="q-question" id="q-title-text"></div>
+      <div class="q-bottom-row">
+        <div class="resp-badge">응답 <span id="resp-num">0</span></div>
+        <div class="action-btns">
+          <button class="btn btn-open"  id="btn-open"  onclick="doOpen()">출제</button>
+          <button class="btn btn-close" id="btn-close" onclick="doClose()">마감</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <canvas id="bubble-canvas"></canvas>
+    </div>
+
+    <div class="chart-wrap" id="chart-wrap">
+      <div class="empty-msg" id="chart-empty">아직 답변이 없습니다</div>
+      <div id="chart-content"></div>
+    </div>
+
+  </section>
+</div>
+
+<script src="/lib/signalr/signalr.min.js"></script>
+<script>
+/* ═══ STATE ═══ */
+const SESSION_ID   = @Model.Session.Id;
+const SESSION_CODE = "@Model.Session.Code";
+let curId = null, curType = null, curStatus = 0;
+const initStatus = {
+  @foreach (var q in Model.Session.Questions)
+  {
+    @: @q.Id: @q.Status,
+  }
+};
+
+/* ═══ 탭 전환 (모바일) ═══ */
+function switchTab(tab) {
+  const btns = document.querySelectorAll('.tab-bar button');
+  btns[0].classList.toggle('active', tab === 'q');
+  btns[1].classList.toggle('active', tab === 'r');
+  document.getElementById('panel-q').classList.toggle('tab-active', tab === 'q');
+  document.getElementById('panel-r').classList.toggle('tab-active', tab === 'r');
+}
+
+/* ═══ SIGNALR ═══ */
+const conn = new signalR.HubConnectionBuilder()
+  .withUrl("/hanmadi-hub").withAutomaticReconnect().build();
+
+conn.on("ParticipantCount", n => setText("part-count", n));
+conn.on("SubmitCount",      n => { setText("resp-num", n); setText("submit-count", n); });
+conn.on("BubbleUpdate",  bs => { if (curType === 1) ingestBubbles(bs); });
+conn.on("ResultUpdate",  d  => { if (curId === d.questionId) fetchAndRender(); });
+conn.on("QuestionOpened",q  => updateChip(q.id, 1));
+conn.on("QuestionClosed",id => updateChip(id, 2));
+
+conn.onreconnecting(() => setConnBadge(false));
+conn.onreconnected(() => {
+  setConnBadge(true);
+  conn.invoke("JoinSession", SESSION_CODE, "admin_" + SESSION_ID).catch(e => console.error(e));
+});
+conn.start()
+  .then(() => { setConnBadge(true); return conn.invoke("JoinSession", SESSION_CODE, "admin_" + SESSION_ID); })
+  .catch(e => { setConnBadge(false); console.error("SignalR 연결 실패:", e); });
+
+function setConnBadge(ok) {
+  const el = document.getElementById("conn-badge");
+  if (!el) return;
+  el.textContent = ok ? "🟢 연결됨" : "🔴 끊김";
+  el.className   = "conn-badge" + (ok ? " ok" : "");
+}
+
+/* ═══ 문항 선택 ═══ */
+function selectQEl(el) {
+  const title = (el.dataset.title || '').trim();
+  selectQ(parseInt(el.dataset.id), parseInt(el.dataset.type), title);
+}
+function selectQ(id, type, title) {
+  document.querySelectorAll(".q-item").forEach(e => e.classList.remove("sel"));
+  const el = document.getElementById("qi-" + id);
+  if (el) el.classList.add("sel");
+  curId = id; curType = type; curStatus = initStatus[id] ?? 0;
+  setText("q-title-text", title);
+  setText("resp-num", "-"); setText("submit-count", "-");
+  show("q-header","block"); hide("hint");
+  if (type === 1) { show("canvas-wrap","flex"); hide("chart-wrap"); resetBubbles(); }
+  else            { hide("canvas-wrap"); show("chart-wrap","block"); setChartContent(""); show("chart-empty","block"); }
+  syncBtns();
+  fetchAndRender();
+  // 모바일: 문항 선택 후 자동으로 결과 탭으로 전환
+  if (window.innerWidth <= 640) switchTab('r');
+}
+
+function doOpen() {
+  if (!curId) return;
+  if (conn.state !== "Connected") { alert("연결 중입니다. 잠시 후 다시 시도해주세요."); return; }
+  conn.invoke("OpenQuestion", curId)
+    .then(() => { curStatus = 1; initStatus[curId] = 1; syncBtns(); })
+    .catch(e => { console.error("출제 오류:", e); alert("오류: " + e); });
+}
+function doClose() {
+  if (!curId) return;
+  if (conn.state !== "Connected") { alert("연결 중입니다. 잠시 후 다시 시도해주세요."); return; }
+  conn.invoke("CloseQuestion", curId)
+    .then(() => { curStatus = 2; initStatus[curId] = 2; syncBtns(); })
+    .catch(e => { console.error("마감 오류:", e); alert("오류: " + e); });
+}
+function doEnd() {
+  if (!confirm("세션을 종료하시겠습니까?")) return;
+  if (conn.state !== "Connected") { alert("연결 중입니다. 잠시 후 다시 시도해주세요."); return; }
+  conn.invoke("EndSession", SESSION_ID)
+    .then(() => { location.href = "/hanmadi/admin"; })
+    .catch(e => { console.error("종료 오류:", e); alert("오류: " + e); });
+}
+function syncBtns() {
+  $("btn-open").disabled  = curStatus === 1 || curStatus === 2;
+  $("btn-close").disabled = curStatus !== 1;
+}
+function updateChip(id, status) {
+  const el = document.getElementById("chip-" + id);
+  if (!el) return;
+  el.className  = "s-chip " + (status===1?"c-live":status===2?"c-done":"c-wait");
+  el.textContent = status===1?"🔴 진행중":status===2?"마감":"대기";
+  initStatus[id] = status;
+  if (curId === id) { curStatus = status; syncBtns(); }
+}
+
+/* ═══ FETCH & RENDER ═══ */
+let pollTimer = null;
+function fetchAndRender() {
+  if (!curId) return;
+  clearInterval(pollTimer);
+  fetch("/hanmadi/api/results?questionId=" + curId)
+    .then(r => { if (!r.ok) throw new Error("API " + r.status); return r.json(); })
+    .then(data => {
+      setText("resp-num", data.totalCount ?? 0);
+      setText("submit-count", data.totalCount ?? 0);
+      if      (curType === 1) ingestBubbles(data.bubbles || []);
+      else if (curType === 2) renderBars(data.bars   || []);
+      else if (curType === 3) renderScale(data.scale || {});
+      else if (curType === 4) renderCards(data.cards || []);
+    })
+    .catch(e => console.error("결과 조회 실패:", e));
+  if (curStatus === 1 && curType !== 1)
+    pollTimer = setInterval(fetchAndRender, 5000);
+}
+
+/* ═══ 3D BUBBLE ENGINE ═══ */
+const PALETTE = [
+  ['#FF8A65','#E64A19'],['#EC407A','#C2185B'],['#26C6DA','#0097A7'],
+  ['#AB47BC','#7B1FA2'],['#42A5F5','#1565C0'],['#EF5350','#B71C1C'],
+  ['#66BB6A','#2E7D32'],['#FFCA28','#F57F17'],['#FFA726','#E65100'],['#26A69A','#004D40'],
+];
+let bubbles=[], colorMap={}, colorSeq=0, rafId=null;
+const canvas=document.getElementById("bubble-canvas");
+const ctx=canvas.getContext("2d");
+
+function resetBubbles() { bubbles=[]; colorMap={}; colorSeq=0; }
+
+function ingestBubbles(incoming) {
+  if (!incoming.length) return;
+  const maxC=incoming[0].count||1;
+  const cw=canvas.offsetWidth, ch=canvas.offsetHeight;
+  const maxR=Math.min(cw,ch)*0.18, minR=20;
+  incoming.forEach(b => {
+    const targetR=minR+(b.count/maxC)*(maxR-minR);
+    const ex=bubbles.find(x=>x.text===b.text);
+    if (ex) { ex.count=b.count; ex.targetR=targetR; }
+    else {
+      if (!(b.text in colorMap)) colorMap[b.text]=colorSeq++%PALETTE.length;
+      bubbles.push({text:b.text,count:b.count,
+        x:cw/2+(Math.random()-.5)*60, y:ch/2+(Math.random()-.5)*60,
+        vx:(Math.random()-.5)*3, vy:(Math.random()-.5)*3,
+        r:5, targetR, colorIdx:colorMap[b.text]});
+    }
+  });
+  if (!rafId) { resizeCanvas(); rafId=requestAnimationFrame(physicsLoop); }
+}
+
+function resizeCanvas() {
+  const wrap=document.getElementById("canvas-wrap");
+  canvas.width=wrap.offsetWidth*devicePixelRatio;
+  canvas.height=wrap.offsetHeight*devicePixelRatio;
+  ctx.scale(devicePixelRatio,devicePixelRatio);
+}
+
+function physicsLoop() {
+  const W=canvas.width/devicePixelRatio, H=canvas.height/devicePixelRatio;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle="#fafbff"; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle="rgba(91,91,214,.04)";
+  for(let x=0;x<W;x+=28) for(let y=0;y<H;y+=28)
+    { ctx.beginPath(); ctx.arc(x,y,1,0,Math.PI*2); ctx.fill(); }
+  const n=bubbles.length;
+  bubbles.forEach(b => {
+    b.r+=(b.targetR-b.r)*0.08;
+    b.vx+=(Math.random()-.5)*0.12; b.vy+=(Math.random()-.5)*0.12;
+    b.vx*=0.985; b.vy*=0.985; b.x+=b.vx; b.y+=b.vy;
+    const pad=10;
+    if(b.x-b.r<pad){b.x=b.r+pad;b.vx=Math.abs(b.vx)*0.7;}
+    if(b.x+b.r>W-pad){b.x=W-pad-b.r;b.vx=-Math.abs(b.vx)*0.7;}
+    if(b.y-b.r<pad){b.y=b.r+pad;b.vy=Math.abs(b.vy)*0.7;}
+    if(b.y+b.r>H-pad){b.y=H-pad-b.r;b.vy=-Math.abs(b.vy)*0.7;}
+  });
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) {
+    const a=bubbles[i],b=bubbles[j];
+    const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy),minD=a.r+b.r+4;
+    if(dist<minD&&dist>0.01){
+      const nx=dx/dist,ny=dy/dist,ov=(minD-dist)/2;
+      a.x-=nx*ov;a.y-=ny*ov;b.x+=nx*ov;b.y+=ny*ov;
+      const dv=(a.vx-b.vx)*nx+(a.vy-b.vy)*ny;
+      if(dv>0){a.vx-=dv*nx*0.6;a.vy-=dv*ny*0.6;b.vx+=dv*nx*0.6;b.vy+=dv*ny*0.6;}
+    }
+  }
+  bubbles.forEach(b=>drawBubble(b,W,H));
+  rafId=requestAnimationFrame(physicsLoop);
+}
+
+function drawBubble(b,W,H) {
+  const [c1,c2]=PALETTE[b.colorIdx%PALETTE.length];
+  const x=b.x,y=b.y,r=b.r;
+  ctx.save();
+  ctx.shadowColor=c2+"55"; ctx.shadowBlur=r*0.55; ctx.shadowOffsetY=r*0.12;
+  const gM=ctx.createRadialGradient(x-r*.28,y-r*.28,r*.05,x,y,r);
+  gM.addColorStop(0,hexAlpha(c1,1));gM.addColorStop(.55,c1);gM.addColorStop(1,c2);
+  ctx.fillStyle=gM; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore();
+  const gHL=ctx.createRadialGradient(x-r*.32,y-r*.38,r*.02,x-r*.12,y-r*.18,r*.62);
+  gHL.addColorStop(0,"rgba(255,255,255,0.72)");gHL.addColorStop(.45,"rgba(255,255,255,0.22)");gHL.addColorStop(1,"rgba(255,255,255,0)");
+  ctx.fillStyle=gHL; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  const gBL=ctx.createRadialGradient(x+r*.1,y+r*.65,0,x+r*.1,y+r*.65,r*.45);
+  gBL.addColorStop(0,"rgba(255,255,255,0.18)");gBL.addColorStop(1,"rgba(255,255,255,0)");
+  ctx.fillStyle=gBL; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  const showCount=r>32;
+  const textY=showCount?y-r*.15:y;
+  const fontSize=Math.max(12,Math.min(r*.46,34));
+  ctx.save();
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.font=`800 ${fontSize}px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif`;
+  ctx.fillStyle="#ffffff";
+  ctx.shadowColor="rgba(0,0,0,0.22)"; ctx.shadowBlur=fontSize*.5;
+  ctx.shadowOffsetX=0; ctx.shadowOffsetY=fontSize*.08;
+  ctx.fillText(b.text,x,textY);
+  if(showCount){
+    const cs=Math.max(10,fontSize*.6);
+    ctx.font=`600 ${cs}px -apple-system,BlinkMacSystemFont,sans-serif`;
+    ctx.fillStyle="rgba(255,255,255,0.85)"; ctx.shadowBlur=cs*.4;
+    ctx.fillText(b.count,x,y+r*.33);
+  }
+  ctx.restore();
+}
+function hexAlpha(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `rgba(${r},${g},${b},${a})`;}
+
+new ResizeObserver(()=>{
+  if(curType===1&&bubbles.length){cancelAnimationFrame(rafId);rafId=null;resizeCanvas();rafId=requestAnimationFrame(physicsLoop);}
+}).observe(document.getElementById("canvas-wrap"));
+
+/* ═══ BAR / SCALE / CARDS ═══ */
+function renderBars(bars) {
+  if(!bars.length){show("chart-empty","block");setChartContent("");return;}
+  hide("chart-empty");
+  const max=Math.max(...bars.map(b=>b.count),1);
+  let h='<div class="bar-chart">';
+  bars.forEach(b=>{
+    const pct=Math.round((b.count/max)*100);
+    h+=`<div class="bar-row">
+      <div class="bar-label" title="${esc(b.text)}">${esc(b.text)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="bar-cnt">${b.count}</div></div>`;
+  });
+  setChartContent(h+'</div>');
+}
+function renderScale(scale) {
+  const counts=[1,2,3,4,5].map(i=>scale[i]||0);
+  const max=Math.max(...counts,1);
+  let h='<div class="scale-area">';
+  counts.forEach((c,i)=>{
+    const pct=Math.round((c/max)*100);
+    h+=`<div class="scale-col">
+      <div class="scale-cnt">${c}</div>
+      <div class="scale-track"><div class="scale-fill" style="height:${pct}%"></div></div>
+      <div class="scale-lbl">${i+1}점</div></div>`;
+  });
+  setChartContent(h+'</div>'); hide("chart-empty");
+}
+function renderCards(cards) {
+  if(!cards.length){show("chart-empty","block");setChartContent("");return;}
+  hide("chart-empty");
+  setChartContent('<div class="cards-stream">'+cards.map(c=>`<div class="ans-card">${esc(c)}</div>`).join("")+'</div>');
+}
+
+/* ═══ UTILS ═══ */
+function $(id)             { return document.getElementById(id); }
+function show(id,d)        { $(id).style.display=d||"block"; }
+function hide(id)          { $(id).style.display="none"; }
+function setText(id,v)     { const el=$(id); if(el) el.textContent=v; }
+function setChartContent(h){ $("chart-content").innerHTML=h; }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+</script>
+</body>
+</html>

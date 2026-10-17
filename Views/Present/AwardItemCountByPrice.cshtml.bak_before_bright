@@ -1,0 +1,284 @@
+@model List<(string Label, int Min, int Max, int Total, int Visible, int Hidden)>
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Services
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+}
+
+@{
+    Layout = null;
+    var rows = Model ?? new();
+    // SuperAdmin이 아니면 숨김 항목을 집계에서 제외
+    if (!isSuperAdmin)
+        rows = rows.Select(r => (r.Label, r.Min, r.Max, Total: r.Visible, Visible: r.Visible, Hidden: 0)).ToList();
+    int total   = rows.Sum(r => r.Total);
+    int visible = rows.Sum(r => r.Visible);
+    int hidden  = rows.Sum(r => r.Hidden);
+
+    // 가격대별 색상
+    string[] bandColors = { "#6366f1", "#3b82f6", "#10b981", "#f59e0b", "#f97316", "#ef4444" };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>가격대별 카운트</title>
+    <style>
+        :root {
+            --bg:     #f6f8ff;
+            --panel:  #ffffff;
+            --ink:    #0f172a;
+            --muted:  #64748b;
+            --line:   rgba(15,23,42,.09);
+            --blue:   #2563eb;
+            --r:      18px;
+            --shadow: 0 16px 44px rgba(2,6,23,.09);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            min-height: 100vh;
+        }
+
+        .wrap { max-width: 760px; margin: 0 auto; padding: 20px 14px 40px; }
+
+        /* ── 헤더 ── */
+        .hero {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: calc(var(--r) + 4px);
+            box-shadow: var(--shadow);
+            padding: 18px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .heroLeft h1 { font-size: 18px; font-weight: 900; letter-spacing: -.3px; }
+        .heroLeft p  { margin-top: 5px; font-size: 13px; color: var(--muted); }
+
+        .heroRight { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 14px; border-radius: 12px;
+            font-size: 13px; font-weight: 800; font-family: inherit;
+            text-decoration: none; cursor: pointer; border: none;
+            transition: opacity .12s;
+        }
+        .btn:hover { opacity: .82; }
+        .btnGhost {
+            background: rgba(255,255,255,.95);
+            border: 1px solid var(--line);
+            color: var(--ink);
+            box-shadow: 0 6px 16px rgba(2,6,23,.06);
+        }
+
+        /* ── 요약 ── */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .summary-pills {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .summary-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 13px; border-radius: 999px;
+            background: var(--panel); border: 1px solid var(--line);
+            box-shadow: 0 6px 14px rgba(2,6,23,.05);
+            font-size: 13px; font-weight: 800; color: var(--muted);
+            white-space: nowrap;
+        }
+        .summary-pill b { font-size: 15px; }
+        .pill-total   b { color: #2563eb; }
+        .pill-visible b { color: #16a34a; }
+        .pill-hidden  b { color: #dc2626; }
+
+        /* ── 리스트 패널 ── */
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--r);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        /* ── 각 행 ── */
+        .row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(15,23,42,.055);
+            text-decoration: none;
+            color: inherit;
+            transition: background .1s;
+            cursor: pointer;
+        }
+        .row:last-child { border-bottom: none; }
+        .row:hover { background: rgba(37,99,235,.05); }
+        .row:hover .rowLabel { opacity: 1; }
+        .row.zero { opacity: .45; cursor: default; pointer-events: none; }
+
+        /* 색상 도트 */
+        .rowDot {
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* 가격 라벨 */
+        .rowLabel {
+            flex: 1; min-width: 0;
+            font-size: 14px; font-weight: 800;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            opacity: .88;
+            transition: opacity .1s, color .1s;
+        }
+        .row:hover .rowLabel { color: var(--blue); }
+
+        /* 바 + 카운트 */
+        .rowRight {
+            display: flex; align-items: center; gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .bar {
+            width: 120px; height: 8px;
+            background: #e2e8f0; border-radius: 999px; overflow: hidden;
+        }
+        .barFill {
+            height: 100%; border-radius: 999px;
+            transition: width .3s ease;
+        }
+
+        .cnt {
+            min-width: 32px; text-align: right;
+            font-size: 14px; font-weight: 900;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 숨김/표시 칩 */
+        .rowChips {
+            display: flex; gap: 5px; flex-shrink: 0;
+        }
+        .chip {
+            display: inline-flex; align-items: center; gap: 3px;
+            padding: 2px 8px; border-radius: 999px;
+            font-size: 11px; font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .chip-v { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+        .chip-h { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+
+        .arrow {
+            font-size: 13px; color: var(--muted); opacity: .5;
+        }
+
+        /* 0개 행: 화살표 숨김 */
+        .row.zero .arrow { display: none; }
+
+        /* 빈 상태 */
+        .empty {
+            padding: 36px; text-align: center;
+            color: var(--muted); font-size: 14px;
+        }
+
+        @@media (max-width: 540px) {
+            .bar { display: none; }
+            .rowLabel { font-size: 13px; }
+            .row { padding: 13px 12px; gap: 8px; }
+            .chip { font-size: 10px; padding: 2px 6px; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <div class="hero">
+        <div class="heroLeft">
+            <h1>💰 가격대별 카운트</h1>
+            <p>AwardItem 테이블 · 가격 구간별 상품 수 · 항목 클릭 시 해당 상품만 수정</p>
+        </div>
+        <div class="heroRight">
+            <a class="btn btnGhost" href="/Present/AwardItemCountByKind">📊 종류별</a>
+            <a class="btn btnGhost" href="/Present/AwardItemAdmin">← 전체 목록</a>
+            <a class="btn btnGhost" href="/">🏠 홈</a>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <div class="summary-pills">
+            <div class="summary-pill pill-total">전체 <b>@total</b>개</div>
+            <div class="summary-pill pill-visible">👁 표시 <b>@visible</b>개</div>
+            <div class="summary-pill pill-hidden">🙈 숨김 <b>@hidden</b>개</div>
+        </div>
+    </div>
+
+    <div class="panel">
+        @{
+            int maxCnt = rows.Any() ? rows.Max(r => r.Total) : 1;
+            if (maxCnt == 0) maxCnt = 1;
+        }
+        @for (int i = 0; i < rows.Count; i++)
+        {
+            var row      = rows[i];
+            int pct      = (int)Math.Round(row.Total * 100.0 / maxCnt);
+            string color = bandColors[i % bandColors.Length];
+            string href  = row.Total > 0
+                ? $"/Present/AwardItemAdminByPrice?min={row.Min}&max={row.Max}"
+                : "#";
+
+            <a class="row @(row.Total == 0 ? "zero" : "")" href="@href">
+                <span class="rowDot" style="background:@color;box-shadow:0 0 0 3px @(color)22;"></span>
+                <span class="rowLabel">@row.Label</span>
+                <div class="rowRight">
+                    <div class="bar">
+                        <div class="barFill" style="width:@pct%;background:@color;"></div>
+                    </div>
+                    <span class="cnt" style="color:@color;">@row.Total</span>
+                    <div class="rowChips">
+                        <span class="chip chip-v">👁 @row.Visible</span>
+                        @if (row.Hidden > 0)
+                        {
+                            <span class="chip chip-h">🙈 @row.Hidden</span>
+                        }
+                    </div>
+                    <span class="arrow">›</span>
+                </div>
+            </a>
+        }
+    </div>
+
+</div>
+</body>
+</html>

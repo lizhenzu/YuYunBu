@@ -1,0 +1,466 @@
+﻿<!-- =========================================================
+     📸 MyPhotoPick Banner (Cookie Controlled – FULL SCOPE)
+     - 동일 룰 적용
+       1) 쿠키 판정 전: "결정 중..." UI(boot) 먼저 노출
+       2) 쿠키 있음: 배너 DOM + 스타일(style)까지 통째로 제거
+       3) 쿠키 없음: 배너+스타일 전체 표시
+       4) 기존 훅(js-global-cookie-section / js-global-cookie-hide-btn) 그대로 유지
+     ========================================================= -->
+
+<div id="mypick-banner-root"
+     class="mypick-root js-global-cookie-section"
+     data-cookie-key="MyPhotoPickBanner_2025"
+     data-state="checking">
+
+    <!-- ✅ 1) 판정 중 UI: 먼저 보임 -->
+    <div class="mypick-boot" aria-live="polite">
+        <div class="mypick-boot-card">
+            <div class="mypick-boot-row">
+                <div class="mypick-boot-spinner" aria-hidden="true"></div>
+                <div class="mypick-boot-title">사진 다운로드 배너 표시 여부를 확인 중이에요…</div>
+            </div>
+            <div class="mypick-boot-sub">잠시만요 📸 (숨김 설정이 있으면 자동으로 감춰져요)</div>
+        </div>
+    </div>
+
+    <!-- ✅ 2) 실제 배너 콘텐츠(Show일 때만 표시) -->
+    <div class="mypick-content" hidden>
+
+        <!-- 📸 나의 사진 다운로드 서비스 배너 -->
+        <div class="mypick-banner-wrapper">
+
+            <div class="mypick-banner">
+
+                <!-- 왼쪽 아이콘 -->
+                <div class="mypick-banner-visual">
+                    <div class="mypick-banner-visual-main">📸</div>
+                </div>
+
+                <div class="mypick-banner-body">
+
+                    <!-- 상단: 라벨 + 숨기기 버튼 -->
+                    <div class="mypick-banner-header">
+                        <div class="mypick-banner-label mypick-soft-blink">
+                            <span class="emoji">✨</span>
+                            <span>나의 사진 다운로드</span>
+                        </div>
+
+                        <div class="mypick-hide-controls">
+                            <button type="button"
+                                    class="mypick-hide-btn js-global-cookie-hide-btn"
+                                    data-hide="today">
+                                오늘만 안보기
+                            </button>
+                            <button type="button"
+                                    class="mypick-hide-btn js-global-cookie-hide-btn"
+                                    data-hide="1week">
+                                1주일 동안 숨기기
+                            </button>
+                            <button type="button"
+                                    class="mypick-hide-btn js-global-cookie-hide-btn"
+                                    data-hide="3week">
+                                3주 숨기기
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mypick-banner-title">
+                        내 사진만 쏙 골라<br />한 번에 받아보세요
+                    </div>
+
+                    <div class="mypick-banner-sub">
+                        유년부 앨범 속 수많은 사진 중<br>
+                        <strong>“나(우리 아이)가 나온 사진만 자동 정리”</strong> 후 ZIP 파일로 제공합니다.
+                    </div>
+
+                    <div class="mypick-banner-bullets">
+                        <div class="mypick-banner-badge">✅ 인별 자동 분류</div>
+                        <div class="mypick-banner-badge">📁 ZIP으로 한번에 저장</div>
+                        <!-- <div class="mypick-banner-badge">📌 놓치기 전에 백업</div> -->
+                    </div>
+
+                    <div class="mypick-banner-actions">
+                        <a href="https://bit2001-001-site4.dtempurl.com/Albums/MyPhotoPick"
+                           class="mypick-banner-cta"
+                           target="_blank" rel="noopener">
+                            <span class="emoji">👉</span>
+                            <span>나의 사진 다운로드 페이지 열기</span>
+                        </a>
+                    </div>
+
+                    <!-- 🔔 추가 안내 박스 -->
+                    <div class="mypick-extra-box">
+                        <div class="mypick-extra-title">
+                            <span>🔔 자녀 사진이 필요하신가요?</span>
+                        </div>
+
+                        자녀가 나온 사진만 받아보고 싶으시면
+                        <strong>자녀 얼굴 사진 1장과 이름</strong>을 아래 이메일로 보내주세요.
+                        앨범에 올라온 여러 사진 중 <strong>자녀 사진만 골라서</strong> 정리해드립니다.
+
+                        <div class="mypick-extra-email">
+                            📧 보내실 곳: <strong>lizhenzhu@naver.com</strong>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ✅ 스타일: Boot는 항상, 나머지는 shown 상태에서만 적용(스코프) -->
+    <style id="mypick-banner-style">
+        /* ==========================
+                   ✅ Boot(판정중) UI
+                   ========================== */
+        .mypick-root {
+            margin: 1.5rem 0 2.5rem;
+        }
+
+        .mypick-boot {
+            display: block;
+        }
+
+        .mypick-boot-card {
+            border-radius: 18px;
+            padding: .95rem 1rem;
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(0,0,0,.10);
+            box-shadow: 0 14px 34px rgba(0,0,0,.08);
+            backdrop-filter: blur(10px);
+        }
+
+        .mypick-boot-row {
+            display: flex;
+            align-items: center;
+            gap: .65rem;
+        }
+
+        .mypick-boot-title {
+            font-weight: 900;
+            font-size: .98rem;
+            color: rgba(2,6,23,.88);
+        }
+
+        .mypick-boot-sub {
+            margin-top: .35rem;
+            font-size: .86rem;
+            color: rgba(2,6,23,.60);
+            font-weight: 700;
+        }
+
+        .mypick-boot-spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 3px solid rgba(2,6,23,.18);
+            border-top-color: rgba(44,156,156,.95);
+            animation: mypickSpin .8s linear infinite;
+        }
+        @@keyframes mypickSpin {
+            to
+
+        {
+            transform: rotate(360deg);
+        }
+
+        }
+
+        /* ==========================
+                   📸 나의 사진 다운로드 서비스 배너 (shown에서만)
+                   ========================== */
+        .mypick-root[data-state="shown"] .mypick-banner-wrapper {
+            margin: 1.5rem 0 2.5rem;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner {
+            position: relative;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 1.2rem;
+            align-items: center;
+            padding: 1.4rem 1.7rem;
+            border-radius: 24px;
+            background: radial-gradient(circle at top left, #e4f8ff 0%, #f0fff7 45%, #e3f2ff 100%);
+            border: 3px solid #2c9c9c;
+            box-shadow: 0 12px 26px rgba(10, 120, 140, 0.18);
+            color: #0f3640;
+            overflow: hidden;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-visual {
+            position: relative;
+            width: 82px;
+            height: 82px;
+            border-radius: 26px;
+            background: linear-gradient(135deg, #2c9c9c, #53b78f);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 18px rgba(0, 123, 139, 0.35);
+            overflow: hidden;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-visual-main {
+            font-size: 2.1rem;
+            color: #ffffff;
+            z-index: 1;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-visual::before,
+        .mypick-root[data-state="shown"] .mypick-banner-visual::after {
+            content: "";
+            position: absolute;
+            width: 54px;
+            height: 36px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-visual::before {
+            top: 10px;
+            left: 6px;
+            transform: rotate(-11deg);
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-visual::after {
+            bottom: 8px;
+            right: 6px;
+            transform: rotate(9deg);
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-body {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.3rem;
+            flex-wrap: wrap;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.18rem 0.75rem;
+            border-radius: 999px;
+            background: #ffffff;
+            border: 2px solid rgba(44, 156, 156, 0.45);
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #1a5a5a;
+        }
+
+            .mypick-root[data-state="shown"] .mypick-banner-label .emoji {
+                font-size: 1.1rem;
+            }
+
+        .mypick-root[data-state="shown"] .mypick-banner-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            letter-spacing: 0.02em;
+            line-height: 1.35;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-sub {
+            font-size: 0.93rem;
+            opacity: 0.9;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-bullets {
+            margin-top: 0.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            font-size: 0.82rem;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-badge {
+            padding: 0.16rem 0.6rem;
+            border-radius: 999px;
+            background: rgba(44, 156, 156, 0.08);
+            border: 1px solid rgba(44, 156, 156, 0.35);
+            color: #1b5555;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            white-space: nowrap;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-actions {
+            margin-top: 0.7rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            align-items: center;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-cta {
+            font-size: 0.9rem;
+            font-weight: 800;
+            padding: 0.5rem 1.25rem;
+            border-radius: 999px;
+            border: 0;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            background: #2c9c9c;
+            color: #ffffff;
+            box-shadow: 0 4px 14px rgba(0, 122, 139, 0.45);
+            transition: all 0.15s ease;
+        }
+
+            .mypick-root[data-state="shown"] .mypick-banner-cta:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 7px 20px rgba(0, 122, 139, 0.6);
+                background: #217e7e;
+            }
+
+        .mypick-root[data-state="shown"] .mypick-extra-box {
+            margin-top: 1rem;
+            padding: 0.9rem 1rem;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 2px solid rgba(44,156,156,0.35);
+            box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-extra-title {
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #146060;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-extra-email {
+            margin-top: 0.35rem;
+            font-weight: 700;
+            color: #0f4f4f;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-soft-blink {
+            animation: mypickSoftBlink 1.8s ease-in-out infinite;
+        }
+
+        @@keyframes mypickSoftBlink {
+            0%
+
+        {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.7;
+            transform: scale(1.02);
+        }
+
+        100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        }
+
+        /* ✅ 이 배너 전용 hide 버튼 (기존 birthday-* 이름 충돌 방지) */
+        .mypick-root[data-state="shown"] .mypick-hide-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-hide-btn {
+            border-radius: 999px;
+            border: 0;
+            padding: 0.3rem 0.75rem;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.8);
+            color: #1a5a5a;
+            border: 1px solid rgba(44, 156, 156, 0.45);
+            box-shadow: 0 2px 7px rgba(0,0,0,0.05);
+            transition: background 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+            white-space: nowrap;
+        }
+
+            .mypick-root[data-state="shown"] .mypick-hide-btn:hover {
+                background: #e8fbff;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            }
+
+        @@media (max-width: 640px) {
+            .mypick-root[data-state="shown"] .mypick-banner
+
+        {
+            grid-template-columns: 1fr;
+            padding: 1.2rem 1.3rem;
+        }
+
+        .mypick-root[data-state="shown"] .mypick-banner-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        }</style>
+
+    <!-- ✅ 쿠키 판정 스크립트: 숨김이면 "스타일+DOM" 통째로 제거 -->
+    <script>
+        (function () {
+            var root = document.getElementById("mypick-banner-root");
+            if (!root) return;
+
+            var cookieKey = root.getAttribute("data-cookie-key") || "MyPhotoPickBanner_2025";
+
+            function getCookie(name) {
+                var m = document.cookie.match(new RegExp("(^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+                return m ? decodeURIComponent(m[2]) : null;
+            }
+
+            function showContent() {
+                root.setAttribute("data-state", "shown");
+
+                var boot = root.querySelector(".mypick-boot");
+                var content = root.querySelector(".mypick-content");
+
+                if (boot) boot.style.display = "none";
+                if (content) { content.hidden = false; content.style.display = "block"; }
+
+                // ✅ 글로벌 훅이 display:none 걸어둔 경우 대비
+                root.style.display = "block";
+            }
+
+            function hideAll() {
+                root.setAttribute("data-state", "hidden");
+
+                // ✅ 스타일 제거
+                var st = document.getElementById("mypick-banner-style");
+                if (st && st.parentNode) st.parentNode.removeChild(st);
+
+                // ✅ DOM 통째로 제거(boot 포함)
+                if (root && root.parentNode) root.parentNode.removeChild(root);
+            }
+
+            var v = getCookie(cookieKey);
+            if (v) hideAll();
+            else showContent();
+        })();
+    </script>
+
+</div>

@@ -1,0 +1,313 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    // 이번 주 시상 대상자 수
+    List<PointAwardUser> pointAwardUsers = ViewBag.PointAwardUser as List<PointAwardUser>;
+    int pointAwardUsersCount = (pointAwardUsers != null && pointAwardUsers.Count > 0) ? pointAwardUsers.Count : 0;
+
+    bool hasAwardUsers = pointAwardUsersCount > 0;
+
+    // (옵션) 뱃지 문구: NEW / HOT
+    // 필요 시 조건 변경 가능 (예: 10명 이상이면 HOT)
+    string awardBadgeText = hasAwardUsers ? (pointAwardUsersCount >= 10 ? "HOT" : "NEW") : "";
+}
+
+<style>
+    /* ============================
+           SUB FEATURE CARD – MERGED
+           + Award Button Enhancements
+           ============================ */
+
+    .subcards-wrap {
+        margin: 1.2rem 0 2rem;
+        display: grid;
+        gap: 12px;
+    }
+
+    .subcard {
+        position: relative;
+        border-radius: 22px;
+        padding: 16px 16px 14px;
+        background: rgba(255,255,255,.90);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(15,23,42,.12);
+        box-shadow: 0 18px 48px rgba(15,23,42,.10);
+        overflow: hidden;
+    }
+
+        .subcard::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            height: 6px;
+            pointer-events: none;
+            background: linear-gradient( 90deg, rgba(58,168,255,.40), rgba(22,199,154,.36), rgba(124,108,255,.38) );
+        }
+
+        .subcard:hover {
+            box-shadow: 0 22px 56px rgba(15,23,42,.12);
+        }
+
+    /* ---------- Header ---------- */
+    .subcard-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .subcard-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        border: 1px solid rgba(15,23,42,.12);
+        background: linear-gradient( 135deg, rgba(22,199,154,.18), rgba(58,168,255,.12), rgba(124,108,255,.10) );
+        box-shadow: 0 10px 22px rgba(15,23,42,.06), inset 0 0 0 1px rgba(255,255,255,.35);
+        flex: 0 0 auto;
+    }
+
+    /* ---------- Titles ---------- */
+    .subcard-title-main {
+        font-size: 18px;
+        font-weight: 1000;
+        letter-spacing: -0.3px;
+        line-height: 1.15;
+        color: #0b1220;
+        text-shadow: 0 1px 0 rgba(255,255,255,.55);
+    }
+
+    .subcard-title-sub {
+        margin-top: 2px;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: -0.15px;
+        line-height: 1.2;
+        color: #1f2937;
+    }
+
+    /* ---------- Body ---------- */
+    .subcard-text {
+        margin: 6px 0 12px;
+        font-size: 13px;
+        font-weight: 800;
+        color: #334155;
+        line-height: 1.55;
+    }
+
+    /* ---------- Actions ---------- */
+    .subcard-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .subbtn {
+        border: 1px solid rgba(15,23,42,.14);
+        border-radius: 999px;
+        padding: 10px 12px;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: -0.15px;
+        cursor: pointer;
+        background: rgba(255,255,255,.92);
+        color: #0b1220;
+        box-shadow: 0 10px 22px rgba(15,23,42,.07);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
+        white-space: nowrap;
+        position: relative; /* badge position */
+    }
+
+        .subbtn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(15,23,42,.10);
+            background: rgba(255,255,255,1);
+            border-color: rgba(15,23,42,.18);
+        }
+
+        .subbtn:active {
+            transform: translateY(0px);
+        }
+
+        .subbtn.primary {
+            border-color: rgba(22,199,154,.45);
+            background: linear-gradient( 135deg, rgba(22,199,154,.22), rgba(58,168,255,.14) );
+        }
+
+        .subbtn.outline {
+            background: rgba(255,255,255,.86);
+            border-style: dashed;
+            border-color: rgba(58,168,255,.45);
+            color: #0b3a66;
+        }
+
+        .subbtn .emoji {
+            font-size: 16px;
+        }
+
+        /* ✅ 0명일 때 비활성화 스타일 */
+        .subbtn.disabled,
+        .subbtn:disabled {
+            cursor: not-allowed;
+            opacity: .55;
+            transform: none !important;
+            box-shadow: none !important;
+            background: rgba(241,245,249,.95) !important;
+            border-color: rgba(148,163,184,.45) !important;
+            color: rgba(71,85,105,.95) !important;
+            border-style: solid !important;
+            filter: grayscale(.25);
+        }
+
+        /* ✅ 💎 버튼 살짝 강조 (outline 기반 + 은은한 컬러) */
+        .subbtn.award {
+            border-style: solid;
+            border-color: rgba(124,108,255,.42);
+            background: linear-gradient( 135deg, rgba(124,108,255,.14), rgba(56,189,248,.10) );
+            box-shadow: 0 12px 26px rgba(124,108,255,.12);
+            color: #1f2a52;
+        }
+
+            .subbtn.award:hover {
+                box-shadow: 0 16px 34px rgba(124,108,255,.16);
+                border-color: rgba(124,108,255,.55);
+            }
+
+    /* ✅ NEW / HOT 배지 */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 18px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 1000;
+        letter-spacing: -0.2px;
+        line-height: 1;
+        border: 1px solid rgba(15,23,42,.10);
+        box-shadow: 0 8px 16px rgba(15,23,42,.08);
+        user-select: none;
+        position: relative;
+        top: -1px;
+    }
+
+        .badge.new {
+            background: rgba(56,189,248,.18);
+            border-color: rgba(56,189,248,.40);
+            color: #0b3a66;
+        }
+
+        .badge.hot {
+            background: rgba(244,63,94,.14);
+            border-color: rgba(244,63,94,.38);
+            color: #7f1d1d;
+        }
+
+    /* ---------- Hint ---------- */
+    .subhint {
+        margin-top: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        color: #475569;
+    }
+
+    /* ---------- Mobile ---------- */
+    @@media (max-width: 520px) {
+        .subcard {
+            padding: 14px 14px 12px;
+        }
+
+        .subcard-icon {
+            width: 48px;
+            height: 48px;
+            font-size: 24px;
+        }
+
+        .subbtn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="subcards-wrap">
+
+    <div class="subcard">
+
+        <div class="subcard-header">
+            <div class="subcard-icon">✨</div>
+            <div>
+                <div class="subcard-title-main">
+                    @ConstatsCommon.MainKeyTitle
+                </div>
+                <div class="subcard-title-sub">
+                    미션 참여 · 시상 · 선물 · 사용법 영상 안내
+                </div>
+            </div>
+        </div>
+
+        <p class="subcard-text">
+            여기에서 <b>미션을 열심히 한 친구들(참여자)</b>을 확인하고,
+            <b>시상/선물</b>도 한눈에 볼 수 있어요.<br />
+            또한 <b>@ConstatsCommon.MainKeyTitle 사용법</b>과 <b>관련 영상 모음</b>도 바로 확인할 수 있습니다.
+        </p>
+
+        <div class="subcard-actions">
+            <button class="subbtn outline"
+                    onclick="location.href='/DailyMission2/ParticipantPersons';">
+                <span class="emoji">🔍</span>
+                <span>참여자 목록</span>
+            </button>
+
+            <!-- ✅ 이번주 시상 대상자: 0명이면 비활성화 + 강조 + NEW/HOT 배지 -->
+       @*      <button class="subbtn award @(hasAwardUsers ? "" : "disabled")"
+                    onclick="@(hasAwardUsers ? "location.href='/CheckPoint/GetThisWeekRewardingAward?viewOption=v';" : "return false;")"
+                    @(hasAwardUsers ? "" : "disabled")>
+                <span class="emoji">💎</span>
+                <span>이번주 시상 대상자 (@pointAwardUsersCount 명)</span>
+
+                @if (hasAwardUsers)
+                {
+                    <span class="badge @(awardBadgeText == "HOT" ? "hot" : "new")">@awardBadgeText</span>
+                }
+            </button> *@
+
+            <button class="subbtn"
+                    onclick="location.href='/Present/ListPresent?productDisplayOpton=display';">
+                <span class="emoji">🎁</span>
+                <span>선물 보기</span>
+            </button>
+
+            <button class="subbtn primary"
+                    onclick="location.href='https://www.youtube.com/watch?v=nmEH3FeHk3A';">
+                <span class="emoji">▶️</span>
+                <span>소개 영상</span>
+            </button>
+
+            <button class="subbtn"
+                    onclick="location.href='https://www.youtube.com/watch?v=s6os4aGVKCY';">
+                <span class="emoji">🎬</span>
+                <span>관련 영상 모음</span>
+            </button>
+
+        </div>
+
+        <div class="subhint">
+            * 시상 대상자는 이번 주 기준으로 자동 계산됩니다.
+            (영상은 외부 링크(유튜브)로 이동합니다.)
+        </div>
+
+    </div>
+
+</div>

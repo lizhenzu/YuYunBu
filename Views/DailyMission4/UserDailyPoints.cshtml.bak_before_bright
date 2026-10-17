@@ -1,0 +1,223 @@
+﻿@using System.Globalization
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.DailyMission2.UserDailyPointsVM
+
+@*  ══════════════════════════════════════════════════════════════
+    일자별 포인트 — Bone 스킨
+
+    이번 달 1일 ~ 오늘까지 하루하루를 표로 본다.
+    미션별 점수(말씀2 · 퀴즈1 · 기도2 · 암송1)를 숫자 그대로 보여 주고,
+    맨 아래에 합계 행을 붙인다.
+    네 가지를 다 한 날은 줄 전체에 옅은 브라스를 깐다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = "_Layout_Mission3";
+    ViewData["Title"] = "일자별 포인트";
+
+    var today = DateHelper.GetKoreaNow().Date;
+
+    var rows = (Model.Rows ?? new List<BulletinBoard.Models.DailyMission2.UserDailyPointRow>())
+               .OrderByDescending(x => x.DateBy)
+               .ToList();
+
+    // 이 기간에 지난 날 · 그중 점수가 있는 날
+    int elapsed = (int)((Model.ToDate.Date - Model.FromDate.Date).TotalDays) + 1;
+    if (elapsed < 1) { elapsed = 1; }
+    int actedDays = rows.Count(x => x.TotalPoint > 0);
+
+    var fullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+    var who = !string.IsNullOrWhiteSpace(fullName) ? fullName : (Model.UserName ?? "");
+    var initial = string.IsNullOrWhiteSpace(who) ? "·" : who.Substring(0, 1);
+
+    string DayLink(DateTime d) => $"/DailyMission4?date={d:yyyy-MM-dd}";
+}
+
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* 일자별 포인트 전용 — 공통 규칙은 /css/mission3/bone.css 에 있다. */
+
+    /* ── 프로그램 안내 ── */
+    .qz .dpPgm { padding: 2px 0 18px; border-bottom: 1px solid var(--rule); margin-bottom: 18px; }
+    .qz .dpPgmK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin-bottom: 9px; }
+    .qz .dpPgmT {
+        font-family: "Noto Serif KR", serif; font-weight: 400;
+        font-size: 20px; line-height: 1.45; letter-spacing: -.01em;
+    }
+    .qz .dpPgmS { font-size: 11.5px; color: var(--dim); line-height: 1.7; margin-top: 7px; }
+
+    /* ── 사람 ── */
+    .qz .dpWho {
+        display: flex; align-items: center; gap: 13px;
+        padding-bottom: 18px; border-bottom: 1px solid var(--rule);
+    }
+    .qz .dpAv {
+        width: 46px; height: 46px; border-radius: 50%; background: var(--mark); flex: 0 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        font-family: "Noto Serif KR", serif; font-size: 17px; color: var(--acc);
+        box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--acc);
+        margin: 3px;
+    }
+    .qz .dpWhoTx { min-width: 0; }
+    .qz .dpWhoN { font-family: "Noto Serif KR", serif; font-size: 22px; line-height: 1.3; }
+    .qz .dpWhoS { font-size: 11.5px; color: var(--dim); margin-top: 5px; letter-spacing: .02em; }
+
+    /* ── 총점 ── */
+    .qz .dpTot {
+        display: flex; justify-content: space-between; align-items: flex-end; gap: 14px;
+        padding: 20px 0 18px; border-bottom: 1px solid var(--rule);
+    }
+    .qz .dpTotL { font-size: 9.5px; font-weight: 600; letter-spacing: .18em; color: var(--dim); margin-bottom: 9px; }
+    .qz .dpTotN {
+        font-family: "Inter", sans-serif; font-weight: 200; font-size: 46px; line-height: .9;
+        letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+    }
+    .qz .dpTotN u { text-decoration: none; font-size: 13px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+    .qz .dpTotR { text-align: right; flex: 0 0 auto; white-space: nowrap; }
+    .qz .dpTotRV {
+        font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px;
+        color: var(--acc); font-variant-numeric: tabular-nums;
+    }
+
+    /* ── 표 ── */
+    .qz .dpTable { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .qz .dpTable th {
+        font-size: 9.5px; font-weight: 600; letter-spacing: .1em; color: var(--dim);
+        padding: 0 0 11px; text-align: center; border-bottom: 1px solid var(--rule);
+    }
+    .qz .dpTable th.l { text-align: left; }
+    .qz .dpTable td {
+        padding: 13px 0; text-align: center; border-bottom: 1px solid var(--rule);
+        font-family: "Inter", sans-serif; font-size: 13px; font-weight: 300; color: var(--dim2);
+    }
+    .qz .dpTable td.l { text-align: left; font-size: 12.5px; }
+    .qz .dpTable td.l a { text-decoration: none; color: inherit; }
+    .qz .dpTable td.l b { font-weight: 500; color: var(--tx); font-size: 13.5px; margin-right: 3px; }
+    .qz .dpTable td.l a:hover b { color: var(--acc); }
+    .qz .dpTable td.z { color: #DBD8D1; }
+    .qz .dpTable td.sum { color: var(--acc); font-weight: 500; font-size: 14px; }
+    .qz .dpTable tr.full td { background: rgba(237,229,216,.5); }
+    .qz .dpTable tfoot td {
+        border-bottom: 0; border-top: 1px solid var(--tx);
+        padding-top: 12px; font-weight: 500; color: var(--tx);
+    }
+    .qz .dpTable tfoot td.l {
+        font-family: "Gothic A1", sans-serif; font-size: 10px;
+        letter-spacing: .14em; color: var(--dim); font-weight: 600;
+    }
+    .qz .dpTable tfoot td.sum { color: var(--acc); }
+
+    @@media (max-width: 560px) {
+        .qz .dpTotN { font-size: 40px; }
+        .qz .dpWhoN { font-size: 20px; }
+        .qz .dpTable th { font-size: 9px; }
+        .qz .dpTable td { font-size: 12.5px; padding: 12px 0; }
+        .qz .dpTable td.l { font-size: 11.5px; }
+        .qz .dpTable td.l b { font-size: 13px; }
+    }
+</style>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">@Model.FromDate.ToString("yyyy.MM")</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        @* ── 프로그램 안내 ── *@
+        <div class="dpPgm">
+            <div class="dpPgmK">@ConstatsCommon.MainKeyTitle</div>
+            <div class="dpPgmT">@ConstatsCommon.MainKeyTitle</div>
+            <div class="dpPgmS">하루하루 쌓아 온 기록이에요</div>
+        </div>
+
+        @* ── 사람 ── *@
+        <div class="dpWho">
+            <div class="dpAv">@initial</div>
+            <div class="dpWhoTx">
+                <div class="dpWhoN">@(who)님</div>
+                <div class="dpWhoS">
+                    @Model.FromDate.ToString("M월 d일", new CultureInfo("ko-KR"))
+                    ~ @Model.ToDate.ToString("M월 d일", new CultureInfo("ko-KR")) · 일일 수행 현황
+                </div>
+            </div>
+        </div>
+
+        @* ── 총점 ── *@
+        <div class="dpTot">
+            <div>
+                <div class="dpTotL">이 기간 총점</div>
+                <div class="dpTotN">@Model.SumTotal.ToString("N0")<u>점</u></div>
+            </div>
+            <div class="dpTotR">
+                <div class="dpTotL">수행한 날</div>
+                <div class="dpTotRV">@actedDays / @elapsed</div>
+            </div>
+        </div>
+
+        @* ── 날짜별 표 ── *@
+        <div class="qzLabel" style="margin-top:26px">날짜별</div>
+
+        @if (rows.Count == 0)
+        {
+            <div class="qzEmpty">아직 기록이 없어요</div>
+        }
+        else
+        {
+            <table class="dpTable">
+                <thead>
+                    <tr>
+                        <th class="l">날짜</th>
+                        <th>말씀</th>
+                        <th>퀴즈</th>
+                        <th>기도</th>
+                        <th>암송</th>
+                        <th>합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in rows)
+                    {
+                        // 네 가지를 다 한 날은 줄 전체에 옅은 브라스를 깐다.
+                        bool full = r.WordPoint > 0 && r.QuizPoint > 0 && r.PrayPoint > 0 && r.RecitePoint > 0;
+                        var dow = r.DateBy.ToString("ddd", new CultureInfo("ko-KR"));
+
+                        <tr class="@(full ? "full" : "")">
+                            <td class="l">
+                                <a href="@DayLink(r.DateBy)" title="@r.DateBy.ToString("yyyy-MM-dd") 미션으로 이동">
+                                    <b>@r.DateBy.Day</b>@dow
+                                </a>
+                            </td>
+                            <td class="@(r.WordPoint   == 0 ? "z" : "")">@(r.WordPoint   == 0 ? "–" : r.WordPoint.ToString())</td>
+                            <td class="@(r.QuizPoint   == 0 ? "z" : "")">@(r.QuizPoint   == 0 ? "–" : r.QuizPoint.ToString())</td>
+                            <td class="@(r.PrayPoint   == 0 ? "z" : "")">@(r.PrayPoint   == 0 ? "–" : r.PrayPoint.ToString())</td>
+                            <td class="@(r.RecitePoint == 0 ? "z" : "")">@(r.RecitePoint == 0 ? "–" : r.RecitePoint.ToString())</td>
+                            <td class="@(r.TotalPoint  == 0 ? "z" : "sum")">@r.TotalPoint</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="l">합계</td>
+                        <td>@Model.SumWord</td>
+                        <td>@Model.SumQuiz</td>
+                        <td>@Model.SumPray</td>
+                        <td>@Model.SumRecite</td>
+                        <td class="sum">@Model.SumTotal</td>
+                    </tr>
+                </tfoot>
+            </table>
+        }
+    </div>
+</div>

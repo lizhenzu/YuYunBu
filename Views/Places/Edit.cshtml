@@ -1,0 +1,82 @@
+﻿@using BulletinBoard.Models
+@model PlaceItemInput
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>수정</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0e101a;
+            color: #e7e9f1;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif
+        }
+
+        header {
+            padding: 18px 16px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .btn {
+            background: linear-gradient(180deg,#7ee0ff,#64d1ff);
+            color: #0b1324;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-weight: 700;
+            text-decoration: none
+        }
+
+            .btn.ghost {
+                background: transparent;
+                color: #e7e9f1;
+                border: 1px solid rgba(255,255,255,.12)
+            }
+
+        main {
+            padding: 16px
+        }
+
+        form .danger {
+            margin-left: auto;
+            background: #ff8a8a;
+            color: #132
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>✏️ 장소 수정 (#@Model.PlaceId)</h1>
+        <div>
+            <a class="btn ghost" href="/Places/List?category=@Model.Category">목록</a>
+            <a class="btn ghost" href="/Places/Main">메인</a>
+        </div>
+    </header>
+    <main>
+        <form asp-action="Edit" method="post" style="display:grid;gap:12px">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="PlaceId" />
+            <partial name="_Form" model="Model" />
+            <div style="display:flex;gap:8px">
+                <button class="btn" type="submit">저장</button>
+            </div>
+        </form>
+
+        <form asp-action="Delete" method="post" onsubmit="return confirm('삭제하시겠습니까?')"
+              style="margin-top:12px;display:flex">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.PlaceId" />
+            <input type="hidden" name="category" value="@Model.Category" />
+            <button class="btn danger" type="submit">삭제</button>
+        </form>
+    </main>
+</body>
+</html>

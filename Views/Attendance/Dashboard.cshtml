@@ -1,0 +1,415 @@
+﻿@model BulletinBoard.Models.AttendanceDashboardVM
+@{
+    Layout = null;
+    var dateStr = Model.Date.ToString("yyyy-MM-dd");
+    var classTitle = string.IsNullOrWhiteSpace(Model.ClassName) ? "반을 선택해 주세요" : Model.ClassName;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>출석 대시보드</title>
+    <style>
+        :root {
+            --bg: #f6fbf8;
+            --card: #fff;
+            --ink: #123029;
+            --muted: #5a6b66;
+            --line: #dfeee8;
+            --primary: #1F6F5B;
+            --shadow: 0 10px 30px rgba(18,48,41,.08);
+            --radius: 18px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        .wrap {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 16px 14px 70px;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(246,251,248,.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(223,238,232,.9);
+        }
+
+            .topbar .wrap {
+                padding-bottom: 12px;
+            }
+
+        .head {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: -.3px;
+        }
+
+        .sub {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .ctl {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 10px 10px;
+            box-shadow: 0 6px 18px rgba(18,48,41,.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .ctl label {
+                font-size: 12px;
+                color: var(--muted);
+                white-space: nowrap;
+            }
+
+            .ctl input[type="date"], .ctl select {
+                border: 0;
+                outline: 0;
+                font-size: 14px;
+                background: transparent;
+                color: var(--ink);
+            }
+
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(3,minmax(0,1fr));
+            gap: 10px;
+        }
+        @@media (max-width: 860px) {
+            .grid
+
+        {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+        }
+
+        }
+
+        @@media (max-width: 560px) {
+            .grid
+
+        {
+            grid-template-columns: 1fr;
+        }
+
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px;
+        }
+
+        .k {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .v {
+            margin-top: 6px;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -.3px;
+        }
+
+        .hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .two {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1.3fr .7fr;
+            gap: 10px;
+        }
+
+        @@media (max-width: 900px) {
+            .two
+
+        {
+            grid-template-columns: 1fr;
+        }
+
+        }
+
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: rgba(255,255,255,.75);
+        }
+
+        .name {
+            font-weight: 800;
+        }
+
+        .chip {
+            font-size: 12px;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 6px 10px;
+            color: var(--muted);
+            background: #fff;
+        }
+
+        .week {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(7,minmax(0,1fr));
+            gap: 8px;
+        }
+
+        @@media (max-width: 860px) {
+            .week
+
+        {
+            grid-template-columns: repeat(4,minmax(0,1fr));
+        }
+
+        }
+
+        @@media (max-width: 520px) {
+            .week
+
+        {
+            grid-template-columns: repeat(2,minmax(0,1fr));
+        }
+
+        }
+
+        .day {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #fff;
+            padding: 10px;
+            box-shadow: 0 6px 18px rgba(18,48,41,.05);
+        }
+
+            .day .d {
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+            .day .r {
+                margin-top: 6px;
+                font-weight: 900;
+                font-size: 18px;
+                color: var(--primary);
+            }
+
+            .day .c {
+                margin-top: 4px;
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+        .actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: #fff;
+            cursor: pointer;
+            font-weight: 800;
+            color: var(--ink);
+            text-decoration: none;
+        }
+
+            .btn.primary {
+                background: var(--primary);
+                border-color: rgba(31,111,91,.35);
+                color: #fff;
+            }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/att-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+<body>
+    <div class="topbar">
+        <div class="wrap">
+            <div class="head">
+                <div>
+                    <h1>출석 대시보드</h1>
+                    <p class="sub">@dateStr · @classTitle</p>
+                </div>
+                <div class="controls">
+                    <div class="ctl">
+                        <label>날짜</label>
+                        <input id="datePick" type="date" value="@dateStr" />
+                    </div>
+                    <div class="ctl">
+                        <label>반</label>
+                        <select id="classPick">
+                            <option value="">선택</option>
+                            @foreach (var c in Model.Classes)
+                            {
+                                var v = $"{c.ClassYear}|{c.ClassBan}";
+                                var selected = (c.ClassYear == Model.ClassYear && c.ClassBan == Model.ClassBan);
+                                <option value="@v" selected="@(selected)">@c.ClassName</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <a class="btn primary"
+                   href="/Attendance/Check?date=@dateStr&classYear=@Model.ClassYear&classBan=@Model.ClassBan">출석 체크로 이동</a>
+                <a class="btn"
+                   href="/Attendance/Dashboard?date=@dateStr&classYear=@Model.ClassYear&classBan=@Model.ClassBan">새로고침</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="wrap">
+        @if (Model.ClassYear <= 0 || Model.ClassBan <= 0)
+        {
+            <div class="card">
+                <div class="v">반을 선택해 주세요</div>
+                <div class="hint">상단에서 날짜/반을 선택하면 대시보드가 표시됩니다.</div>
+            </div>
+        }
+        else
+        {
+            <section class="grid">
+                <div class="card">
+                    <div class="k">오늘 총원</div>
+                    <div class="v">@Model.TotalStudents 명</div>
+                    <div class="hint">반편성(ClassInfo) 기준</div>
+                </div>
+                <div class="card">
+                    <div class="k">오늘 출석</div>
+                    <div class="v">@Model.PresentCount 명</div>
+                    <div class="hint">AttendanceCheck.IsPresent = 1</div>
+                </div>
+                <div class="card">
+                    <div class="k">오늘 출석률</div>
+                    <div class="v">@Model.PresentRate %</div>
+                    <div class="hint">출석/총원</div>
+                </div>
+            </section>
+
+            <section class="two">
+                <div class="card">
+                    <div class="k">오늘 결석자 목록</div>
+                    <div class="hint" style="margin-top:6px;">레코드 없거나 IsPresent=0이면 결석으로 표시됩니다.</div>
+
+                    <div class="list">
+                        @if (Model.AbsentStudents.Count == 0)
+                        {
+                            <div class="row">
+                                <div class="name">결석자가 없습니다</div>
+                                <span class="chip">전체 출석</span>
+                            </div>
+                        }
+                        else
+                        {
+                            foreach (var s in Model.AbsentStudents)
+                            {
+                                <div class="row">
+                                    <div class="name">@s.StudentName</div>
+                                    <span class="chip">미출석</span>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="k">주간 통계</div>
+                    <div class="hint">@Model.WeekStart.ToString("MM/dd") ~ @Model.WeekEnd.ToString("MM/dd")</div>
+
+                    <div class="week">
+                        @foreach (var d in Model.Weekly)
+                        {
+                            <div class="day">
+                                <div class="d">@d.Date.ToString("MM/dd (ddd)")</div>
+                                <div class="r">@d.Rate %</div>
+                                <div class="c">@d.Present / @d.Total</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </section>
+        }
+    </div>
+
+    <script>
+        const datePick = document.getElementById('datePick');
+        const classPick = document.getElementById('classPick');
+
+        function navigateReload(){
+            const d = datePick.value;
+            const v = classPick.value; // "year|ban"
+            let y = 0, b = 0;
+            if(v && v.includes('|')){
+                const p = v.split('|');
+                y = Number(p[0] || 0);
+                b = Number(p[1] || 0);
+            }
+            location.href = `/Attendance/Dashboard?date=${encodeURIComponent(d)}&classYear=${encodeURIComponent(y)}&classBan=${encodeURIComponent(b)}`;
+        }
+
+        datePick?.addEventListener('change', navigateReload);
+        classPick?.addEventListener('change', navigateReload);
+    </script>
+</body>
+</html>

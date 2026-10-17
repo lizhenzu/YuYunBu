@@ -1,0 +1,311 @@
+@model List<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray>
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Html
+@*
+   기도 목록 — 읽는 화면과 관리 화면을 하나로 합친 곳입니다.
+     · 일반 사용자 : 사용중인 기도문만, 읽기 링크만
+     · 슈퍼 유저   : 숨긴 것까지 전부, 수정·삭제 버튼과 운영 수치까지
+   갈림길은 오직 isSuper 하나입니다.
+*@
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    int total    = ViewBag.TotalCount is int _t ? _t : 0;          // 사용중 전체
+    int rotCnt   = ViewBag.RotationCount is int _rc ? _rc : total; // 매일 순환하는 것만
+    int rotNo    = ViewBag.RotationNo is int _r ? _r : 0;
+    int todayId  = ViewBag.TodayPrayId is int _tp ? _tp : 0;
+
+    var msg = TempData["Msg"] as string;
+    var err = TempData["Error"] as string;
+
+    DateTime kNow = ViewBag.TodayKst is DateTime _k ? _k : DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow:yyyy년 M월 d일} {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // ── 카카오톡·메신저 공유 미리보기 (Open Graph) ─────────────
+    //    카카오는 og:image 를 절대 주소로만 읽는다. 상대 경로면 미리보기가 비어 나온다.
+    string ogDomain = (ViewBag.Domain as string ?? "").TrimEnd('/');
+    string ogUrl    = ViewBag.FullURL as string ?? $"{ogDomain}/EntranceExamPray/List";
+    string ogImage  = $"{ogDomain}/images/og/entrance-exam-pray.png";
+    string ogTitle  = "수험생을 위한 기도문";
+    string ogDesc   = total > 0
+        ? $"기도문 {total}편 · 매일 한 편씩 함께 기도해요"
+        : "수험생을 위해 오늘도 함께 기도해요";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7F6FC" />
+    <title>@ogTitle</title>
+    <meta name="description" content="@ogDesc" />
+
+    @* ── 공유 미리보기 (카카오톡 · 페이스북 등) ───────────────── *@
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="@ogTitle" />
+    <meta property="og:title"       content="@ogTitle" />
+    <meta property="og:description" content="@ogDesc" />
+    <meta property="og:url"         content="@ogUrl" />
+    <meta property="og:image"       content="@ogImage" />
+    <meta property="og:image:secure_url" content="@ogImage" />
+    <meta property="og:image:type"  content="image/png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="@ogTitle" />
+    <meta property="og:locale"      content="ko_KR" />
+
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="@ogTitle" />
+    <meta name="twitter:description" content="@ogDesc" />
+    <meta name="twitter:image"       content="@ogImage" />
+
+    <link rel="canonical" href="@ogUrl" />
+
+    @await Html.PartialAsync("_Study")
+    <style>
+    .ahero{ padding:30px 0 18px; text-align:center; }
+    .ahero h1{
+        font-family:var(--f-read);
+        margin:12px 0 0; font-size:clamp(21px,5.2vw,30px); font-weight:800;
+        letter-spacing:-.02em; line-height:1.34; text-wrap:balance; word-break:keep-all;
+    }
+    .ahero-sub{ margin-top:10px; font-size:12.5px; font-weight:600; color:var(--muted); }
+    .ahero-rule{
+        margin:18px auto 0; width:52px; height:3px; border-radius:999px;
+        background:linear-gradient(90deg,var(--leaf),var(--sun));
+    }
+
+    /* 오늘의 기도문으로 들어가는 큰 자리 */
+    .todaybox{
+        display:block; margin:18px 0 16px; padding:18px 20px;
+        background:linear-gradient(135deg,var(--leaf) 0%,#7A72DC 100%);
+        border-radius:16px; color:#fff;
+        box-shadow:0 4px 20px rgba(91,84,201,.28);
+        transition:transform .15s, box-shadow .18s;
+    }
+    .todaybox:hover{ transform:translateY(-2px); box-shadow:0 8px 28px rgba(91,84,201,.34); }
+    .todaybox:active{ transform:translateY(0); }
+    .tb-top{ display:flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; opacity:.92; }
+    .tb-tt{
+        font-family:var(--f-read); margin-top:8px;
+        font-size:clamp(17px,4.2vw,21px); font-weight:800; line-height:1.4;
+        word-break:keep-all;
+    }
+    .tb-go{ margin-top:11px; font-size:12.5px; font-weight:600; opacity:.94; }
+
+    .stat-row{ display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
+
+    /* 목록 줄 */
+    .rowitem.tap{ cursor:pointer; }
+    .row-when{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .row-badge{
+        flex:none; margin-left:8px; padding:2px 8px; border-radius:999px;
+        background:var(--leaf); color:#fff; font-size:10.5px; font-weight:700;
+    }
+    .row-badge.off{ background:var(--muted); }
+    /* 그날에 읽는 기도문 — 순번 대신 달력 표시 */
+    .row-no-day{ background:var(--sun-sf); border-color:#F2DFBE; color:#93611A; font-size:14px; }
+    .grouphint{
+        padding:11px 16px; border-bottom:1px solid var(--line);
+        background:var(--card-2); font-size:11.5px; line-height:1.65;
+        color:var(--muted); word-break:keep-all;
+    }
+    /* 관리자만 보는 줄 — 링크가 아니라 버튼이 붙습니다 */
+    .rowitem.adm{ cursor:default; }
+    .rowitem.adm:hover{ background:transparent; }
+    </style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        <a class="nb-btn" href="/PrayHome/Index">← 기도홈</a>
+        <div class="nb-mid">@dateStr</div>
+        @if (isSuper)
+        {
+            <a class="nb-btn" href="/EntranceExamPray/Create">✚ 등록</a>
+        }
+        else
+        {
+            <a class="nb-btn" href="/">🏠 홈</a>
+        }
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="ahero">
+        <span class="chip chip-leaf">📚 수험생을 위한 기도</span>
+        <h1>수험생을<br />위한 기도문</h1>
+        <div class="ahero-sub">
+            @if (total > 0)
+            {
+                <text>모두 @(total)편 · 매일 한 편씩 돌아가며 보여 드려요</text>
+            }
+            else
+            {
+                <text>곧 준비될 예정입니다</text>
+            }
+        </div>
+        <div class="ahero-rule"></div>
+    </section>
+
+    @if (!string.IsNullOrEmpty(msg)) { <div class="flash flash-ok">@msg</div> }
+    @if (!string.IsNullOrEmpty(err)) { <div class="flash flash-err">@err</div> }
+
+    @{
+        var todayItem = Model?.Find(x => x.PrayId == todayId);
+    }
+    @if (todayItem != null)
+    {
+        <a class="todaybox" href="/EntranceExamPray/Index">
+            <div class="tb-top">📖 오늘의 기도 · @(rotNo) / @(rotCnt)</div>
+            <div class="tb-tt">@todayItem.Title</div>
+            <div class="tb-go">눌러서 오늘의 기도문 읽기 →</div>
+        </a>
+    }
+
+    @* 운영 수치 — 슈퍼 유저(SuperAdmin · basic) 에게만 *@
+    @if (isSuper)
+    {
+        <div class="stat-row">
+            <span class="chip chip-leaf">📖 사용중 @(total)편</span>
+            <span class="chip chip-water">📅 매일 순환 @(rotCnt)편 · 오늘 @(rotNo)번째</span>
+            @if (total - rotCnt > 0) { <span class="chip chip-sun">🗓 그날에만 @(total - rotCnt)편</span> }
+            @{ int unusedCnt = (Model?.Count ?? 0) - total; }
+            @if (unusedCnt > 0) { <span class="chip chip-gray">💤 미사용 @(unusedCnt)편</span> }
+        </div>
+    }
+
+    @{
+        // 매일 돌아가는 기도문과, 특정한 날에만 읽는 기도문을 나누어 보여 줍니다.
+        var daily    = Model?.FindAll(x => !x.IsOccasion) ?? new List<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray>();
+        var occasion = Model?.FindAll(x =>  x.IsOccasion) ?? new List<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray>();
+
+        // 한 줄을 그리는 부분이 두 묶음에서 같으므로 지역 함수로 묶어 둡니다.
+        Func<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray, IHtmlContent> row = p =>
+        {
+            var sb = new System.Text.StringBuilder();
+
+            bool isToday  = todayId > 0 && p.PrayId == todayId;
+            bool isActive = !string.Equals(p.UseYN, "N", StringComparison.OrdinalIgnoreCase);
+            string href   = $"/EntranceExamPray/Detail?PrayId={p.PrayId}";
+
+            // 수정일 — 한 번도 고치지 않았으면 등록일을 대신 보여 줍니다.
+            DateTime? touched = p.UpdatedAt ?? (p.CreatedAt == DateTime.MinValue ? (DateTime?)null : p.CreatedAt);
+            bool everEdited   = p.UpdatedAt.HasValue;
+
+            // 관리자는 줄 안에 버튼이 있어야 하므로 <a> 로 감쌀 수 없습니다.
+            sb.Append(isSuper
+                ? $"<div class=\"rowitem adm{(isToday ? " is-today" : "")}\">"
+                : $"<a class=\"rowitem tap{(isToday ? " is-today" : "")}\" href=\"{href}\">");
+
+            // 왼쪽 번호는 "며칠째에 나오는지" 를 뜻하는 순환 차례입니다.
+            // RotationNo 는 순환에 드는 기도문끼리만 1,2,3… 으로 매겨지고,
+            // 순환에서 빠진 것(🗓)과 숨긴 것(💤)은 0 으로 옵니다.
+            // ⚠️ SortOrder 는 중간이 비어 있어(2,3,…,11,13,14…) 번호로 쓰면 헷갈립니다.
+            sb.Append($"<div class=\"row-no{(p.RotationNo > 0 ? "" : " row-no-day")}\">");
+            sb.Append(p.RotationNo > 0 ? p.RotationNo.ToString() : (p.IsOccasion ? "🗓" : "💤"));
+            sb.Append("</div>");
+
+            sb.Append("<div class=\"row-bd\">");
+            sb.Append($"<div class=\"row-tt\">{Html.Encode(p.Title)}</div>");
+            sb.Append("<div class=\"row-meta\">");
+
+            // 수정일·조회수·좋아요는 운영 정보라 슈퍼 유저에게만. 성경 구절은 누구에게나.
+            var bits = new List<string>();
+            if (isSuper)
+            {
+                if (touched.HasValue)
+                {
+                    string tip = (everEdited ? "마지막 수정" : "등록") + ": " + touched.Value.ToString("yyyy-MM-dd HH:mm");
+                    bits.Add($"<span class=\"row-when\" title=\"{Html.Encode(tip)}\">{(everEdited ? "✏️" : "🌱")} {touched.Value:yyyy-MM-dd}</span>");
+                }
+                bits.Add($"👀 {p.ClickCount:N0}");
+                bits.Add($"🙏 {p.LikeCount:N0}");
+            }
+            if (!string.IsNullOrWhiteSpace(p.BibleRef)) bits.Add($"📖 {Html.Encode(p.BibleRef)}");
+            sb.Append(string.Join(" · ", bits));
+
+            sb.Append("</div></div>");
+
+            if (isToday) sb.Append("<span class=\"row-badge\">오늘</span>");
+            if (isSuper && !isActive) sb.Append("<span class=\"row-badge off\">미사용</span>");
+
+            if (isSuper)
+            {
+                sb.Append("<div class=\"row-act\">");
+                sb.Append($"<a class=\"row-btn\" href=\"{href}\">👁<span> 보기</span></a>");
+                sb.Append($"<a class=\"row-btn\" href=\"/EntranceExamPray/Edit?PrayId={p.PrayId}\">✏️<span> 수정</span></a>");
+                sb.Append($"<a class=\"row-btn del\" href=\"/EntranceExamPray/Delete?PrayId={p.PrayId}\">🗑<span> 삭제</span></a>");
+                sb.Append("</div>");
+            }
+
+            sb.Append(isSuper ? "</div>" : "</a>");
+            return new HtmlString(sb.ToString());
+        };
+    }
+
+    @if (Model == null || Model.Count == 0)
+    {
+        <div class="ncard">
+            <div class="empty">
+                <div class="empty-ico">📚</div>
+                <div class="empty-tt">아직 등록된 기도문이 없어요</div>
+                <div class="empty-sub">
+                    @if (isSuper) { <text>첫 기도문을 등록해 주세요.</text> }
+                    else          { <text>곧 준비될 예정입니다.</text> }
+                </div>
+                @if (isSuper)
+                {
+                    <div style="margin-top:18px;">
+                        <a class="btn btn-leaf" href="/EntranceExamPray/Create">✚ 기도문 등록</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="ncard">
+            <div class="ncard-hd">
+                <div class="ncard-ico">📂</div>
+                <span class="ncard-tt">매일 돌아가는 기도문</span>
+                <span class="ncard-sub">순환 차례 순 · @(daily.Count)편</span>
+            </div>
+            @foreach (var p in daily) { @row(p) }
+        </div>
+
+        @* 특정한 날에만 읽는 기도문 — 순환에서 빠져 있으므로 여기서 직접 골라 읽습니다 *@
+        @if (occasion.Count > 0)
+        {
+            <div class="ncard">
+                <div class="ncard-hd">
+                    <div class="ncard-ico" style="background:var(--sun-sf);">🗓</div>
+                    <span class="ncard-tt">그날에 읽는 기도문</span>
+                    <span class="ncard-sub">@(occasion.Count)편</span>
+                </div>
+                <div class="grouphint">시험 날이나 발표를 기다리는 날처럼, 그때에 맞추어 골라 읽는 기도문입니다. 매일 순환에는 나오지 않습니다.</div>
+                @foreach (var p in occasion) { @row(p) }
+            </div>
+        }
+    }
+
+    <div class="btn-row">
+        <a class="btn btn-leaf" href="/EntranceExamPray/Index">📖 오늘의 기도문</a>
+        <a class="btn" href="/PrayHome/Index">🙏 기도홈</a>
+        <a class="btn" href="/">🏠 홈</a>
+    </div>
+
+    @if (isSuper)
+    {
+        <div class="btn-row" style="margin-top:9px;">
+            <a class="btn" href="/EntranceExamPray/Create">✚ 새 기도문 등록</a>
+        </div>
+    }
+
+</div>
+
+</body>
+</html>

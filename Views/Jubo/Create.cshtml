@@ -1,0 +1,143 @@
+@model BulletinBoard.Models.Jubo.JuboCreateViewModel
+@using BulletinBoard.Models.Jubo
+@{
+    ViewData["Title"] = "새 주보 만들기";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/jubo.css" />
+
+<div class="jubo-page">
+    <div style="max-width:760px; margin:0 auto;">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb" style="background:transparent; padding:0; font-size:0.85rem;">
+                <li class="breadcrumb-item"><a href="/Jubo" style="color:#3B82F6;">📋 주보 목록</a></li>
+                <li class="breadcrumb-item active">✨ 새 주보 만들기</li>
+            </ol>
+        </nav>
+
+        <div class="jubo-form-card">
+            <div class="jubo-form-header">
+                <div class="jubo-form-title">✨ 새 주보 만들기</div>
+                <div style="color:#6B8AC4; font-size:0.9rem; margin-top:0.3rem;">
+                    아이들을 위한 아름다운 주보를 만들어요! 🎉
+                </div>
+            </div>
+
+            <div class="jubo-form-body">
+                <form asp-action="Create" method="post">
+                    @Html.AntiForgeryToken()
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger" style="border-radius:12px; font-size:0.9rem;">
+                            <asp-validation-summary asp-validation-summary="All" />
+                        </div>
+                    }
+
+                    <!-- Date -->
+                    <div class="jubo-field-group">
+                        <label class="jubo-label">
+                            <span class="label-emoji">📅</span> 주일 날짜
+                        </label>
+                        <input asp-for="JuboDate"
+                               type="date"
+                               class="jubo-input"
+                               value="@Model.JuboDate.ToString("yyyy-MM-dd")" />
+                        <span asp-validation-for="JuboDate"
+                              class="text-danger" style="font-size:0.8rem;"></span>
+                    </div>
+
+                    <!-- Season -->
+                    <div class="jubo-field-group">
+                        <label class="jubo-label">
+                            <span class="label-emoji">🌸</span> 절기 <small style="color:#94A3B8; font-weight:400;">(선택)</small>
+                        </label>
+                        <input asp-for="Season"
+                               class="jubo-input"
+                               placeholder="예: 종려주일, 부활절, 성탄절..." />
+                    </div>
+
+                    <!-- Title -->
+                    <div class="jubo-field-group">
+                        <label class="jubo-label">
+                            <span class="label-emoji">📝</span> 주보 제목
+                        </label>
+                        <input asp-for="Title"
+                               class="jubo-input"
+                               placeholder="예: 2026년 4월 첫째 주 주보" />
+                        <span asp-validation-for="Title"
+                              class="text-danger" style="font-size:0.8rem;"></span>
+                    </div>
+
+                    <!-- Template -->
+                    <div class="jubo-field-group">
+                        <label class="jubo-label">
+                            <span class="label-emoji">🎨</span> 템플릿 선택
+                        </label>
+                        <input type="hidden" name="TemplateType" value="@Model.TemplateType" id="selectedTemplate" />
+
+                        <div class="template-cards">
+                            <div class="template-card @(Model.TemplateType == "Normal" ? "active normal" : "")"
+                                 data-value="Normal"
+                                 onclick="selectTemplate(this, 'Normal')">
+                                <div class="template-card-emoji">⛪</div>
+                                <div class="template-card-name">일반</div>
+                                <div class="template-card-desc">파란색 · 초록 파스텔</div>
+                                <div style="margin-top:0.5rem; display:flex; gap:4px; justify-content:center;">
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#87CEEB;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#98FB98;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#FFE066;display:inline-block;"></span>
+                                </div>
+                            </div>
+
+                            <div class="template-card @(Model.TemplateType == "PalmSunday" ? "active palmsunday" : "")"
+                                 data-value="PalmSunday"
+                                 onclick="selectTemplate(this, 'PalmSunday')">
+                                <div class="template-card-emoji">🌿</div>
+                                <div class="template-card-name">종려주일</div>
+                                <div class="template-card-desc">보라색 · 초록 파스텔</div>
+                                <div style="margin-top:0.5rem; display:flex; gap:4px; justify-content:center;">
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#A78BFA;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#6EE7B7;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#FDE68A;display:inline-block;"></span>
+                                </div>
+                            </div>
+
+                            <div class="template-card @(Model.TemplateType == "Easter" ? "active easter" : "")"
+                                 data-value="Easter"
+                                 onclick="selectTemplate(this, 'Easter')">
+                                <div class="template-card-emoji">🥚</div>
+                                <div class="template-card-name">부활절</div>
+                                <div class="template-card-desc">분홍 · 노랑 파스텔</div>
+                                <div style="margin-top:0.5rem; display:flex; gap:4px; justify-content:center;">
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#F9A8D4;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#FDE68A;display:inline-block;"></span>
+                                    <span style="width:12px;height:12px;border-radius:50%;background:#A7F3D0;display:inline-block;"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div style="display:flex; gap:1rem; justify-content:flex-end; margin-top:2rem; padding-top:1.5rem; border-top:2px solid #F1F5F9;">
+                        <a href="/Jubo" class="btn-jubo btn-jubo-danger">취소</a>
+                        <button type="submit" class="btn-jubo btn-jubo-create">✨ 주보 만들기</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="~/js/jubo.js"></script>
+<script>
+    function selectTemplate(card, value) {
+        document.querySelectorAll('.template-card').forEach(c => {
+            c.classList.remove('active', 'normal', 'palmsunday', 'easter');
+        });
+        card.classList.add('active', value.toLowerCase());
+        document.getElementById('selectedTemplate').value = value;
+    }
+</script>

@@ -1,0 +1,305 @@
+﻿@model BulletinBoard.Models.AttendanceCheckVM
+@{
+    Layout = null;
+    var dateStr = Model.Date.ToString("yyyy-MM-dd");
+    string headerClass = string.IsNullOrWhiteSpace(Model.ClassName) ? "반을 선택해 주세요" : Model.ClassName!;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>출석 체크</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9;
+                --ok: #15803D; --okbg: #EAF7EF; --warn: #B4531F; --warnbg: #FBEFE7; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; background: #FFFFFF; color: var(--tx); -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 70px; }
+
+        .topbar { background: #FFFFFF; }
+        .topbar .wrap { padding-bottom: 6px; }
+        .nav0 { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .nav0 a { font-weight: 700; color: var(--tx); }
+        .nav0 a:hover { color: var(--blue); }
+        .kk { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        h1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .sub { margin: 5px 0 0; font-size: 13px; color: var(--dim2); display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+
+        .mybadge, .otherbadge { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+        .mybadge { background: var(--okbg); color: var(--ok); }
+        .otherbadge { background: var(--warnbg); color: var(--warn); }
+        .myclasshint { font-size: 12px; color: var(--dim2); white-space: nowrap; }
+        .myclasshint b { color: var(--ink); }
+        .backmyclass { font-size: 12px; font-weight: 800; color: var(--blue); background: var(--soft); border-radius: 999px; padding: 4px 11px; white-space: nowrap; }
+
+        /* 아직 미체크인 반 알림 */
+        .ncbar { margin-top: 12px; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--warnbg); color: var(--warn); display: block; }
+        .nctitle { font-weight: 800; font-size: 13px; }
+        .ncchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+        .ncchip { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--tx); background: #fff; border: 0; border-radius: 999px; padding: 6px 12px; box-shadow: none; }
+
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+        .ctl { display: block; background: var(--grey); border: 0; border-radius: 12px; padding: 8px 12px; box-shadow: none; }
+        .ctl label { display: block; font-size: 11px; color: var(--dim); white-space: nowrap; }
+        .ctl input[type="date"], .ctl select { width: 100%; border: 0; outline: 0; background: none; font-family: inherit; font-size: 15px; font-weight: 700; color: var(--ink); padding: 2px 0; }
+        .nav-btn { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border: 0; border-radius: 14px; background: var(--soft); box-shadow: none; font-size: 15px; font-weight: 800; color: var(--ink); }
+        .nav-btn::after { content: "→"; font-size: 20px; font-weight: 300; color: var(--blue); }
+        .nav-btn.primary { background: var(--soft); border: 0; color: var(--ink); }
+        .btn { display: none; }
+
+        .summary { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink); font-size: 16px; font-weight: 800; }
+        .summary strong { color: var(--blue); font-weight: 800; }
+        .summary small { font-size: 12px; font-weight: 400; color: var(--dim2); }
+        .sbar { height: 5px; border-radius: 3px; background: #E8ECF2; margin-top: 8px; overflow: hidden; }
+        .sbar i { display: block; height: 100%; border-radius: 3px; background: var(--blue); transition: width .25s; }
+
+        .list { margin-top: 4px; display: block; }
+        .item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .name { font-size: 17px; font-weight: 700; color: var(--ink); word-break: keep-all; letter-spacing: 0; }
+        .toggle { display: flex; align-items: center; gap: 10px; user-select: none; }
+        .badge { font-size: 12px; font-weight: 700; color: var(--dim); border: 0; border-radius: 999px; background: var(--grey); padding: 5px 11px; min-width: 56px; text-align: center; }
+        .switch { width: 52px; height: 30px; border-radius: 999px; background: #D9DEE6; position: relative; transition: .15s ease; border: 0; }
+        .switch::after { content: ""; width: 24px; height: 24px; border-radius: 50%; background: #fff; position: absolute; top: 3px; left: 3px; box-shadow: 0 2px 6px rgba(17,24,39,.2); transition: .15s ease; }
+        .present .switch { background: #7CCB9B; border: 0; }
+        .present .switch::after { left: 25px; }
+        .present .badge { border: 0; background: var(--okbg); color: var(--ok); font-weight: 700; }
+        .emptyBox { padding: 24px 2px; border-bottom: 1px solid var(--line); }
+        .emptyBox .name { font-size: 16px; }
+        .emptyBox .sub { margin-top: 4px; }
+
+        .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px; font-size: 12.5px; box-shadow: 0 10px 28px rgba(17,24,39,.25); opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="wrap">
+            <div class="nav0"><a href="/Attendance/Index">← 출석부</a><a href="/">홈으로</a></div>
+            <div class="kk">ATTENDANCE</div>
+            <h1>출석 체크</h1>
+            <p class="sub">
+                <span>@dateStr · @headerClass</span>
+
+                @{
+                    // ✅ Q39: "내 반" 표시 + 내 반으로 바로가기
+                    // (ViewBag 대신 Model 기준으로 통일)
+                    var myLabel = Model.MyClassLabel;
+                    int myY = Model.MyClassYear;
+                    int myB = Model.MyClassBan;
+
+                    if (string.IsNullOrWhiteSpace(myLabel) && myY > 0 && myB > 0)
+                    {
+                        myLabel = $"{myY}학년 {myB}반";
+                    }
+
+                    // ✅ 정책: 이동 URL은 classYear/classBan만 (date 파라미터 없이 서버가 주일 계산)
+                    var myUrl = (myY > 0 && myB > 0)
+                        ? $"/Attendance/Check?classYear={myY}&classBan={myB}"
+                        : "";
+                }
+
+                @if (Model.ClassYear > 0 && Model.ClassBan > 0)
+                {
+                    if (Model.IsMyClass)
+                    {
+                        <span class="mybadge">내 반</span>
+                        <span class="myclasshint">담당 반: <b>@Model.ClassYear</b>학년 <b>@Model.ClassBan</b>반</span>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(myLabel))
+                    {
+                        <span class="otherbadge">다른 반</span>
+                        <span class="myclasshint">내 반: <b>@myLabel</b></span>
+                        if (!string.IsNullOrWhiteSpace(myUrl))
+                        {
+                            <a class="backmyclass" href="@myUrl">내 반으로</a>
+                        }
+                    }
+                }
+            </p>
+
+            @* ✅ Q40-2(2차): 체크 화면 상단 "미체크 반" 안내 *@
+            @if (Model.NotCheckedCount > 0)
+            {
+                <div class="ncbar" role="alert" aria-live="polite">
+                    <span class="nctitle">아직 체크 안 한 반 @(Model.NotCheckedCount)개</span>
+                    <div class="ncchips">
+                        @foreach (var nc in Model.NotCheckedClasses)
+                        {
+                            <a class="ncchip" href="/Attendance/Check?classYear=@nc.ClassYear&classBan=@nc.ClassBan">
+                                @nc.ClassName
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+
+            <div class="controls">
+                <div class="ctl">
+                    <label>날짜</label>
+                    <input id="datePick" type="date" value="@dateStr" />
+                </div>
+                <div class="ctl">
+                    <label>반</label>
+                    <select id="classPick">
+                        <option value="">선택</option>
+                        @foreach (var c in Model.Classes)
+                        {
+                            var v = $"{c.ClassYear}|{c.ClassBan}";
+                            var selected = (c.ClassYear == Model.ClassYear && c.ClassBan == Model.ClassBan);
+                            <option value="@v" selected="@(selected)">@c.ClassName</option>
+                        }
+                    </select>
+                </div>
+
+                <a href="/Attendance/DashboardAll" class="nav-btn primary">전체반 출석 대시보드</a>
+            </div>
+
+            <div class="summary">
+                <span>출석 <strong id="sumT">0</strong> <small>/ 전체 <span id="sumAll">0</span></small></span>
+                <small>이름을 누르면 바로 저장돼요</small>
+            </div>
+            <div class="sbar"><i id="sumBar" style="width:0%"></i></div>
+        </div>
+    </div>
+
+    <div class="wrap">
+        @if (Model.ClassYear <= 0 || Model.ClassBan <= 0)
+        {
+            <div class="emptyBox">
+                <div class="name">반을 선택해 주세요</div>
+                <div class="sub">상단에서 날짜/반을 선택하면 출석 체크가 가능합니다.</div>
+            </div>
+        }
+        else if (Model.Students == null || Model.Students.Count == 0)
+        {
+            <div class="emptyBox">
+                <div class="name">학생이 없어요</div>
+                <div class="sub">ClassInfo에 해당 반 학생 배정이 필요합니다.</div>
+            </div>
+        }
+        else
+        {
+            <section class="list" id="list">
+                @foreach (var s in Model.Students)
+                {
+                    var nm = string.IsNullOrWhiteSpace(s.StudentName) ? "친구" : s.StudentName.Trim();
+                    var presentClass = s.IsPresent ? "present" : "";
+                    <article class="item @presentClass"
+                             data-person-id="@s.PersonId"
+                             data-present="@(s.IsPresent ? "1" : "0")">
+                        <div class="name">@nm</div>
+                        <div class="toggle" role="button" aria-label="출석 토글">
+                            <span class="badge">@(s.IsPresent ? "출석" : "미출석")</span>
+                            <div class="switch" aria-hidden="true"></div>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+    </div>
+
+    <div class="toast" id="toast">저장됐어요</div>
+
+    <script>
+        const datePick = document.getElementById('datePick');
+        const classPick = document.getElementById('classPick');
+        const list = document.getElementById('list');
+        const toast = document.getElementById('toast');
+
+        const sumT = document.getElementById('sumT');
+        const sumAll = document.getElementById('sumAll');
+
+        function showToast(msg){
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(()=>toast.classList.remove('show'), 900);
+        }
+
+        function navigateReload(){
+            const d = datePick.value;
+            const v = classPick.value; // "year|ban"
+            let y = 0, b = 0;
+            if(v && v.includes('|')){
+                const parts = v.split('|');
+                y = Number(parts[0] || 0);
+                b = Number(parts[1] || 0);
+            }
+            location.href = `/Attendance/Check?date=${encodeURIComponent(d)}&classYear=${encodeURIComponent(y)}&classBan=${encodeURIComponent(b)}`;
+        }
+
+        datePick?.addEventListener('change', navigateReload);
+        classPick?.addEventListener('change', navigateReload);
+
+        async function apiSavePresent(personId, isPresent){
+            const payload = {
+                attendDate: datePick.value,
+                personId: Number(personId),
+                isPresent: !!isPresent
+            };
+            const res = await fetch('/Attendance/SavePresent', {
+                method:'POST',
+                headers:{ 'Content-Type':'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return await res.json();
+        }
+
+        function refreshSummary(){
+            if(!list){ sumT.textContent = "0"; sumAll.textContent = "0"; return; }
+            const items = Array.from(list.querySelectorAll('.item'));
+            sumAll.textContent = String(items.length);
+            const presentCount = items.filter(x => x.dataset.present === "1").length;
+            sumT.textContent = String(presentCount);
+            const bar = document.getElementById('sumBar'); if(bar) bar.style.width = (items.length ? Math.round(presentCount*100/items.length) : 0) + '%';
+        }
+
+        if(list){
+            list.addEventListener('click', async (e)=>{
+                const item = e.target.closest('.item');
+                if(!item) return;
+
+                const personId = item.dataset.personId;
+                const prev = item.dataset.present === "1";
+                const next = !prev;
+
+                // optimistic update
+                item.dataset.present = next ? "1" : "0";
+                item.classList.toggle('present', next);
+                const badge = item.querySelector('.badge');
+                if(badge) badge.textContent = next ? "출석" : "미출석";
+                refreshSummary();
+
+                try{
+                    const json = await apiSavePresent(personId, next);
+                    if(!json?.ok){
+                        // rollback
+                        item.dataset.present = prev ? "1" : "0";
+                        item.classList.toggle('present', prev);
+                        if(badge) badge.textContent = prev ? "출석" : "미출석";
+                        refreshSummary();
+                        showToast(json?.message || "저장 실패");
+                        return;
+                    }
+                    showToast("저장됐어요");
+                }catch{
+                    // rollback
+                    item.dataset.present = prev ? "1" : "0";
+                    item.classList.toggle('present', prev);
+                    if(badge) badge.textContent = prev ? "출석" : "미출석";
+                    refreshSummary();
+                    showToast("네트워크 오류");
+                }
+            });
+        }
+
+        refreshSummary();
+    </script>
+</body>
+</html>

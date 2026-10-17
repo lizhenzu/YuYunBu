@@ -1,0 +1,212 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+ 
+@using System.Globalization
+<style>
+
+
+    /* =====================================
+           ✅ TEST 배너 (단색 + 볼륨감)
+           - 그라데이션 없음
+           - 카드 볼륨(그림자/하이라이트/테두리)로 존재감
+           ===================================== */
+
+    .testBannerWrap {
+        margin-top: 12px;
+    }
+
+    .testBannerCard {
+        position: relative;
+        padding: 14px 14px;
+        overflow: hidden;
+        /* ✅ 단색 배경 */
+        background: #ffffff;
+        /* ✅ 볼륨감: 2중 그림자 + 은은한 인셋 하이라이트 */
+        box-shadow: 0 18px 40px rgba(2,6,23,.12), 0 6px 14px rgba(2,6,23,.08), inset 0 1px 0 rgba(255,255,255,.90);
+        /* ✅ 또렷한 테두리 */
+        border: 1px solid rgba(37,99,235,.22);
+        transform: translateZ(0);
+    }
+
+        /* ✅ 그라데이션 대신, 왼쪽에 얇은 컬러 바(존재감 + 깔끔) */
+        .testBannerCard::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 6px;
+            background: red; /* 브랜드 블루 */
+            box-shadow: 4px 0 18px rgba(37,99,235,.18);
+        }
+
+    /* ✅ 과한 glow 제거: 필요 없으니 숨김 처리 */
+    .testBannerGlow {
+        display: none;
+    }
+
+    .testBannerInner2 {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        /* 컬러 바 공간 확보 */
+        padding-left: 8px;
+    }
+
+    .testBannerLeft {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        min-width: 0;
+    }
+
+    /* 왼쪽 아이콘 박스: 단색 + 볼륨 */
+    .testMark {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(37,99,235,.10);
+        border: 1px solid rgba(37,99,235,.18);
+        box-shadow: 0 10px 22px rgba(37,99,235,.12), inset 0 1px 0 rgba(255,255,255,.90);
+    }
+
+    .testMarkIcon {
+        font-size: 26px;
+        line-height: 1;
+    }
+
+    /* TEST 배지: 단색 + 깔끔 */
+    .testMarkBadge {
+        position: absolute;
+        top: 7px;
+        left: 7px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        background: rgba(245,158,11,.16); /* 앰버 단색 */
+        border: 1px solid rgba(245,158,11,.28);
+        color: rgba(120,53,15,.98);
+        font-weight: 950;
+        font-size: 11px;
+        letter-spacing: .14em;
+    }
+
+    .testCopy {
+        min-width: 0;
+    }
+
+    .testTitle {
+        font-size: 16.5px;
+        font-weight: 950;
+        letter-spacing: -.25px;
+        color: rgba(11,18,32,.95);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .testDesc {
+        margin-top: 6px;
+        font-size: 13px;
+        font-weight: 800;
+        color: rgba(11,18,32,.66);
+        line-height: 1.35;
+    }
+
+        /* 핵심 강조: 단색 pill */
+        .testDesc b {
+            font-weight: 950;
+            color: rgba(29,78,216,.98);
+            background: rgba(37,99,235,.10);
+            border: 1px solid rgba(37,99,235,.18);
+            padding: 2px 6px;
+            border-radius: 999px;
+        }
+
+    .testSep {
+        display: inline-block;
+        margin: 0 8px;
+        opacity: .45;
+    }
+
+    /* 오른쪽 영역 */
+    .testBannerRight2 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: 0 0 auto;
+    }
+
+    /* 중요 안내 pill: 단색 */
+    .testPillHot {
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(2,6,23,.06);
+        border: 1px solid rgba(2,6,23,.10);
+        color: rgba(11,18,32,.86);
+        font-weight: 950;
+        font-size: 12.5px;
+        box-shadow: 0 10px 18px rgba(2,6,23,.08), inset 0 1px 0 rgba(255,255,255,.85);
+        white-space: nowrap;
+    }
+
+    /* CTA 버튼: 단색(브랜드 블루) + 볼륨 */
+    .testCta {
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: #2563eb;
+        border: 1px solid rgba(29,78,216,.75);
+        color: rgba(255,255,255,.96);
+        font-weight: 950;
+        font-size: 12.5px;
+        box-shadow: 0 14px 24px rgba(37,99,235,.22), inset 0 1px 0 rgba(255,255,255,.20);
+        white-space: nowrap;
+    }
+
+    .testBannerCard:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 22px 46px rgba(2,6,23,.14), 0 8px 18px rgba(2,6,23,.10), inset 0 1px 0 rgba(255,255,255,.90);
+    }
+
+    /* 모바일 */
+    @@media (max-width: 640px) {
+        .testTitle {
+            white-space: normal;
+        }
+
+        .testBannerRight2 {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+</style>
+
+<section class="testBannerWrap" aria-label="테스트 안내 배너">
+    <div class="testBannerCard" role="status" aria-live="polite" style="cursor:pointer;">
+        <div class="testBannerGlow" aria-hidden="true"></div>
+        <div class="testBannerInner2">
+            <div class="testBannerLeft">
+                <div class="testCopy">
+                    <div class="testTitle" style=" color: #dc3545; font-weight: 600;">
+                        <b>@ConstatsCommon.MainKeyTitle</b>은 현재 테스트 중입니다.
+                    </div>
+                    <br />
+                    <div class="testDesc">
+                        현재 포인트는 정식으로 시작시 <b>자동 소멸</b>됩니다. <br /> <br />
+                        시작 일정은 <b>별도 공지</b>로 안내드릴게요.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+

@@ -1,0 +1,205 @@
+@model BulletinBoard.Models.SuperAdmin.AnomalyDashboardVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+
+@*  ══════════════════════════════════════════════════════════════
+    이상징후(중복 이름) 점검 — 슈퍼관리자.  2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · Identity.User 와 view_PersonMaster_2026 에서 같은 이름이 둘 이상인 묶음을 이름별로 모아 보여 준다.
+    · 계정 / 명단 은 칩으로 바꿔 본다.  같은 이름 안에서 전화 · 생일이 겹치면 "같은 전화 · 같은 생일" 꼬리표.
+    · 계정이 있는 줄에는 사용자 관리 링크.  읽기 전용.
+    · 이전 화면(Mission3 Bone 스킨)은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var idGroups = (Model.IdentityDupRows ?? new()).GroupBy(r => r.FullNameKey).ToList();
+    var pmGroups = (Model.PersonMasterDupRows ?? new()).GroupBy(r => r.FullName).ToList();
+    bool clean = idGroups.Count == 0 && pmGroups.Count == 0;
+
+    string D(DateTime? d, string fmt = "yyyy.MM.dd") => d.HasValue ? d.Value.ToString(fmt) : "";
+    string Norm(string? p) => new string((p ?? "").Where(char.IsDigit).ToArray());
+    string Birth(BulletinBoard.Models.SuperAdmin.PersonMasterDupRow r) =>
+        (r.BYear.HasValue && r.BMonth.HasValue && r.BDay.HasValue) ? $"{r.BYear:0000}.{r.BMonth:00}.{r.BDay:00}" : "";
+
+    // 묶음 안에서 2번 이상 나온 값 = 중복 의심
+    HashSet<string> Dups(IEnumerable<string> vals) =>
+        vals.Where(v => v != "").GroupBy(v => v).Where(x => x.Count() > 1).Select(x => x.Key).ToHashSet();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>중복 이름 점검</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .qb button { font: inherit; }
+        .an-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+        @@media (min-width: 640px) { .an-stats { grid-template-columns: repeat(4, 1fr); } }
+        .an-stats div { padding: 12px 14px; border-radius: 14px; background: var(--grey); }
+        .an-stats b { display: block; font-size: 24px; font-weight: 800; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .an-stats b.w { color: var(--warn); }
+        .an-stats b.o { color: var(--ok); }
+        .an-stats span { display: block; margin-top: 3px; font-size: 12px; color: var(--dim2); }
+        .an-ok { margin-top: 16px; padding: 14px; border-radius: 14px; background: var(--okbg); color: var(--ok); font-size: 14px; font-weight: 800; text-align: center; }
+        .an-hint { margin-top: 10px; font-size: 12px; line-height: 1.7; color: var(--dim2); word-break: keep-all; }
+        .an-none { margin-top: 12px; font-size: 13px; font-weight: 800; color: var(--ok); }
+        .an-grp { margin-top: 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+        .an-gh { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--grey); }
+        .an-gh b { font-size: 15.5px; font-weight: 800; color: var(--ink); }
+        .an-cnt { padding: 2px 8px; border-radius: 999px; background: var(--warnbg); color: var(--warn); font-size: 11px; font-weight: 800; }
+        .an-row { display: flex; gap: 12px; padding: 12px 14px; border-top: 1px solid var(--line); }
+        .an-row .n { flex: none; width: 24px; font-size: 15px; font-weight: 800; color: #7FA3DB; }
+        .an-row .t { flex: 1; min-width: 0; }
+        .an-kv { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; line-height: 1.7; color: var(--ink); }
+        .an-kv span { white-space: nowrap; }
+        .an-kv u { margin-right: 4px; text-decoration: none; font-size: 11px; color: var(--dim); }
+        .an-kv .e, .an-kv .e u { color: #D1D5DB; }
+        .an-kv .id { flex-basis: 100%; white-space: normal; word-break: break-all; font-size: 11px; color: var(--dim); }
+        .an-same { display: inline-block; margin: 4px 4px 0 0; padding: 2px 8px; border-radius: 999px; background: var(--redbg); color: var(--red); font-size: 11px; font-weight: 800; }
+        .an-ac { margin-top: 8px; }
+        .an-ac a { display: inline-block; padding: 5px 12px; border-radius: 999px; background: var(--soft); color: var(--blue) !important; font-size: 12px; font-weight: 700; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>이상징후</span>
+        <span>ANOMALY</span>
+    </div>
+
+    <div class="qb-k">SUPER ADMIN · ANOMALY</div>
+    <h1 class="qb-h1">중복 이름 점검<small>@Model.GeneratedAt.ToString("HH:mm") 기준</small></h1>
+    <div class="qb-sub">같은 이름(성 + 이름)이 둘 이상인 계정과 명단을 모아 보여 줘요. 실제로 다른 사람인지, 잘못 만들어진 중복인지 확인해 주세요.</div>
+
+    <div class="an-stats">
+        <div><b class="@(Model.IdentityDupGroupCount > 0 ? "w" : "o")">@Model.IdentityDupGroupCount</b><span>계정 중복 이름</span></div>
+        <div><b>@Model.IdentityDupUserCount</b><span>계정 수</span></div>
+        <div><b class="@(Model.PersonMasterDupGroupCount > 0 ? "w" : "o")">@Model.PersonMasterDupGroupCount</b><span>명단 중복 이름</span></div>
+        <div><b>@Model.PersonMasterDupRowCount</b><span>명단 행 수</span></div>
+    </div>
+
+    @if (clean)
+    {
+        <div class="an-ok">중복된 이름이 없어요</div>
+    }
+
+    <div class="qb-chips" id="anTabs">
+        <button type="button" class="on" data-t="anId">계정 @idGroups.Count</button>
+        <button type="button" data-t="anPm">명단 @pmGroups.Count</button>
+    </div>
+
+    @* ── 1. 계정 (Identity.User) ── *@
+    <div id="anId">
+        <div class="an-hint">성 + 이름이 같은 로그인 계정이에요. 한 사람이 계정을 두 번 만든 경우가 대부분이에요.</div>
+        @if (idGroups.Count == 0)
+        {
+            <div class="an-none">이상 없음</div>
+        }
+        @foreach (var g in idGroups)
+        {
+            int n = 0;
+            var samePhone = Dups(g.Select(r => Norm(r.PhoneNumber)));
+            var sameMail = Dups(g.Select(r => (r.Email ?? "").Trim().ToLowerInvariant()));
+            <div class="an-grp">
+                <div class="an-gh"><b>@g.Key</b><span class="an-cnt">@(g.Count())명</span></div>
+                @foreach (var r in g)
+                {
+                    n++;
+                    bool sp = samePhone.Contains(Norm(r.PhoneNumber));
+                    bool sm = sameMail.Contains((r.Email ?? "").Trim().ToLowerInvariant());
+                    <div class="an-row">
+                        <span class="n">@n.ToString("00")</span>
+                        <div class="t">
+                            <div class="an-kv">
+                                <span class="@(string.IsNullOrWhiteSpace(r.UserName) ? "e" : "")"><u>아이디</u>@(r.UserName ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.PhoneNumber) ? "e" : "")"><u>전화</u>@(r.PhoneNumber ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Email) ? "e" : "")"><u>이메일</u>@(r.Email ?? "—")</span>
+                                <span class="@(r.InsertDT.HasValue ? "" : "e")"><u>가입</u>@(r.InsertDT.HasValue ? D(r.InsertDT, "yyyy.MM.dd HH:mm") : "—")</span>
+                                <span class="id"><u>USERID</u>@r.UserId</span>
+                            </div>
+                            @if (sp) { <span class="an-same">같은 전화</span> }
+                            @if (sm) { <span class="an-same">같은 이메일</span> }
+                            @if (!string.IsNullOrWhiteSpace(r.UserId))
+                            {
+                                <div class="an-ac"><a href="/HumanResource/ManageUserInfo?UserId=@r.UserId">사용자 관리</a></div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── 2. 명단 (view_PersonMaster_2026) ── *@
+    <div id="anPm" hidden>
+        <div class="an-hint">이름이 같은 명단 행이에요. 생년월일 · 학교 · 전화가 다르면 동명이인, 같으면 중복 등록이에요. 생일은 년·월·일이 모두 있을 때만 보여요.</div>
+        @if (pmGroups.Count == 0)
+        {
+            <div class="an-none">이상 없음</div>
+        }
+        @foreach (var g in pmGroups)
+        {
+            int n = 0;
+            var samePhone = Dups(g.Select(r => Norm(r.PhoneNumber)));
+            var sameBirth = Dups(g.Select(r => Birth(r)));
+            <div class="an-grp">
+                <div class="an-gh"><b>@g.Key</b><span class="an-cnt">@(g.Count())행</span></div>
+                @foreach (var r in g)
+                {
+                    n++;
+                    string birth = Birth(r);
+                    bool sp = samePhone.Contains(Norm(r.PhoneNumber));
+                    bool sb = sameBirth.Contains(birth);
+                    <div class="an-row">
+                        <span class="n">@n.ToString("00")</span>
+                        <div class="t">
+                            <div class="an-kv">
+                                <span><u>번호</u>@(r.PersonId?.ToString() ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.UserName) ? "e" : "")"><u>아이디</u>@(r.UserName ?? "—")</span>
+                                <span class="@(birth == "" ? "e" : "")"><u>생일</u>@(birth == "" ? "—" : birth)</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Sex) ? "e" : "")"><u>성별</u>@(r.Sex ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.School) ? "e" : "")"><u>학교</u>@(r.School ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.PhoneNumber) ? "e" : "")"><u>전화</u>@(r.PhoneNumber ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Email) ? "e" : "")"><u>이메일</u>@(r.Email ?? "—")</span>
+                                <span class="@(r.InsertDT.HasValue ? "" : "e")"><u>등록</u>@(r.InsertDT.HasValue ? D(r.InsertDT) : "—")</span>
+                                <span class="@(r.UpdateDT.HasValue ? "" : "e")"><u>수정</u>@(r.UpdateDT.HasValue ? D(r.UpdateDT) : "—")</span>
+                                @if (!string.IsNullOrWhiteSpace(r.UserId))
+                                {
+                                    <span class="id"><u>USERID</u>@r.UserId</span>
+                                }
+                            </div>
+                            @if (sb) { <span class="an-same">같은 생일</span> }
+                            @if (sp) { <span class="an-same">같은 전화</span> }
+                            @if (!string.IsNullOrWhiteSpace(r.UserId))
+                            {
+                                <div class="an-ac"><a href="/HumanResource/ManageUserInfo?UserId=@r.UserId">사용자 관리</a></div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="qb-ft">
+        <span>중복 이름 점검</span>
+        <span><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    document.getElementById('anTabs').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-t]'); if (!b) return;
+        this.querySelectorAll('[data-t]').forEach(function (x) {
+            x.classList.toggle('on', x === b);
+            document.getElementById(x.dataset.t).hidden = x !== b;
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미션 수행</title>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Jua', sans-serif;
+            background: #ECEFF1;
+            text-align: center;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 모바일에서는 바깥 여백을 없애고 화면을 꽉 채운다.
+           (읽는 화면들이 좁아 보이던 원인이 이 20px 이었다) */
+        @@media (max-width: 640px) {
+            body {
+                padding: 0;
+            }
+        }
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+ 
+        .mission-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.1);
+            margin: 5px 0;
+            padding: 25px;
+            width: 90%;
+            max-width: 450px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out, background 0.3s;
+        }
+
+            .mission-card:active {
+                border-color: #ff7043;
+            }
+
+            .mission-card:hover {
+                border-color: #ff7043;
+            }
+
+            .mission-card img {
+                width: 55px;
+                height: 55px;
+                border-radius: 50%;
+                border: 3px solid #ffffff;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+                border-radius: 35px;
+            }
+
+        .mission-text {
+            flex: 1;
+            margin-left: 15px;
+            text-align: left;
+        }
+
+        .mission-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #37474F;
+        }
+
+        .mission-desc {
+            font-size: 16px;
+            color: #546E7A;
+        }
+
+        .mission-status {
+            padding: 10px 10px;
+            border-radius: 50%;
+            font-size: 16px;
+            border: 3px solid white;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .completed {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .pending {
+            background: #FF9800;
+            color: white;
+        }
+ 
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+
+    <link rel="stylesheet" href="/css/topLevelImage.css">
+    <link rel="stylesheet" href="/css/missionCircle.css">
+    <link rel="stylesheet" href="/css/ProcessBar.css">
+    <link rel="stylesheet" href="/css/missionNavigationCard.css">
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+
+    <link rel="stylesheet" href="/assets/styles.css">
+     
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+</head>
+<body>
+   
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+
+    @RenderBody()
+
+      <environment include="Development">
+        <script src="~/lib/jquery/dist/jquery.js"></script>
+        <script src="~/lib/bootstrap/dist/js/bootstrap.js"></script>
+        <script src="~/js/site.js" asp-append-version="true"></script>
+
+             <script src="/assets/celebrate.js"
+                onload="console.log('celebrate.js loaded')"
+                onerror="console.error('celebrate.js NOT loaded — check path & static files');">
+        </script>
+        <script>
+            (function initFX(){
+              // celebrate.js가 UMD/전역 방식이라면 window.CelebrateFX를 노출합니다.
+              if (window.CelebrateFX && typeof window.CelebrateFX.init === 'function') {
+                window.FX = window.CelebrateFX.init({ enableSound: true });
+                console.log('FX ready:', !!window.FX);
+              } else {
+                console.error('CelebrateFX가 로드되지 않았습니다. 경로 또는 파일 내용을 확인하세요.');
+              }
+            })();
+        </script>
+
+    </environment>
+    <environment exclude="Development">
+        <script src="https://ajax.aspnetcdn.com/ajax/jquery/jquery-2.2.0.min.js"
+                asp-fallback-src="~/lib/jquery/dist/jquery.min.js"
+                asp-fallback-test="window.jQuery"
+                crossorigin="anonymous"
+                integrity="sha384-K+ctZQ+LL8q6tP7I94W+qzQsfRV2a+AfHIi9k8z8l9ggpc8X+Ytst4yBo/hH+8Fk">
+        </script>
+        <script src="https://ajax.aspnetcdn.com/ajax/bootstrap/3.3.7/bootstrap.min.js"
+                asp-fallback-src="~/lib/bootstrap/dist/js/bootstrap.min.js"
+                asp-fallback-test="window.jQuery && window.jQuery.fn && window.jQuery.fn.modal"
+                crossorigin="anonymous"
+                integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa">
+        </script>
+        <script src="~/js/site.min.js" asp-append-version="true"></script>
+        <!-- </body> 위쪽, init() 전에 배치 -->
+        <script src="/assets/celebrate.js"
+                onload="console.log('celebrate.js loaded')"
+                onerror="console.error('celebrate.js NOT loaded — check path & static files');">
+        </script>
+        <script>
+            (function initFX(){
+              // celebrate.js가 UMD/전역 방식이라면 window.CelebrateFX를 노출합니다.
+              if (window.CelebrateFX && typeof window.CelebrateFX.init === 'function') {
+                window.FX = window.CelebrateFX.init({ enableSound: true });
+                console.log('FX ready:', !!window.FX);
+              } else {
+                console.error('CelebrateFX가 로드되지 않았습니다. 경로 또는 파일 내용을 확인하세요.');
+              }
+            })();
+        </script>
+
+    </environment>
+     
+@*     <script>
+        function playSound() {
+            var audio = document.getElementById("audio");
+            audio.play();
+        }
+    </script> 
+ *@  
+    @* 대기 카드 — 이 레이아웃을 쓰는 모든 화면이 DailyMission4 의 밝은 카드를 쓴다 (DailyMission3 폴더에 기대지 않는다) *@
+    @await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+</body>
+</html>
+ 

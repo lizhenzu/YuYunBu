@@ -1,0 +1,328 @@
+@model BulletinBoard.Models.BessingACoupleDatas
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@using System.Text.RegularExpressions
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    부부 기도 — 아내를 위한 / 남편을 위한 (?Kind=Wife · Husband)
+    · 2026-10-04 시안 확정 — /Prayer365 (365일 축복 기도) 와 같은 밝은 흰색 결
+      한 줄 머리(홈으로 · 부부 기도 + 가− 100% 가+) · 원 + 제목 머리 · 호칭 줄 파란 선 · 이름 자리 연파랑
+    · 이전 화면(노을 로즈 · 명조)은 DetailWords.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"MarriedCouple_{todayDate}.webp";
+    string formattedModResultDataOG = $"{@ViewBag.Domain}//images/workspace/MarriedCouple/horizontal/{formattedModResultData}";
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // KindDataA = 기도를 받는 사람, KindDataB = 기도하는 사람
+    string KindDataA = "아내";
+    string KindDataB = "남편";
+    bool isForHusband = (string)ViewBag.Kind == "Husband";
+    if (isForHusband)
+    {
+        KindDataA = "남편";
+        KindDataB = "아내";
+    }
+    // 받침 유무에 맞춘 목적격 조사 — 남편을 / 아내를
+    string josa = isForHusband ? "을" : "를";
+    // 주격 조사 — 남편이 / 아내가
+    string josaB = isForHusband ? "가" : "이";
+
+    string pageTitle = $"{ChurchName} {DepartmentName}";
+
+    var kNow = DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow.Month}월 {kNow.Day}일 {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // 본문은 HTML 로 해석되지 않도록 이스케이프하고,
+    // **...** 처럼 별표로 감싼 부분만 강조 표시로 바꾼다.
+    Func<string, Microsoft.AspNetCore.Html.IHtmlContent> Mark = raw =>
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(raw ?? string.Empty);
+        enc = Regex.Replace(enc, @"\*{2,3}(.+?)\*{2,3}", "<span class=\"nm\">$1</span>");
+        return new Microsoft.AspNetCore.Html.HtmlString(enc);
+    };
+
+    Func<string, string[]> Lines = raw =>
+        string.IsNullOrWhiteSpace(raw)
+            ? new string[0]
+            : raw.Replace("\r\n", "\n").Replace("\r", "\n").Trim()
+                 .Split('\n')
+                 .Where(l => !string.IsNullOrWhiteSpace(l))
+                 .ToArray();
+
+    var prayLines = Lines(Model?.PrayText);
+    var wordLines = Lines(Model?.PrayHolyWord);
+
+    // 짧고 쉼표로 끝나는 줄("사랑의 하나님,")은 호칭 — 365 기도와 같은 규칙
+    bool IsCall(string line) { var l = line.Trim(); return l.EndsWith(",") && l.Length <= 30; }
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    // 기도 관리자 = 로그인 아이디 "Basic" · "SuperAdmin" 두 계정 (역할은 보지 않는다 — 2026-10-11)
+    //   → 읽음 수 보기 · 목록 · 수정 버튼
+    var isPrayManager = PrayManagerHelper.IsPrayManager(User);
+    var canSeeCount = isPrayManager;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@pageTitle</title>
+
+    <meta property="og:title" content="@pageTitle">
+    <meta property="og:description" content="@pageTitle 입니다.">
+    <meta property="og:image" content="@formattedModResultDataOG">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root { --tx:#111827; --dim:#9CA3AF; --dim2:#6B7280; --rule:#EEF0F3; --mark:#F4F6F9; --acc:#2F80ED; --soft:#EAF2FD; --fs: 1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        .pz { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+
+        /* 맨 위 한 줄 */
+        .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; font-size: 13px; color: var(--dim); }
+        .bar > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar a { color: #374151; font-weight: 700; }
+        .bar a:hover { color: var(--acc); }
+        .bar .sep { margin: 0 6px; color: #D1D5DB; }
+        .prog { height: 3px; border-radius: 99px; background: var(--mark); }
+
+        /* 글자 크기 — 가− 100% 가+ (가운데를 누르면 100%) */
+        .fz { flex: none; display: inline-flex; align-items: stretch; border: 1px solid #E1E6EE; border-radius: 8px; overflow: hidden; background: #fff; }
+        .fz button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: #374151; padding: 5px 9px; cursor: pointer; }
+        .fz button:hover:not(:disabled) { color: var(--acc); }
+        .fz button:disabled { color: #D1D5DB; cursor: default; }
+        .fz #pfsPct { min-width: 48px; border-left: 1px solid #E1E6EE; border-right: 1px solid #E1E6EE; font-size: 11.5px; font-weight: 400; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+        /* 머리 — 원(맞물린 두 고리) + 제목 */
+        .phd { display: flex; gap: 14px; align-items: center; margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+        .rings { flex: none; width: 72px; height: 72px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+        .rings i { position: relative; width: 46px; height: 28px; }
+        .rings i::before, .rings i::after { content: ""; position: absolute; top: 0; width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--acc); }
+        .rings i::before { left: 0; }
+        .rings i::after { right: 0; border-color: #7FA3DB; }
+        .phdTx { flex: 1; min-width: 0; }
+        .kk { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--acc); }
+        .ttl { margin: 4px 0 0; font-size: 19px; font-weight: 800; line-height: 1.4; letter-spacing: -.01em; color: var(--tx); word-break: keep-all; text-wrap: balance; }
+        .phdS { margin-top: 3px; font-size: 12px; color: var(--dim); }
+        .phdS .cnt { color: var(--acc); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        /* 아내를 위해 / 남편을 위해 */
+        .who { display: flex; gap: 6px; margin-top: 14px; }
+        .who a { font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 13px; background: var(--mark); color: var(--dim2); }
+        .who a:hover { color: var(--acc); }
+        .who a.on { background: var(--soft); color: var(--acc); }
+
+        /* 본문 */
+        .body { margin-top: 16px; }
+        .body p { margin: 0 0 12px; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: #2A2F3A; word-break: keep-all; }
+        .body p.call { margin-top: 14px; padding-left: 10px; border-left: 3px solid var(--acc); line-height: 1.5; font-weight: 800; color: var(--tx); }
+        .body p.call:first-child { margin-top: 0; }
+        .nm { background: var(--soft); color: var(--tx); font-weight: 700; border-radius: 4px; padding: 0 3px; }
+
+        /* 함께 읽는 말씀 — 처음에는 접힘 */
+        details.vs { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; }
+        details.vs > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 800; color: var(--tx); }
+        details.vs > summary::-webkit-details-marker { display: none; }
+        details.vs > summary span { font-size: 12.5px; font-weight: 700; color: var(--acc); }
+        details.vs > summary span::after { content: "펼쳐 보기 ⌄"; }
+        details.vs[open] > summary span::after { content: "접기 ⌃"; }
+        .vsBody { margin-top: 10px; padding-left: 12px; border-left: 3px solid #D6E4FA; }
+        .vsBody p { margin: 0 0 8px; font-size: calc(13.5px * var(--fs)); line-height: 1.85; color: var(--dim2); word-break: keep-all; }
+        .vsBody p:last-child { margin-bottom: 0; }
+
+        .none { margin-top: 24px; text-align: center; padding: 28px 20px; border-radius: 14px; background: var(--mark); color: var(--dim2); font-size: 14px; }
+        .stamp { margin-top: 14px; text-align: right; font-size: 11px; color: var(--dim); }
+
+        /* 아래 버튼 — 연한 색 */
+        /* 아래 버튼 — 홈으로 · 기도홈 / (관리자) 목록 · 수정 : 모두 같은 크기·같은 색 2×2 (2026-10-11 C안) */
+        .act { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+        .act a { flex: 1 1 calc(50% - 4px); min-width: 0; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 14px; font-weight: 800; background: var(--soft); color: var(--acc); }
+        .act a:hover { background: #DCEAFB; }
+        /* 검증 버튼 — 한 줄 전폭, 검증완료는 연초록(눌러지지 않음) */
+        .act .vf { flex: 1 1 100%; margin: 0; }
+        .act .vb { width: 100%; height: 46px; border: 0; border-radius: 14px; font: inherit; font-size: 14px; font-weight: 800; background: var(--soft); color: var(--acc); cursor: pointer; }
+        .act .vb:hover { background: #DCEAFB; }
+        /* 검증완료 — 누르면 검증 전으로 돌아가는 토글 */
+        .act .vb.done { background: #E8F6EE; color: #1B7A4B; }
+        .act .vb.done:hover { background: #D5EEDD; }
+        /* 새 기도문 — 맨 아래 진한 파랑 전폭 (2026-10-15 B안) */
+        .act a.wide { flex: 1 1 100%; }
+        .act a.pri { background: var(--acc); color: #fff; }
+        .act a.pri:hover { background: #1F6FDB; }
+
+        /* 함께 만들어 가는 기도문 — 오타 · 새 기도문 제보 (수험생 기도문과 같은 박스, 이 화면의 파랑 결로) */
+        .note { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--rule); }
+        .noteT { font-size: 16px; font-weight: 800; color: var(--tx); }
+        .noteI { padding: 12px 0; border-bottom: 1px solid var(--rule); font-size: 13px; color: #374151; }
+        .noteI:last-of-type { border-bottom: 0; }
+        .noteI small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--dim); }
+        .noteBtn { display: grid; place-items: center; height: 46px; margin-top: 12px; border-radius: 14px; background: var(--acc); color: #fff; font-size: 14px; font-weight: 800; }
+        .noteBtn:hover { background: #1F6FDB; }
+        .noteFine { margin-top: 8px; text-align: center; font-size: 11px; color: var(--dim); }
+        @@media print { .note { display: none !important; } }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>부부 기도</span>
+        <span class="fz" role="group" aria-label="기도문 글자 크기">
+            <button type="button" id="pfsDn" onclick="stepPFs(-1)" aria-label="글자 작게">가−</button>
+            <button type="button" id="pfsPct" onclick="setPFs('m')" title="100%로 되돌리기" aria-label="글자 크기 100%로 되돌리기">100%</button>
+            <button type="button" id="pfsUp" onclick="stepPFs(1)" aria-label="글자 크게">가+</button>
+        </span>
+    </div>
+    <div class="prog"></div>
+
+    <div class="phd">
+        <div class="rings" aria-hidden="true"><i></i></div>
+        <div class="phdTx">
+            <div class="kk">부부 기도 · @(KindDataA)@(josa) 위해</div>
+            <h1 class="ttl">@(string.IsNullOrWhiteSpace(Model?.PrayTitle) ? $"{KindDataA}{josa} 위한 기도" : Model.PrayTitle)</h1>
+            <div class="phdS">
+                @(KindDataB)@(josaB) 드리는 기도 · @dateStr
+                @if (canSeeCount && Model != null)
+                {
+                    <span class="cnt">· 읽음 @Model.visited</span>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="who">
+        <a class="@(isForHusband ? "" : "on")" href="/BessingACouple/DetailWords?Kind=Wife">아내를 위해</a>
+        <a class="@(isForHusband ? "on" : "")" href="/BessingACouple/DetailWords?Kind=Husband">남편을 위해</a>
+    </div>
+
+    @if (prayLines.Length == 0 && wordLines.Length == 0)
+    {
+        <div class="none">표시할 기도문이 없어요</div>
+    }
+    else
+    {
+        <div class="body">
+            @foreach (var line in prayLines)
+            {
+                <p class="@(IsCall(line) ? "call" : "")">@Mark(line)</p>
+            }
+        </div>
+
+        @if (wordLines.Length > 0)
+        {
+            @* 처음에는 접힌 상태 — 제목을 눌러 펼친다 *@
+            <details class="vs">
+                <summary>함께 읽는 말씀<span></span></summary>
+                <div class="vsBody">
+                    @foreach (var line in wordLines)
+                    {
+                        <p>@Mark(line)</p>
+                    }
+                </div>
+            </details>
+        }
+    }
+
+    @if (Model != null && Model.UpdateDT != default(DateTime))
+    {
+        <div class="stamp">수정일 @Model.UpdateDT.ToString("yyyy-MM-dd")</div>
+    }
+
+    @{
+        bool verifyReady = ViewBag.VerifyReady is bool _vr && _vr;
+        bool canAddPray = ViewBag.CanAddPray is bool _ca && _ca;   // 새 기도문 — SuperAdmin 역할 · Basic 계정
+    }
+    <div class="act">
+        <a href="/">@ConstatsCommon.ToHome</a>
+        <a href="/PrayHome/Index">기도홈</a>
+        @if (isPrayManager)
+        {
+            <a href="/BessingACouple/DetailList?Kind=@ViewBag.Kind">목록</a>
+            if (Model != null)
+            {
+                <a href="/BessingACouple/ModifyView?Kind=@ViewBag.Kind&Id=@Model.Id">수정</a>
+            }
+            @* 검증 — 한 줄 전폭. 검증이 끝나면 연초록 "검증완료" 로 바뀌고 눌러지지 않는다 (관리자에게만 보인다) *@
+            if (verifyReady && Model != null)
+            {
+                @* 토글 — 검증 ⇄ 검증완료. 검증완료를 누르면 검증 전으로 돌아간다 *@
+                <form class="vf" method="post" action="/BessingACouple/@(Model.IsVerified ? "Unverify" : "Verify")">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Kind" value="@ViewBag.Kind" />
+                    <input type="hidden" name="Id" value="@Model.Id" />
+                    @if (Model.IsVerified)
+                    {
+                        <button type="submit" class="vb done" title="누르면 검증이 취소돼요" aria-pressed="true">검증완료</button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="vb" aria-pressed="false">검증</button>
+                    }
+                </form>
+            }
+        }
+        @* 새 기도문 — 맨 아래 진한 파랑 전폭 (2026-10-15 B안) *@
+        @if (canAddPray)
+        {
+            <a class="wide pri" href="/BessingACouple/EnrollView?Kind=@ViewBag.Kind">＋ 새 기도문</a>
+        }
+    </div>
+
+    @* 오타·새 기도문 제보 — 익명 게시판으로 보낸다 (수험생 기도문 화면과 같은 박스) *@
+    <section class="note">
+        <div class="noteT">함께 만들어 가는 기도문</div>
+        <div class="noteI">오타나 어색한 곳이 있나요?<small>알려 주시면 살펴보고 고칠게요</small></div>
+        <div class="noteI">나누고 싶은 기도문이 있나요?<small>올려 드릴게요. 함께 기도해요</small></div>
+        <a class="noteBtn" href="/Board/Create2?boardName=Anonymous">알려 주기</a>
+        <div class="noteFine">이름을 남기지 않아도 돼요</div>
+    </section>
+
+</div>
+
+<script>
+    /* 기도문 글자 크기 — 가− 100% 가+ (예전과 같은 저장 키 acFs · 단계 s/m/l/xl) */
+    (function () {
+        var MAP = { s: 0.90, m: 1, l: 1.18, xl: 1.36 }, ORD = ['s', 'm', 'l', 'xl'], cur = 'm';
+        window.setPFs = function (k, silent) {
+            if (!MAP[k]) k = 'm';
+            cur = k;
+            document.documentElement.style.setProperty('--fs', MAP[k]);
+            var pct = document.getElementById('pfsPct'); if (pct) pct.textContent = Math.round(MAP[k] * 100) + '%';
+            var ix = ORD.indexOf(k);
+            var dn = document.getElementById('pfsDn'), up = document.getElementById('pfsUp');
+            if (dn) dn.disabled = ix <= 0;
+            if (up) up.disabled = ix >= ORD.length - 1;
+            if (!silent) { try { localStorage.setItem('acFs', k); } catch (e) { } }
+        };
+        window.stepPFs = function (d) {
+            var ix = Math.max(0, Math.min(ORD.length - 1, ORD.indexOf(cur) + d));
+            setPFs(ORD[ix]);
+        };
+        var saved = 'm';
+        try { saved = localStorage.getItem('acFs') || 'm'; } catch (e) { }
+        setPFs(saved, true);
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+@model BulletinBoard.Models.PrayPhrase
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    기도문 등록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 입력칸은 Shared/_PrayPhrasePartial, 저장 주소(CreatePrayPhrase)는 그대로
+    · 이전 화면은 EnrollPrayPhrase.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>기도문 등록</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pp-date { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: var(--okbg); color: var(--ok); font-size: 12px; font-weight: 800; }
+        .pp-rng { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--soft); }
+        .pp-rng .lbl { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; color: var(--blue); }
+        .pp-rng .pr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .pp-rng .pr + .pr { margin-top: 8px; }
+        .pp-rng .qb-in { background: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>등록하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/PrayPhrase/PrayPhraseDetailList">기도문 작성</a><span class="sep">›</span>등록</span>
+        <span>PRAY</span>
+    </div>
+
+    <div class="qb-k">NEW</div>
+    <h1 class="qb-h1">기도문 등록</h1>
+
+    <form asp-action="CreatePrayPhrase" method="post" onsubmit="return beforeSubmit(this);">
+        <div asp-validation-summary="ModelOnly"></div>
+
+        @await Html.PartialAsync("_PrayPhrasePartial", Model)
+
+        <button type="submit" class="qb-submit">등록</button>
+    </form>
+
+    <div class="qb-ft">
+        <span>기도문 등록</span>
+        <span><a href="/PrayPhrase/PrayPhraseDetailList">기도문 목록</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script>
+    function beforeSubmit(form) {
+        if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) return false;
+        document.getElementById('loadingOverlay').classList.add('on');
+        return true;
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

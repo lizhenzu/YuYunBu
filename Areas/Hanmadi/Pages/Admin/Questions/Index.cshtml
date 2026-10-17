@@ -1,0 +1,371 @@
+@page "/hanmadi/admin/sessions/{id:int}/questions"
+@model BulletinBoard.Areas.Hanmadi.Pages.Admin.Questions.IndexModel
+@{
+    Layout = null;
+    ViewData["Title"] = "문항 관리";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>문항 관리 · 한마디</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f1f5f9; color: #0f172a; min-height: 100vh; padding: 24px 16px;
+  }
+  .top { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .back { color: #94a3b8; text-decoration: none; font-size: 13px; }
+  .back:hover { color: #6366f1; }
+  h1 { font-size: 20px; font-weight: 900; margin-bottom: 4px; color: #0f172a; }
+  .meta { font-size: 13px; color: #94a3b8; margin-bottom: 22px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .code-badge {
+    background: #ede9fe; color: #6366f1;
+    font-size: 12px; font-weight: 900;
+    padding: 3px 10px; border-radius: 8px; letter-spacing: 2px;
+  }
+
+  .form-box {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 16px; padding: 22px; margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .form-box h2 { font-size: 13px; font-weight: 800; color: #64748b; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field { margin-bottom: 14px; }
+  label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 5px; }
+  textarea {
+    width: 100%; padding: 11px 13px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 10px; color: #0f172a;
+    font-size: 14px; min-height: 68px; resize: vertical;
+    font-family: inherit; outline: none; transition: border-color .2s;
+  }
+  textarea:focus { border-color: #6366f1; background: #fff; }
+
+  .type-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; }
+  .type-btn {
+    padding: 10px 8px; border-radius: 10px;
+    border: 1.5px solid #e2e8f0; cursor: pointer;
+    text-align: center; font-size: 12px; font-weight: 700;
+    background: #f8fafc; color: #64748b; transition: all .15s;
+  }
+  .type-btn:hover  { border-color: #6366f1; color: #6366f1; background: #ede9fe; }
+  .type-btn.active { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+  input[name="Type"] { display: none; }
+
+  .btn-add {
+    width: 100%; padding: 11px; border-radius: 10px;
+    font-size: 13px; font-weight: 700; cursor: pointer; border: none;
+    background: #6366f1; color: #fff; transition: background .15s;
+  }
+  .btn-add:hover { background: #4f46e5; }
+
+  /* 객관식 선택지 */
+  #options-area { display: none; margin-bottom: 14px; }
+  .opt-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 8px; }
+  .opt-row { display: flex; align-items: center; gap: 7px; }
+  .opt-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #ede9fe; color: #6366f1;
+    font-size: 11px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .opt-input {
+    flex: 1; padding: 9px 11px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 9px; font-size: 13px; color: #0f172a;
+    font-family: inherit; outline: none; transition: border-color .2s;
+  }
+  .opt-input:focus { border-color: #6366f1; background: #fff; }
+  .btn-add-opt {
+    font-size: 12px; font-weight: 700; color: #6366f1;
+    background: #ede9fe; border: none; border-radius: 8px;
+    padding: 7px 12px; cursor: pointer; transition: background .15s;
+  }
+  .btn-add-opt:hover { background: #ddd6fe; }
+  .btn-rm-opt {
+    background: none; border: none; color: #fca5a5;
+    font-size: 16px; cursor: pointer; line-height: 1; flex-shrink: 0;
+    transition: color .15s;
+  }
+  .btn-rm-opt:hover { color: #ef4444; }
+
+  .q-card {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 14px; padding: 14px 16px;
+    margin-bottom: 10px; display: flex;
+    align-items: flex-start; justify-content: space-between; gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+  }
+  .q-title { font-size: 14px; font-weight: 800; color: #0f172a; }
+  .type-chip {
+    font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 999px; background: #ede9fe; color: #6366f1; margin-top: 4px; display: inline-block;
+  }
+  .btn-del {
+    background: #fff; border: 1.5px solid #fecaca; color: #ef4444;
+    font-size: 11px; padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    flex-shrink: 0; transition: all .15s;
+  }
+  .btn-del:hover { background: #fef2f2; }
+  .btn-edit {
+    background: #fff; border: 1.5px solid #c7d2fe; color: #6366f1;
+    font-size: 11px; padding: 5px 11px; border-radius: 8px; cursor: pointer;
+    flex-shrink: 0; transition: all .15s;
+  }
+  .btn-edit:hover { background: #ede9fe; }
+  .empty { color: #94a3b8; font-size: 13px; text-align: center; padding: 32px 0; }
+
+  /* 수정 모달 */
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.4); z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 18px; padding: 24px 22px;
+    width: min(480px, 94vw); box-shadow: 0 20px 60px rgba(0,0,0,.18);
+  }
+  .modal-box h3 { font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 16px; }
+  .modal-box .field { margin-bottom: 12px; }
+  .modal-box label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+  .modal-box textarea, .modal-box input[type=text] {
+    width: 100%; padding: 10px 12px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 10px; color: #0f172a; font-size: 14px;
+    font-family: inherit; outline: none; transition: border-color .2s;
+  }
+  .modal-box textarea { min-height: 80px; resize: vertical; }
+  .modal-box textarea:focus, .modal-box input[type=text]:focus { border-color: #6366f1; background: #fff; }
+  .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  .modal-cancel {
+    background: #f1f5f9; border: none; color: #64748b;
+    padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .modal-save {
+    background: #6366f1; border: none; color: #fff;
+    padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .modal-save:hover { background: #4f46e5; }
+
+  .live-btn {
+    margin-left: auto;
+    background: #22c55e; color: #fff;
+    font-size: 13px; font-weight: 700;
+    padding: 9px 16px; border-radius: 10px; text-decoration: none;
+    transition: background .15s;
+  }
+  .live-btn:hover { background: #16a34a; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a href="/hanmadi" class="back">← 한마디 홈</a>
+  <a href="/hanmadi/admin" class="back" style="margin-left:4px">세션 목록</a>
+  <a href="/hanmadi/admin/sessions/@Model.Session!.Id/live" class="live-btn">🔴 라이브 진행</a>
+</div>
+<h1>@Model.Session!.Title</h1>
+<div class="meta">
+  참여코드 <span class="code-badge">@Model.Session.Code</span>
+  문항 @(Model.Session.Questions.Count)개
+</div>
+
+<div class="form-box">
+  <h2>문항 추가</h2>
+  <form method="post" asp-page-handler="AddQuestion">
+    <input type="hidden" name="SessionId" value="@Model.Session.Id"/>
+    <div class="field">
+      <label>문항 유형</label>
+      <div class="type-grid">
+        <button type="button" class="type-btn active" onclick="setType(1,this)">💬 단답형<br/><small style="font-weight:400">버블 클라우드</small></button>
+        <button type="button" class="type-btn"        onclick="setType(2,this)">☑️ 객관식<br/><small style="font-weight:400">막대 그래프</small></button>
+        <button type="button" class="type-btn"        onclick="setType(3,this)">⭐ 척도<br/><small style="font-weight:400">1~5점 게이지</small></button>
+        <button type="button" class="type-btn"        onclick="setType(4,this)">📝 자유서술<br/><small style="font-weight:400">카드 스트림</small></button>
+      </div>
+      <input type="hidden" id="typeInput" name="Type" value="1"/>
+    </div>
+    <div class="field">
+      <label>문항 내용</label>
+      <textarea name="Title" placeholder="예) 오늘 말씀에서 기억에 남는 단어는?" required></textarea>
+    </div>
+
+    <!-- 객관식 선택지 (type=2일 때만 표시) -->
+    <div id="options-area">
+      <label>선택지 <span style="font-weight:400;color:#94a3b8">(2~6개)</span></label>
+      <div class="opt-list" id="opt-list">
+        <div class="opt-row"><span class="opt-num">1</span><input class="opt-input" name="Options" placeholder="선택지 1" disabled/></div>
+        <div class="opt-row"><span class="opt-num">2</span><input class="opt-input" name="Options" placeholder="선택지 2" disabled/></div>
+        <div class="opt-row"><span class="opt-num">3</span><input class="opt-input" name="Options" placeholder="선택지 3" disabled/><button type="button" class="btn-rm-opt" onclick="removeOpt(this)">×</button></div>
+        <div class="opt-row"><span class="opt-num">4</span><input class="opt-input" name="Options" placeholder="선택지 4" disabled/><button type="button" class="btn-rm-opt" onclick="removeOpt(this)">×</button></div>
+      </div>
+      <button type="button" class="btn-add-opt" onclick="addOpt()">+ 선택지 추가</button>
+    </div>
+
+    <button type="submit" class="btn-add">+ 추가하기</button>
+  </form>
+</div>
+
+@if (!Model.Session.Questions.Any())
+{
+  <div class="empty">아직 문항이 없어요. 위에서 추가해보세요!</div>
+}
+else
+{
+  string[] typeNames = { "", "단답형", "객관식", "척도", "자유서술" };
+  @foreach (var q in Model.Session.Questions.OrderBy(q => q.Order))
+  {
+    <div class="q-card">
+      <div style="min-width:0;flex:1">
+        <div class="q-title">@q.Title</div>
+        <span class="type-chip">@typeNames[q.Type]</span>
+        @if (q.Type == 2 && q.Options.Any())
+        {
+          <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px">
+            @foreach (var opt in q.Options.OrderBy(o => o.Order))
+            {
+              <span style="font-size:11px;background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:6px;font-weight:600">@opt.Text</span>
+            }
+          </div>
+        }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+        <button type="button" class="btn-edit"
+          data-id="@q.Id"
+          data-type="@q.Type"
+          data-title="@System.Text.Json.JsonSerializer.Serialize(q.Title)"
+          data-opts="@System.Text.Json.JsonSerializer.Serialize(q.Options.OrderBy(o=>o.Order).Select(o=>o.Text).ToList())"
+          onclick="openEdit(this)">수정</button>
+        <form method="post" asp-page-handler="DeleteQuestion">
+          <input type="hidden" name="QuestionId" value="@q.Id"/>
+          <button type="submit" class="btn-del">삭제</button>
+        </form>
+      </div>
+    </div>
+  }
+}
+
+<!-- 수정 모달 -->
+<div class="modal-backdrop" id="edit-modal">
+  <div class="modal-box">
+    <h3>문항 수정</h3>
+    <form method="post" asp-page-handler="EditQuestion" id="edit-form">
+      <input type="hidden" name="QuestionId" id="edit-q-id"/>
+      <div class="field">
+        <label>문항 내용</label>
+        <textarea name="Title" id="edit-title" required></textarea>
+      </div>
+      <div id="edit-opts-area" style="display:none">
+        <label>선택지</label>
+        <div class="opt-list" id="edit-opt-list" style="margin-bottom:8px"></div>
+        <button type="button" class="btn-add-opt" onclick="addEditOpt()">+ 선택지 추가</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="modal-cancel" onclick="closeEdit()">취소</button>
+        <button type="submit" class="modal-save">저장</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function setType(val, el) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('typeInput').value = val;
+  const isChoice = (val == 2);
+  document.getElementById('options-area').style.display = isChoice ? 'block' : 'none';
+  // 객관식일 때 활성화·필수 설정, 아닐 때 비활성화
+  document.querySelectorAll('.opt-input').forEach((inp, i) => {
+    inp.disabled = !isChoice;
+    inp.required = isChoice && i < 2;
+  });
+}
+
+function addOpt() {
+  const list = document.getElementById('opt-list');
+  const count = list.children.length;
+  if (count >= 6) return;
+  const row = document.createElement('div');
+  row.className = 'opt-row';
+  row.innerHTML = `<span class="opt-num">${count+1}</span>
+    <input class="opt-input" name="Options" placeholder="선택지 ${count+1}" />
+    <button type="button" class="btn-rm-opt" onclick="removeOpt(this)">×</button>`;
+  list.appendChild(row);
+  renumberOpts();
+}
+
+function removeOpt(btn) {
+  const list = document.getElementById('opt-list');
+  if (list.children.length <= 2) return;
+  btn.closest('.opt-row').remove();
+  renumberOpts();
+}
+
+function renumberOpts() {
+  document.querySelectorAll('#opt-list .opt-row').forEach((row, i) => {
+    row.querySelector('.opt-num').textContent = i + 1;
+    row.querySelector('input').placeholder = `선택지 ${i+1}`;
+  });
+}
+
+/* ─── 수정 모달 ─── */
+function openEdit(btn) {
+  const id    = btn.dataset.id;
+  const type  = parseInt(btn.dataset.type);
+  const title = JSON.parse(btn.dataset.title);
+  const opts  = JSON.parse(btn.dataset.opts);
+  document.getElementById('edit-q-id').value    = id;
+  document.getElementById('edit-title').value   = title;
+  const optsArea = document.getElementById('edit-opts-area');
+  const optList  = document.getElementById('edit-opt-list');
+  optList.innerHTML = '';
+  if (type === 2) {
+    optsArea.style.display = 'block';
+    opts.forEach((txt, i) => {
+      optList.insertAdjacentHTML('beforeend', makeEditOptRow(i+1, txt));
+    });
+  } else {
+    optsArea.style.display = 'none';
+  }
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-modal').classList.remove('open');
+}
+
+function makeEditOptRow(num, val) {
+  return `<div class="opt-row">
+    <span class="opt-num">${num}</span>
+    <input class="opt-input" name="Options" value="${val.replace(/"/g,'&quot;')}" placeholder="선택지 ${num}"/>
+    <button type="button" class="btn-rm-opt" onclick="removeEditOpt(this)">×</button>
+  </div>`;
+}
+
+function addEditOpt() {
+  const list = document.getElementById('edit-opt-list');
+  if (list.children.length >= 6) return;
+  const num = list.children.length + 1;
+  list.insertAdjacentHTML('beforeend', makeEditOptRow(num, ''));
+}
+
+function removeEditOpt(btn) {
+  const list = document.getElementById('edit-opt-list');
+  if (list.children.length <= 2) return;
+  btn.closest('.opt-row').remove();
+  list.querySelectorAll('.opt-row').forEach((row, i) => {
+    row.querySelector('.opt-num').textContent = i + 1;
+    row.querySelector('input').placeholder = `선택지 ${i+1}`;
+  });
+}
+
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEdit();
+});
+</script>
+</body>
+</html>

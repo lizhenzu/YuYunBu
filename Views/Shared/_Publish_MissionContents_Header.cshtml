@@ -1,0 +1,39 @@
+﻿@model BulletinBoard.Models.TodayCheckCompositeData
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IAuthService AuthService
+
+@{
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<div class="content">
+    <h3>안녕하세요.</h3>
+
+    @if (!string.IsNullOrEmpty(UserFullName))
+    {
+        <img id="myImage" src="@ViewData["ProfilePicturePath"]" alt="Profile Picture" loading="lazy" onclick="ManageUserInfo('@ViewData["UserId"]')" class="profile-picture" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);">
+
+        <h5>(위 사진을 눌러서 개인 사진을 변경할 수 있어요~)</h5>
+        <h5>"@UserFullName"님!!!</h5>
+    }
+    <h2>@ConstatsCommon.MainKeyTitle</h2>
+    <h5>"거룩한 습관 만들기" 프로그램에 오심을 환영해요.</h5>
+    <h5>Let’s get started.</h5>
+</div>
+<script>
+    function loadLatestImage() {
+        const imageElement = document.getElementById('myImage');
+        const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+        imageElement.src = `@ViewData["ProfilePicturePath"]?${timestamp}`;
+    }
+
+    // 페이지 로드 시 실행 또는 필요할 때 호출
+    window.onload = loadLatestImage;
+                // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+</script>

@@ -1,0 +1,181 @@
+@model BulletinBoard.Models.Prayer365.Prayer365PageVM
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using Cfg = BulletinBoard.Models.Prayer365.Prayer365Config
+
+@*  ══════════════════════════════════════════════════════════════
+    오늘의 기도 — 자녀를 위한 365일 축복 기도문 (누구나)
+    · 오늘(KST) 날짜의 기도문.  ?md=0303 으로 다른 날.  ← 어제 · 오늘 · 내일 →, 날짜 고르기, 글자 크기, 본문 복사
+    · 본문은 줄바꿈으로 문단.  짧고 쉼표로 끝나는 줄("사랑의 하나님,")은 호칭 — 금빛 문단 머리
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var it = Model.Item;
+    string label = Cfg.Label(Model.MonthDay);
+    int idx = Cfg.DayIndex(Model.MonthDay);
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    string dateText = Model.Today.ToString("yyyy.MM.dd", inv) + " " + Model.Today.ToString("ddd", inv).ToUpperInvariant();
+
+    // 본문 → 문단 · 호칭 · 마지막 "아멘."
+    var paras = new List<(bool call, string text)>();
+    bool amen = false;
+    if (it != null)
+    {
+        var body = it.Body.Replace("\r\n", "\n").Trim();
+        if (body.EndsWith("아멘.") || body.EndsWith("아멘"))
+        {
+            amen = true;
+            body = body[..body.LastIndexOf("아멘")].TrimEnd();
+        }
+        foreach (var raw in body.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;
+            bool call = line.EndsWith(",") && line.Length <= 30;
+            paras.Add((call, line));
+        }
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@label 축복 기도 — @Cfg.BookTitle</title>
+    <partial name="_Prayer365Style" />
+    <style>
+        .date { margin-top: 10px; text-align: center; font-family: "Noto Serif KR", serif; font-size: 15px; color: var(--acc2); letter-spacing: .2em; }
+        .date::before, .date::after { content: "❋"; margin: 0 10px; font-size: 11px; color: var(--acc); vertical-align: 2px; }
+        .ttl { margin-top: 12px; text-align: center; font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 25px; line-height: 1.45; word-break: keep-all; text-wrap: balance; }
+        .vs { margin: 22px auto 0; max-width: 62ch; padding: 14px 18px; border-left: 2px solid var(--acc); background: #fff;
+              font-family: "Noto Serif KR", serif; font-size: 14px; line-height: 1.9; color: var(--dim2); word-break: keep-all; }
+        .vs cite { display: block; margin-top: 6px; font-style: normal; font-family: Inter, "Gothic A1", sans-serif; font-size: 11.5px; color: var(--acc2); letter-spacing: .04em; }
+        .body { margin: 24px auto 0; max-width: 62ch; font-family: "Noto Serif KR", serif; font-size: calc(var(--fsb, 16.5px) + var(--fsd, 0px)); line-height: 2.05; word-break: keep-all; }
+        .body p { margin: 0 0 4px; text-indent: 1em; }
+        .body p.call { text-indent: 0; margin-top: 14px; font-weight: 600; color: var(--acc2); }
+        .body p.call:first-child { margin-top: 0; }
+        .amen { max-width: 62ch; margin: 14px auto 0; text-align: right; font-family: "Noto Serif KR", serif; font-weight: 600; color: var(--acc2); font-size: calc(var(--fsb, 16.5px) + var(--fsd, 0px)); }
+        .none { margin: 40px auto 0; max-width: 46ch; text-align: center; padding: 30px 20px; border: 1px dashed var(--rule); background: #fff; color: var(--dim2); font-size: 14px; line-height: 1.8; }
+        .tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
+        .src { margin-top: 18px; font-size: 10.5px; color: var(--dim); text-align: center; letter-spacing: .04em; line-height: 1.7; }
+        .dpk { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+        .ptoast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none; background: var(--tx); color: var(--bg);
+                  padding: 8px 14px; font-size: 12px; transition: opacity .18s, transform .18s; z-index: 50; }
+        .ptoast.on { opacity: 1; transform: translate(-50%, 0); }
+        @@media (max-width: 560px) {
+            .ttl { font-size: 21px; }
+            .body, .amen { --fsb: 15.5px; }   /* 휴대폰 기본 크기 — 가−/가+ 는 --fsd(차이값)로 더한다 */
+            .tools { justify-content: center; }
+            .tools .grp { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+<div class="pz">
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><span>매일 축복 기도</span>@if (Model.IsStaff) {<span class="sep">·</span><a href="/Prayer365/Admin">관리 →</a>}</span>
+        <span>@dateText</span>
+    </div>
+    <div class="prog"><i style="width:@((idx * 100.0 / Cfg.TotalDays).ToString("0.#", inv))%"></i></div>
+
+    <div class="kk" style="text-align:center;margin-top:26px">PRAYER 365 · 자녀를 위한 축복 기도</div>
+
+    @if (Model.IsClosed)
+    {
+        @* 허락 전 — 관리자만 (Prayer365Config.StaffOnly) *@
+        <div class="none">매일 축복 기도는 준비 중이에요.<br />곧 함께 나눌게요.</div>
+        <div class="src"><a href="/">@ConstatsCommon.ToHome</a></div>
+    }
+    else
+    {
+    <div class="date">@label</div>
+    @if (Model.IsStaff && Cfg.StaffOnly)
+    {
+        <div class="src" style="margin-top:6px;color:var(--warn)">🔒 지금은 관리자만 볼 수 있어요 (허락 전)</div>
+    }
+
+    @if (it != null)
+    {
+        <div class="ttl">@it.Title</div>
+        @if (!string.IsNullOrWhiteSpace(it.VerseText) || !string.IsNullOrWhiteSpace(it.VerseRef))
+        {
+            <div class="vs">@if (!string.IsNullOrWhiteSpace(it.VerseText)) {<text>“@it.VerseText”</text>}@if (!string.IsNullOrWhiteSpace(it.VerseRef)) {<cite>@it.VerseRef</cite>}</div>
+        }
+        <div class="body" id="pBody">
+            @foreach (var p in paras)
+            {
+                <p class="@(p.call ? "call" : "")">@p.text</p>
+            }
+        </div>
+        @if (amen) { <div class="amen">아멘.</div> }
+    }
+    else
+    {
+        <div class="none">
+            @label 기도문을 준비하고 있어요.<br />다른 날의 기도문을 먼저 읽어 보세요.
+            @if (Model.IsStaff) { <div style="margin-top:12px"><a class="nb gold" href="/Prayer365/Edit?md=@Model.MonthDay">이 날 기도문 넣기 →</a></div> }
+        </div>
+    }
+
+    <div class="tools">
+        <div class="grp">
+            <a class="nb" href="/Prayer365?md=@Model.Prev">← @Cfg.Label(Model.Prev)</a>
+            <a class="nb @(Model.IsToday ? "pri" : "")" href="/Prayer365">오늘</a>
+            <a class="nb" href="/Prayer365?md=@Model.Next">@Cfg.Label(Model.Next) →</a>
+        </div>
+        <div class="grp">
+            <label class="nb" style="position:relative">날짜 고르기<input type="date" class="dpk" id="pDate" /></label>
+            <button class="nb" type="button" data-fs="-1" aria-label="글자 작게">가 −</button>
+            <button class="nb" type="button" data-fs="1" aria-label="글자 크게">가 ＋</button>
+            @if (it != null) { <button class="nb gold" type="button" id="pCopy">본문 복사</button> }
+        </div>
+    </div>
+
+    <div class="src">한 해의 @(idx)번째 날 · 출처 : @Cfg.Author 지음, 「@Cfg.BookTitle」, @Cfg.Publisher</div>
+    }
+</div>
+<div class="ptoast" id="pToast" role="status" aria-live="polite"></div>
+
+<script>
+    (function () {
+        var root = document.documentElement, KEY = 'p365fs';
+        function toast(m) { var t = document.getElementById('pToast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1600); }
+
+        // 글자 크기 (이 기기에만 기억)
+        var fs = 0; try { fs = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch (e) { }
+        // 휴대폰은 .body 에 기본 크기가 따로 있어서, 크기 자체가 아니라 차이값(--fsd)만 넘긴다
+        function applyFs() { if (fs) root.style.setProperty('--fsd', (fs * 1.5) + 'px'); else root.style.removeProperty('--fsd'); }
+        applyFs();
+        document.querySelectorAll('[data-fs]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                fs = Math.max(-2, Math.min(4, fs + parseInt(b.getAttribute('data-fs'), 10)));
+                applyFs(); try { localStorage.setItem(KEY, String(fs)); } catch (e) { }
+            });
+        });
+
+        // 날짜 고르기 — 연도는 무시하고 월일로 간다
+        var dp = document.getElementById('pDate');
+        dp.closest('label').addEventListener('click', function () { if (dp.showPicker) { try { dp.showPicker(); } catch (e) { } } });
+        dp.addEventListener('change', function () { if (dp.value) location.href = '/Prayer365?md=' + dp.value.slice(5, 7) + dp.value.slice(8, 10); });
+
+        // 본문 복사
+        var cp = document.getElementById('pCopy');
+        if (cp) cp.addEventListener('click', function () {
+            var parts = [document.querySelector('.date').textContent.trim(), document.querySelector('.ttl').textContent.trim(), ''];
+            var vs = document.querySelector('.vs'); if (vs) parts.push(vs.innerText.trim(), '');
+            document.querySelectorAll('#pBody p').forEach(function (p) { parts.push(p.textContent.trim()); });
+            if (document.querySelector('.amen')) parts.push('아멘.');
+            var text = parts.join('\n');
+            (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+                .then(function () { toast('기도문을 복사했어요'); })
+                .catch(function () {
+                    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); toast('기도문을 복사했어요'); } catch (e) { } document.body.removeChild(ta);
+                });
+        });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,703 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract;
+@using System.Text.Json
+@inject IAuthService AuthService
+
+@model BulletinBoard.ViewModels.Birthday.BirthdayListPageVM
+
+@*  ══════════════════════════════════════════════════════════════
+    월별 생일자 — 달력(기본) · 명단 두 보기를 같은 데이터(ITEMS)로 그린다.
+    DailyMission4 밝은 흰색 버전.  관리자는 이름을 눌러 메모 · 문자 · 선물 선택 · 전달 상태를 고친다.
+    고른 선물이 있으면 달력 칸 · 명단 줄 · 수정창에 이름과 사진을 보여 준다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var month = Model.Month ?? DateHelper.GetKoreaNow().Month;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isAdmin || isSuperAdmin;
+
+    var now   = DateHelper.GetKoreaNow();
+    var year  = now.Year;
+    var items = Model.Items ?? new List<BulletinBoard.ViewModels.Birthday.BirthdayCardVM>();
+    string dateText = now.ToString("yyyy.MM.dd") + " " + now.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    // 달력 · 명단이 같이 쓰는 데이터
+    var itemsForClient = items.Select(x => new
+    {
+        x.PersonId, x.UserId, x.FullName, x.BMonth, x.BDay, x.ClassLabel, x.RoleLabel, x.PublishYN,
+        x.ProfileImageUrl, x.PhoneNumber, x.PhoneNumber2,
+        x.PickSmsSent, x.PickSmsSentAt, x.Memo,
+        x.GiftPicked, x.GiftProductId, x.GiftProductName, x.GiftProductDescription,
+        x.GiftIsActive, x.GiftIsSent, x.GiftSourceType
+    }).ToList();
+    var itemsJson = JsonSerializer.Serialize(itemsForClient, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+    var toast = TempData["Toast"] as string;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@(month)월 생일자 — @ConstatsCommon.MainKeyTitle</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+
+    /* ── 머리 ── */
+    .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+    .bar a { color: #374151; }
+    .bar a:hover { color: #2F80ED; }
+    .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .hdT small { font-size: 13px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; }
+    .msg { margin-top: 14px; padding: 10px 14px; border-radius: 12px; background: #EAF2FD; color: #2B5FA8; font-size: 13px; line-height: 1.6; }
+
+    /* ── 월 띠 ── */
+    .ms { display: flex; gap: 6px; margin-top: 16px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+    .ms::-webkit-scrollbar { display: none; }
+    .ms a { flex: none; padding: 7px 14px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .ms a:hover { color: #2F80ED; }
+    .ms a.on { background: #2F80ED; color: #fff; font-weight: 800; }
+
+    /* ── 도구 줄 ── */
+    .tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0 12px; }
+    .toolsL { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .seg { display: flex; gap: 6px; }
+    .seg button { font-size: 12.5px; padding: 7px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+    .seg button:hover { color: #2F80ED; }
+    .seg button.on { background: #2F80ED; color: #fff; font-weight: 800; }
+    .legend { display: flex; gap: 12px; font-size: 11.5px; color: #9CA3AF; align-items: center; }
+    .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #D1D5DB; vertical-align: middle; margin-right: 5px; }
+    .legend i.f { background: #2F80ED; }
+    .links { display: flex; gap: 14px; font-size: 12px; font-weight: 700; }
+    .links a, .links button { color: #2F80ED; background: none; border: 0; padding: 0; font: inherit; font-weight: 700; cursor: pointer; }
+    .links a:hover, .links button:hover { color: #1F6FDB; }
+
+    /* ── 달력 ── */
+    .cal { border-top: 1px solid #EEF0F3; border-left: 1px solid #EEF0F3; }
+    .dow { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .dow div { padding: 8px; font-size: 11px; font-weight: 700; color: #9CA3AF; border-right: 1px solid #EEF0F3; border-bottom: 1px solid #EEF0F3; background: #F9FAFB; }
+    .dow div:first-child { color: #B4531F; }
+    .dow div:last-child  { color: #5B8DD6; }
+    .cells { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .c { min-height: 108px; padding: 7px 8px 8px; border-right: 1px solid #EEF0F3; border-bottom: 1px solid #EEF0F3; background: #fff; min-width: 0; }
+    .c.out { background: #FAFAFB; }
+    .c.today { background: #EAF2FD; }
+    .c.sel { box-shadow: inset 0 0 0 2px #2F80ED; }
+    .dn { font-size: 14px; font-weight: 300; color: #111827; line-height: 1; display: flex; justify-content: space-between; align-items: baseline; }
+    .dn u { text-decoration: none; font-size: 10px; font-weight: 800; color: #2F80ED; }
+    .c.sun .dn { color: #B4531F; }
+    .c.sat .dn { color: #5B8DD6; }
+    .c.out .dn { color: #D1D5DB; }
+    .p { margin-top: 8px; min-width: 0; }
+    .p + .p { padding-top: 7px; border-top: 1px solid #F1F3F6; }
+    .p.click { cursor: pointer; }
+    .pn { font-size: 12.5px; font-weight: 700; color: #111827; line-height: 1.3; word-break: keep-all; }
+    .pn i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #D1D5DB; margin-right: 5px; vertical-align: 1px; }
+    .pn i.f { background: #2F80ED; }
+    .pc { font-size: 10.5px; color: #9CA3AF; margin-top: 1px; }
+    .pg { margin-top: 3px; padding: 2px 7px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 10.5px; font-weight: 700; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .p.click:hover .pn { color: #2F80ED; }
+    .dots { display: none; gap: 3px; flex-wrap: wrap; margin-top: 5px; }
+    .dots i { width: 6px; height: 6px; border-radius: 50%; background: #D1D5DB; display: inline-block; }
+    .dots i.f { background: #2F80ED; }
+
+    /* ── 명단 ── */
+    .listHead { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 700; color: #111827; margin: 16px 0 0; }
+    .listHead a { color: #2F80ED; font-size: 12px; }
+    .listHead[hidden] { display: none; }
+    .row { display: flex; gap: 14px; padding: 15px 0; border-bottom: 1px solid #EEF0F3; align-items: flex-start; }
+    .row:last-of-type { border-bottom: 0; }
+    .rd { width: 46px; flex: 0 0 auto; }
+    .rd b { display: block; font-weight: 300; font-size: 22px; color: #8DB5F3; line-height: 1; font-variant-numeric: tabular-nums; }
+    .rd span { font-size: 11px; color: #9CA3AF; }
+    .rb { flex: 1 1 auto; min-width: 0; }
+    .rtop { display: flex; gap: 12px; align-items: flex-start; }
+    .av { width: 40px; height: 40px; border-radius: 50%; background: #EAF2FD; flex: 0 0 auto; object-fit: cover; display: block; }
+    .rt { flex: 1 1 auto; min-width: 0; }
+    .nm { font-size: 15.5px; font-weight: 700; color: #111827; line-height: 1.3; word-break: keep-all; }
+    .mt { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; line-height: 1.7; display: flex; flex-wrap: wrap; }
+    .mt > span + span::before { content: "·"; color: #D1D5DB; margin: 0 6px; }
+    .memo { margin-top: 6px; padding: 8px 12px; border-radius: 12px; background: #F4F6F9; font-size: 12px; line-height: 1.6; color: #6B7280; white-space: pre-wrap; }
+    .ra { display: flex; gap: 5px; align-items: center; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+    .ra b { font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 999px; background: #F4F6F9; color: #9CA3AF; white-space: nowrap; }
+    .ra b.on { background: #EAF2FD; color: #2B5FA8; }
+    .ra button { font-size: 12px; font-weight: 700; color: #2F80ED; background: none; border: 0; padding: 0; margin-left: 6px; cursor: pointer; white-space: nowrap; }
+    .ra button:hover { color: #1F6FDB; }
+    .empty { padding: 36px 0; text-align: center; font-size: 13.5px; color: #9CA3AF; border-top: 1px solid #EEF0F3; }
+
+    /* 고른 선물 */
+    .gf { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #F4F6F9; }
+    .gi { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 10px; object-fit: cover; background: #fff; display: block; cursor: zoom-in; }
+    .gt { min-width: 0; flex: 1; }
+    .gn { font-size: 13px; font-weight: 700; color: #111827; line-height: 1.35; word-break: keep-all; }
+    .gn em { font-style: normal; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 10.5px; font-weight: 700; vertical-align: 1px; }
+    .gd { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+
+    .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+    .ft a { color: #6B7280; }
+    .ft a:hover { color: #2F80ED; }
+
+    /* ── 수정 시트 · 사진 크게 ── */
+    .mask { display: none; position: fixed; inset: 0; background: rgba(17,24,39,.45); z-index: 9000; align-items: center; justify-content: center; padding: 16px; }
+    .mask.show { display: flex; }
+    .sheet { background: #fff; border-radius: 16px; width: 100%; max-width: 440px; max-height: 92vh; overflow: auto; padding: 18px 20px 18px; color: #111827; text-align: left; }
+    .sheet .sh { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid #EEF0F3; }
+    .sheet .sh .k { font-size: 16px; font-weight: 800; }
+    .sheet .sh button { font-size: 12px; font-weight: 700; color: #6B7280; background: #F4F6F9; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+    .sheet .sp { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+    .sheet .sp img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #EAF2FD; }
+    .sheet .sp .nm { font-size: 17px; }
+    .sheet .sp .mt { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; }
+    .sheet .sg { display: flex; gap: 10px; align-items: center; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #F4F6F9; }
+    .sheet .sg img { width: 48px; height: 48px; object-fit: cover; border-radius: 10px; background: #fff; flex: 0 0 auto; cursor: zoom-in; display: block; }
+    .sheet .sg .gn { font-size: 13px; }
+    .sheet .sg .gd { display: block; font-size: 11.5px; color: #9CA3AF; margin-top: 2px; line-height: 1.5; }
+    .sheet .sf { margin-top: 14px; }
+    .sheet .sf label { display: block; font-size: 12.5px; font-weight: 700; color: #6B7280; margin-bottom: 6px; }
+    .sheet textarea { width: 100%; border: 0; border-radius: 12px; background: #F4F6F9; padding: 10px 14px; font: inherit; font-size: 13.5px; line-height: 1.6; resize: vertical; min-height: 64px; outline: none; color: #111827; }
+    .sheet textarea:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+    .sheet .cnt { text-align: right; font-size: 11px; color: #9CA3AF; margin-top: 3px; }
+    .sheet .tg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
+    .sheet .tg span { position: relative; }
+    .sheet .tg label { display: block; font-size: 12.5px; padding: 9px 0; text-align: center; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; user-select: none; }
+    .sheet .tg input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .sheet .tg input:checked + label { background: #EAF2FD; color: #2B5FA8; font-weight: 800; }
+    .sheet .sfoot { display: flex; justify-content: flex-end; align-items: center; margin-top: 16px; gap: 6px; }
+    .sheet .btn { border: 0; border-radius: 999px; background: #2F80ED; color: #fff; padding: 10px 20px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+    .sheet .btn:hover { background: #1F6FDB; }
+    .sheet .btn:disabled { opacity: .6; cursor: default; }
+    .sheet .btn.line { background: #F4F6F9; color: #6B7280; font-weight: 700; }
+    .sheet .btn.line:hover { color: #2F80ED; background: #F4F6F9; }
+    .sheet .noauth { padding: 18px 0; font-size: 13px; color: #6B7280; }
+    .imgBox { position: relative; background: #fff; border-radius: 16px; padding: 14px; max-width: 560px; width: 100%; }
+    .imgBox img { display: block; width: 100%; max-height: 72vh; object-fit: contain; background: #fff; border-radius: 12px; }
+    .imgBox button { position: absolute; top: 14px; right: 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12px; font-weight: 700; padding: 5px 12px; cursor: pointer; }
+
+    /* ── 모바일 : 달력 칸은 숫자 + 점만, 명단은 아래에 ── */
+    @@media (max-width: 640px) {
+        .c { min-height: 46px; padding: 5px 5px 6px; }
+        .dn { font-size: 12px; }
+        .dn u { display: none; }
+        .p { display: none; }
+        .dots { display: flex; }
+        .dow div { padding: 6px 4px; font-size: 10px; }
+        .row { gap: 10px; }
+        .rtop { flex-wrap: wrap; }
+        .ra { width: 100%; justify-content: flex-start; padding-left: 52px; }
+    }
+
+    /* ── 인쇄 : 달력만 ── */
+    @@media print {
+        .wrap { max-width: none; padding: 0; }
+        .bar, .tools, .ms, .listWrap, .ft, .msg { display: none !important; }
+        .calWrap { display: block !important; }
+        .c { min-height: 90px; }
+        .c.today { background: #fff; }
+    }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+    <div class="bar">
+        <a href="/">← @ConstatsCommon.ToHome</a>
+        <span>@dateText</span>
+    </div>
+
+    <div class="hdK">잠실새내 유년부 입니다.</div>
+    <h1 class="hdT">@(month)월 생일자<small>@(items.Count)명</small></h1>
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="msg">@toast</div>
+    }
+
+    <div class="ms" id="monthStrip">
+        @for (int m = 1; m <= 12; m++)
+        {
+            <a href="/Birthdays/Month?month=@m" class="@(m == month ? "on" : "")">@(m)월</a>
+        }
+    </div>
+
+    <div class="tools">
+        <div class="toolsL">
+            <div class="seg">
+                <button type="button" id="btnCal" class="on">달력</button>
+                <button type="button" id="btnList">명단</button>
+            </div>
+            <div class="legend"><span><i class="f"></i>선물 골랐음</span><span><i></i>아직</span></div>
+        </div>
+        <div class="links">
+            <a href="/Birthdays/NoBirthday">미지정</a>
+            <a href="/Birthdays/Year">연간</a>
+            <button type="button" onclick="window.print()">인쇄</button>
+        </div>
+    </div>
+
+    @if (items.Count == 0)
+    {
+        <div class="empty">@(month)월에는 생일인 친구가 없어요. 다른 달을 골라 보세요.</div>
+    }
+    else
+    {
+        <div class="calWrap" id="calView">
+            <div class="cal">
+                <div class="dow"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+                <div class="cells" id="calCells"></div>
+            </div>
+            <div class="listHead" id="dayHead" hidden>
+                <span id="dayHeadText"></span>
+                <a href="#" id="dayHeadAll">전체 보기</a>
+            </div>
+            <div id="dayList"></div>
+        </div>
+
+        <div class="listWrap" id="listView" style="display:none;">
+            <div id="fullList"></div>
+        </div>
+    }
+
+    <div class="ft">
+        <span>© 유년부 · 생일</span>
+        <a href="/">@ConstatsCommon.ToHome</a>
+    </div>
+
+</div>
+
+<!-- 수정 시트 (관리자) -->
+<div class="mask" id="editMask" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="sheet">
+        <div class="sh"><span class="k">생일 선물 관리</span><button type="button" onclick="closeEditModal()">닫기</button></div>
+
+        @if (isStaff)
+        {
+            <div class="sp">
+                <img id="mProfileImg" src="" alt="" onerror="this.style.visibility='hidden';" />
+                <div>
+                    <div class="nm" id="mShowName">이름</div>
+                    <div class="mt" id="mShowBirth">생일</div>
+                </div>
+            </div>
+
+            <div class="sg" id="giftPreviewWrap" style="display:none;">
+                <img id="giftPreviewImg" src="" alt="선물" />
+                <div>
+                    <div class="gn" id="sProductDisplay">-</div>
+                    <div class="gd" id="sProductDesc"></div>
+                </div>
+            </div>
+            <div class="sg" id="giftPreviewEmptyWrap" style="display:none;">
+                <div class="gd">아직 고른 선물이 없어요.</div>
+            </div>
+
+            <form id="editForm" method="post" action="/Birthdays/UpdateGiftState">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="PersonId" id="fPersonId" />
+                <input type="hidden" name="UserId" id="fUserId" />
+
+                <div class="sf">
+                    <label for="fMemo">메모</label>
+                    <textarea name="Memo" id="fMemo" rows="3" maxlength="500" placeholder="자유 메모 (최대 500자)"></textarea>
+                    <div class="cnt"><span id="fMemoCount">0</span> / 500</div>
+                </div>
+
+                <div class="tg">
+                    <span><input type="checkbox" id="fPickSmsSent" /><label for="fPickSmsSent">문자 발송</label></span>
+                    <span><input type="checkbox" id="fIsActive" /><label for="fIsActive">선물 선택</label></span>
+                    <span><input type="checkbox" id="fIsSent" /><label for="fIsSent">선물 전달</label></span>
+                </div>
+            </form>
+
+            <div class="sfoot">
+                <button class="btn line" type="button" onclick="closeEditModal()">취소</button>
+                <button class="btn saveBtn" type="button" onclick="submitEdit()">저장</button>
+            </div>
+        }
+        else
+        {
+            <div class="noauth">관리자만 고칠 수 있어요.</div>
+        }
+    </div>
+</div>
+
+<!-- 사진 크게 -->
+<div class="mask" id="imgMask" aria-hidden="true">
+    <div class="imgBox" role="dialog" aria-modal="true">
+        <button type="button" onclick="closeImage()">닫기</button>
+        <img id="imgBig" src="" alt="" />
+    </div>
+</div>
+
+<script>
+    // ===== 서버 데이터 =====
+    const ITEMS = @Html.Raw(itemsJson);
+    const YEAR  = @year;
+    const MONTH = @month;
+    const TODAY = @(now.Month == month ? now.Day : 0);
+    const IS_ADMIN = @(isStaff ? "true" : "false");
+    const DOW_EN = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+    function esc(s) {
+        return (s ?? "").toString()
+            .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    }
+    function byDay() {
+        const map = new Map();
+        (ITEMS || []).forEach(it => {
+            if (it.bMonth === MONTH && it.bDay) {
+                if (!map.has(it.bDay)) map.set(it.bDay, []);
+                map.get(it.bDay).push(it);
+            }
+        });
+        map.forEach(list => list.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || "")));
+        return map;
+    }
+    const DAY_MAP = byDay();
+    function isMobile() { return window.matchMedia("(max-width: 640px)").matches; }
+
+    // 월 띠 : 지금 달이 가운데 오게
+    (function () {
+        const ms = document.getElementById('monthStrip');
+        const on = ms && ms.querySelector('.on');
+        if (on) ms.scrollLeft = on.offsetLeft - ms.clientWidth / 2 + on.clientWidth / 2;
+    })();
+
+    // ===== 고른 선물 =====
+    function giftImageUrl(productId) { return productId ? `/images/AwardItem/${productId}.jpg` : ""; }
+    function giftName(it) {
+        const n = (it.giftProductName ?? "").toString().trim();
+        return n || (it.giftProductId ? `상품 ${it.giftProductId}` : "");
+    }
+    function hasGift(it) { return !!it.giftPicked && !!giftName(it); }
+
+    // 명단 줄 · 달력 아래에 붙는 선물 칸 (사진 + 이름 + 설명)
+    function giftBoxHtml(it) {
+        if (!hasGift(it)) return '';
+        const url  = giftImageUrl(it.giftProductId);
+        const name = esc(giftName(it));
+        const desc = (it.giftProductDescription ?? "").toString().trim();
+        const img  = url
+            ? `<img class="gi" src="${esc(url)}" alt="${name}" data-url="${esc(url)}" onclick="openImage(this.getAttribute('data-url'))" onerror="this.style.display='none'" />`
+            : '';
+        return `<div class="gf">${img}
+                    <div class="gt">
+                        <div class="gn">${name}${it.giftIsSent ? '<em>전달완료</em>' : ''}</div>
+                        ${desc ? `<div class="gd">${esc(desc)}</div>` : ''}
+                    </div>
+                </div>`;
+    }
+
+    // ===== 보기 전환 =====
+    const btnCal  = document.getElementById('btnCal');
+    const btnList = document.getElementById('btnList');
+    const calView = document.getElementById('calView');
+    const listView = document.getElementById('listView');
+    let selectedDay = 0;
+
+    function setView(mode) {
+        const isCal = (mode !== 'list');
+        btnCal?.classList.toggle('on', isCal);
+        btnList?.classList.toggle('on', !isCal);
+        if (calView)  calView.style.display  = isCal ? '' : 'none';
+        if (listView) listView.style.display = isCal ? 'none' : '';
+        if (isCal) { renderCalendar(); renderDayList(); } else { renderFullList(); }
+        try { localStorage.setItem('birthday_view_mode', isCal ? 'cal' : 'list'); } catch (e) { }
+    }
+    btnCal?.addEventListener('click', () => setView('cal'));
+    btnList?.addEventListener('click', () => setView('list'));
+
+    // ===== 달력 =====
+    function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+    function dayOfWeek(y, m, d) { return new Date(y, m - 1, d).getDay(); }
+
+    function renderCalendar() {
+        const host = document.getElementById('calCells');
+        if (!host) return;
+        host.innerHTML = "";
+
+        const totalDays = daysInMonth(YEAR, MONTH);
+        const firstDow  = dayOfWeek(YEAR, MONTH, 1);
+        const prevDays  = daysInMonth(MONTH === 1 ? YEAR - 1 : YEAR, MONTH === 1 ? 12 : MONTH - 1);
+        const rows      = Math.ceil((firstDow + totalDays) / 7);
+
+        for (let cell = 0; cell < rows * 7; cell++) {
+            const day = cell - firstDow + 1;
+            const dow = cell % 7;
+            const div = document.createElement('div');
+            const cls = ['c'];
+            if (dow === 0) cls.push('sun');
+            if (dow === 6) cls.push('sat');
+
+            if (day < 1 || day > totalDays) {
+                cls.push('out');
+                const shown = day < 1 ? prevDays + day : day - totalDays;
+                div.className = cls.join(' ');
+                div.innerHTML = `<div class="dn">${shown}</div>`;
+                host.appendChild(div);
+                continue;
+            }
+
+            if (day === TODAY) cls.push('today');
+            if (day === selectedDay) cls.push('sel');
+            div.className = cls.join(' ');
+            div.setAttribute('data-day', day);
+
+            const list = DAY_MAP.get(day) || [];
+            let html = `<div class="dn"><span>${day}</span>${day === TODAY ? '<u>오늘</u>' : ''}</div>`;
+
+            // 데스크톱 : 이름 · 반 · 고른 선물 (점 = 선물 골랐는지)
+            list.forEach(it => {
+                const cl = it.classLabel ? esc(it.classLabel) : (it.roleLabel ? esc(it.roleLabel) : '');
+                html += `<div class="p ${IS_ADMIN ? 'click' : ''}" data-pid="${it.personId}">
+                            <div class="pn"><i class="${it.giftPicked ? 'f' : ''}"></i>${esc(it.fullName)}</div>
+                            ${cl ? `<div class="pc">${cl}</div>` : ''}
+                            ${hasGift(it) ? `<div class="pg" title="${esc(giftName(it))}">${esc(giftName(it))}</div>` : ''}
+                         </div>`;
+            });
+            // 모바일 : 점만
+            if (list.length) {
+                html += `<div class="dots">${list.map(it => `<i class="${it.giftPicked ? 'f' : ''}"></i>`).join('')}</div>`;
+            }
+            div.innerHTML = html;
+            host.appendChild(div);
+        }
+    }
+
+    // 이름 클릭(관리자 → 수정) · 모바일 날짜 칸 클릭(→ 그 날 명단)
+    document.getElementById('calCells')?.addEventListener('click', (e) => {
+        const p = e.target.closest('.p');
+        if (p && IS_ADMIN) { openEditModal(parseInt(p.getAttribute('data-pid'), 10)); return; }
+        const c = e.target.closest('.c[data-day]');
+        if (c && isMobile()) {
+            const d = parseInt(c.getAttribute('data-day'), 10);
+            selectedDay = (selectedDay === d) ? 0 : d;
+            renderCalendar(); renderDayList();
+        }
+    });
+    document.getElementById('dayHeadAll')?.addEventListener('click', (e) => {
+        e.preventDefault(); selectedDay = 0; renderCalendar(); renderDayList();
+    });
+
+    // ===== 명단 줄 =====
+    function rowHtml(it, withDate) {
+        const d   = it.bDay || 0;
+        const dow = d ? DOW_EN[dayOfWeek(YEAR, MONTH, d)] : '';
+        const meta = [];
+        if (it.classLabel) meta.push(esc(it.classLabel)); else if (it.roleLabel) meta.push(esc(it.roleLabel));
+        if (it.phoneNumber)  meta.push(esc(it.phoneNumber));
+        if (it.phoneNumber2) meta.push(esc(it.phoneNumber2));
+
+        let right = '';
+        if (IS_ADMIN) {
+            right = `<div class="ra">
+                        <b class="${it.pickSmsSent ? 'on' : ''}">문자</b>
+                        <b class="${it.giftPicked ? 'on' : ''}">선택</b>
+                        <b class="${it.giftIsSent ? 'on' : ''}">전달</b>
+                        <button type="button" onclick="openEditModal(${it.personId})">수정</button>
+                     </div>`;
+        } else {
+            right = `<div class="ra"><b class="${it.giftPicked ? 'on' : ''}">${it.giftPicked ? '선물 골랐음' : '선물 아직'}</b></div>`;
+        }
+        const memo = (IS_ADMIN && it.memo) ? `<div class="memo">${esc(it.memo)}</div>` : '';
+
+        return `<div class="row">
+                    ${withDate ? `<div class="rd"><b>${d}</b><span>${dow}</span></div>` : ''}
+                    <div class="rb">
+                        <div class="rtop">
+                            <img class="av" src="${esc(it.profileImageUrl)}" alt="" onerror="this.style.visibility='hidden';" />
+                            <div class="rt">
+                                <div class="nm">${esc(it.fullName)}</div>
+                                ${meta.length ? `<div class="mt">${meta.map(m => `<span>${m}</span>`).join('')}</div>` : ''}
+                            </div>
+                            ${right}
+                        </div>
+                        ${giftBoxHtml(it)}
+                        ${memo}
+                    </div>
+                </div>`;
+    }
+
+    // 달력 아래 (모바일에서 날짜를 골랐을 때만)
+    function renderDayList() {
+        const head = document.getElementById('dayHead');
+        const host = document.getElementById('dayList');
+        if (!head || !host) return;
+        if (!selectedDay || !isMobile()) { head.hidden = true; host.innerHTML = ''; return; }
+        const list = DAY_MAP.get(selectedDay) || [];
+        const dow  = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(YEAR, MONTH, selectedDay)];
+        head.hidden = false;
+        document.getElementById('dayHeadText').textContent = `${MONTH}월 ${selectedDay}일 (${dow}) · ${list.length}명`;
+        host.innerHTML = list.length ? list.map(it => rowHtml(it, false)).join('') : `<div class="empty">이 날은 생일인 친구가 없어요.</div>`;
+    }
+
+    // 명단 보기 : 날짜순 전체
+    function renderFullList() {
+        const host = document.getElementById('fullList');
+        if (!host) return;
+        const all = [...(ITEMS || [])].filter(x => x.bMonth === MONTH)
+            .sort((a, b) => (a.bDay || 0) - (b.bDay || 0) || (a.fullName || "").localeCompare(b.fullName || ""));
+        host.innerHTML = all.map(it => rowHtml(it, true)).join('');
+    }
+
+    // 창 크기가 바뀌면 (모바일 ↔ 데스크톱) 다시 그림
+    let _rt = null;
+    window.addEventListener('resize', () => { clearTimeout(_rt); _rt = setTimeout(() => { renderCalendar(); renderDayList(); }, 120); });
+
+    // 초기 보기
+    let saved = null; try { saved = localStorage.getItem('birthday_view_mode'); } catch (e) { }
+    setView(saved === 'list' ? 'list' : 'cal');
+
+    // ===== 수정 시트 =====
+    const mask = document.getElementById('editMask');
+    function findByPersonId(pid) { return (ITEMS || []).find(x => x.personId === pid); }
+    function setText(id, val) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = (val === null || val === undefined || val === "") ? "-" : String(val);
+    }
+
+    function showGiftPreview(it) {
+        const wrap = document.getElementById('giftPreviewWrap');
+        const emptyWrap = document.getElementById('giftPreviewEmptyWrap');
+        const img = document.getElementById('giftPreviewImg');
+        const url = giftImageUrl(it.giftProductId);
+        const name = (it.giftProductName ?? "").toString().trim();
+        if (!url && !name) {
+            if (wrap) wrap.style.display = "none";
+            if (emptyWrap) emptyWrap.style.display = "";
+            return;
+        }
+        if (emptyWrap) emptyWrap.style.display = "none";
+        if (wrap) wrap.style.display = "";
+        setText('sProductDisplay', name || (it.giftProductId ? `ID ${it.giftProductId}` : "-"));
+        const desc = document.getElementById('sProductDesc');
+        if (desc) desc.textContent = (it.giftProductDescription ?? "").toString().trim();
+        if (img) {
+            img.style.display = url ? '' : 'none';
+            img.src = url;
+            img.onclick = () => openImage(url);
+            img.onerror = function () { this.style.display = 'none'; };
+        }
+    }
+
+    window.openEditModal = function (pid) {
+        if (!IS_ADMIN) return;
+        const it = findByPersonId(pid);
+        if (!it) return;
+
+        document.getElementById('fPersonId').value = it.personId || "";
+        document.getElementById('fUserId').value   = it.userId || "";
+
+        const pimg = document.getElementById('mProfileImg');
+        if (pimg) { pimg.style.visibility = ''; pimg.src = it.profileImageUrl || ""; }
+
+        const d = it.bDay || 0;
+        const dow = d ? ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(YEAR, it.bMonth || MONTH, d)] : '';
+        setText('mShowName', it.fullName || "이름");
+        setText('mShowBirth', `${it.bMonth || ""}월 ${d || ""}일${dow ? ` (${dow})` : ''}${it.classLabel ? ` · ${it.classLabel}` : ''}`);
+
+        showGiftPreview(it);
+
+        document.getElementById('fPickSmsSent').checked = !!it.pickSmsSent;
+        document.getElementById('fIsActive').checked    = !!it.giftIsActive;
+        document.getElementById('fIsSent').checked      = !!it.giftIsSent;
+
+        const fMemo = document.getElementById('fMemo');
+        fMemo.value = (it.memo ?? "").toString();
+        document.getElementById('fMemoCount').textContent = fMemo.value.length;
+
+        mask?.classList.add('show');
+        mask?.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closeEditModal = function () {
+        mask?.classList.remove('show');
+        mask?.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    };
+
+    document.getElementById('fMemo')?.addEventListener('input', function () {
+        document.getElementById('fMemoCount').textContent = this.value.length;
+    });
+
+    window.submitEdit = async function () {
+        const form = document.getElementById('editForm');
+        if (!form) return;
+        const saveBtn = document.querySelector('.saveBtn');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '저장 중…'; }
+
+        ensureHiddenBool(form, "PickSmsSent", document.getElementById('fPickSmsSent')?.checked ?? false);
+        ensureHiddenBool(form, "IsActive",    document.getElementById('fIsActive')?.checked    ?? false);
+        ensureHiddenBool(form, "IsSent",      document.getElementById('fIsSent')?.checked      ?? false);
+
+        try {
+            const params = new URLSearchParams();
+            for (const [k, v] of new FormData(form).entries()) params.append(k, v);
+            const res = await fetch(form.action, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+                body: params.toString()
+            });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            location.reload();
+        } catch (e) {
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '저장'; }
+            alert('저장하지 못했어요. 다시 해 주세요.');
+        }
+    };
+
+    function ensureHiddenBool(form, name, val) {
+        let h = form.querySelector(`input[type="hidden"][data-bool="${name}"]`);
+        if (!h) {
+            h = document.createElement('input');
+            h.type = 'hidden'; h.setAttribute('data-bool', name); h.name = name;
+            form.appendChild(h);
+        }
+        h.value = val ? "true" : "false";
+    }
+
+    mask?.addEventListener('click', (e) => { if (e.target === mask) closeEditModal(); });
+
+    // ===== 사진 크게 =====
+    const imgMask = document.getElementById('imgMask');
+    const imgBig  = document.getElementById('imgBig');
+    window.openImage = function (url) {
+        if (!url) return;
+        imgBig.src = url;
+        imgMask.classList.add('show');
+        imgMask.setAttribute('aria-hidden', 'false');
+    };
+    window.closeImage = function () {
+        imgMask.classList.remove('show');
+        imgMask.setAttribute('aria-hidden', 'true');
+        imgBig.src = "";
+    };
+    imgMask?.addEventListener('click', (e) => { if (e.target === imgMask) closeImage(); });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== "Escape") return;
+        if (imgMask?.classList.contains('show')) closeImage();
+        else if (mask?.classList.contains('show')) closeEditModal();
+    });
+</script>
+</body>
+</html>

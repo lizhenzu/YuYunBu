@@ -1,0 +1,295 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Models.AwardItem
+
+@{
+    Layout = null;
+    var returnUrl = (ViewBag.ReturnUrl as string) ?? "/";
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool canSeePrice = isSuperAdmin || isAdmin;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>상품 상세</title>
+
+    <style>
+        :root {
+            --bg0: #0b1220;
+            --bg1: #0f1a2e;
+            --card: rgba(255,255,255,.92);
+            --text: #0b1220;
+            --muted: rgba(2,6,23,.65);
+            --line: rgba(255,255,255,.14);
+            --shadow: 0 18px 55px rgba(0,0,0,.20);
+            --r0: 26px;
+            --r1: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            min-height: 100vh;
+            background: radial-gradient(900px 700px at 12% 10%, rgba(56,189,248,0.20), transparent 60%), radial-gradient(900px 700px at 88% 18%, rgba(245,158,11,0.16), transparent 60%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            color: #eaf1ff;
+            padding: 18px 14px 36px;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        .hero {
+            border-radius: var(--r0);
+            padding: 16px;
+            border: 1px solid var(--line);
+            background: linear-gradient(135deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
+            box-shadow: var(--shadow);
+        }
+
+        .top {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 1000;
+            letter-spacing: -.02em;
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 12px;
+            font-weight: 950;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,.12);
+            border: 1px solid rgba(255,255,255,.16);
+            color: #eaf1ff;
+        }
+
+            .btn:hover {
+                filter: brightness(1.05);
+            }
+
+        .card {
+            margin-top: 14px;
+            border-radius: var(--r0);
+            background: var(--card);
+            color: var(--text);
+            overflow: hidden;
+            border: 1px solid rgba(2,6,23,.10);
+            box-shadow: 0 18px 55px rgba(0,0,0,.10);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 14px;
+            padding: 14px;
+        }
+
+        @@media (max-width: 860px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .imgbox {
+            border-radius: var(--r0);
+            overflow: hidden;
+            border: 1px solid rgba(2,6,23,.10);
+            background: #f3f6fb;
+            box-shadow: 0 12px 28px rgba(0,0,0,.10);
+        }
+
+            .imgbox img {
+                width: 100%;
+                aspect-ratio: 1/1;
+                object-fit: cover;
+                display: block;
+            }
+
+        .meta {
+            display: grid;
+            gap: 10px;
+        }
+
+        .name {
+            font-size: 1.2rem;
+            font-weight: 1100;
+            letter-spacing: -.02em;
+            margin: 0;
+        }
+
+        .desc {
+            margin: 0;
+            color: var(--muted);
+            font-weight: 800;
+            line-height: 1.55;
+            white-space: pre-wrap;
+        }
+
+        .pillRow {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(2,6,23,.04);
+            border: 1px solid rgba(2,6,23,.08);
+            font-weight: 950;
+            color: rgba(2,6,23,.80);
+        }
+
+        .price {
+            background: rgba(245,158,11,.14);
+            border-color: rgba(245,158,11,.28);
+            color: #5a2c00;
+        }
+
+        .footer {
+            padding: 0 14px 14px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn2 {
+            border-radius: 16px;
+            padding: 10px 12px;
+            font-weight: 1000;
+            cursor: pointer;
+            border: 1px solid rgba(2,6,23,.12);
+            background: rgba(2,6,23,.06);
+            color: rgba(2,6,23,.92);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .btn2:hover {
+                filter: brightness(1.02);
+            }
+
+        .emptyBox {
+            padding: 18px;
+            border-radius: var(--r0);
+            border: 1px dashed rgba(255,255,255,.22);
+            background: rgba(255,255,255,.06);
+            margin-top: 14px;
+            color: rgba(234,241,255,.92);
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <section class="hero">
+            <div class="top">
+                <h1 class="title">🎁 상품 상세</h1>
+                <a class="btn" href="@returnUrl">↩️ 돌아가기</a>
+            </div>
+        </section>
+
+        @* ✅ Model이 null이면 안내만 출력 *@
+        @if (Model == null)
+        {
+            <div class="emptyBox">
+                <b>상품 정보를 찾을 수 없습니다.</b><br />
+                <span style="opacity:.85;">목록으로 돌아가 다시 선택해 주세요.</span>
+                <div style="margin-top:12px;">
+                    <a class="btn2" href="@returnUrl">↩️ 목록으로</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            var imgUrl = $"/images/AwardItem/{Model.ProductID}.jpg";
+
+            <section class="card">
+                <div class="grid">
+                    <div class="imgbox">
+                        <img src="@imgUrl"
+                             alt="상품 이미지"
+                             loading="lazy"
+                             onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                    </div>
+
+                    <div class="meta">
+                        <h2 class="name">@Model.ProductName</h2>
+
+                        <div class="pillRow">
+                            <span class="pill">#@Model.ProductID</span>
+
+                            @if(canSeePrice)
+                            {
+                            @if (!string.IsNullOrWhiteSpace(Model.SourceType))
+                            {
+                                <span class="pill">@Model.SourceType</span>
+                            }
+                            }
+
+                            @{
+                                int pointReq = 0;
+                                int.TryParse(Model.PointRequirement ?? "", out pointReq);
+                            }
+                            @if (pointReq > 0)
+                            {
+                                <span class="pill">✨ @pointReq</span>
+                            }
+
+                            @if (isAdmin || isSuperAdmin)
+                            {
+                                <span class="pill price">💰 @Model.UnitPrice.ToString("N0")원</span>
+                            }
+                        </div>
+
+                        <p class="desc">@(!string.IsNullOrWhiteSpace(Model.ProductDescription) ? Model.ProductDescription : "설명이 없습니다.")</p>
+                    </div>
+                </div>
+
+                <div class="footer">
+                    <a class="btn2" href="@returnUrl">↩️ 목록으로</a>
+                </div>
+            </section>
+        }
+    </div>
+</body>
+</html>

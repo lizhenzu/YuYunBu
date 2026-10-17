@@ -1,0 +1,198 @@
+@page "/hanmadi/admin/sessions/{id:int}/participants"
+@model BulletinBoard.Areas.Hanmadi.Pages.Admin.ParticipantsModel
+@{
+    Layout = null;
+    ViewData["Title"] = "참여자 목록";
+    var total   = Model.Participants.Count;
+    var named   = Model.Participants.Count(p => !string.IsNullOrEmpty(p.Nickname));
+    var unnamed = total - named;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>참여자 · 한마디</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f1f5f9; color: #0f172a;
+  min-height: 100vh; padding: 24px 16px;
+  max-width: 640px; margin: 0 auto;
+}
+
+/* 상단 */
+.top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.back { color: #94a3b8; text-decoration: none; font-size: 13px; }
+.back:hover { color: #6366f1; }
+h1 { font-size: 20px; font-weight: 900; color: #0f172a; }
+.session-meta {
+  font-size: 13px; color: #94a3b8;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 22px; flex-wrap: wrap;
+}
+.code-badge {
+  background: #ede9fe; color: #6366f1;
+  font-size: 12px; font-weight: 900;
+  padding: 2px 10px; border-radius: 7px; letter-spacing: 2px;
+}
+
+/* 통계 카드 */
+.stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  margin-bottom: 20px;
+}
+.stat-card {
+  background: #fff; border: 1.5px solid #e2e8f0;
+  border-radius: 14px; padding: 16px 14px; text-align: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.stat-num  { font-size: 28px; font-weight: 900; color: #4f46e5; line-height: 1; }
+.stat-lbl  { font-size: 11px; font-weight: 700; color: #94a3b8; margin-top: 5px; }
+
+/* 검색 */
+.search-wrap { position: relative; margin-bottom: 14px; }
+.search-wrap input {
+  width: 100%; padding: 10px 14px 10px 36px;
+  background: #fff; border: 1.5px solid #e2e8f0;
+  border-radius: 11px; font-size: 14px; color: #0f172a;
+  outline: none; font-family: inherit; transition: border-color .2s;
+}
+.search-wrap input:focus { border-color: #6366f1; }
+.search-icon {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  font-size: 15px; pointer-events: none;
+}
+
+/* 목록 */
+.list { display: flex; flex-direction: column; gap: 7px; }
+.p-row {
+  background: #fff; border: 1.5px solid #e2e8f0;
+  border-radius: 12px; padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.03);
+  transition: border-color .15s;
+}
+.p-row:hover { border-color: #c4b5fd; }
+
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 900; flex-shrink: 0;
+  color: #fff;
+}
+.p-info { flex: 1; min-width: 0; }
+.p-name {
+  font-size: 14px; font-weight: 800; color: #0f172a;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.p-anon { font-size: 14px; font-weight: 600; color: #94a3b8; font-style: italic; }
+.p-time { font-size: 11px; color: #cbd5e1; margin-top: 2px; }
+.p-num  {
+  font-size: 11px; font-weight: 900; color: #94a3b8;
+  background: #f1f5f9; padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
+}
+
+.empty { text-align: center; color: #94a3b8; font-size: 14px; padding: 48px 0; }
+.no-result { text-align: center; color: #cbd5e1; font-size: 13px; padding: 32px 0; display: none; }
+
+/* 새로고침 버튼 */
+.refresh-btn {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto;
+  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  color: #64748b; font-size: 12px; font-weight: 700;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  text-decoration: none; transition: all .15s;
+}
+.refresh-btn:hover { border-color: #6366f1; color: #6366f1; background: #ede9fe; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a href="/hanmadi/admin" class="back">← 세션 목록</a>
+  <h1>👥 참여자</h1>
+  <a href="" class="refresh-btn" onclick="location.reload();return false;">↻ 새로고침</a>
+</div>
+<div class="session-meta">
+  @Model.Session!.Title
+  <span class="code-badge">@Model.Session.Code</span>
+</div>
+
+<!-- 통계 -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num">@total</div>
+    <div class="stat-lbl">전체 참여</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#16a34a">@named</div>
+    <div class="stat-lbl">닉네임 입력</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num" style="color:#94a3b8">@unnamed</div>
+    <div class="stat-lbl">익명 참여</div>
+  </div>
+</div>
+
+@if (!Model.Participants.Any())
+{
+  <div class="empty">아직 참여자가 없습니다</div>
+}
+else
+{
+  <!-- 검색 -->
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search" placeholder="닉네임 검색..." oninput="filterList(this.value)"/>
+  </div>
+
+  <div class="list" id="list">
+    @{
+      var colors = new[]{"#6366f1","#22c55e","#f59e0b","#ef4444","#06b6d4","#8b5cf6","#ec4899","#14b8a6"};
+      int idx = 0;
+    }
+    @foreach (var p in Model.Participants)
+    {
+      var hasName   = !string.IsNullOrEmpty(p.Nickname);
+      var initial   = hasName ? p.Nickname!.Substring(0, 1).ToUpper() : "?";
+      var color     = colors[idx % colors.Length];
+      var timeStr   = p.JoinedAt.ToLocalTime().ToString("HH:mm:ss");
+      idx++;
+      <div class="p-row" data-name="@(p.Nickname?.ToLower() ?? "")">
+        <div class="avatar" style="background:@color">@initial</div>
+        <div class="p-info">
+          @if (hasName)
+          {
+            <div class="p-name">@p.Nickname</div>
+          }
+          else
+          {
+            <div class="p-anon">익명</div>
+          }
+          <div class="p-time">@timeStr 참여</div>
+        </div>
+        <div class="p-num">#@idx</div>
+      </div>
+    }
+  </div>
+  <div class="no-result" id="no-result">검색 결과가 없습니다</div>
+}
+
+<script>
+function filterList(q) {
+  const rows = document.querySelectorAll(".p-row");
+  const kw = q.trim().toLowerCase();
+  let visible = 0;
+  rows.forEach(r => {
+    const match = !kw || r.dataset.name.includes(kw);
+    r.style.display = match ? "" : "none";
+    if (match) visible++;
+  });
+  const noResult = document.getElementById("no-result");
+  if (noResult) noResult.style.display = visible === 0 ? "block" : "none";
+}
+</script>
+</body>
+</html>

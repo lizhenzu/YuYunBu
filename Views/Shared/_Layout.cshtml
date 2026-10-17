@@ -1,0 +1,92 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ChurchName · @DepartmentName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+
+
+    <link rel="stylesheet" href="~/css/button.css" />
+    <link rel="stylesheet" href="~/css/card.css">
+    <link rel="stylesheet" href="~/css/InputForm.css">
+    <link rel="stylesheet" href="~/css/responsive.css">
+    <link rel="stylesheet" href="~/css/Table.css">
+    <link rel="stylesheet" href="~/css/radiobox.css">
+    <link rel="stylesheet" href="~/css/img_thumbnail.css">
+    <link rel="stylesheet" href="~/css/textFont.css">
+    <link rel="stylesheet" href="~/css/modalPopup.css">
+    <link rel="stylesheet" href="~/css/welcome2.css">
+    <link rel="stylesheet" href="~/css/construction.css">
+    <link rel="stylesheet" href="~/css/common.layer.css">
+    <link rel="stylesheet" href="~/css/textTextBackgroundColorAndColor.css">
+
+
+    <link rel="stylesheet" href="~/css/site.css" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-dark border-bottom box-shadow mb-3">
+            <div class="container">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".navbar-collapse" aria-controls="navbarSupportedContent"
+                        aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="navbar-collapse collapse d-sm-inline-flex flex-sm-row-reverse">
+                    <partial name="_LoginPartial" />
+                    <ul class="navbar-nav flex-grow-1">
+                        <li class="nav-item">
+                            <a class="nav-link text-light" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+
+                        @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)) ||
+                        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.Admin)) ||
+                        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.Moderator))))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-light" asp-area="" asp-controller="UserRoles" asp-action="Index">User Roles</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-light" asp-area="" asp-controller="RoleManager" asp-action="Index">Role Manager</a>
+                            </li>
+                            <partial name="_AdminMenuPartial_2" />
+                        }
+                    </ul>
+
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container">
+           © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,1173 @@
+﻿@model BibleReadingThrough.Models.BibleReadViewModel
+@{
+    ViewData["Title"] = $"{Model.BookName} {Model.Jang}장";
+    ViewData["Page"] = Model.Testament == "신약" ? "nt" : "ot";
+    bool isNt = Model.Testament == "신약";
+
+    bool hasYt  = !string.IsNullOrEmpty(Model.YoutubeUrl);
+    bool hasOv1 = Model.OverviewDetail != null &&
+                  !string.IsNullOrWhiteSpace(Model.OverviewDetail.SummaryURL1);
+    bool hasOv2 = Model.OverviewDetail != null &&
+                  !string.IsNullOrWhiteSpace(Model.OverviewDetail.SummaryURL2);
+    bool hasAnyMedia = hasYt || hasOv1 || hasOv2;
+}
+
+<div class="bible-reader">
+
+    <div class="bible-header d-flex align-items-start justify-content-between flex-wrap gap-3">
+        <div>
+            <div class="bible-book-name">@Model.BookName</div>
+            <div class="bible-chapter">@Model.Testament · @Model.Jang 장 · @Model.Verses.Count 절</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:4px">
+            <a href="/Bible/List?testament=@Model.Testament" style="color:var(--text2);font-size:.9rem">← 목록</a>
+        </div>
+    </div>
+
+    @if (hasAnyMedia)
+    {
+        <div class="media-bar">
+            <span class="media-bar-label">🎬 미디어</span>
+
+            @if (hasYt)
+            {
+                <button class="media-btn media-btn--yt" type="button" onclick="openYoutube(event)">
+                    <span class="media-btn-icon">🎧</span>
+                    <span class="media-btn-text">
+                        <span class="media-btn-title">유튜브 듣기</span>
+                        <span class="media-btn-sub">@Model.BookName @Model.Jang 장</span>
+                    </span>
+                </button>
+            }
+
+            @if (hasOv1)
+            {
+                <button class="media-btn media-btn--ov1" type="button"
+                        onclick="openOvYoutube('@Html.Raw(Model.OverviewDetail.SummaryURL1)', '관련 영상 1')">
+                    <span class="media-btn-icon">🎬</span>
+                    <span class="media-btn-text">
+                        <span class="media-btn-title">개요 해설</span>
+                        <span class="media-btn-sub">@Model.BookName 1</span>
+                    </span>
+                </button>
+            }
+
+            @if (hasOv2)
+            {
+                <button class="media-btn media-btn--ov2" type="button"
+                        onclick="openOvYoutube('@Html.Raw(Model.OverviewDetail.SummaryURL2)', '관련 영상 2')">
+                    <span class="media-btn-icon">🎬</span>
+                    <span class="media-btn-text">
+                        <span class="media-btn-title">개요 해설</span>
+                        <span class="media-btn-sub">@Model.BookName 2</span>
+                    </span>
+                </button>
+            }
+        </div>
+    }
+
+    <div id="chapterDoneBanner" class="chapter-done-banner @(Model.IsChapterRead ? "show" : "")">
+        이 페이지 다 읽었어요
+    </div>
+
+    <div class="mode-pills">
+        <button class="mode-pill" data-mode="1" type="button" onclick="setMode(1)">🌱 한 절씩</button>
+        <button class="mode-pill" data-mode="3" type="button" onclick="setMode(3)">📖 3절씩</button>
+        <button class="mode-pill" data-mode="5" type="button" onclick="setMode(5)">📚 5절씩</button>
+        <button class="mode-pill" data-mode="0" type="button" onclick="setMode(0)">📋 전체</button>
+    </div>
+
+    <div class="lang-pills">
+        <button class="lang-pill" data-lang="all"    type="button" onclick="toggleLang('all')">모두</button>
+        <button class="lang-pill" data-lang="ko"     type="button" onclick="toggleLang('ko')">🇰🇷 개역개정</button>
+        <button class="lang-pill" data-lang="modern" type="button" onclick="toggleLang('modern')">📖 현대인</button>
+        <button class="lang-pill" data-lang="en" type="button" onclick="toggleLang('en')">🌎 NIV</button>
+    </div>
+
+    <div class="chapter-pills">
+        @foreach (var ch in Model.AllChapters)
+        {
+            string pillClass;
+            if (ch == Model.Jang)
+                pillClass = "cur";
+            else if (Model.ReadChapters.Contains(ch))
+                pillClass = "done";
+            else
+                pillClass = "unread";
+
+            <a href="/Bible/Read?bookName=@Uri.EscapeDataString(Model.BookName)&jang=@ch"
+               class="ch-pill @pillClass"
+               title="@ch 장 @(Model.ReadChapters.Contains(ch) ? "✅ 완독" : "📖 미완")">@ch</a>
+        }
+    </div>
+
+    <div class="reader-progress">
+        <div class="prog-label">
+            <span id="progLbl">📊 @Model.ReadVerseCount / @Model.Verses.Count 절</span>
+            <span id="progPct">@(Model.Verses.Count == 0 ? 0 : Math.Round((double)Model.ReadVerseCount / Model.Verses.Count * 100, 0))%</span>
+        </div>
+        <div class="prog-track">
+            <div class="prog-fill @(isNt ? "green" : "purple")"
+                 id="progFill"
+                 style="width:@(Model.Verses.Count == 0 ? 0 : (double)Model.ReadVerseCount / Model.Verses.Count * 100)%"></div>
+        </div>
+    </div>
+
+    <div class="page-nav-r" id="pageNav" style="display:none">
+        <button class="page-btn" id="prevPg" type="button" onclick="prevPage()">◀ 이전</button>
+        <span id="pgInfo" style="color:var(--text2);font-size:.9rem"></span>
+        <button class="page-btn" id="nextPg" type="button" onclick="nextPage()">다음 ▶</button>
+    </div>
+
+    @if (Model.BasicInfo != null || Model.OverviewDetail != null)
+    {
+        <div class="ov-card" id="ovCard">
+
+            <button class="ov-head" type="button" onclick="ovToggleOpen()" aria-expanded="false" id="ovHead">
+                <span class="ov-head-left">
+                    <span class="ov-icon" aria-hidden="true">📖</span>
+                    <span class="ov-title">@Model.BookName 개요</span>
+                    <span class="ov-mode-badge" id="ovModeBadge">간략본</span>
+                </span>
+                <span class="ov-chevron" id="ovChevron" aria-hidden="true">▾</span>
+            </button>
+
+            <div class="ov-body" id="ovBody">
+
+                <div class="ov-switch-bar">
+                    <button class="ov-sw-btn ov-sw-active" id="ovBtnSimple" type="button"
+                            onclick="ovSetMode('simple')">간략본</button>
+                    <button class="ov-sw-btn" id="ovBtnDetail" type="button"
+                            onclick="ovSetMode('detail')">상세본</button>
+                </div>
+
+                <div id="ovSimple">
+                    @if (Model.BasicInfo != null)
+                    {
+                        @if (!string.IsNullOrWhiteSpace(Model.BasicInfo.Author))
+                        {
+                            <div class="ov-row">
+                                <span class="ov-label">✍️ 저자</span>
+                                <span class="ov-val">@Model.BasicInfo.Author</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.BasicInfo.WhenWritten))
+                        {
+                            <div class="ov-row">
+                                <span class="ov-label">📅 기록 시기</span>
+                                <span class="ov-val">@Model.BasicInfo.WhenWritten</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.BasicInfo.OverView))
+                        {
+                            <div class="ov-row">
+                                <span class="ov-label">📜 개요</span>
+                                <span class="ov-val">@Model.BasicInfo.OverView</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.BasicInfo.Purpose))
+                        {
+                            <div class="ov-row">
+                                <span class="ov-label">🎯 기록 목적</span>
+                                <span class="ov-val">@Model.BasicInfo.Purpose</span>
+                            </div>
+                        }
+                    }
+                </div>
+
+                <div id="ovDetail" style="display:none">
+                    @if (Model.OverviewDetail != null)
+                    {
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.Author))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">✍️ 저자</div>
+                                <div class="ov-sec-body">
+                                    <strong>@Model.OverviewDetail.Author</strong>
+                                    @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.AuthorDescription))
+                                    {
+                                        <p>@Model.OverviewDetail.AuthorDescription</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.WrittenDateFrom))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📅 저작 연대</div>
+                                <div class="ov-sec-body">
+                                    @Model.OverviewDetail.WrittenDateFrom
+                                    @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.WrittenDateTo))
+                                    { <span> ~ @Model.OverviewDetail.WrittenDateTo</span> }
+                                    @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.AlternativeDate))
+                                    { <p>@Model.OverviewDetail.AlternativeDate</p> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.WrittenPlace))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📍 기록 장소</div>
+                                <div class="ov-sec-body">@Model.OverviewDetail.WrittenPlace</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.WrittenTarget))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">🎯 기록 대상</div>
+                                <div class="ov-sec-body">@Model.OverviewDetail.WrittenTarget</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.HistoricalBackground))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">🕰️ 역사적 배경</div>
+                                <div class="ov-sec-body">
+                                    @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.HistoricalPeriod))
+                                    { <p><strong>@Model.OverviewDetail.HistoricalPeriod</strong></p> }
+                                    @Model.OverviewDetail.HistoricalBackground
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.Keywords))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">🔑 핵심어</div>
+                                <div class="ov-sec-body">
+                                    @foreach (var kw in Model.OverviewDetail.Keywords.Split(new[]{",","·","、"}, StringSplitOptions.RemoveEmptyEntries))
+                                    {
+                                        <span class="ov-kw-chip">@kw.Trim()</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.OverviewDetail.ContentSummary))
+                        {
+                            var contentLines = Model.OverviewDetail.ContentSummary
+                                .Split(new[] { "\\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+                            var numberedItems = new List<string>();
+                            var finalNote = "";
+                            foreach (var ln in contentLines)
+                            {
+                                if (System.Text.RegularExpressions.Regex.IsMatch(ln.Trim(), @"^\d+\.\s"))
+                                    numberedItems.Add(System.Text.RegularExpressions.Regex.Replace(ln.Trim(), @"^\d+\.\s*", ""));
+                                else
+                                    finalNote = ln.Trim();
+                            }
+
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📜 핵심 내용 요약</div>
+                                <div class="ov-sec-body">
+                                    @if (numberedItems.Any())
+                                    {
+                                        <ol class="ov-list">
+                                            @foreach (var item in numberedItems)
+                                            { <li>@item</li> }
+                                        </ol>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(finalNote))
+                                    {
+                                        <p class="ov-final-note">💡 @finalNote</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    <div id="verseList">
+        @{
+            var summaryMap = new Dictionary<int, List<BibleReadingThrough.Models.EBibleSummary>>();
+            foreach (var s in Model.Summaries)
+            {
+                int insertAtZul = s.FromJang < Model.Jang ? 1 : s.FromZul;
+                if (!summaryMap.ContainsKey(insertAtZul))
+                    summaryMap[insertAtZul] = new List<BibleReadingThrough.Models.EBibleSummary>();
+                summaryMap[insertAtZul].Add(s);
+            }
+        }
+
+        @for (int i = 0; i < Model.Verses.Count; i++)
+        {
+            var v = Model.Verses[i];
+
+            @if (summaryMap.TryGetValue(v.Zul, out var summList))
+            {
+                foreach (var s in summList)
+                {
+                    <div class="summary-card" data-idx="@i">
+                        <div class="summary-range">
+                            📝 @s.BibleText @s.FromJang:@s.FromZul
+                            @if (s.FromJang != s.ToJang || s.FromZul != s.ToZul)
+                            {
+                                <span class="summary-range-sep">~ @s.ToJang:@s.ToZul</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(s.BibleKeyWord))
+                        {
+                            <div class="summary-keyword" style="font-size:18px;font-weight:900;">🔑 @s.BibleKeyWord</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(s.BibleSummary))
+                        {
+                            <div class="summary-body" style="font-size:15px;font-weight:900;">@s.BibleSummary</div>
+                        }
+                    </div>
+                }
+            }
+
+            <div class="verse-card-r @(v.IsRead ? "is-read" : "") @(v.IsBookmarked ? "bookmarked" : "")"
+                 id="vc-@v.VerseId"
+                 data-idx="@i"
+                 data-zul="@v.Zul"
+                 data-verse-id="@v.VerseId"
+                 data-text="@Html.Raw(v.BibleData.Replace("\"", "&quot;"))"
+                 style="scroll-margin-top:80px">
+                <div class="vnum">@v.Zul</div>
+                <div class="vtext-wrap">
+                    <div class="vtext-ko-line">
+                        <span class="vtext vtext-ko">@v.BibleData</span>
+                        <span class="vactions-inline">
+                            <button class="vbtn vbtn-read @(v.IsRead ? "done" : "unread")"
+                                    id="vr-@v.VerseId"
+                                    type="button"
+                                    onclick="toggleVerse(@v.VerseId, this)">
+                                @(v.IsRead ? "📖" : "📗")
+                            </button>
+                            <button class="vbtn vbtn-bm @(v.IsBookmarked ? "bm-on" : "")"
+                                    id="vbm-@v.VerseId"
+                                    type="button"
+                                    onclick="toggleBm(@v.VerseId, this)">
+                                @(v.IsBookmarked ? "📚" : "🔖")
+                            </button>
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(v.BibleDataModern))
+                    {
+                        <div class="vtext-modern-line">
+                            <span class="vtext-modern">@v.BibleDataModern</span>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(v.BibleDataEn))
+                    {
+                        <div class="vtext-en-line">
+                            <span class="vtext-en">@v.BibleDataEn</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="mark-all-wrap">
+        <button class="complete-mega @(Model.IsChapterRead ? "is-done" : "is-not-done")"
+                id="completeMega"
+                type="button"
+                onclick="markAll('@Model.BookName', @Model.Jang)">
+            <div class="cm-icon-circle" id="cmIconCircle">
+                @(Model.IsChapterRead ? "📗" : "📖")
+            </div>
+            <div class="cm-body">
+                <span class="complete-mega-title" id="completeMegaTitle">
+                    @(Model.IsChapterRead ? "이 페이지 읽음으로 표시 취소 할까요?" : "이 페이지 읽음으로 표시 할까요?")
+                </span>
+                <span class="complete-mega-desc @(Model.IsChapterRead ? "desc-hide" : "")"
+                      id="completeMegaDesc">(클릭하면 성경통독Board에 자동 반영돼요^^)</span>
+            </div>
+            <div class="cm-badge">
+                <span class="complete-mega-count" id="completeMegaCount">오늘 읽은 총 절수 : @Model.TodayTotalReadCount 절</span>
+                <span class="cm-arrow">→</span>
+            </div>
+        </button>
+    </div>
+
+    <div class="chapter-nav-r">
+        @if (Model.PrevBook != null)
+        {
+            <a href="/Bible/Read?bookName=@Uri.EscapeDataString(Model.PrevBook)&jang=@Model.PrevJang">
+                ← @Model.PrevBook @Model.PrevJang 장
+            </a>
+        }
+        else
+        {
+            <span></span>
+        }
+
+        @if (Model.NextBook != null)
+        {
+            <a href="/Bible/Read?bookName=@Uri.EscapeDataString(Model.NextBook)&jang=@Model.NextJang" style="text-align:right">
+                @Model.NextBook @Model.NextJang 장 →
+            </a>
+        }
+    </div>
+
+    <div class="dashboard-btn-wrap">
+        <a href="/Bible" class="dashboard-btn">
+            📊 대시보드로 이동
+        </a>
+        <a href="/Home/Index" class="dashboard-btn">
+            🏠 홈으로
+        </a>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.YoutubeUrl))
+{
+    <div id="ytModal" onclick="closeYoutube(event)">
+        <div class="yt-modal-box" onclick="event.stopPropagation()">
+            <div class="yt-modal-head">
+                <div class="yt-modal-title">🎵 @Model.BookName @Model.Jang 장 듣기</div>
+                <div class="yt-modal-controls">
+                    <button class="yt-ctrl-btn yt-stop-btn" type="button" onclick="ytStop(event)">⏹ 정지</button>
+                    <button class="yt-ctrl-btn yt-close-btn" type="button" onclick="closeYoutube(event)">✕ 닫기</button>
+                </div>
+            </div>
+            <div class="yt-iframe-wrap">
+                <div id="ytFrameHost"></div>
+            </div>
+            <div class="yt-modal-foot">
+                <span id="ytStatusMsg">▶ 준비 중...</span>
+                <span class="yt-loop-badge">∞ 무한 반복</span>
+            </div>
+        </div>
+    </div>
+}
+
+<div id="ovYtModal" onclick="closeOvYoutube(event)">
+    <div class="yt-modal-box" onclick="event.stopPropagation()">
+        <div class="yt-modal-head">
+            <div class="yt-modal-title" id="ovYtTitle">🎬 관련 영상</div>
+            <div class="yt-modal-controls">
+                <button class="yt-ctrl-btn yt-stop-btn" type="button" onclick="ovYtStop(event)">⏹ 정지</button>
+                <button class="yt-ctrl-btn yt-close-btn" type="button" onclick="closeOvYoutube(event)">✕ 닫기</button>
+            </div>
+        </div>
+        <div class="yt-iframe-wrap">
+            <div id="ovYtFrameHost"></div>
+        </div>
+        <div class="yt-modal-foot">
+            <span id="ovYtStatusMsg">▶ 준비 중...</span>
+            <span class="yt-loop-badge">∞ 무한 반복</span>
+        </div>
+    </div>
+</div>
+
+<div id="loadingModal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.55);align-items:center;justify-content:center;">
+    <div style="background:var(--card-bg);border-radius:20px;padding:36px 44px;
+                text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.35);min-width:220px;">
+        <div style="display:flex;justify-content:center;margin-bottom:18px">
+            <div id="loadSpinner" style="
+                width:44px;height:44px;border-radius:50%;
+                border:5px solid var(--border);
+                border-top-color:#f97316;
+                animation:spinAnim .75s linear infinite;"></div>
+        </div>
+        <div style="font-size:1.05rem;font-weight:800;color:var(--text);margin-bottom:6px">처리 중...</div>
+        <div style="font-size:.85rem;color:var(--text2)">잠시만 기다려 주세요</div>
+    </div>
+</div>
+
+<style>
+    .media-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 16px;
+        margin: 8px 0 14px;
+        background: var(--card-bg);
+        border-radius: 16px;
+        border: 1.5px solid var(--border);
+        box-shadow: 0 2px 12px rgba(0,0,0,.07);
+    }
+    .media-bar-label {
+        font-size: .72rem;
+        font-weight: 900;
+        color: var(--text2);
+        letter-spacing: .06em;
+        padding-right: 10px;
+        border-right: 1.5px solid var(--border);
+        margin-right: 2px;
+        white-space: nowrap;
+        align-self: center;
+    }
+    .media-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 16px;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        text-align: left;
+        transition: transform .15s, box-shadow .15s, filter .15s;
+        flex-shrink: 0;
+    }
+    .media-btn:hover  { transform: translateY(-2px); filter: brightness(1.07); }
+    .media-btn:active { transform: scale(.97); }
+    .media-btn-icon { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+    .media-btn-text { display: flex; flex-direction: column; gap: 2px; }
+    .media-btn-title { font-size: .88rem; font-weight: 900; color: #fff; line-height: 1.2; }
+    .media-btn-sub   { font-size: .7rem; font-weight: 600; color: rgba(255,255,255,.78); line-height: 1; }
+    .media-btn--yt  { background: linear-gradient(135deg, #ff2d2d 0%, #c40000 100%); box-shadow: 0 4px 14px rgba(196,0,0,.30); }
+    .media-btn--ov1 { background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); box-shadow: 0 4px 14px rgba(109,40,217,.28); }
+    .media-btn--ov2 { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); box-shadow: 0 4px 14px rgba(79,70,229,.28); }
+
+    /* ── 연속 사각형 버튼 그룹 ── */
+    .lang-pills {
+        display: inline-flex; flex-wrap: nowrap;
+        margin: 6px 0 14px;
+        border: 1.5px solid var(--border);
+        border-radius: 10px; overflow: hidden;
+        background: var(--card-bg);
+    }
+    .lang-pill {
+        padding: 8px 15px;
+        border: none; border-right: 1.5px solid var(--border);
+        background: transparent; color: var(--text2);
+        font-size: .82rem; font-weight: 600;
+        cursor: pointer; transition: background .15s, color .15s;
+        font-family: inherit; white-space: nowrap; line-height: 1.4;
+    }
+    .lang-pill:last-child { border-right: none; }
+    .lang-pill:hover:not(.active) { background: var(--bg3); color: var(--text); }
+    /* ── 활성 버튼: 번역별 배경 채움 ── */
+    .lang-pill.active { font-weight: 900; color: #fff; }
+    .lang-pill[data-lang="all"].active    { background: #475569; }  /* slate-600  */
+    .lang-pill[data-lang="ko"].active     { background: #4f46e5; }  /* indigo-600 */
+    .lang-pill[data-lang="modern"].active { background: #0284c7; }  /* sky-600    */
+    .lang-pill[data-lang="en"].active     { background: #0d9488; }  /* teal-600   */
+
+    .vtext-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .vtext-ko-line { display: block; line-height: 1.9; }
+    .vtext-ko-line .vtext-ko { display: inline; flex: none; font-size: 1.23rem; }
+    .vactions-inline { display: inline-flex; align-items: center; gap: 3px; margin-left: 7px; vertical-align: middle; flex-shrink: 0; }
+    .vactions-inline .vbtn { padding: 2px 5px; font-size: 1rem; border: none; border-radius: 6px; cursor: pointer; background: transparent; line-height: 1; transition: transform .12s, background .12s; }
+    .vactions-inline .vbtn:hover  { background: var(--bg3); transform: scale(1.15); }
+    .vactions-inline .vbtn:active { transform: scale(.92); }
+    /* ── 현대인성경 라인 ─────────────────────────────────────── */
+    .vtext-modern-line { display: block; line-height: 1.7; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #bae6fd; }
+    .vtext-modern-line .vtext-modern { display: inline; font-size: 1.13em; color: #0369a1; letter-spacing: .01em; }
+    [data-theme="dark"] .vtext-modern-line { border-top-color: #164e63; }
+    [data-theme="dark"] .vtext-modern-line .vtext-modern { color: #7dd3fc; }
+    /* 현대인 단독 모드: primary 텍스트로 표시 */
+    body.lang-modern .vtext-modern-line { border-top: none; margin-top: 0; padding-top: 0; line-height: 1.9; }
+    body.lang-modern .vtext-modern-line .vtext-modern { font-size: 1.23rem; color: var(--text); }
+
+    /* ── NIV 라인 ────────────────────────────────────────────── */
+    .vtext-en-line { display: block; line-height: 1.7; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+    .vtext-en-line .vtext-en { display: inline; font-size: 1.13em; color: black; font-style: italic; letter-spacing: .01em; }
+    body.lang-en .vtext-en-line { border-top: none; margin-top: 0; padding-top: 0; line-height: 1.9; }
+    body.lang-en .vtext-en-line .vtext-en { display: inline; font-style: normal; font-size: 1.23rem; color: var(--text); }
+
+    .chapter-done-banner { display: none; margin: 10px 0 14px; padding: 12px 16px; border-radius: 12px; background: linear-gradient(135deg, #22c55e, #16a34a); color: #fff; font-size: .96rem; font-weight: 900; text-align: center; box-shadow: 0 6px 20px rgba(34,197,94,.25); }
+    .chapter-done-banner.show { display: block; }
+
+    .summary-card { background: linear-gradient(135deg, color-mix(in srgb, #6366f1 10%, var(--card-bg)), color-mix(in srgb, #a78bfa 8%, var(--card-bg))); border: 1.5px solid color-mix(in srgb, #6366f1 25%, transparent); border-left: 4px solid #6366f1; border-radius: 14px; padding: 14px 16px; margin-bottom: 6px; box-shadow: 0 2px 10px rgba(99,102,241,.10); }
+    .summary-range { font-size: .78rem; font-weight: 800; color: #6366f1; margin-bottom: 6px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .summary-range-sep { opacity: .75; }
+    .summary-keyword { font-size: .84rem; font-weight: 700; color: #4f46e5; margin-bottom: 8px; line-height: 1.5; }
+    [data-theme="dark"] .summary-keyword { color: #a5b4fc; }
+    .summary-body { font-size: .92rem; color: var(--text); line-height: 1.75; word-break: keep-all; }
+
+    #ytModal  { display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.75); align-items: center; justify-content: center; padding: 16px; }
+    #ovYtModal{ display: none; position: fixed; inset: 0; z-index: 10001; background: rgba(0,0,0,.75); align-items: center; justify-content: center; padding: 16px; }
+    .yt-modal-box { background: var(--card-bg); border-radius: 20px; width: 100%; max-width: 640px; box-shadow: 0 16px 60px rgba(0,0,0,.5); overflow: hidden; display: flex; flex-direction: column; }
+    .yt-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+    .yt-modal-title { font-size: 1rem; font-weight: 900; color: var(--text); display: flex; align-items: center; gap: 8px; }
+    .yt-modal-controls { display: flex; gap: 8px; align-items: center; }
+    .yt-ctrl-btn { padding: 7px 16px; border-radius: 50px; border: none; cursor: pointer; font-size: .82rem; font-weight: 800; transition: all .15s; }
+    .yt-stop-btn  { background: #ef4444; color: #fff; }
+    .yt-stop-btn:hover  { background: #dc2626; }
+    .yt-close-btn { background: var(--bg3); color: var(--text); }
+    .yt-close-btn:hover { background: var(--border); }
+    .yt-iframe-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; overflow: hidden; }
+    #ytFrameHost, #ytFrameHost iframe, #ovYtFrameHost, #ovYtFrameHost iframe { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; border: 0; }
+    .yt-modal-foot { padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .82rem; color: var(--text2); flex-wrap: wrap; }
+    .yt-loop-badge { display: inline-flex; align-items: center; gap: 5px; background: var(--primary); color: #fff; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 800; }
+
+    .mark-all-wrap { margin: 16px 0 12px; }
+
+    .complete-mega {
+        width: 100%; display: flex; align-items: center; gap: 14px;
+        padding: 18px 20px; border: none; border-radius: 20px;
+        cursor: pointer; color: #fff; font-family: inherit;
+        position: relative; overflow: hidden; text-align: left;
+        transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .22s;
+    }
+    .complete-mega:hover  { transform: translateY(-3px) scale(1.01); }
+    .complete-mega:active { transform: scale(.97); }
+    .complete-mega:disabled { opacity: .65; cursor: not-allowed; transform: none; }
+
+    /* 상태별 배경 */
+    .complete-mega.is-not-done {
+        background: linear-gradient(135deg, #10b981 0%, #059669 55%, #047857 100%);
+        box-shadow: 0 10px 36px rgba(16,185,129,.38), 0 2px 8px rgba(0,0,0,.10);
+    }
+    .complete-mega.is-done {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #3730a3 100%);
+        box-shadow: 0 10px 32px rgba(99,102,241,.32), 0 2px 8px rgba(0,0,0,.10);
+    }
+
+    /* shimmer 스윕 */
+    .complete-mega::before {
+        content: '';
+        position: absolute; top: 0; left: -110%; width: 55%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+        transform: skewX(-15deg);
+        transition: left .6s ease;
+        pointer-events: none;
+    }
+    .complete-mega:hover::before { left: 130%; }
+
+    .complete-mega::after { display: none; }
+
+    /* 왼쪽: 아이콘 원 */
+    .cm-icon-circle {
+        flex-shrink: 0;
+        width: 52px; height: 52px; border-radius: 50%;
+        background: rgba(255,255,255,.18);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.55rem; line-height: 1;
+        border: 2px solid rgba(255,255,255,.28);
+        box-shadow: 0 2px 10px rgba(0,0,0,.12);
+        transition: transform .2s;
+    }
+    .complete-mega:hover .cm-icon-circle { transform: rotate(-8deg) scale(1.08); }
+
+    /* 중앙: 텍스트 */
+    .cm-body { flex: 1; min-width: 0; }
+    .complete-mega-title {
+        font-size: 1.18rem; font-weight: 950; line-height: 1.35;
+        display: block; letter-spacing: -.2px;
+    }
+    .complete-mega-desc {
+        font-size: .78rem; font-weight: 700;
+        opacity: .78; margin-top: 3px; display: block;
+        letter-spacing: .01em;
+    }
+    .complete-mega-desc.desc-hide { display: none !important; }
+
+    /* 오른쪽: 진도 배지 */
+    .cm-badge {
+        flex-shrink: 0; display: flex; flex-direction: column;
+        align-items: center; gap: 3px;
+    }
+    .complete-mega-count {
+        font-size: .82rem; font-weight: 900;
+        background: rgba(255,255,255,.20);
+        border: 1px solid rgba(255,255,255,.30);
+        padding: 5px 12px; border-radius: 999px;
+        white-space: nowrap; letter-spacing: .02em;
+        backdrop-filter: blur(4px);
+    }
+    .cm-arrow {
+        font-size: 1.1rem; opacity: .65;
+        transition: transform .2s, opacity .2s;
+    }
+    .complete-mega:hover .cm-arrow { transform: translateX(4px); opacity: 1; }
+
+    .dashboard-btn-wrap { display: flex; justify-content: center; align-items: stretch; gap: 10px; margin: 20px 0 32px; }
+    .dashboard-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 32px; border-radius: 50px; background: var(--card-bg); border: 2px solid var(--border); color: var(--text2); font-size: .92rem; font-weight: 700; text-decoration: none; transition: all .2s; }
+    .dashboard-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); transform: translateY(-2px); box-shadow: var(--shadow); }
+
+    @@keyframes spinAnim { to { transform: rotate(360deg); } }
+
+    .ov-card { margin: 10px 0 14px; border-radius: 18px; overflow: hidden; border: 1.5px solid color-mix(in srgb, var(--primary) 22%, var(--border)); background: var(--card-bg); box-shadow: 0 4px 20px rgba(99,102,241,.08); }
+    .ov-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, var(--card-bg)) 0%, color-mix(in srgb, var(--primary) 6%, var(--card-bg)) 100%); border: none; cursor: pointer; text-align: left; transition: background .16s; font-family: inherit; }
+    .ov-head:hover { background: color-mix(in srgb, var(--primary) 14%, var(--card-bg)); }
+    .ov-head-left  { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .ov-icon       { font-size: 1.1rem; flex-shrink: 0; }
+    .ov-title      { font-size: 1rem; font-weight: 900; color: var(--text); letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ov-mode-badge { flex-shrink: 0; font-size: .72rem; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--primary) 18%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); }
+    .ov-chevron    { flex-shrink: 0; font-size: 1rem; color: var(--text2); transition: transform .22s ease; }
+    .ov-card.is-open .ov-chevron { transform: rotate(180deg); }
+    .ov-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); animation: ovFadeIn .18s ease; }
+    .ov-card.is-open .ov-body { display: block; }
+    @@keyframes ovFadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .ov-switch-bar { display: flex; gap: 6px; margin: 14px 0 12px; }
+    .ov-sw-btn { padding: 7px 18px; border-radius: 999px; border: 1.5px solid var(--border); background: transparent; color: var(--text2); font-size: .82rem; font-weight: 800; cursor: pointer; transition: all .16s; font-family: inherit; }
+    .ov-sw-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .ov-sw-btn.ov-sw-active { background: var(--primary); border-color: var(--primary); color: #fff; box-shadow: 0 3px 10px rgba(99,102,241,.28); }
+    .ov-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+    .ov-row:last-child { border-bottom: none; }
+    .ov-label { flex-shrink: 0; min-width: 88px; font-size: .8rem; font-weight: 900; color: var(--primary); padding-top: 1px; }
+    .ov-val   { font-size: .9rem; color: var(--text); line-height: 1.65; word-break: keep-all; }
+    .ov-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+    .ov-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .ov-sec-title { font-size: .82rem; font-weight: 900; color: var(--primary); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; padding-left: 6px; border-left: 3px solid var(--primary); }
+    .ov-sec-body  { font-size: .9rem; color: var(--text); line-height: 1.7; word-break: keep-all; padding-left: 9px; }
+    .ov-sec-body p { margin: 4px 0 0; }
+    .ov-sec-body strong { color: var(--text); }
+    .ov-kw-chip { display: inline-block; margin: 3px 4px 3px 0; padding: 4px 11px; border-radius: 999px; background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 24%, transparent); font-size: .8rem; font-weight: 800; }
+    .ov-list { margin: 0; padding-left: 18px; color: var(--text); line-height: 1.75; }
+    .ov-list li { margin-bottom: 4px; font-size: .9rem; }
+    .ov-final-note { margin: 10px 0 0; font-size: .88rem; font-weight: 700; color: var(--text2); background: color-mix(in srgb, var(--primary) 8%, transparent); border-radius: 10px; padding: 9px 12px; border-left: 3px solid var(--primary); }
+
+    @@media (max-width: 480px) {
+        .media-bar { padding: 10px 12px; gap: 7px; }
+        .media-bar-label { display: none; }
+        .media-btn { padding: 8px 13px; gap: 7px; border-radius: 10px; }
+        .media-btn-icon  { font-size: 1.25rem; }
+        .media-btn-title { font-size: .82rem; }
+        .media-btn-sub   { font-size: .66rem; }
+        .dashboard-btn { flex: 1; min-width: 0; padding: 12px 10px; justify-content: center; border-radius: 14px; white-space: nowrap; }
+        .ov-label { min-width: 74px; font-size: .75rem; }
+        .ov-val, .ov-sec-body, .ov-list li { font-size: .86rem; }
+        .summary-card { padding: 12px 13px; border-radius: 11px; }
+        .summary-body { font-size: .87rem; }
+        .yt-modal-title { font-size: .88rem; }
+        .yt-ctrl-btn { padding: 6px 12px; font-size: .78rem; }
+        /* ── 완료 버튼 모바일 레이아웃 개선 ─────────────────────
+           배지를 두 번째 줄로 내려 → 텍스트가 아이콘 옆 전체 너비 확보
+        ──────────────────────────────────────────────────────── */
+        .complete-mega {
+            flex-wrap: wrap;
+            padding: 14px 16px;
+            gap: 6px 10px;
+            border-radius: 16px;
+            align-items: center;
+        }
+        /* 아이콘: 약간 축소 */
+        .cm-icon-circle {
+            width: 40px; height: 40px;
+            font-size: 1.22rem;
+        }
+        /* 텍스트 영역: 남은 너비 전부 */
+        .cm-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .complete-mega-title {
+            font-size: .92rem;
+            line-height: 1.4;
+            word-break: keep-all;
+        }
+        .complete-mega-desc {
+            font-size: .72rem;
+            margin-top: 2px;
+        }
+        /* 배지: 두 번째 줄, 오른쪽 정렬 */
+        .cm-badge {
+            flex: 0 0 100%;
+            flex-direction: row;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            border-top: 1px solid rgba(255,255,255,.18);
+            padding-top: 8px;
+            margin-top: 2px;
+        }
+        .complete-mega-count {
+            font-size: .76rem;
+            padding: 4px 12px;
+        }
+        .cm-arrow { font-size: .88rem; }
+        .chapter-done-banner { font-size: .9rem; padding: 10px 12px; border-radius: 10px; }
+    }
+</style>
+
+@section Scripts {
+    <script>
+        (function () {
+            var OV_MODE_KEY = 'bibleOvMode';
+            var OV_OPEN_KEY = 'bibleOvOpen';
+
+            function ovInit() {
+                var savedMode = localStorage.getItem(OV_MODE_KEY) || 'simple';
+                _applyMode(savedMode, false);
+                if (localStorage.getItem(OV_OPEN_KEY) === '1') _setOpen(true, false);
+            }
+            function _setOpen(open, save) {
+                var card = document.getElementById('ovCard');
+                var head = document.getElementById('ovHead');
+                if (!card) return;
+                card.classList.toggle('is-open', open);
+                if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (save) localStorage.setItem(OV_OPEN_KEY, open ? '1' : '0');
+            }
+            function _applyMode(mode, save) {
+                var simple = document.getElementById('ovSimple');
+                var detail = document.getElementById('ovDetail');
+                var badge  = document.getElementById('ovModeBadge');
+                var btnS   = document.getElementById('ovBtnSimple');
+                var btnD   = document.getElementById('ovBtnDetail');
+                if (!simple) return;
+                var isDetail = (mode === 'detail');
+                simple.style.display = isDetail ? 'none' : '';
+                detail.style.display = isDetail ? ''     : 'none';
+                if (badge) badge.textContent = isDetail ? '상세본' : '간략본';
+                if (btnS)  btnS.classList.toggle('ov-sw-active', !isDetail);
+                if (btnD)  btnD.classList.toggle('ov-sw-active',  isDetail);
+                if (save) localStorage.setItem(OV_MODE_KEY, mode);
+            }
+            window.ovToggleOpen = function () {
+                var card = document.getElementById('ovCard');
+                if (!card) return;
+                _setOpen(!card.classList.contains('is-open'), true);
+            };
+            window.ovSetMode = function (mode) { _applyMode(mode, true); };
+            document.addEventListener('DOMContentLoaded', ovInit);
+        })();
+
+        (function () {
+            function extractId(url) {
+                if (!url) return null;
+                var u = url.trim(), m;
+                m = u.match(/[?&]v=([^&#\s]+)/);       if (m) return m[1];
+                m = u.match(/youtu\.be\/([^?&#\s]+)/);  if (m) return m[1];
+                m = u.match(/\/embed\/([^?&#\s]+)/);    if (m) return m[1];
+                m = u.match(/\/shorts\/([^?&#\s]+)/);   if (m) return m[1];
+                if (/^[A-Za-z0-9_-]{11}$/.test(u)) return u;
+                return null;
+            }
+            function buildEmbed(videoId) {
+                var p = new URLSearchParams({ autoplay:'1', loop:'1', playlist:videoId, start:'0', rel:'0', modestbranding:'1', playsinline:'1' });
+                return 'https://www.youtube.com/embed/' + videoId + '?' + p.toString();
+            }
+            function setOvStatus(text) { var el = document.getElementById('ovYtStatusMsg'); if (el) el.textContent = text; }
+
+            window.openOvYoutube = function (url, label) {
+                var modal = document.getElementById('ovYtModal');
+                var title = document.getElementById('ovYtTitle');
+                var host  = document.getElementById('ovYtFrameHost');
+                if (!modal || !host) return;
+                if (title) title.textContent = '🎬 ' + (label || '관련 영상');
+                var id = extractId(url);
+                if (!id) {
+                    setOvStatus('⚠️ 유튜브 주소가 올바르지 않습니다.');
+                    host.innerHTML = '';
+                } else {
+                    host.innerHTML = '<iframe src="' + buildEmbed(id) + '" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+                    setOvStatus('▶ 무한 반복 재생 중...');
+                }
+                modal.style.display = 'flex';
+            };
+            window.ovYtStop = function (e) {
+                if (e) { e.preventDefault(); e.stopPropagation(); }
+                var host = document.getElementById('ovYtFrameHost');
+                if (host) host.innerHTML = '';
+                setOvStatus('⏹ 정지됨');
+            };
+            window.closeOvYoutube = function (e) {
+                if (e) { e.preventDefault(); e.stopPropagation(); }
+                var modal = document.getElementById('ovYtModal');
+                if (modal) modal.style.display = 'none';
+                var host  = document.getElementById('ovYtFrameHost');
+                if (host) host.innerHTML = '';
+                setOvStatus('⏹ 닫힘');
+            };
+        })();
+
+        const BOOK  = '@Html.Raw(Model.BookName)';
+        const JANG  = @Model.Jang;
+        const TOTAL = @Model.Verses.Count;
+        let todayTotal = @Model.TodayTotalReadCount;
+        let mode    = parseInt(localStorage.getItem('bibleMode') ?? '0', 10);
+        let curPage = 0;
+        // ✅ 다중 토글 언어 선택 (Set 기반)
+        function _loadLangSet() {
+            var s = localStorage.getItem('bibleLang') || 'ko';
+            if (s==='all'||s==='al')   return new Set(['ko','modern','en']);
+            if (s==='both')            return new Set(['ko','en']);
+            if (s==='ko+modern')       return new Set(['ko','modern']);
+            var parts = s.split(',').filter(function(x){ return x==='ko'||x==='modern'||x==='en'; });
+            return parts.length > 0 ? new Set(parts) : new Set(['ko']);
+        }
+        var activeLangs = _loadLangSet();
+        function _saveLang(){ localStorage.setItem('bibleLang', Array.from(activeLangs).join(',')); }
+
+        function toggleLang(l) {
+            var ALL = ['ko','modern','en'];
+            if (l === 'all') {
+                activeLangs = ALL.every(function(x){ return activeLangs.has(x); }) ? new Set(['ko']) : new Set(ALL);
+            } else {
+                if (activeLangs.has(l)) { activeLangs.delete(l); if (activeLangs.size===0) activeLangs.add('ko'); }
+                else activeLangs.add(l);
+            }
+            _saveLang(); applyLang();
+        }
+
+        function applyLang() {
+            var showKo=activeLangs.has('ko'), showModern=activeLangs.has('modern'), showEn=activeLangs.has('en');
+            var isAll = showKo && showModern && showEn;
+
+            document.querySelector('[data-lang="all"]').classList.toggle('active', isAll);
+            document.querySelector('[data-lang="ko"]').classList.toggle('active', showKo);
+            document.querySelector('[data-lang="modern"]').classList.toggle('active', showModern);
+            document.querySelector('[data-lang="en"]').classList.toggle('active', showEn);
+
+            document.body.classList.remove('lang-ko','lang-en','lang-modern','lang-ko_modern','lang-all','lang-both');
+            if (showKo&&!showModern&&!showEn)       document.body.classList.add('lang-ko');
+            else if (!showKo&&showModern&&!showEn)  document.body.classList.add('lang-modern');
+            else if (!showKo&&!showModern&&showEn)  document.body.classList.add('lang-en');
+
+            document.querySelectorAll('.verse-card-r').forEach(function (card) {
+                var koLine     = card.querySelector('.vtext-ko-line');
+                var modernLine = card.querySelector('.vtext-modern-line');
+                var enLine     = card.querySelector('.vtext-en-line');
+                var koText     = card.querySelector('.vtext-ko');
+                var actions    = card.querySelector('.vactions-inline');
+
+                if (koText)     koText.style.display    = showKo     ? '' : 'none';
+                if (modernLine) modernLine.style.display = showModern ? '' : 'none';
+                if (enLine)     enLine.style.display     = showEn     ? '' : 'none';
+
+                if (actions) {
+                    if (!showKo && showModern && modernLine) modernLine.appendChild(actions);
+                    else if (!showKo && !showModern && showEn && enLine) enLine.appendChild(actions);
+                    else if (koLine) koLine.appendChild(actions);
+                }
+            });
+        }
+
+        let readSet = new Set(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Verses.Where(v => v.IsRead).Select(v => v.VerseId).ToList())));
+        let bmSet   = new Set(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Verses.Where(v => v.IsBookmarked).Select(v => v.VerseId).ToList())));
+
+        document.addEventListener('DOMContentLoaded', function () { applyMode(mode); applyLang(); checkMega(); scrollToTarget(); });
+
+        function scrollToTarget() {
+            const hash = location.hash;
+            if (hash) { const el = document.querySelector(hash); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } }
+            const firstUnread = [...document.querySelectorAll('.verse-card-r')].find(c => !c.classList.contains('is-read'));
+            if (firstUnread) setTimeout(() => firstUnread.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+        }
+
+        function setMode(m) { mode = m; localStorage.setItem('bibleMode', m); curPage = 0; applyMode(m); }
+        function applyMode(m) {
+            document.querySelectorAll('.mode-pill').forEach(function (b) { b.classList.toggle('active', parseInt(b.dataset.mode, 10) === m); });
+            const nav = document.getElementById('pageNav');
+            if (m === 0) { nav.style.display = 'none'; showAll(); }
+            else         { nav.style.display = 'flex'; showPage(0); }
+        }
+        function showAll() {
+            document.querySelectorAll('.verse-card-r').forEach(c => c.style.display = '');
+            document.querySelectorAll('.summary-card').forEach(s => s.style.display = '');
+        }
+        function showPage(p) {
+            const cards     = document.querySelectorAll('.verse-card-r');
+            const totalPage = Math.ceil(cards.length / mode);
+            curPage = Math.max(0, Math.min(p, totalPage - 1));
+            const startIdx  = curPage * mode;
+            const endIdx    = (curPage + 1) * mode;
+            cards.forEach((c, i) => { c.style.display = (i >= startIdx && i < endIdx) ? '' : 'none'; });
+            document.querySelectorAll('.summary-card').forEach(s => {
+                const idx = parseInt(s.dataset.idx, 10);
+                s.style.display = (idx >= startIdx && idx < endIdx) ? '' : 'none';
+            });
+            document.getElementById('pgInfo').textContent = `${curPage + 1} / ${totalPage} 페이지`;
+            document.getElementById('prevPg').disabled = curPage === 0;
+            document.getElementById('nextPg').disabled = curPage >= totalPage - 1;
+        }
+        function prevPage() { showPage(curPage - 1); }
+        function nextPage() { showPage(curPage + 1); }
+
+        function toggleVerse(verseId, btn) {
+            $.post('/Bible/ToggleVerse', { verseId }, function (d) {
+                const card = btn.closest('.verse-card-r');
+                if (!card) return;
+                if (d.isRead) { card.classList.add('is-read'); btn.classList.replace('unread','done'); btn.textContent = '📖'; readSet.add(verseId); }
+                else          { card.classList.remove('is-read'); btn.classList.replace('done','unread'); btn.textContent = '📗'; readSet.delete(verseId); }
+                if (d.todayTotal != null) todayTotal = d.todayTotal;
+                updateProg(d.readVerses, d.totalVerses);
+                checkMega();
+            });
+        }
+        function toggleBm(verseId, btn) {
+            const card = document.getElementById('vc-' + verseId);
+            $.post('/Bible/ToggleBookmark', { verseId }, function (d) {
+                if (d.isBookmarked) { btn.classList.add('bm-on'); btn.textContent = '📚'; card?.classList.add('bookmarked'); bmSet.add(verseId); }
+                else                { btn.classList.remove('bm-on'); btn.textContent = '🔖'; card?.classList.remove('bookmarked'); bmSet.delete(verseId); }
+            });
+        }
+
+        function showLoading() { const m = document.getElementById('loadingModal'); if (m) m.style.display = 'flex'; }
+        function hideLoading() { const m = document.getElementById('loadingModal'); if (m) m.style.display = 'none'; }
+
+        function markAllWithLoading(book, jang) {
+            const btn = document.getElementById('completeMega');
+            if (btn) btn.disabled = true;
+            showLoading();
+            $.post('/Bible/ToggleChapter', { bookName: book, jang }, function (d) {
+                if (d.isRead) {
+                    document.querySelectorAll('.verse-card-r').forEach(function (c) {
+                        c.classList.add('is-read');
+                        const verseId = parseInt(c.dataset.verseId, 10);
+                        readSet.add(verseId);
+                        const vbtn = document.getElementById('vr-' + verseId);
+                        if (vbtn) { vbtn.classList.replace('unread','done'); vbtn.textContent = '📖'; }
+                    });
+                    updateProg(d.readVerses ?? TOTAL, d.totalVerses ?? TOTAL);
+                } else {
+                    document.querySelectorAll('.verse-card-r').forEach(function (c) {
+                        c.classList.remove('is-read');
+                        const verseId = parseInt(c.dataset.verseId, 10);
+                        readSet.delete(verseId);
+                        const vbtn = document.getElementById('vr-' + verseId);
+                        if (vbtn) { vbtn.classList.replace('done','unread'); vbtn.textContent = '📗'; }
+                    });
+                    updateProg(d.readVerses ?? 0, d.totalVerses ?? TOTAL);
+                }
+                if (d.todayTotal != null) todayTotal = d.todayTotal;
+                checkMega();
+            }).fail(function () {
+                alert('처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }).always(function () {
+                hideLoading();
+                if (btn) btn.disabled = false;
+            });
+        }
+        function markAll(book, jang) { markAllWithLoading(book, jang); }
+
+        function updateProg(read, total) {
+            const pct = total ? (read / total * 100) : 0;
+            document.getElementById('progFill').style.width = pct + '%';
+            document.getElementById('progLbl').textContent  = `📊 ${read} / ${total} 절`;
+            document.getElementById('progPct').textContent  = Math.round(pct) + '%';
+        }
+
+        function checkMega() {
+            const btn    = document.getElementById('completeMega');
+            const title  = document.getElementById('completeMegaTitle');
+            const desc   = document.getElementById('completeMegaDesc');
+            const count  = document.getElementById('completeMegaCount');
+            const icon   = document.getElementById('cmIconCircle');
+            const banner = document.getElementById('chapterDoneBanner');
+            if (!btn || !title || !desc || !count || !banner) return;
+            const isAllRead = TOTAL > 0 && readSet.size >= TOTAL;
+            btn.classList.toggle('is-done',     isAllRead);
+            btn.classList.toggle('is-not-done', !isAllRead);
+            if (icon) icon.textContent = isAllRead ? '📗' : '📖';
+            title.textContent  = isAllRead ? '이 페이지 읽음으로 표시 취소 할까요?' : '이 페이지 읽음으로 표시 할까요?';
+            desc.style.display = isAllRead ? 'none' : 'inline';
+            count.textContent  = `오늘 읽은 총 절수 : ${todayTotal} 절`;
+            banner.classList.toggle('show', isAllRead);
+        }
+    </script>
+
+    @if (!string.IsNullOrEmpty(Model.YoutubeUrl))
+    {
+        // ⚠️ TimeMM/TimeSS 는 "동영상 길이"(bibleCenter 입력 화면 기준)다. 시작 위치로 쓰면 영상 끝에서 시작해 재생이 안 된다 → 항상 처음부터.
+        var ytStartSec = 0;
+        <script>
+            (function () {
+                const YT_URL   = '@Html.Raw(Model.YoutubeUrl)';
+                const YT_START = @ytStartSec;
+
+                function setStatus(text) { var el = document.getElementById('ytStatusMsg'); if (el) el.textContent = text; }
+                function extractVideoId(url) {
+                    if (!url) return null;
+                    var u = url.trim(), m;
+                    m = u.match(/[?&]v=([^&#\s]+)/);       if (m && m[1]) return m[1];
+                    m = u.match(/youtu\.be\/([^?&#\s]+)/);  if (m && m[1]) return m[1];
+                    m = u.match(/\/embed\/([^?&#\s]+)/);    if (m && m[1]) return m[1];
+                    m = u.match(/\/shorts\/([^?&#\s]+)/);   if (m && m[1]) return m[1];
+                    if (/^[A-Za-z0-9_-]{11}$/.test(u)) return u;
+                    return null;
+                }
+                function buildYoutubeEmbedUrl(videoId, startSeconds) {
+                    var params = new URLSearchParams({ autoplay:'1', loop:'1', playlist:videoId, start:String(startSeconds||0), rel:'0', modestbranding:'1', playsinline:'1' });
+                    return 'https://www.youtube.com/embed/' + videoId + '?' + params.toString();
+                }
+                // ── YouTube IFrame API ──
+                // 시작 시간(DB의 분·초)이 영상 길이 이상이면 끝에서 시작해 아무것도 안 나온다
+                // (예: 출애굽기 1장 — 영상 2:38, 시작 2:38). 실제 길이를 보고 처음부터 재생한다.
+                var ytPlayer = null, ytApiState = 0, ytApiWaiters = [];
+                function loadYtApi(cb) {
+                    if (window.YT && window.YT.Player) { cb(false); return; }
+                    ytApiWaiters.push(cb);
+                    if (ytApiState === 1) return;
+                    ytApiState = 1;
+                    var prevReady = window.onYouTubeIframeAPIReady;
+                    window.onYouTubeIframeAPIReady = function () {
+                        if (typeof prevReady === 'function') { try { prevReady(); } catch (_) { } }
+                        ytApiState = 2;
+                        ytApiWaiters.splice(0).forEach(function (f) { f(false); });
+                    };
+                    var s = document.createElement('script');
+                    s.src = 'https://www.youtube.com/iframe_api';
+                    s.onerror = function () { ytApiState = 0; ytApiWaiters.splice(0).forEach(function (f) { f(true); }); };
+                    document.head.appendChild(s);
+                }
+                function ytDestroy() {
+                    if (ytPlayer) { try { ytPlayer.destroy(); } catch (_) { } ytPlayer = null; }
+                }
+                function plainIframe(host, videoId) {
+                    // API 를 못 쓰면 처음부터 반복 재생 (끝에서 시작하는 문제는 피한다)
+                    host.innerHTML = '<iframe src="' + buildYoutubeEmbedUrl(videoId, 0) + '" title="YouTube audio player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+                    setStatus('▶ 무한 반복 재생 중...');
+                }
+                window.openYoutube = function (e) {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    var modal   = document.getElementById('ytModal');
+                    var host    = document.getElementById('ytFrameHost');
+                    var videoId = extractVideoId(YT_URL);
+                    if (modal) modal.style.display = 'flex';
+                    ytDestroy();
+                    if (!videoId) {
+                        setStatus('⚠️ 유튜브 주소가 올바르지 않습니다.');
+                        if (host) host.innerHTML = '';
+                        return false;
+                    }
+                    if (!host) return false;
+                    host.innerHTML = '<div id="ytPlayerSlot"></div>';
+                    setStatus('⏳ 불러오는 중...');
+                    var fallback = setTimeout(function () { if (!ytPlayer && document.getElementById('ytPlayerSlot')) plainIframe(host, videoId); }, 6000);
+                    loadYtApi(function (failed) {
+                        if (!document.getElementById('ytPlayerSlot')) return;   // 닫았거나 이미 대체 재생 중
+                        clearTimeout(fallback);
+                        if (failed) { plainIframe(host, videoId); return; }
+                        var start = YT_START > 0 ? YT_START : 0;
+                        function fixStart(p) {
+                            var d = 0; try { d = p.getDuration() || 0; } catch (_) { }
+                            if (d > 0 && start >= d - 2) start = 0;             // 시작 시간이 영상 끝 → 처음부터
+                        }
+                        ytPlayer = new YT.Player('ytPlayerSlot', {
+                            videoId: videoId,
+                            playerVars: { autoplay: 1, start: start, rel: 0, modestbranding: 1, playsinline: 1 },
+                            events: {
+                                onReady: function (ev) {
+                                    var before = start; fixStart(ev.target);
+                                    if (start !== before) ev.target.seekTo(0, true);
+                                    ev.target.playVideo();
+                                    setStatus('▶ 무한 반복 재생 중...');
+                                },
+                                onStateChange: function (ev) {
+                                    if (ev.data === YT.PlayerState.ENDED) {                // 무한 반복
+                                        fixStart(ev.target);
+                                        ev.target.seekTo(start, true);
+                                        ev.target.playVideo();
+                                    }
+                                },
+                                onError: function () { setStatus('⚠️ 이 영상은 지금 재생할 수 없습니다.'); }
+                            }
+                        });
+                    });
+                    return false;
+                };
+                window.ytStop = function (e) {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    ytDestroy();
+                    var host = document.getElementById('ytFrameHost');
+                    if (host) host.innerHTML = '';
+                    setStatus('⏹ 정지됨');
+                    return false;
+                };
+                window.closeYoutube = function (e) {
+                    if (e) { e.preventDefault(); e.stopPropagation(); }
+                    ytDestroy();
+                    var modal = document.getElementById('ytModal');
+                    if (modal) modal.style.display = 'none';
+                    var host  = document.getElementById('ytFrameHost');
+                    if (host) host.innerHTML = '';
+                    setStatus('⏹ 닫힘');
+                    return false;
+                };
+            })();
+        </script>
+    }
+}

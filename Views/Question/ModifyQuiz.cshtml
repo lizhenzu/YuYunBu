@@ -1,0 +1,129 @@
+@model BulletinBoard.Models.QuestionTypeDataObjects
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 수정 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css · 문제 작성과 같은 모양)
+    · 예전 _Layout_Quiz 대신 단독 화면.  폼 이름 · 검증 · 저장 주소(ModifyQuestionProcess) · hidden 값은 그대로
+    · 이전 화면은 ModifyQuiz.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    if (string.IsNullOrWhiteSpace(Model.QuestionBackground)) { Model.QuestionBackground = "blank"; }   // [Required] — 비어 있으면 저장이 막힌다
+    string qt = Model.QuestionType?.ToLower() ?? "";
+    string questionTypeLabel = qt switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    var ed = Model.ExposeDate;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>퀴즈 수정</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>저장하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/Index">퀴즈</a><span class="sep">›</span>수정</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k">EDIT · @questionTypeLabel · @ed.ToString("M월 d일") @(dayKor[(int)ed.DayOfWeek])요일</div>
+    <h1 class="qb-h1">퀴즈 수정</h1>
+
+    <form asp-action="ModifyQuestionProcess" method="post" onsubmit="return beforeSubmit(this);">
+        <div asp-validation-summary="ModelOnly"></div>
+
+        <div class="qb-f">
+            <label asp-for="@Model.QuestionBackground">문제 배경</label>
+            <textarea class="qb-in" id="QuestionBackground" name="QuestionBackground" asp-for="QuestionBackground" rows="2" style="min-height:70px"></textarea>
+            <span asp-validation-for="QuestionBackground" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label asp-for="@Model.QuestionQ">질문</label>
+            <textarea class="qb-in" id="QuestionQ" name="QuestionQ" asp-for="QuestionQ" rows="6" autofocus></textarea>
+            <span asp-validation-for="QuestionQ" class="error"></span>
+        </div>
+
+        @if (qt == "o")
+        {
+            <div class="qb-f">
+                <label asp-for="@Model.Question1">보기 1</label>
+                <input type="text" class="qb-in" id="Question1" name="Question1" asp-for="Question1" />
+                <span asp-validation-for="Question1" class="error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question2">보기 2</label>
+                <input type="text" class="qb-in" id="Question2" name="Question2" asp-for="Question2" />
+                <span asp-validation-for="Question2" class="error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question3">보기 3</label>
+                <input type="text" class="qb-in" id="Question3" name="Question3" asp-for="Question3" />
+                <span asp-validation-for="Question3" class="error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question4">보기 4</label>
+                <input type="text" class="qb-in" id="Question4" name="Question4" asp-for="Question4" />
+                <span asp-validation-for="Question4" class="error"></span>
+            </div>
+            <div class="qb-f">
+                <span class="lbl">정답 선택</span>
+                <div class="qb-cho">
+                    <label><input type="radio" name="CorrectAnswer" value="1" asp-for="CorrectAnswer" /><span>1번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="2" asp-for="CorrectAnswer" /><span>2번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="3" asp-for="CorrectAnswer" /><span>3번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="4" asp-for="CorrectAnswer" /><span>4번</span></label>
+                </div>
+                <span asp-validation-for="CorrectAnswer" class="error"></span>
+            </div>
+        }
+        else
+        {
+            <div class="qb-f">
+                <label asp-for="CorrectAnswer">정답</label>
+                <input asp-for="CorrectAnswer" class="qb-in" />
+                <span asp-validation-for="CorrectAnswer" class="error"></span>
+            </div>
+        }
+
+        <div class="qb-f">
+            <label asp-for="@Model.AnswerGuide">힌트 · 해설</label>
+            <textarea class="qb-in" id="AnswerGuide" name="AnswerGuide" asp-for="AnswerGuide" rows="6"></textarea>
+            <span asp-validation-for="AnswerGuide" class="error"></span>
+        </div>
+
+        <button type="submit" class="qb-submit">퀴즈 수정</button>
+
+        <input type="hidden" id="QuestionType" name="QuestionType" value="@Model.QuestionType" />
+        <input type="hidden" id="Id" name="Id" value="@Model.Id" />
+        <input type="hidden" id="ExposeDate" name="ExposeDate" value="@Model.ExposeDate" />
+    </form>
+
+    <div class="qb-ft">
+        <span>퀴즈 수정</span>
+        <span><a href="/Question/Index">퀴즈 달력</a><a href="/Question/QuestionDetailList">퀴즈 목록</a><a href="#" onclick="history.back(); return false;">뒤로</a></span>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script>
+    function beforeSubmit(form) {
+        if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) return false;
+        document.getElementById('loadingOverlay').classList.add('on');
+        return true;
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

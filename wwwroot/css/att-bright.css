@@ -1,0 +1,328 @@
+﻿/* ══════════════════════════════════════════════════════════════
+   출석부 통계·분석 화면 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정)
+   board-bone.css 와 각 화면 <style> 뒤에 불러와 덮어쓴다.
+   · 색 변수를 밝은 값으로 바꾸고, 짙은 머리 · 명조 제목 · 굵은 선을 밝게 바꾼다.
+   · 화면 구조와 스크립트는 건드리지 않는다.
+   ══════════════════════════════════════════════════════════════ */
+:root, :root:not([data-x]) {
+    --bg: #FFFFFF; --tx: #111827; --dim: #9CA3AF; --dim2: #6B7280;
+    --rule: #EEF0F3; --line: #EEF0F3; --acc: #2F80ED; --mark: #EAF2FD; --card: #FFFFFF;
+    --head: #FFFFFF; --headtx: #111827; --headk: #2F80ED; --headdim: #6B7280;
+    --danger: #D9534F; --pad: 16px;
+    --ab-grey: #F4F6F9; --ab-ok: #15803D; --ab-okbg: #EAF7EF;
+    color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #FFFFFF; --tx: #111827; --dim: #9CA3AF; --dim2: #6B7280;
+        --rule: #EEF0F3; --line: #EEF0F3; --acc: #2F80ED; --mark: #EAF2FD; --card: #FFFFFF;
+        --head: #FFFFFF; --headtx: #111827; --headk: #2F80ED; --headdim: #6B7280; --danger: #D9534F;
+    }
+}
+
+/* 글꼴 — 명조 · Inter 를 모두 고딕 하나로 */
+body, body *:not(i):not(svg):not(path) { font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif !important; }
+body { background: #FFFFFF; color: #374151; }
+
+/* 머리 — 짙은 띠 대신 흰 바탕 */
+.hd { background: #FFFFFF !important; color: #111827; }
+.hd .sh { padding-top: 0; padding-bottom: 4px; }
+.hdTop { padding: 14px 0 12px; border-bottom: 1px solid #EEF0F3; color: #6B7280; }
+.hdTop a { font-weight: 700; color: #374151; }
+.hdTop a:hover { color: #2F80ED; }
+.hdTop .sep { color: #D1D5DB; opacity: 1; }
+.hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+.hdT { margin-top: 6px; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #111827; }
+.hdS { color: #6B7280; }
+.hdS b { font-weight: 800; color: #111827; }
+@media (max-width: 480px) { .hdT { font-size: 22px; } }
+
+/* 구역 제목 — 굵은 검정 아랫줄 대신 가는 윗줄 */
+.sec { margin-top: 24px; }
+.secH { padding: 16px 0 8px; border-bottom: 0; border-top: 1px solid #EEF0F3; }
+.secK { font-size: 11.5px; font-weight: 800; letter-spacing: 0; color: #2F80ED; }
+.secT { margin-top: 1px; font-size: 16px; font-weight: 800; color: #111827; }
+.secN { font-size: 11.5px; font-weight: 600; color: #9CA3AF; }
+
+.tag { background: #EAF2FD; color: #2F80ED; border-radius: 999px; padding: 1px 8px; letter-spacing: 0; font-weight: 800; }
+.tag.line { background: #EAF2FD; border: 0; color: #2F80ED; }
+.empty { color: #9CA3AF; }
+.ft { padding: 16px 0 24px; font-size: 11.5px; color: #9CA3AF; }
+.ft a { color: #2F80ED; font-weight: 700; }
+
+/* 버튼 · 입력 — 둥근 알약 */
+.nbtn { border: 0; border-radius: 999px; background: #F4F6F9; color: #374151; font-weight: 700; }
+.nbtn:hover { color: #2F80ED; }
+.nbtn.pri { background: #2F80ED; color: #fff; }
+.nbtn.pri:hover { background: #1F6FDB; color: #fff; }
+.hd .nbtn { background: #F4F6F9; color: #374151; }
+.hd .nbtn.pri { background: #2F80ED; color: #fff; }
+.fIn, select, input[type=date], input[type=search], input[type=text] { border-radius: 12px; }
+.fIn { border: 0; background: #F4F6F9; }
+.fIn:focus { background: #fff; box-shadow: inset 0 0 0 2px #2F80ED; }
+
+/* 표 — 가는 줄, 위 머리글은 흐린 글자 */
+table { border-color: #EEF0F3; }
+th { color: #9CA3AF; font-weight: 400; }
+
+/* ── 월별 통계 · 통계 상세 (민트 카드 화면) — 같은 밝은 톤으로 ── */
+:root {
+    --ink: #111827; --muted: #6B7280; --primary: #2F80ED;
+    --shadow: none; --radius: 14px;
+    --gold: #2F80ED; --silver: #7FA3DB; --bronze: #9FBCE6;
+    --ok: #15803D;
+}
+.wrap { max-width: 760px !important; padding-left: 16px !important; padding-right: 16px !important; }
+.page-title { font-size: 24px !important; font-weight: 800 !important; letter-spacing: -.02em !important; color: #111827; }
+.page-sub { color: #6B7280 !important; }
+.section-title { font-size: 16px !important; font-weight: 800 !important; color: #111827 !important; margin-top: 24px !important; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+.card, .box, .panel, .stat-card, .summary-card, .rank-card, .top-card, .month-card, .class-card { box-shadow: none !important; border-color: #EEF0F3 !important; border-radius: 14px !important; }
+.nav-btn, .btn { box-shadow: none !important; border: 0 !important; border-radius: 999px !important; background: #F4F6F9 !important; color: #374151 !important; font-weight: 700 !important; }
+.nav-btn.primary, .btn-primary { background: #EAF2FD !important; color: #2F80ED !important; }
+.nav-btn:hover, .btn:hover { transform: none !important; color: #2F80ED !important; }
+
+/* ── 최근 3주 현황 (AdminTrend3Weeks) ── */
+.big .pct { font-weight: 300; font-size: 48px; color: #2F80ED; }
+.big .pct small { font-size: 18px; color: #6B7280; }
+.big .sub b { font-weight: 800; color: #111827; }
+.chg { border: 0; padding: 0; font-weight: 800; color: #D9534F; }
+.chg.up { color: #15803D; }
+.chg.eq { color: #9CA3AF; }
+.ch { background: none; border: 0; border-bottom: 1px solid #EEF0F3; padding-top: 6px; }
+.cb .v { font-weight: 700; font-size: 12.5px; color: #6B7280; }
+.cb .col { background: #EEF3FB; border-radius: 8px 8px 0 0; overflow: hidden; }
+.cb .col i { background: #CFE0FA; border-radius: 8px 8px 0 0; }
+.cb.lo .col i { background: #F3B3B1; }
+.cb.now .col i { background: #2F80ED; }
+.cb.now.lo .col i { background: #E57F7C; }
+.cb.now .v, .cb.now .dt { color: #2F80ED; font-weight: 800; }
+.wkK { font-size: 11.5px; font-weight: 800; letter-spacing: 0; color: #2F80ED; }
+.wkT b { font-weight: 800; font-size: 15.5px; color: #111827; }
+.wkT .p { font-weight: 300; font-size: 20px; color: #111827; }
+.wk.lo .wkT .p, .wk.lo .pp { color: #D9534F; }
+.bar { height: 5px; border-radius: 3px; background: #E8ECF2; overflow: hidden; }
+.bar i { height: 5px; border-radius: 3px; background: #2F80ED; }
+.wk.lo .bar i { background: #F3B3B1; }
+.wkM .a { color: #15803D; }
+.wkA { flex-wrap: wrap; }
+.wkA a { flex: none; height: auto; padding: 7px 13px; border: 0; border-radius: 999px; background: #F4F6F9; color: #374151; font-size: 12.5px; font-weight: 700; }
+.wkA a:hover { color: #2F80ED; }
+.wkA a.pri { background: #EAF2FD; color: #2F80ED; }
+.wkA a.pri:hover { background: #DCE9FB; color: #2F80ED; }
+.wkA + .wkA { margin-top: 6px; }
+@media (min-width: 760px) { article.wk { background: #FFFFFF !important; border: 1px solid #EEF0F3 !important; border-radius: 14px; } article.wk.now { border-color: #2F80ED !important; box-shadow: none !important; } }
+.more a { border-bottom: 1px solid #EEF0F3; }
+.mL { font-weight: 700; font-size: 15.5px; color: #111827; }
+.mD { color: #6B7280; }
+.more i { color: #7FA3DB; }
+
+/* ── 반별 출석 (AdminTrendSundayDetail) · 공통 주 이동 ── */
+.dn h1 { font-weight: 800; font-size: 24px; letter-spacing: -.02em; color: #111827; }
+.dn h1 small { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+.dn a, .dn span.off { font-weight: 300; color: #6B7280; }
+.st div { font-size: 11.5px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; }
+.st b { font-weight: 300; color: #111827; }
+.st .k b { color: #2F80ED; }
+.st .lo b { color: #D9534F; }
+.seg { border: 0; gap: 6px; }
+.seg button { border: 0 !important; border-radius: 999px; background: #F4F6F9; color: #6B7280; }
+.seg button.on { background: #2F80ED; color: #fff; font-weight: 700; }
+.clT b { font-weight: 800; font-size: 15.5px; color: #111827; }
+.clT .p { font-weight: 300; font-size: 20px; color: #111827; }
+.cl.lo .clT .p { color: #D9534F; }
+.bar i { background: #2F80ED; }
+.cl.lo .bar i { background: #F3B3B1; }
+.clM .a { color: #15803D; }
+.clM .go a { border: 0; border-radius: 999px; background: #F4F6F9; color: #374151; font-weight: 700; font-size: 12.5px; }
+.clM .go a:hover { color: #2F80ED; }
+.clM .go a.pri { background: #EAF2FD; color: #2F80ED; }
+.clM .go a.pri:hover { background: #DCE9FB; color: #2F80ED; }
+.links a { border: 0; border-radius: 12px; background: #F4F6F9; color: #374151; font-weight: 700; }
+.links a:hover { color: #2F80ED; }
+
+/* ── 아이별 출석 등수 (AdminStudentRank3Weeks) ── */
+.tools { background: #FFFFFF; border-bottom: 1px solid #EEF0F3; }
+.chips { gap: 6px; }
+.chips button { border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; }
+.chips button.on { background: #2F80ED; color: #fff; font-weight: 700; }
+.tg { border: 0; gap: 4px; background: #F4F6F9; border-radius: 999px; padding: 3px; }
+.tg button { border: 0 !important; border-radius: 999px; background: none; color: #6B7280; padding: 6px 13px; }
+.tg button.on { background: #FFFFFF; color: #2F80ED; font-weight: 800; box-shadow: 0 1px 3px rgba(17,24,39,.08); }
+.pd { background: #F4F6F9; border: 0; border-radius: 14px; }
+.pd.p1 { background: #EAF2FD; border: 0; box-shadow: none; }
+.pd i { font-weight: 800; color: #7FA3DB; }
+.pd.p1 i { color: #2F80ED; }
+.pd b { font-weight: 800; color: #111827; }
+.pd em { font-weight: 700; color: #374151; }
+.pd .tie { border: 0; border-radius: 999px; background: #FFFFFF; color: #2F80ED; font-weight: 800; letter-spacing: 0; padding: 1px 8px; }
+.asH { font-size: 11.5px; letter-spacing: 0; font-weight: 800; color: #2F80ED; }
+.wr { background: #FDEEEE; border: 0; border-radius: 12px; }
+.wr i { color: #D9534F; font-weight: 800; }
+.rk { font-weight: 800; font-size: 15px; color: #7FA3DB; }
+.rk.same { color: #E1E6EE; }
+.gh { background: #EAF2FD; border-left: 0; border-radius: 12px; }
+.gh b { font-weight: 800; color: #2F80ED; }
+.gh span { font-weight: 700; color: #111827; }
+.nm b { font-weight: 700; color: #111827; }
+.nb b { font-weight: 300; font-size: 17px; color: #111827; }
+.nb.lo b { color: #D9534F; }
+.bar.lo i { background: #F3B3B1; }
+.cH { border-bottom: 0; border-top: 1px solid #EEF0F3; padding-top: 14px; }
+.cH b { font-weight: 800; color: #111827; }
+.sum { background: #F4F6F9; border: 0; border-radius: 12px; }
+
+/* ── 아이별 주별 출석표 (AdminStudentMatrixWeeks) ── */
+.dn a { border-bottom-color: #E1E6EE; }
+.dn a.on { color: #2F80ED; border-color: #2F80ED; font-weight: 800; }
+.wkChart { background: none; border: 0; border-top: 1px solid #EEF0F3; border-bottom: 1px solid #EEF0F3; padding-left: 0; padding-right: 0; }
+.bars a { background: #CFE0FA; border-radius: 3px 3px 0 0; }
+.bars a:hover { background: #7FA3DB; }
+.bars a.now { background: #2F80ED; }
+.mo span { border-left-color: #EEF0F3; }
+.seg button + button { border-left: 0 !important; }
+.srch { border: 0; border-radius: 12px; background: #F4F6F9; }
+.srch:focus { background: #fff; box-shadow: inset 0 0 0 2px #2F80ED; }
+.lg i { border-radius: 3px; border-color: #D1D5DB; }
+.lg i.p { background: #2F80ED; border-color: #2F80ED; }
+.lg i.x3 { border-color: #F3B3B1; background: #FDEEEE; }
+.mxW { border: 0; border-top: 1px solid #EEF0F3; background: #FFFFFF; }
+.wk .nm { background: #FFFFFF; border-right-color: #EEF0F3; }
+.wk .nm b { font-weight: 700; color: #111827; }
+.wk thead th { background: #FFFFFF; }
+.wk thead th.nm, .wk .r3 th { border-bottom-color: #E1E6EE; }
+.wk .tn { color: #2F80ED; }
+.wk .m1 { border-left-color: #E1E6EE; }
+.wk .now { background: #F1F6FD; }
+.wk td.c i { border-radius: 4px; border-color: #E1E6EE; }
+.wk td.c i.p { background: #2F80ED; border-color: #2F80ED; }
+.wk td.c i.x3 { border-color: #F3B3B1; background: #FDEEEE; }
+/* ── 월별 통계 (Statistics) · 통계 상세 (StatisticsDetail) ── */
+.top-actions { justify-content: flex-start !important; }
+.card.card-pad { background: #FFFFFF !important; border: 0 !important; padding: 0 !important; }
+.month-grid { gap: 6px !important; }
+.month-card { border: 0 !important; border-radius: 999px !important; background: #F4F6F9 !important; color: #6B7280 !important; box-shadow: none !important; font-weight: 400 !important; }
+.month-card:hover { transform: none !important; color: #2F80ED !important; }
+.month-card.active { background: #2F80ED !important; color: #fff !important; font-weight: 800 !important; }
+.btn-detail { box-shadow: none !important; border: 0 !important; border-radius: 999px !important; background: #EAF2FD !important; color: #2F80ED !important; font-weight: 800 !important; }
+.btn-detail:hover { transform: none !important; }
+.rank-card { background: #F4F6F9 !important; border: 0 !important; box-shadow: none !important; }
+.rank-card.gold { background: #EAF2FD !important; }
+.rank-badge { font-weight: 800 !important; color: #7FA3DB !important; }
+.rank-card.gold .rank-badge { color: #2F80ED !important; }
+.rank-class { font-weight: 800 !important; color: #111827 !important; }
+.rank-meta { color: #6B7280 !important; }
+.rank-pill { border: 0 !important; border-radius: 999px !important; background: #FFFFFF !important; color: #2F80ED !important; box-shadow: none !important; }
+.summary-card { background: #FFFFFF !important; border: 0 !important; border-left: 1px solid #EEF0F3 !important; border-radius: 0 !important; box-shadow: none !important; text-align: center; padding: 6px 4px !important; }
+.summary-card:first-child { border-left: 0 !important; }
+.summary-card:hover { transform: none !important; }
+.summary-top { justify-content: center !important; }
+.summary-top .value { font-weight: 300 !important; color: #111827 !important; }
+.summary-card:first-child .summary-top .value { color: #2F80ED !important; }
+.summary-label { color: #9CA3AF !important; font-size: 11.5px !important; }
+.muted { color: #6B7280 !important; }
+.table th { background: #FFFFFF !important; color: #9CA3AF !important; border-color: #EEF0F3 !important; }
+.table td { border-color: #EEF0F3 !important; }
+.click-row:hover { background: #F1F6FD !important; }
+.table .badge { border: 0 !important; border-radius: 999px !important; background: #EAF2FD !important; color: #2F80ED !important; }
+.last-class-pill { border: 0 !important; border-radius: 999px !important; background: #EAF2FD !important; color: #2F80ED !important; }
+.hint { color: #6B7280 !important; }
+
+/* ── 주일 명단 (SundayStudentsMobile) ── */
+.prog b { font-weight: 300; color: #111827; }
+.prog i { color: #D9534F; }
+.hd .bar, .prog + .bar { background: #E8ECF2; }
+.hd .bar i { background: #2F80ED; }
+.seg button { flex: 1; }
+.jump a { border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; }
+.jump a b { font-weight: 800; color: #111827; }
+.jump a.full { background: #EAF7EF; color: #15803D; }
+.jump a.zero { background: #FDEEEE; color: #D9534F; }
+.cH { border-bottom: 0; border-top: 1px solid #EEF0F3; padding-top: 14px; }
+.cH b { font-weight: 800; color: #111827; }
+.cH .n b { font-weight: 800; color: #15803D; }
+.cBar { height: 4px; border-radius: 2px; background: #E8ECF2; overflow: hidden; }
+.cBar i { height: 4px; background: #7CCB9B; }
+.kid { border: 0; border-radius: 999px; background: #F4F6F9; color: #9CA3AF; font-weight: 700; height: 44px; }
+.kid.on { background: #EAF7EF; color: #15803D; border: 0; }
+.kid.on::after { display: none; }
+.kid.off { border: 0; }
+.nw { border-radius: 999px; background: #EAF2FD; color: #2F80ED; font-weight: 800; padding: 1px 6px; }
+.kid.on .nw { background: #fff; color: #15803D; }
+.fix a { border-bottom: 0; color: #2F80ED; font-weight: 700; }
+
+/* ── 주일 보고서 (SundayStudentsPC) 화면 위쪽 — 아래 인쇄 종이는 그대로 ── */
+.dn a, .dn span.off { border: 0 !important; color: #6B7280; }
+.dn select { background: #F4F6F9; color: #111827; border: 0; border-radius: 12px; font-weight: 700; }
+.acts a, .acts button { border: 0; border-radius: 999px; background: #F4F6F9; color: #374151; font-weight: 700; font-size: 12.5px; padding: 8px 14px; }
+.acts a:hover, .acts button:hover { color: #2F80ED; }
+.acts .pri { background: #EAF2FD; color: #2F80ED; font-weight: 800; }
+.acts .pri:hover { color: #2F80ED; }
+@media print { body, body *:not(i):not(svg):not(path) { font-family: "Noto Sans KR", "Malgun Gothic", sans-serif !important; } }
+
+/* ── 돌봄 · 연락할 아이 (LongAbsent) ── */
+.seg a { border: 0 !important; border-radius: 999px; background: #F4F6F9; color: #6B7280; flex: none; padding: 8px 14px; }
+.seg a.on { background: #2F80ED; color: #fff; font-weight: 700; }
+.wk b { font-weight: 300; color: #D9534F; }
+.wk.never b { font-weight: 700; color: #D9534F; }
+.caN { font-weight: 800; color: #111827; }
+.caM { color: #6B7280; }
+.caMemo { background: #F4F6F9; border-radius: 10px; }
+.call { height: auto; padding: 8px 14px; border-radius: 999px; background: #EAF2FD; color: #2F80ED; font-weight: 800; font-size: 13px; }
+.call:hover { background: #DCE9FB; color: #2F80ED; }
+.call.off { border: 0; background: #F4F6F9; color: #9CA3AF; }
+.good b { font-weight: 800; color: #111827; }
+
+/* ── 반 담임 배정 (TeacherAssign) ── */
+.ok { border-left: 0; border-radius: 12px; background: #EAF7EF; color: #15803D; }
+.ok.bad { background: #FDEEEE; color: #D9534F; }
+.clN { font-weight: 800; font-size: 15.5px; color: #111827; }
+.clT b { font-weight: 800; color: #15803D; }
+.clT.none { color: #B4531F; font-weight: 800; }
+.cl.none { background: none; }
+.sel { border: 0; border-radius: 12px; background-color: #F4F6F9; }
+.sel:focus { background-color: #fff; box-shadow: inset 0 0 0 2px #2F80ED; }
+.sel.changed { background-color: #EAF2FD; box-shadow: inset 0 0 0 2px #2F80ED; }
+.save { border: 0; border-radius: 12px; background: #E1E6EE; color: #9CA3AF; font-weight: 800; }
+.save.on { background: #2F80ED; color: #fff; }
+.save.on:hover { background: #1F6FDB; color: #fff; }
+.clAct .hint, .cl .hint { color: #2F80ED !important; }
+
+/* ── 전체반 대시보드 (DashboardAll) · 반 대시보드 (Dashboard) ── */
+:root { --good: #15803D; --goodBg: #EAF7EF; --warn: #B4531F; --warnBg: #FBEFE7; --dangerBg: #FDEEEE; }
+.topbar { background: #FFFFFF !important; backdrop-filter: none !important; border-bottom: 1px solid #EEF0F3 !important; }
+h1 { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #111827; }
+.sub { color: #6B7280; }
+.ctl { border: 0 !important; border-radius: 12px !important; background: #F4F6F9 !important; box-shadow: none !important; }
+.ctl label { color: #9CA3AF; }
+.ctl input[type="date"], .ctl select { font-weight: 700; color: #111827; }
+.toggle { border: 0 !important; background: #F4F6F9 !important; box-shadow: none !important; }
+.switch { border: 0 !important; background: #D9DEE6 !important; }
+.knob { background: #fff !important; box-shadow: 0 2px 6px rgba(17,24,39,.2); }
+.toggle input:checked + .switch { background: #F3B3B1 !important; }
+.pill { border: 0 !important; background: #F4F6F9 !important; box-shadow: none !important; color: #6B7280; }
+.pill strong { color: #111827; font-weight: 800; }
+.search { border: 0 !important; background: #F4F6F9 !important; box-shadow: none !important; }
+.legend .tag { border: 0 !important; background: #F4F6F9 !important; color: #6B7280 !important; font-weight: 700; padding: 6px 10px; }
+.dot.good { background: #15803D; } .dot.danger { background: #D9534F; } .dot.warn { background: #B4531F; }
+.grid .card, .card:not(.card-pad) { background: #F4F6F9 !important; border: 0 !important; box-shadow: none !important; border-radius: 14px !important; }
+.card:hover { transform: none !important; box-shadow: none !important; }
+.card:before { display: none !important; }
+.card.not-checked { background: #FBEFE7 !important; }
+.title { font-weight: 800; color: #111827; }
+.badge { border: 0 !important; border-radius: 999px; }
+.badge.good { background: #EAF7EF; color: #15803D; }
+.badge.danger { background: #FDEEEE; color: #D9534F; }
+.badge.warn { background: #FBEFE7; color: #B4531F; }
+.meta { color: #6B7280; }
+.rate { font-weight: 300; font-size: 26px; color: #2F80ED; }
+.card.not-checked .rate { color: #B4531F; font-size: 15px; font-weight: 800; }
+.btn.primary { background: #EAF2FD !important; color: #2F80ED !important; }
+.alert { border: 0 !important; border-radius: 14px !important; background: #FBEFE7 !important; box-shadow: none !important; }
+.alert .title { color: #B4531F; font-weight: 800; }
+.chip-link { border: 0 !important; background: #FFFFFF !important; color: #374151 !important; font-weight: 700; }
+.section-head h2 { font-weight: 800; color: #111827; }
+.nccard { border: 0 !important; background: #FBEFE7 !important; box-shadow: none !important; border-radius: 14px !important; }
+.nccard .t { font-weight: 800; color: #111827; }
+.note { color: #9CA3AF; }
+.card .btn:not(.primary) { background: #FFFFFF !important; }
+

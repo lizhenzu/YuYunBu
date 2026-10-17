@@ -1,0 +1,387 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment WebEnv
+
+@*  ══════════════════════════════════════════════════════════════
+    다가오는 생일 — 장부처럼 한 줄에 한 사람.  D-day · 사진 · 이름 · 반 · 출석 · 선물 상태.
+    /ApplyEvent/Branch 의 Bone(.qz) 안에서만 쓰인다.  숨기기 쿠키 · 라이트박스 · 복사는 그대로 둔다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isAdmin || isSuperAdmin;
+
+    var birthdayList  = ViewBag.BirthDayList7 as IEnumerable<BulletinBoard.Models.UpcomingBirthdayRowVM>;
+    var withinDays    = (int?)(ViewBag.BirthDayWithinDays) ?? 30;
+    var attMap2       = ViewBag.AttendanceMap as Dictionary<int, int>;
+    var attWeeksCount = (int?)(ViewBag.AttendanceWeeksCount) ?? 0;
+    var lastAttendMap = ViewBag.LastAttendDateMap as Dictionary<int, DateTime>;
+
+    // 반별 담임선생님 (키 = "학년-반") — ApplyEventController.Branch 가 채운다
+    var teacherMap = ViewBag.ClassTeacherMap as Dictionary<string, (string Name, string Phone)>;
+
+    // 상품별 쿠팡 URL (ProductId → ExternalUrl)
+    var coupangUrlMap = (ViewBag.CoupangItems as List<BulletinBoard.Models.AwardItem>)
+        ?.Where(x => !string.IsNullOrWhiteSpace(x.ExternalUrl))
+        .ToDictionary(x => x.ProductID, x => x.ExternalUrl!)
+        ?? new Dictionary<int, string>();
+
+    var rows = (birthdayList ?? Enumerable.Empty<BulletinBoard.Models.UpcomingBirthdayRowVM>())
+               .Where(r => r.User != null && r.DDay >= 1 && r.DDay <= withinDays)
+               .OrderBy(r => r.DDay)
+               .ToList();
+}
+
+@functions {
+    string GetDayOfWeekName(DateTime date)
+        => date.ToString("ddd", new System.Globalization.CultureInfo("ko-KR"));
+}
+
+@if (rows.Count > 0)
+{
+    @* 설정과 상관없이 항상 보인다 (숨기기 · 서버 쿠키 판정 없음) *@
+    <div id="bd-root" class="bd-root">
+
+        <!-- 실제 콘텐츠 -->
+        <div class="bd-content">
+
+            <div class="bdSec">
+                <span class="bdSecT">다가오는 생일 · @(rows.Count)명</span>
+                <span class="bdHide">
+                    <span>@(withinDays)일 이내</span>
+                </span>
+            </div>
+
+            <div class="bdList">
+                @foreach (var row in rows)
+                {
+                    var b        = row.User;
+                    var dday     = row.DDay;
+                    var weekName = GetDayOfWeekName(row.NextBirthdayDate);
+                    bool picked  = row.HasPickedGift;
+                    bool sent    = row.IsSent;
+                    bool hot     = dday <= 3;
+
+                    string giftImg = "";
+                    if (picked && row.ProductId.HasValue && row.ProductId.Value > 0)
+                    {
+                        var imgPath = System.IO.Path.Combine(WebEnv.WebRootPath, "images", "AwardItem", $"{row.ProductId.Value}.jpg");
+                        var imgVer  = System.IO.File.Exists(imgPath)
+                                      ? new System.IO.FileInfo(imgPath).LastWriteTime.Ticks
+                                      : DateHelper.GetKoreaNow().Ticks;
+                        giftImg = $"/images/AwardItem/{row.ProductId.Value}.jpg?v={imgVer}";
+                    }
+
+                    // 출석
+                    string attText = ""; bool attWarn = false;
+                    if (attMap2 != null && b.PersonId > 0 && attWeeksCount > 0 && attMap2.TryGetValue(b.PersonId, out var attCnt))
+                    {
+                        int rate = (int)Math.Round(attCnt * 100.0 / attWeeksCount);
+                        attText = $"{attCnt}/{attWeeksCount} ({rate}%)";
+                        attWarn = rate < 50;
+                    }
+                    string lastText = ""; bool lastWarn = false;
+                    if (lastAttendMap != null && b.PersonId > 0)
+                    {
+                        if (lastAttendMap.TryGetValue(b.PersonId, out var lastDate))
+                        {
+                            var daysDiff = (DateHelper.GetKoreaToday() - lastDate.Date).Days;
+                            lastText = $"마지막 {lastDate:M/d} ({daysDiff}일 전)";
+                            lastWarn = daysDiff > 21;
+                        }
+                        else { lastText = "출석 기록 없음"; lastWarn = true; }
+                    }
+
+                    <article class="bdRow @(hot ? "hot" : "")" data-user-id="@b.UserId">
+
+                        <div class="bdDd">
+                            <div class="bdDdN"><u>D</u>@dday</div>
+                            <div class="bdDdW">@(row.NextBirthdayDate.ToString("M.d")) @weekName</div>
+                        </div>
+
+                        <div class="bdBody">
+                            <div class="bdTop">
+                                <img class="bdAv"
+                                     src="@b.ProfilePicturePath"
+                                     alt="@b.FullName"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+
+                                <div class="bdTx">
+                                    <div class="bdNm">@b.FullName<a href="/humanResource/confirmbirth?UserId=@b.UserId" title="생일 수정">수정</a></div>
+                                    <div class="bdMt">
+                                        @if (!string.IsNullOrWhiteSpace(b.UserName)) { <span>@b.UserName</span> }
+                                        @if (b.ClassYear > 0) { <span>@($"{b.ClassYear}학년 {b.ClassBan}반")</span> }
+                                        @if (!string.IsNullOrWhiteSpace(b.PhoneNumber))
+                                        {
+                                            // 부모님 연락처 — "(모)" 같은 표시는 빼고 숫자만 모아 전화를 건다
+                                            var pDigits = new string(b.PhoneNumber.Where(char.IsDigit).ToArray());
+                                            <span>@b.PhoneNumber @if (pDigits.Length >= 9) { <a class="bdTel" href="tel:@pDigits">전화</a> }</span>
+                                        }
+                                    </div>
+                                    @if (attText != "" || lastText != "")
+                                    {
+                                        <div class="bdMt">
+                                            @if (attText != "") { <span><b>출석</b> <em class="@(attWarn ? "warn" : "")">@attText</em></span> }
+                                            @if (lastText != "") { <span class="@(lastWarn ? "warn" : "")">@lastText</span> }
+                                        </div>
+                                    }
+                                    @{
+                                        // 담임선생님 (이름 · 연락처) — 그 아이가 속한 반의 담임
+                                        string tName = "", tPhone = "";
+                                        if (teacherMap != null && b.ClassYear > 0
+                                            && teacherMap.TryGetValue($"{b.ClassYear}-{b.ClassBan}", out var tInfo))
+                                        {
+                                            tName = tInfo.Name; tPhone = tInfo.Phone;
+                                        }
+                                        var tDigits = new string(tPhone.Where(char.IsDigit).ToArray());
+                                    }
+                                    @if (tName != "")
+                                    {
+                                        <div class="bdMt">
+                                            <span><b>담임</b> @tName 선생님</span>
+                                            @if (tPhone != "")
+                                            {
+                                                <span>@tPhone @if (tDigits.Length >= 9) { <a class="bdTel" href="tel:@tDigits">전화</a> }</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (isStaff && !string.IsNullOrWhiteSpace(row.Memo))
+                                    {
+                                        <div class="bdMemo">@row.Memo</div>
+                                    }
+                                </div>
+
+                                @if (b.RoleCode == "T1001")
+                                {
+                                    <div class="bdAct">
+                                        <div class="bdSts">
+                                            <span class="bdSt @(picked ? "on" : "")">@(picked ? "선택완료" : "미선택")</span>
+                                            <span class="bdSt @((picked && sent) ? "on" : "")">@(picked ? (sent ? "발송완료" : "미발송") : "대기")</span>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(b.UserId))
+                                        {
+                                            <a class="bdBtn @(picked ? "line" : "")"
+                                               href="/Present/Birth?userid=@Uri.EscapeDataString(b.UserId)">@(picked ? "선물 바꾸기" : "선물 선택")</a>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            @if (b.RoleCode == "T1001" && picked)
+                            {
+                                <div class="bdGift">
+                                    <img src="@giftImg" alt="@row.ProductName" title="클릭하면 크게 볼 수 있어요"
+                                         onerror="this.onerror=null;this.src='/images/common/no-image.jpg';"
+                                         onclick="bdayOpenLightbox(this.src, this.alt)" />
+                                    <div class="bdGiftTx">
+                                        <div class="bdGiftN">@row.ProductName</div>
+                                        @if (!string.IsNullOrWhiteSpace(row.ProductDescription))
+                                        {
+                                            <div class="bdGiftD bd-desc-row">
+                                                <span>@row.ProductDescription</span>
+                                                <textarea class="bday-copy-src" aria-hidden="true" tabindex="-1">@row.ProductDescription</textarea>
+                                                <button type="button" class="bdCopy" onclick="bdayCopyText(this)" title="복사">복사</button>
+                                            </div>
+                                        }
+                                    </div>
+                                    @if (isStaff && row.ProductId.HasValue && coupangUrlMap.TryGetValue(row.ProductId.Value, out var coupangUrl))
+                                    {
+                                        <a class="bdGiftL" href="@coupangUrl" target="_blank" rel="noopener noreferrer">쿠팡에서 보기 →</a>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                    </article>
+                }
+            </div>
+
+        </div><!-- /bd-content -->
+
+        <!-- Toast -->
+        <div id="bdayToast" class="bd-toast" role="status" aria-live="polite"></div>
+
+        <!-- 라이트박스 -->
+        <div id="bdLightbox" role="dialog" aria-modal="true" aria-label="이미지 크게 보기"
+             onclick="if(event.target===this)bdayCloseLightbox()">
+            <div class="bd-lb-box">
+                <button class="bd-lb-close" onclick="bdayCloseLightbox()" aria-label="닫기">닫기</button>
+                <img class="bd-lb-img" id="bdLightboxImg" src="" alt="" />
+                <div class="bd-lb-caption" id="bdLightboxCaption"></div>
+            </div>
+        </div>
+
+        <style id="birthday-banner-style">
+            /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 (이 파셜은 /ApplyEvent/Branch 에서만 쓴다) */
+            .bd-root { margin: 0; }
+
+            /* 섹션 줄 */
+            .bdSec { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap;
+                     margin: 22px 0 4px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+            .bdSecT { font-size: 16px; font-weight: 800; color: #111827; }
+            .bdHide { display: flex; gap: 12px; align-items: baseline; font-size: 11.5px; }
+            .bdHide button { border: 0; background: none; padding: 0; font: inherit; color: #9CA3AF; cursor: pointer; }
+            .bdHide button:hover { color: #2F80ED; }
+
+            /* 줄 */
+            .bdRow { display: flex; gap: 14px; padding: 15px 0; border-bottom: 1px solid #EEF0F3; }
+            .bdRow:last-of-type { border-bottom: 0; }
+            .bdDd { width: 54px; flex: 0 0 auto; padding-top: 2px; }
+            .bdDdN { font-weight: 300; font-size: 22px; color: #2F80ED; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.1; }
+            .bdDdN u { text-decoration: none; font-size: 11px; font-weight: 700; color: #9CA3AF; margin-right: 2px; }
+            .bdRow.hot .bdDdN { color: #B4531F; }
+            .bdDdW { font-size: 11px; color: #9CA3AF; margin-top: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+            .bdBody { flex: 1 1 auto; min-width: 0; }
+            .bdTop { display: flex; align-items: flex-start; gap: 12px; }
+            .bdAv { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: #EAF2FD; flex: 0 0 auto; display: block; }
+            .bdTx { flex: 1 1 auto; min-width: 0; }
+            .bdNm { font-size: 15.5px; font-weight: 700; color: #111827; line-height: 1.3; word-break: keep-all; }
+            .bdNm a { font-size: 11px; font-weight: 400; color: #9CA3AF; text-decoration: none; margin-left: 8px; }
+            .bdNm a:hover { color: #2F80ED; }
+            .bdMt { font-size: 11.5px; color: #9CA3AF; line-height: 1.7; font-variant-numeric: tabular-nums; display: flex; flex-wrap: wrap; }
+            .bdMt > span + span::before { content: "·"; color: #D1D5DB; margin: 0 6px; }
+            .bdMt b { font-weight: 700; color: #6B7280; }
+            .bdMt em { font-style: normal; }
+            .bdMt .warn { color: #B4531F; }
+            .bdTel { margin-left: 6px; padding: 1px 9px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11px; font-weight: 700; text-decoration: none; }
+            .bdTel:hover { background: #DCEAFC; }
+            .bdMemo { margin-top: 6px; padding: 8px 12px; border-radius: 12px; background: #F4F6F9; font-size: 12px; line-height: 1.6; color: #6B7280; }
+
+            .bdAct { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+            .bdSts { display: flex; gap: 5px; }
+            .bdSt { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 9px; white-space: nowrap; border-radius: 999px; background: #F4F6F9; color: #9CA3AF; }
+            .bdSt.on { background: #EAF2FD; color: #2B5FA8; }
+            .bdBtn { display: inline-block; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; padding: 8px 14px; font-size: 12px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+            .bdBtn:hover { background: #1F6FDB; color: #fff; }
+            .bdBtn.line { background: #F4F6F9; color: #6B7280; font-weight: 700; }
+            .bdBtn.line:hover { background: #F4F6F9; color: #2F80ED; }
+
+            /* 고른 선물 */
+            .bdGift { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #F4F6F9; }
+            .bdGift img { width: 40px; height: 40px; object-fit: cover; border-radius: 10px; background: #fff; display: block; cursor: zoom-in; flex: 0 0 auto; }
+            .bdGiftTx { flex: 1 1 auto; min-width: 0; }
+            .bdGiftN { font-size: 13px; font-weight: 700; color: #111827; line-height: 1.35; word-break: keep-all; }
+            .bdGiftD { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; line-height: 1.5; display: flex; gap: 6px; align-items: baseline; }
+            .bdGiftD span { min-width: 0; word-break: break-word; }
+            .bday-copy-src { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+            .bdCopy { border: 0; border-radius: 999px; background: #fff; padding: 2px 9px; font: inherit; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+            .bdCopy:hover { color: #2F80ED; }
+            .bdGiftL { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; color: #2F80ED; text-decoration: none; white-space: nowrap; }
+            .bdGiftL:hover { color: #1F6FDB; }
+
+            /* 토스트 · 라이트박스 */
+            .bd-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none;
+                        background: #111827; color: #fff; padding: 9px 18px; border-radius: 999px; font-size: 12.5px;
+                        transition: opacity .18s, transform .18s; z-index: 9999; }
+            .bd-toast.show { opacity: 1; transform: translate(-50%, 0); }
+            #bdLightbox { display: none; position: fixed; inset: 0; background: rgba(17,24,39,.6); z-index: 9998; align-items: center; justify-content: center; padding: 20px; }
+            #bdLightbox.open { display: flex; }
+            #bdLightbox .bd-lb-box { position: relative; background: #fff; border-radius: 16px; padding: 14px; max-width: 520px; width: 100%; }
+            #bdLightbox .bd-lb-img { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #fff; border-radius: 12px; }
+            #bdLightbox .bd-lb-close { position: absolute; top: 14px; right: 14px; border: 0; border-radius: 999px; background: #F4F6F9;
+                                       color: #6B7280; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 12px; cursor: pointer; }
+
+            /* 항목(전화 · 출석 · 마지막 출석)은 한 덩어리로 — 줄이 바뀔 때 글자 중간에서 끊기지 않게 */
+            .bdMt > span { white-space: nowrap; }
+
+            /* ── 모바일 : 폭이 좁으면 위에서 아래로 차곡차곡 ──
+               D-day 한 줄 → (사진 · 이름 · 정보) → 상태 · 버튼 한 줄 → 선물 */
+            @@media (max-width: 560px) {
+                .bdRow { flex-direction: column; gap: 8px; padding: 14px 0; }
+                .bdDd { width: auto; padding-top: 0; display: flex; align-items: baseline; gap: 8px; }
+                .bdDdN { font-size: 20px; }
+                .bdDdW { margin-top: 0; font-size: 12px; }
+
+                .bdTop { flex-wrap: wrap; gap: 10px 12px; }
+                .bdAv { width: 48px; height: 48px; }
+                .bdTx { flex: 1 1 0; min-width: 0; }
+                .bdNm { font-size: 16px; }
+                .bdMt { gap: 0 12px; font-size: 12px; line-height: 1.8; }
+                .bdMt > span + span::before { content: none; }
+
+                /* 상태 알약 + 선물 버튼은 사진·이름 아래 한 줄로 */
+                .bdAct { flex: 1 1 100%; flex-direction: row; align-items: center; justify-content: space-between; gap: 8px; padding-top: 2px; }
+                .bdSts { flex-wrap: wrap; }
+                .bdBtn { padding: 9px 16px; }
+
+                /* 고른 선물 : 사진 · 이름 한 줄, 쿠팡 링크는 아래에 꽉 차게 */
+                .bdGift { flex-wrap: wrap; gap: 8px 10px; }
+                .bdGift img { width: 44px; height: 44px; }
+                .bdGiftD { flex-wrap: wrap; }
+                .bdGiftL { flex: 1 1 100%; text-align: center; padding: 8px 12px; border-radius: 999px; background: #EAF2FD; }
+
+                .bdSec { margin-top: 18px; }
+                .bdHide { gap: 10px; }
+            }
+        </style>
+
+        <script>
+            /* ── 라이트박스 ── */
+            (function () {
+                window.bdayOpenLightbox = function (src, alt) {
+                    var lb  = document.getElementById("bdLightbox");
+                    var img = document.getElementById("bdLightboxImg");
+                    var cap = document.getElementById("bdLightboxCaption");
+                    if (!lb || !img) return;
+                    img.src = src;
+                    img.alt = alt || "";
+                    if (cap) cap.textContent = alt || "";
+                    lb.classList.add("open");
+                    document.body.style.overflow = "hidden";
+                };
+                window.bdayCloseLightbox = function () {
+                    var lb = document.getElementById("bdLightbox");
+                    if (lb) lb.classList.remove("open");
+                    document.body.style.overflow = "";
+                };
+                document.addEventListener("keydown", function (e) {
+                    if (e.key === "Escape") window.bdayCloseLightbox();
+                });
+            })();
+
+            /* ── Copy + Toast ── */
+            (function () {
+                var _tt = null;
+                window.bdayShowToast = function (msg) {
+                    var t = document.getElementById("bdayToast");
+                    if (!t) return;
+                    t.textContent = msg || "복사됐어요";
+                    t.classList.add("show");
+                    clearTimeout(_tt);
+                    _tt = setTimeout(function () { t.classList.remove("show"); }, 1400);
+                };
+                window.bdayCopyText = async function (btn) {
+                    try {
+                        var row  = btn.closest(".bd-desc-row");
+                        if (!row) return;
+                        var ta   = row.querySelector(".bday-copy-src");
+                        var text = ta ? ta.value : "";
+                        if (!text) return;
+                        if (navigator.clipboard && window.isSecureContext) {
+                            await navigator.clipboard.writeText(text);
+                        } else {
+                            ta.focus(); ta.select();
+                            document.execCommand("copy");
+                        }
+                        var old = btn.textContent;
+                        btn.textContent = "완료";
+                        setTimeout(function () { btn.textContent = old; }, 900);
+                        window.bdayShowToast("복사됐어요");
+                    } catch (e) { alert("복사 실패"); }
+                };
+            })();
+
+            /* 보이기 · 숨기기 판정은 /js/GlobalCookie.js 한 곳에서만 한다 (서버 기록 기준) */
+        </script>
+
+    </div>
+}

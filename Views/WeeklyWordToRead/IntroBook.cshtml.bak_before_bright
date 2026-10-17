@@ -1,0 +1,160 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    const string imgBase = "https://bit2001-001-site4.dtempurl.com";
+    var shots = new[] {
+        new { T = "학생용",           S = "성품카드 포함",     Src = imgBase + "/images/Photo/book/HanaBible_5.jpg",              Alt = "5과정 1학기 유년부 학생용" },
+        new { T = "교사용",           S = "",                  Src = imgBase + "/images/Photo/book/hanaBible_Teacher.jpg",        Alt = "5과정 1학기 유년부 교사용" },
+        new { T = "성품 여행책",       S = "여행 안내서 포함",   Src = imgBase + "/images/Photo/book/characterTourGuideBook.png",   Alt = "성품 여행책" },
+        new { T = "교사용 활동자료",    S = "",                  Src = imgBase + "/images/Photo/book/actBook.png",                  Alt = "유년부 교사용 활동자료" },
+        new { T = "성품 여행책 활용법", S = "",                  Src = imgBase + "/images/Photo/book/characterTourBookUtil.png",    Alt = "성품 여행책 활용법" },
+        new { T = "여행 안내서 활용",   S = "",                  Src = imgBase + "/images/Photo/book/Tourguide.png",                Alt = "여행 안내서 활용" },
+    };
+    var roadMap = imgBase + "/GongGwa/book/roadMap.png";
+    var bookMap = imgBase + "/GongGwa/book/bookMap.png";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>공과 안내 · 하나 바이블</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .sh { max-width: 880px; }
+        .hdBtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 20px; }
+
+        /* 자주 묻는 질문 */
+        details { border-bottom: 1px solid var(--line); }
+        summary { list-style: none; cursor: pointer; display: flex; gap: 14px; align-items: flex-start; padding: 17px 2px; }
+        summary::-webkit-details-marker { display: none; }
+        summary:hover .qT { color: var(--acc); }
+        .qNo { flex: none; width: 34px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--acc); line-height: 1.2; }
+        .qTx { flex: 1; min-width: 0; }
+        .qT { display: block; font-family: "Noto Serif KR", serif; font-size: 17px; line-height: 1.5; transition: color .15s; }
+        .qS { display: block; margin-top: 3px; font-size: 13px; color: var(--dim); }
+        .qChev { flex: none; font-size: 12px; color: var(--dim); padding-top: 6px; transition: transform .2s; }
+        details[open] .qChev { transform: rotate(180deg); }
+        .ans { margin: 0 2px 18px 48px; padding: 14px 16px; background: var(--card); border-left: 2px solid var(--acc); font-family: "Noto Serif KR", serif; font-size: 15px; line-height: 1.85; color: var(--tx); word-break: keep-all; }
+        .ans b { font-weight: 500; color: var(--acc); }
+        .ans .nbtn { margin-top: 12px; font-family: "Gothic A1", sans-serif; }
+        @@media (max-width: 480px) { .ans { margin-left: 0; } }
+
+        /* 교재 사진 */
+        .gal { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+        @@media (max-width: 720px) { .gal { grid-template-columns: repeat(2, 1fr); } }
+        .shot { display: block; background: var(--card); border: 1px solid var(--rule); transition: border-color .15s; }
+        .shot:hover { border-color: var(--acc); }
+        .shot .im { aspect-ratio: 4/5; background: var(--mark); overflow: hidden; }
+        .shot img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+        .shot:hover img { transform: scale(1.03); }
+        .shot .cap { padding: 10px 12px 12px; }
+        .shot .cap b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 15px; }
+        .shot .cap small { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); }
+        .galNote { margin-top: 10px; font-size: 12.5px; color: var(--dim); }
+    </style>
+</head>
+
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="/WeeklyWordToRead/Branch">주일공과</a></span>
+                <span>HANA BIBLE</span>
+            </div>
+            <div class="hdK">ABOUT THE LESSON</div>
+            <h1 class="hdT">공과 안내 · 하나 바이블</h1>
+            <div class="hdS">유년부 공과(하나 바이블)와 공식 자료를 한눈에 정리했어요.</div>
+            <div class="hdBtns">
+                <a class="nbtn pri" href="https://www.xn--9d0bp30cjhe9zk.com/main/page/s2.php" target="_blank" rel="noopener">총회교육개발원 공식 사이트 ↗</a>
+                <a class="nbtn" href="/WeeklyWordToRead/WeeklyWordToReadDetailList">공과 목록</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <section class="sec">
+            <div class="secH">
+                <div><div class="secK">FAQ</div><div class="secT">자주 묻는 질문</div></div>
+            </div>
+
+            <details open>
+                <summary>
+                    <span class="qNo">Q1</span>
+                    <span class="qTx"><span class="qT">우리는 어떤 교재로 공과를 하나요?</span><span class="qS">유년부 공과 교재와 출처를 안내해요.</span></span>
+                    <span class="qChev">▾</span>
+                </summary>
+                <div class="ans">
+                    우리는 <b>총회교육개발원</b>에서 제공하는 교재로 공과를 진행하고 있습니다.<br />
+                    공과책 이름은 <b>하나 바이블</b>입니다.
+                </div>
+            </details>
+
+            <details>
+                <summary>
+                    <span class="qNo">Q2</span>
+                    <span class="qTx"><span class="qT">하나 바이블 교재 출간 로드맵이 있나요?</span><span class="qS">전체 출간 흐름을 이미지로 확인할 수 있어요.</span></span>
+                    <span class="qChev">▾</span>
+                </summary>
+                <div class="ans">
+                    아래 버튼을 눌러 확인해 주세요. 자세한 내용은 총회교육개발원 자료를 참고해 주세요.<br />
+                    <a class="nbtn" href="@roadMap" target="_blank" rel="noopener">출간 로드맵 보기 ↗</a>
+                </div>
+            </details>
+
+            <details>
+                <summary>
+                    <span class="qNo">Q3</span>
+                    <span class="qTx"><span class="qT">하나 바이블 전체 교육과정은 어떻게 되나요?</span><span class="qS">1~5년 전체 과정 그림을 확인할 수 있어요.</span></span>
+                    <span class="qChev">▾</span>
+                </summary>
+                <div class="ans">
+                    아래 버튼을 눌러 전체 교육과정 지도를 확인해 주세요.<br />
+                    <a class="nbtn" href="@bookMap" target="_blank" rel="noopener">1~5년 교육과정 전체 그림 ↗</a>
+                </div>
+            </details>
+
+            <details>
+                <summary>
+                    <span class="qNo">Q4</span>
+                    <span class="qTx"><span class="qT">우리는 지금 어디 과정을 하고 있나요?</span><span class="qS">현재 진행 중인 과정 위치를 알려드려요.</span></span>
+                    <span class="qChev">▾</span>
+                </summary>
+                <div class="ans">
+                    현재 <b>5과정 › 성품 1학기 (5년차 상반기)</b>를 진행하고 있습니다.<br />
+                    <a class="nbtn" href="@bookMap" target="_blank" rel="noopener">교육과정 지도에서 위치 보기 ↗</a>
+                </div>
+            </details>
+        </section>
+
+        <section class="sec">
+            <div class="secH">
+                <div><div class="secK">MATERIALS</div><div class="secT">교재 구성 · 활용</div></div>
+                <span class="secN">@shots.Length 가지</span>
+            </div>
+            <div class="gal">
+                @foreach (var s in shots)
+                {
+                    <a class="shot" href="@s.Src" target="_blank" rel="noopener">
+                        <div class="im"><img src="@s.Src" alt="@s.Alt" loading="lazy" /></div>
+                        <div class="cap"><b>@s.T</b>@if (!string.IsNullOrEmpty(s.S)) {<small>@s.S</small>}</div>
+                    </a>
+                }
+            </div>
+            <div class="galNote">사진을 누르면 크게 볼 수 있어요.</div>
+        </section>
+
+        <div class="ft">
+            <span>© 2026 유년부 · 공과(하나 바이블) 안내</span>
+            <span><a href="@bookMap" target="_blank" rel="noopener">교육과정 지도</a> · <a href="@roadMap" target="_blank" rel="noopener">출간 로드맵</a> · <a href="/">@ConstatsCommon.ToHome</a></span>
+        </div>
+    </main>
+</body>
+</html>

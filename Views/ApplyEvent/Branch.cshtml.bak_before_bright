@@ -1,0 +1,160 @@
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject IAttendanceService AttendanceService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    생일자 · 다가오는 행사 — 안내 책자의 목차처럼 번호 · 제목 · 설명 · 열기 로 늘어놓는다.
+    Bone(호텔 인쇄물) 스킨을 선물함(MyGiftBox3) · 선물 고르기(GiftSelect) 와 같이 쓴다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = (isAdmin || isSuperAdmin);
+
+    var urlBirthDay  = "/Birthdays";
+    var urlEventList = "/ApplyEvent/EventList";
+    var urlGiftKind  = "/Present/Kind";
+    var urlHome      = "/";
+
+    var coupangItems = ViewBag.CoupangItems as List<AwardItem> ?? new List<AwardItem>();
+    int birthCount   = (int?)ViewBag.BirthDayTotalCount ?? 0;
+    int withinDays   = (int?)ViewBag.BirthDayWithinDays ?? 30;
+
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    string N(int v) => v.ToString("N0");
+    var priced = coupangItems.Where(x => x.UnitPrice > 0).ToList();
+    string cpRange = priced.Count == 0 ? $"{coupangItems.Count}종"
+                   : $"{coupangItems.Count}종 · {N(priced.Min(x => x.UnitPrice))} ~ {N(priced.Max(x => x.UnitPrice))}원";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>생일자 · 다가오는 행사 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    /* ── 머리 ── */
+    .qz .brK  { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin: 18px 0 9px; }
+    .qz .brH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.4; }
+    .qz .brH1 b { font-weight: 400; background-image: linear-gradient(transparent 62%, var(--mark) 62%); padding: 0 2px; }
+    .qz .brSum { font-size: 11.5px; color: var(--dim); margin-top: 8px; font-variant-numeric: tabular-nums; }
+
+    .qz .brSec { display: flex; justify-content: space-between; align-items: baseline;
+                 font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: var(--dim); margin: 26px 0 6px; }
+    .qz .brSec span { letter-spacing: .04em; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+    /* 기존 생일 배너(partial)가 이 자리에 들어온다 */
+    .qz .brBanner { margin-top: 18px; }
+    .qz .brBanner:empty { display: none; }
+
+    /* ── 목차 줄 ── */
+    .qz a.brIdx { display: flex; align-items: center; gap: 14px; width: 100%;
+                  padding: 17px 2px; border-top: 1px solid var(--rule);
+                  text-decoration: none; color: inherit; cursor: pointer; }
+    .qz a.brIdx:last-of-type { border-bottom: 1px solid var(--rule); }
+    .qz .brNo { font-family: "Inter", sans-serif; font-weight: 300; font-size: 22px; color: var(--acc);
+                width: 34px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .qz .brTx { flex: 1 1 auto; min-width: 0; }
+    .qz .brT  { font-family: "Noto Serif KR", serif; font-size: 16.5px; line-height: 1.35; word-break: keep-all; }
+    .qz .brD  { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.6; word-break: keep-all; }
+    .qz .brGo { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--dim2); white-space: nowrap; }
+    .qz a.brIdx:hover .brT, .qz a.brIdx:hover .brGo { color: var(--acc); }
+    .qz .brBadge { display: inline-block; font-family: "Inter", sans-serif; font-weight: 600; font-size: 9.5px; letter-spacing: .1em;
+                   color: var(--acc); border: 1px solid var(--acc); padding: 2px 6px; margin-left: 8px; vertical-align: 2px; white-space: nowrap; }
+
+    /* ── 관리자 쿠팡 링크 ── */
+    .qz .cpGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .qz .cp   { border: 1px solid var(--rule); background: #fff; display: flex; flex-direction: column; }
+    .qz .cpTh { width: 100%; aspect-ratio: 1 / 1; background: var(--mark); display: block; object-fit: cover; }
+    .qz .cpB  { padding: 11px 12px 12px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+    .qz .cpN  { font-size: 12.5px; line-height: 1.4; word-break: keep-all;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .qz .cpP  { font-family: "Inter", sans-serif; font-weight: 300; font-size: 14px; color: var(--acc); font-variant-numeric: tabular-nums; }
+    .qz .cpP u { text-decoration: none; font-size: 10px; color: var(--dim); margin-left: 2px; }
+    .qz a.cpA { margin-top: auto; padding: 8px 0; text-align: center; border: 1px solid var(--tx); background: var(--tx); color: var(--bg);
+                font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-decoration: none; }
+    .qz a.cpA:hover { background: var(--acc); border-color: var(--acc); }
+    @@media (max-width: 560px) { .qz .cpGrid { grid-template-columns: repeat(2, 1fr); } }
+
+    /* ── 바닥 ── */
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule);
+                  display: flex; justify-content: space-between; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; }
+    .qz .brFoot a { color: var(--dim2); text-decoration: none; }
+    .qz .brFoot a:hover { color: var(--acc); }
+
+    @@media (min-width: 620px) {
+        .qz .brT { font-size: 17.5px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="@urlHome">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>메뉴</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">DIRECTORY</div>
+        <div class="brH1"><b>생일자 · 이벤트</b></div>
+        <div class="brSum">필요한 화면을 골라 바로 열어요</div>
+
+        <div class="brBanner">
+            @await Html.PartialAsync("_Banner_AlarmHappyBirthday")
+        </div>
+
+        <div class="brSec"><span style="letter-spacing:.2em;font-weight:600">바로 가기</span><span>01 – 03</span></div>
+
+        <a class="brIdx" href="@urlBirthDay">
+            <div class="brNo">01</div>
+            <div class="brTx">
+                <div class="brT">
+                    생일자 보기
+                    @if (birthCount > 0)
+                    {
+                        <span class="brBadge">@(withinDays)일 내 @(birthCount)명</span>
+                    }
+                </div>
+                <div class="brD">이번 달 · 다가오는 생일자를 한 번에 확인하고 연락까지 빠르게</div>
+            </div>
+            <div class="brGo">열기 →</div>
+        </a>
+  
+        <a class="brIdx" href="@urlGiftKind">
+            <div class="brNo">03</div>
+            <div class="brTx">
+                <div class="brT">선물 목록</div>
+                <div class="brD">도전 선물 · 새친구 선물 · 생일 선물을 한 번에 확인해요</div>
+            </div>
+            <div class="brGo">이동 →</div>
+        </a>
+
+     
+    </div>
+</div>
+
+<script src="/js/GlobalCookie.js"></script>
+</body>
+</html>

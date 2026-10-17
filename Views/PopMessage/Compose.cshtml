@@ -1,0 +1,71 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.PopMessage.PopMessageComposeVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    var toLabel = string.IsNullOrWhiteSpace(Model.ToFullName)
+        ? Model.ToUserName
+        : $"{Model.ToFullName} ({Model.ToUserName})";
+    var backUrl = string.IsNullOrWhiteSpace(Model.ReturnUrl) ? "/AddressBook" : Model.ReturnUrl;
+    var backLabel = string.IsNullOrWhiteSpace(Model.ReturnUrl) ? "주소록" : "돌아가기";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>쪽지 보내기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/board-bright.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .cnt { font-size: 12px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .fAct { align-items: center; }
+        .fAct .cnt { margin-right: auto; }
+        .fAct .nbtn, .fAct .nbtn.pri { flex: none; padding: 12px 22px; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <a href="@backUrl">‹ @backLabel</a>
+            <a href="/PopMessage/Index">쪽지함</a>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">쪽지 보내기</h1>
+        <div class="hdS">받는 사람 <b>@toLabel</b></div>
+    </header>
+
+    <main class="sh">
+        <form method="post" action="/PopMessage/Send" class="fm">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="ToUserName" value="@Model.ToUserName" />
+            <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+
+            <div class="fRow">
+                <label class="fLbl" for="msg">내용</label>
+                <textarea id="msg" name="MessageText" class="fIn" maxlength="@Model.MaxLen" placeholder="따뜻한 메시지를 입력해 주세요.">@Model.MessageText</textarea>
+            </div>
+
+            <div class="fAct">
+                <span class="cnt"><span id="cnt">0</span> / @Model.MaxLen</span>
+                <a class="nbtn" href="@backUrl">취소</a>
+                <button type="submit" class="nbtn pri">전송</button>
+            </div>
+        </form>
+
+        <div class="ft"><span>© 유년부 · 쪽지</span></div>
+    </main>
+
+    <script>
+        (() => {
+            const t = document.getElementById('msg');
+            const c = document.getElementById('cnt');
+            function upd(){ c.textContent = String((t.value || '').length); }
+            t.addEventListener('input', upd);
+            upd();
+        })();
+    </script>
+</body>
+</html>

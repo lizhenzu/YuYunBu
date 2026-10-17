@@ -1,0 +1,123 @@
+﻿@*  ── 페이지 이동 대기 카드 '잠시만 기다려 주세요' (DailyMission4 공통) ──
+    · 대상: 이 사이트 안의 다른 화면으로 가는 모든 링크 + 폼 제출(말씀 읽음 · 기도 · 퀴즈 제출 등)
+    · 제외: #앵커, javascript:, mailto:/tel:, 새 창(target=_blank), download, 다른 사이트, 같은 화면 안의 이동,
+            data-nowait 가 붙은 링크/폼, 다른 스크립트가 이미 막은 클릭(defaultPrevented)
+    · _Layout_Mission3, 레이아웃 없는 화면(Branch · 참여자), BibleRead 가 함께 쓴다.
+    · 아이폰(Safari)은 이동이 시작되면 화면을 다시 그리지 않으므로 카드를 먼저 그린 뒤 이동한다. *@
+<style>
+    /* 카드는 툭 켜지지 않고 옅게 스며들듯 나타난다 (display 로 켠 뒤 .in 으로 opacity 를 올린다) */
+    .m3wait { position: fixed; inset: 0; z-index: 30000; background: rgba(22,24,28,.40); display: none; align-items: center; justify-content: center; padding: 20px;
+              opacity: 0; transition: opacity .18s ease; }
+    .m3wait.show { display: flex; }
+    .m3wait.show.in { opacity: 1; }
+    .m3wait .card { transform: translateY(6px); transition: transform .18s ease; }
+    .m3wait.show.in .card { transform: none; }
+    .m3wait .card { width: 100%; max-width: 260px; background: #F7F6F3; color: #16181C; text-align: center; padding: 28px 18px 22px; border-radius: 0; box-shadow: none; border: 0; }
+    .m3wait .sp { width: 34px; height: 34px; margin: 0 auto; border: 2px solid #E2E0DB; border-top-color: #9A7B4F; border-radius: 50%; animation: m3spin .8s linear infinite; }
+    .m3wait .t { font-family: "Noto Serif KR", serif; font-size: 17px; margin-top: 16px; }
+    .m3wait .t span { animation: m3dots 1.2s infinite; }
+    .m3wait .t span:nth-child(2) { animation-delay: .2s; }
+    .m3wait .t span:nth-child(3) { animation-delay: .4s; }
+    .m3wait .s { font-size: 12px; color: #83868C; margin-top: 6px; }
+    /* 누름 효과 (C안) — 금색으로 바뀌며 살짝 작아지고 흐려진다 */
+    a.m3tap { color: #9A7B4F !important; transform: scale(.94); opacity: .75; display: inline-block; transition: transform .1s ease, opacity .1s ease, color .1s ease; }
+    /* 줄 · 칸 모양 링크(미션 줄, 달력 칸, 더 보기 칸 …) — 배치는 그대로 두고 바탕만 옅은 브라스로 물든다 */
+    a.m3tapRow { background-color: #EDE5D8 !important; transition: background-color .12s ease; }
+    @@media (prefers-reduced-motion: reduce) {
+        a.m3tap { transform: none; }
+        .m3wait, .m3wait .card { transition: none; }
+    }
+    @@keyframes m3spin { to { transform: rotate(360deg); } }
+    @@keyframes m3dots { 0%, 20% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
+</style>
+<div class="m3wait" id="m3wait" role="status" aria-live="polite">
+    <div class="card">
+        <div class="sp" aria-hidden="true"></div>
+        <div class="t">잠시만 기다려 주세요<span>.</span><span>.</span><span>.</span></div>
+        <div class="s" id="m3waitMsg">화면을 불러오고 있어요</div>
+    </div>
+</div>
+<script>
+    (function () {
+        if (window.__m3waitReady) return;   // 한 화면에 두 번 들어와도 한 번만
+        window.__m3waitReady = true;
+
+        var box = document.getElementById('m3wait'), msg = document.getElementById('m3waitMsg');
+
+        function message(url) {
+            var p = url.pathname.toLowerCase();
+            if (p === '/' || p === '/home' || p === '/home/index') return '홈으로 이동하고 있어요';
+            if (p === '/dailymission3' || p === '/dailymission3/index') return '미션홈으로 이동하고 있어요';
+            return '화면을 불러오고 있어요';
+        }
+        function show(text, instant) {
+            msg.textContent = text;
+            if (instant) {                    // 곧바로 이동하는 경우 — 전환 없이 바로 보인다
+                box.style.transition = 'none';
+                box.classList.add('show', 'in');
+                return;
+            }
+            box.style.transition = '';
+            box.classList.add('show');
+            void box.offsetWidth;            // display 를 먼저 반영해야 opacity 전환이 보인다
+            box.classList.add('in');
+        }
+        /* 누름 표시 — 글자 링크는 C안(금색 · 살짝 작게), 줄 · 칸 모양 링크는 바탕만 물들인다.
+           block/flex 줄에 inline-block + scale 을 주면 배치가 풀려 화면이 덜컥거리기 때문. */
+        function pressMark(a) {
+            var d = getComputedStyle(a).display;
+            a.classList.add(d === 'inline' ? 'm3tap' : 'm3tapRow');
+        }
+        /* 카드를 실제로 그린 뒤 실행 (아이폰 대응) */
+        function afterPaint(fn) {
+            requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(fn, 30); }); });
+        }
+
+        // ── 링크 ──
+        document.addEventListener('click', function (e) {
+            if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            var a = e.target.closest('a[href]');
+            if (!a || a.hasAttribute('data-nowait') || a.hasAttribute('download')) return;
+            if (a.target && a.target !== '_self') return;
+            var raw = (a.getAttribute('href') || '').trim();
+            if (!raw || raw.charAt(0) === '#' || /^(javascript|mailto|tel|sms):/i.test(raw)) return;
+
+            var url;
+            try { url = new URL(a.href, location.href); } catch (_) { return; }
+            if (url.origin !== location.origin) return;
+            // 같은 화면 안에서 #만 바뀌는 이동은 제외
+            if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+
+            e.preventDefault();
+            if (a.__m3going) return;          // 두 번 눌러도 한 번만
+            a.__m3going = true;
+            // 누름 표시 → 잠깐 뒤 카드가 스며들 듯 → 카드를 그린 뒤 이동 (차례대로)
+            pressMark(a);
+            setTimeout(function () {
+                show(message(url));
+                afterPaint(function () { window.location.href = url.href; });
+            }, 120);
+        });
+
+        // ── 폼 제출 (말씀 읽음 · 기도했어요 · 퀴즈 제출 등) ──
+        document.addEventListener('submit', function (e) {
+            var f = e.target;
+            if (e.defaultPrevented || !f || f.hasAttribute('data-nowait') || (f.target && f.target !== '_self')) return;
+            // 누른 버튼 이름/값을 함께 보내야 하는 폼은 그대로 두고(카드만 즉시 표시), 아니면 카드를 그린 뒤 제출
+            var sb = e.submitter;
+            if (sb && sb.name) { show('저장하고 있어요', true); return; }
+            show('저장하고 있어요');
+            e.preventDefault();
+            afterPaint(function () { HTMLFormElement.prototype.submit.call(f); });
+        });
+
+        // 뒤로 가기로 돌아왔을 때 카드 · 금색 표시가 남지 않게
+        window.addEventListener('pageshow', function () {
+            box.classList.remove('show', 'in');
+            document.querySelectorAll('a.m3tap, a.m3tapRow').forEach(function (x) {
+                x.classList.remove('m3tap', 'm3tapRow');
+                x.__m3going = false;
+            });
+        });
+    })();
+</script>

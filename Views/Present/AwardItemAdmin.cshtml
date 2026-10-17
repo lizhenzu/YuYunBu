@@ -1,0 +1,484 @@
+@model List<AwardItem>
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Services
+
+@*  ══════════════════════════════════════════════════════════════
+    선물(상품) 관리 — 2026-10-04 반응형 구조 새로 구성 · 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/present-bright.css)
+    · 휴대폰: 한 줄 목록(사진 + 정보 + 수정/숨기기/삭제 3칸) · 넓은 화면(640px~): 카드 격자
+    · 도구 줄(검색 + 칩 + 개수)은 위에 붙어 따라온다.  숨김 칩은 SuperAdmin만.  등록은 휴대폰에서 아래 떠 있는 버튼.
+    · 선물 타입(SourceType)은 모두 "쿠팡"이라 화면에서 뺐다.  서버 주소 · 삭제 규칙은 그대로.
+    · 이전 화면은 AwardItemAdmin.cshtml.bak_before_responsive
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+}
+
+@{
+    // ✅ 독립 페이지
+    Layout = null;
+    ViewData["Title"] = "선물(상품) 관리";
+
+    var list        = Model ?? new List<AwardItem>();
+    if (!isSuperAdmin) list = list.Where(x => !x.IsHidden).ToList();
+    var filterName  = ViewBag.FilterName  as string ?? "";
+    var filterPrice = ViewBag.FilterPrice as string ?? "";
+
+    string Norm(string? s) => (s ?? "").Trim();
+    string NormKey(string? s) => Norm(s).ToLowerInvariant();
+
+    int hiddenCount = list.Count(x => x.IsHidden);
+
+    // ✅ PresentItemPick에 존재하면 삭제 불가(UI disable)
+    var pickedIds = ViewBag.PickedProductIds as HashSet<int> ?? new HashSet<int>();
+
+    // ✅ 이미지 캐시 무효화는 변경될 때만
+    long ImgVer(AwardItem it)
+        => (it?.ModifiedDate?.Ticks) ?? (it?.CreatedDate?.Ticks) ?? 0L;
+
+    // ✅ 1x1 투명 SVG (lazy placeholder)
+    var tinySvg = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="선물(상품) 관리 페이지" />
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+    <style>
+        .pw { max-width: 1100px; padding: 0 16px calc(96px + env(safe-area-inset-bottom)); }
+        .mono { font-variant-numeric: tabular-nums; }
+
+        /* 맨 위 */
+        .pbar .lk { display: flex; gap: 16px; }
+        .pbar .lk a { font-size: 13px; font-weight: 700; color: #6B7280; }
+        .pbar .lk a:hover { color: #2F80ED; }
+        .pbar > a { font-size: 13px; font-weight: 700; color: #6B7280; }
+        .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .pSub { margin-top: 3px; font-size: 12.5px; color: #6B7280; }
+        .addTop { display: none; padding: 11px 20px; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14px; font-weight: 800; }
+        .addTop:hover { background: #1F6FDB; }
+
+        /* 필터 안내 줄 */
+        .fBanner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding: 10px 14px; border-radius: 12px; background: #EAF2FD; color: #2B5FA8; font-size: 13.5px; font-weight: 700; }
+        .fBanner small { font-size: 12px; font-weight: 400; color: #6B7280; }
+        .fBanner a { margin-left: auto; font-size: 12px; font-weight: 700; color: #6B7280; }
+        .fBanner a:hover { color: #2F80ED; }
+
+        /* 따라오는 도구 줄 */
+        .tools { position: sticky; top: 0; z-index: 5; margin: 14px -16px 0; padding: 10px 16px; background: rgba(255,255,255,.96); border-bottom: 1px solid #EEF0F3; }
+        .search { position: relative; }
+        .search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #9CA3AF; fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+        .search input { width: 100%; height: 44px; border: 0; border-radius: 999px; background: #F4F6F9; padding: 0 16px 0 40px; font-family: inherit; font-size: 15px; color: #111827; -webkit-appearance: none; appearance: none; }
+        .search input:focus { outline: 0; background: #fff; box-shadow: 0 0 0 2px #CFE0FA; }
+        .search input::placeholder { color: #9CA3AF; }
+        .fl { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+        .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+        .chips::-webkit-scrollbar { display: none; }
+        .chip { flex: none; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; padding: 7px 13px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .chip:hover { color: #2F80ED; }
+        .chip.on { background: #2F80ED; color: #fff; }
+        .chip.w.on { background: #B4531F; }
+        .cnt { flex: none; font-size: 12.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .cnt b { color: #2F80ED; font-weight: 800; }
+
+        .empty { padding: 48px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+
+        /* 목록 — 휴대폰은 한 줄, 넓은 화면은 격자. 카드 경계는 테두리 + 가벼운 그림자로 또렷하게 */
+        .grid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 14px; }
+        .card { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #DDE2EA; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(17,24,39,.07); }
+        .card[data-hidden="1"] { border-color: #F0D6C6; background: #FFFAF6; }
+        .cardTop { display: flex; gap: 12px; }
+        .thumb { width: 76px; height: 76px; flex: none; border-radius: 12px; object-fit: cover; background: #F4F6F9; display: block; }
+        .info { min-width: 0; flex: 1; }
+        .pName { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 15px; font-weight: 800; color: #111827; line-height: 1.4; word-break: keep-all; }
+        .pName:hover { color: #2F80ED; }
+        .pMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 5px; font-size: 12px; color: #9CA3AF; }
+        .price { font-size: 14px; font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; }
+        .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 11px; font-weight: 800; white-space: nowrap; }
+        .stShow { background: #EAF2FD; color: #2B5FA8; }
+        .stHide { background: #FBEFE7; color: #B4531F; }
+        .picked { background: #F4F6F9; color: #9CA3AF; }
+        .ext { display: inline-block; margin-top: 6px; font-size: 12px; font-weight: 700; color: #2F80ED; }
+        .ext:hover { color: #1F6FDB; }
+
+        .dwrap { position: relative; }
+        .desc { margin: 0; padding: 9px 12px; border-radius: 12px; background: #F4F6F9; font-size: 12.5px; line-height: 1.7; color: #6B7280; white-space: pre-wrap; word-break: keep-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+        .desc.open { display: block; }
+        .noDesc { color: #9CA3AF; cursor: default; }
+        .copyBtn { display: none; margin-top: 6px; padding: 4px 12px; border: 0; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11.5px; font-weight: 700; cursor: pointer; }
+        .dwrap.open .copyBtn { display: inline-block; }
+        .copyBtn.done { background: #EAF7EF; color: #15803D; }
+
+        .act { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: auto; }
+        .act form { margin: 0; display: block; }
+        .act .btn { display: flex; align-items: center; justify-content: center; width: 100%; height: 40px; border: 0; border-radius: 12px; background: #F4F6F9; color: #374151; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .act .btn:hover { color: #2F80ED; }
+        .act .btnDanger { background: #FBEFE7; color: #B4531F; }
+        .act .btnDanger:hover { background: #F7E3D5; color: #B4531F; }
+        .act .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+        /* 휴대폰 아래 떠 있는 등록 버튼 */
+        .fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; height: 50px; padding: 0 22px; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14.5px; font-weight: 800; box-shadow: 0 8px 20px rgba(47,128,237,.35); }
+        .fab:hover { background: #1F6FDB; }
+
+        /* 이미지 확대 */
+        .imgModal { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(17,24,39,.6); align-items: center; justify-content: center; padding: 16px; }
+        .imgModal.open { display: flex; }
+        .imgModalBox { background: #fff; border-radius: 16px; padding: 14px; max-width: 560px; width: 100%; }
+        .imgModalBox img { display: block; width: 100%; max-height: 72vh; object-fit: contain; border-radius: 12px; background: #fff; }
+        .imgModalName { margin-top: 10px; text-align: center; font-size: 14px; font-weight: 700; color: #111827; }
+        .imgModalClose { position: absolute; top: 16px; right: 16px; padding: 6px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+
+        /* 넓은 화면 */
+        @@media (min-width: 640px) {
+            .pw { padding: 0 28px 40px; }
+            .tools { margin: 14px -28px 0; padding: 10px 28px; display: flex; gap: 14px; align-items: center; }
+            .tools .search { flex: 1; max-width: 420px; }
+            .tools .fl { margin-top: 0; flex: 1; min-width: 0; }
+            .grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+            .card { padding: 14px; }
+            .thumb { width: 84px; height: 84px; }
+            .addTop { display: inline-block; }
+            .fab { display: none; }
+        }
+        @@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+    </style>
+</head>
+
+<body>
+    <div class="pw">
+        <div class="pbar">
+            <a href="/">← @ConstatsCommon.ToHome</a>
+            <span class="lk">
+                <a href="/Present/AwardItemCountByKind">종류별</a>
+                @if (string.IsNullOrWhiteSpace(filterName))
+                {
+                    <a href="/Present/AwardItemCountByPrice">가격대별</a>
+                }
+            </span>
+        </div>
+
+        <div class="head">
+            <div>
+                <div class="pK">잠실새내 유년부 입니다.</div>
+                <h1 class="pT">선물(상품) 관리</h1>
+                <div class="pSub">상품 @(list.Count)개@(isSuperAdmin ? $" · 숨김 {hiddenCount}개" : "")</div>
+            </div>
+            <a class="addTop" href="/Present/AwardItemCreate">+ 상품 등록</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(filterName))
+        {
+            <div class="fBanner">
+                <span>종류: <b>@filterName</b></span>
+                <small>@(list.Count)개 상품</small>
+                <a href="/Present/AwardItemAdmin">필터 해제</a>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(filterPrice))
+        {
+            <div class="fBanner">
+                <span>가격: <b>@filterPrice</b></span>
+                <small>@(list.Count)개 상품</small>
+                <a href="/Present/AwardItemCountByPrice">가격대별 목록</a>
+            </div>
+        }
+
+        <div class="tools">
+            <div class="search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+                <input id="q" type="search" placeholder="상품명, 번호, 설명으로 찾기" aria-label="상품 찾기" autocomplete="off" />
+            </div>
+            <div class="fl">
+                <div class="chips" id="chips">
+                    <button type="button" class="chip on" data-f="all">전체</button>
+                    <button type="button" class="chip" data-f="show">노출</button>
+                    @if (isSuperAdmin)
+                    {
+                        <button type="button" class="chip w" data-f="hide">숨김</button>
+                    }
+                </div>
+                <div class="cnt"><b id="countNow">0</b> / <span class="mono">@list.Count</span>개</div>
+            </div>
+        </div>
+
+        @if (!list.Any())
+        {
+            <div class="empty">등록된 상품이 없습니다.</div>
+        }
+        else
+        {
+            <div class="grid" id="grid">
+                @foreach (var it in list)
+                {
+                    var v = ImgVer(it);
+                    var realImg = $"/images/AwardItem/{it.ProductID}.jpg?v={v}";
+                    bool isPicked = pickedIds.Contains(it.ProductID);
+
+                    <div class="card rowItem"
+                         data-name="@NormKey(it.ProductName)"
+                         data-id="@it.ProductID"
+                         data-desc="@NormKey(it.ProductDescription)"
+                         data-hidden="@(it.IsHidden ? "1" : "0")">
+
+                        <div class="cardTop">
+                            <img class="thumb lazyImg"
+                                 src="@tinySvg"
+                                 data-src="@realImg"
+                                 loading="lazy"
+                                 decoding="async"
+                                 fetchpriority="low"
+                                 alt="@it.ProductName"
+                                 onclick="openImgModal(this)"
+                                 style="cursor:zoom-in;"
+                                 onerror="this.onerror=null; this.src='/images/common/no-image.jpg'; this.removeAttribute('data-src');" />
+
+                            <div class="info">
+                                <a class="pName" title="@it.ProductName (같은 종류 보기)"
+                                   href="/Present/AwardItemAdminByName?name=@Uri.EscapeDataString(it.ProductName ?? "")">@it.ProductName</a>
+
+                                <div class="pMeta">
+                                    <span class="price">@it.UnitPrice.ToString("N0")원</span>
+                                    <span class="mono">#@it.ProductID</span>
+                                    @if (it.IsHidden)
+                                    {
+                                        <span class="badge stHide">숨김</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge stShow">노출</span>
+                                    }
+                                    @if (isPicked)
+                                    {
+                                        <span class="badge picked" title="누군가 선택한 상품이라 삭제할 수 없습니다.">선택됨</span>
+                                    }
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(it.ExternalUrl))
+                                {
+                                    <a class="ext" href="@it.ExternalUrl" target="_blank" rel="noopener noreferrer">쿠팡에서 보기 ›</a>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="dwrap">
+                            @if (!string.IsNullOrWhiteSpace(it.ProductDescription))
+                            {
+                                <p class="desc" title="눌러서 펼치기">@it.ProductDescription</p>
+                                <button class="copyBtn" type="button" onclick="copyDesc(this)" title="설명 복사">설명 복사</button>
+                            }
+                            else
+                            {
+                                <p class="desc noDesc">설명 없음</p>
+                            }
+                        </div>
+
+                        <div class="act">
+                            <a class="btn" href="/Present/AwardItemEdit/@it.ProductID">수정</a>
+
+                            <form method="post" action="/Present/AwardItemToggleHidden">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@it.ProductID" />
+                                <button type="submit" class="btn">@(it.IsHidden ? "공개하기" : "숨기기")</button>
+                            </form>
+
+                            <!-- ✅ 삭제: PresentItemPick에 존재하면 UI에서 disabled -->
+                            <form method="post" action="/Present/AwardItemDelete"
+                                  onsubmit="return @(isPicked ? "false" : "confirm('정말 삭제할까요? 이미지 파일도 함께 삭제됩니다.');")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@it.ProductID" />
+                                <button type="submit" class="btn btnDanger" @(isPicked ? "disabled title=\"누군가 선택한 상품이라 삭제할 수 없습니다.\"" : "")>삭제</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="empty" id="noMatch" hidden>찾는 상품이 없어요</div>
+        }
+
+        <div class="pft"><span>© 유년부 · 선물 관리</span><a href="/">@ConstatsCommon.ToHome</a></div>
+    </div>
+
+    <a class="fab" href="/Present/AwardItemCreate">+ 상품 등록</a>
+
+    <!-- 이미지 모달 -->
+    <div id="imgModal" class="imgModal" role="dialog" aria-modal="true" aria-label="상품 이미지 확대" onclick="closeImgModal()">
+        <button class="imgModalClose" onclick="closeImgModal()" title="닫기" aria-label="닫기">닫기</button>
+        <div class="imgModalBox" onclick="event.stopPropagation()">
+            <img id="imgModalSrc" src="" alt="확대 이미지" />
+            <div id="imgModalName" class="imgModalName"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // ==========================
+            // 1) 찾기 + 칩(전체 · 노출 · 숨김)
+            // ==========================
+            const q = document.getElementById("q");
+            const items = Array.from(document.querySelectorAll(".rowItem"));
+            const countNow = document.getElementById("countNow");
+            const noMatch = document.getElementById("noMatch");
+            let mode = "all";
+
+            function apply() {
+                const kw = (q.value || "").trim().toLowerCase();
+                let visible = 0;
+                items.forEach(el => {
+                    const nm   = (el.dataset.name || "");
+                    const id   = (el.dataset.id || "");
+                    const desc = (el.dataset.desc || "");
+                    const isHid = el.dataset.hidden === "1";
+
+                    const okKw   = !kw || nm.includes(kw) || id.includes(kw) || desc.includes(kw);
+                    const okMode = mode === "all" || (mode === "hide" ? isHid : !isHid);
+
+                    const show = okKw && okMode;
+                    el.style.display = show ? "" : "none";
+                    if (show) visible++;
+                });
+                if (countNow) countNow.textContent = String(visible);
+                if (noMatch) noMatch.hidden = visible > 0;
+                refreshLazyObserve();
+            }
+
+            q.addEventListener("input", apply);
+            document.getElementById("chips").addEventListener("click", function (e) {
+                const b = e.target.closest("[data-f]");
+                if (!b) return;
+                mode = b.dataset.f;
+                this.querySelectorAll(".chip").forEach(x => x.classList.toggle("on", x === b));
+                apply();
+            });
+
+            // 설명 펼치기
+            const gridEl = document.getElementById("grid");
+            if (gridEl) {
+                gridEl.addEventListener("click", function (e) {
+                    const d = e.target.closest(".desc");
+                    if (!d || d.classList.contains("noDesc")) return;
+                    d.classList.toggle("open");
+                    d.closest(".dwrap").classList.toggle("open", d.classList.contains("open"));
+                });
+            }
+
+            // ==========================
+            // 2) 이미지 지연 로딩 (lazy)
+            // ==========================
+            const lazyImgs = () => Array.from(document.querySelectorAll("img.lazyImg[data-src]"));
+            let io = null;
+
+            function loadImg(img) {
+                const src = img.getAttribute("data-src");
+                if (!src) return;
+                img.src = src;
+                img.removeAttribute("data-src");
+            }
+
+            function refreshLazyObserve() {
+                const imgs = lazyImgs().filter(img => {
+                    const row = img.closest(".rowItem");
+                    if (!row) return true;
+                    return row.style.display !== "none";
+                });
+
+                if ("IntersectionObserver" in window) {
+                    if (!io) {
+                        io = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    const img = entry.target;
+                                    io.unobserve(img);
+                                    loadImg(img);
+                                }
+                            });
+                        }, { root: null, rootMargin: "320px 0px", threshold: 0.01 });
+                    }
+                    imgs.forEach(img => io.observe(img));
+                } else {
+                    const queue = imgs.slice();
+                    const work = () => {
+                        const start = Date.now();
+                        while (queue.length && (Date.now() - start) < 12) loadImg(queue.shift());
+                        if (queue.length) setTimeout(work, 16);
+                    };
+                    if ("requestIdleCallback" in window) requestIdleCallback(work);
+                    else setTimeout(work, 0);
+                }
+            }
+
+            apply();
+
+            // ==========================
+            // 3) 이미지 모달 · 설명 복사
+            // ==========================
+            var modal    = document.getElementById('imgModal');
+            var modalImg = document.getElementById('imgModalSrc');
+            var modalName= document.getElementById('imgModalName');
+
+            window.openImgModal = function (img) {
+                var src = img.getAttribute('data-src') || img.src;
+                if (!src || src.startsWith('data:')) return;
+                modalImg.src = src;
+                modalName.textContent = img.alt || '';
+                modal.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            };
+
+            window.closeImgModal = function () {
+                modal.classList.remove('open');
+                document.body.style.overflow = '';
+                setTimeout(function () { modalImg.src = ''; }, 200);
+            };
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeImgModal();
+            });
+
+            window.copyDesc = function (btn) {
+                const wrap = btn.closest('.dwrap');
+                const desc = wrap ? wrap.querySelector('.desc') : null;
+                const text = desc ? desc.innerText.trim() : '';
+                if (!text) return;
+                function done() {
+                    btn.textContent = '복사했어요';
+                    btn.classList.add('done');
+                    setTimeout(function () { btn.textContent = '설명 복사'; btn.classList.remove('done'); }, 1500);
+                }
+                navigator.clipboard.writeText(text).then(done).catch(function () {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed'; ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    done();
+                });
+            };
+            refreshLazyObserve();
+
+            window.addEventListener("resize", () => refreshLazyObserve(), { passive: true });
+        })();
+    </script>
+</body>
+</html>

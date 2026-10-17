@@ -1,0 +1,493 @@
+@model BulletinBoard.Models.DailyMission2.FamilyAdminVM
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    가족팀 관리 — 2026-10-04 UX 새로 구성 · 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 한 화면에 모두 펼치던 구성을 "팀 목록(teamId 없음) → 팀 상세(teamId 있음)" 2단계로 나눴다.
+    · 구성원은 한 줄 요약 → 누르면 그 자리에서 펼쳐 수정.  역할·관계는 한글 칩(radio), 관계는 학생일 때만.
+    · 순서는 "위로/아래로" — 기존 UpdateMember 를 여러 번 불러 10,20,30… 으로 다시 매긴다.
+    · 빼기(DeleteMember = 비활성)는 화면 안 확인창.  저장 뒤에는 방금 고친 구성원 줄로 돌아온다.
+    · 저장 주소(CreateTeam · UpdateTeam · AddMember · UpdateMember · DeleteMember)와 파라미터 이름은 그대로.
+    · 이전 화면은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string Safe(string? s) => (s ?? "").Trim();
+
+    var err = ViewBag.Error as string;
+    var info = ViewBag.Info as string;
+
+    var roles = new (int Code, string Label)[] { (0, "학생"), (1, "엄마"), (2, "아빠"), (3, "할머니"), (4, "할아버지"), (9, "기타") };
+    var rels = new (int Code, string Label)[] { (0, "본인"), (1, "형"), (2, "동생"), (3, "언니"), (4, "누나"), (9, "정하지 않음") };
+    string RoleLabel(int c) => roles.FirstOrDefault(x => x.Code == c).Label ?? "기타";
+    string RelLabel(int c) => rels.FirstOrDefault(x => x.Code == c).Label ?? "";
+
+    bool detail = Model.SelectedTeamId.HasValue;
+    var team = Model.SelectedTeam;
+    var members = Model.Members ?? new List<BulletinBoard.Models.DailyMission2.FamilyMemberRow2>();
+    var activeM = members.Where(m => m.IsActive).ToList();
+    var offM = members.Where(m => !m.IsActive).ToList();
+    int nextSort = (members.Count == 0 ? 0 : members.Max(m => m.SortNo)) + 10;
+    var me = activeM.FirstOrDefault(m => m.RoleCode == 0 && m.RelationCode == 0);
+    int activeTeams = Model.Teams?.Count(t => t.IsActive) ?? 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@(team != null ? team.TeamName + " · " : "")가족팀 관리</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .qb button { font: inherit; }
+        .fm-toast { margin-top: 14px; border-radius: 12px; padding: 11px 14px; font-size: 13px; font-weight: 800; background: var(--okbg); color: var(--ok); }
+        .fm-toast.err { background: var(--redbg); color: var(--red); }
+        .fm-search { margin-top: 14px; }
+        .fm-search input { width: 100%; border: 0; border-radius: 999px; background: var(--grey); padding: 11px 16px; font: inherit; font-size: 14px; color: var(--ink); }
+        .fm-search input:focus { outline: 0; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .fm-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 2px; border: 0; border-bottom: 1px solid var(--line); background: none; text-align: left; cursor: pointer; color: inherit; }
+        .fm-row .n { flex: none; width: 28px; font-size: 16px; font-weight: 800; color: #7FA3DB; }
+        .fm-row .t { flex: 1; min-width: 0; }
+        .fm-row .t b { display: block; font-size: 16px; font-weight: 800; color: var(--ink); }
+        .fm-row .t small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--dim2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fm-row .g { flex: none; font-size: 18px; font-weight: 300; color: #7FA3DB; }
+        .fm-row:hover .t b, .fm-row:hover .g { color: var(--blue); }
+        .fm-row.off .t b { color: var(--dim); }
+        .fm-row.flash { background: var(--soft); transition: background 1.2s; }
+        .fm-tg { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--grey); color: var(--dim2); font-size: 10.5px; font-weight: 800; vertical-align: 2px; }
+        .fm-tg.role { background: var(--soft); color: var(--blue); }
+        .fm-tg.me { background: var(--warnbg); color: var(--warn); }
+        .fm-tg.off { background: var(--redbg); color: var(--red); }
+        .fm-team { display: flex; gap: 12px; align-items: center; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--soft); }
+        .fm-team .t { flex: 1; min-width: 0; }
+        .fm-team b { display: block; font-size: 17px; font-weight: 800; color: var(--ink); word-break: keep-all; }
+        .fm-team small { font-size: 12.5px; color: var(--dim2); }
+        .fm-team button { flex: none; border: 0; border-radius: 999px; background: #fff; color: var(--blue); font-size: 12.5px; font-weight: 800; padding: 7px 14px; cursor: pointer; }
+        .fm-panel { margin: 10px 0 4px; padding: 14px; border-radius: 14px; background: var(--grey); }
+        .fm-panel .qb-f:first-child { margin-top: 0; }
+        .fm-panel .qb-in { background: #fff; }
+        .fm-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+        .fm-seg label { margin: 0; cursor: pointer; }
+        .fm-seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .fm-seg span { display: block; padding: 8px 14px; border-radius: 999px; background: #fff; color: var(--tx); font-size: 13px; font-weight: 700; }
+        .fm-seg input:checked + span { background: var(--blue); color: #fff; }
+        .fm-seg input:focus-visible + span { box-shadow: 0 0 0 2px var(--blue); }
+        .fm-seg button { border: 0; padding: 8px 14px; border-radius: 999px; background: #fff; color: var(--tx); font-size: 13px; font-weight: 700; cursor: pointer; }
+        .fm-seg button:disabled { color: #D1D5DB; cursor: default; }
+        .fm-hint { margin-top: 8px; font-size: 12px; line-height: 1.6; color: var(--dim2); }
+        .fm-warn { margin-top: 8px; font-size: 12px; line-height: 1.6; font-weight: 700; color: var(--warn); }
+        .fm-sw { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; border-radius: 12px; background: #fff; font-size: 13.5px; color: var(--ink); }
+        .fm-sw button { flex: none; position: relative; width: 44px; height: 26px; padding: 0; border: 0; border-radius: 99px; background: #D1D5DB; cursor: pointer; }
+        .fm-sw button::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .15s; }
+        .fm-sw button.on { background: var(--ok); }
+        .fm-sw button.on::after { left: 21px; }
+        .fm-panel .qb-btns { margin-top: 14px; }
+        .fm-panel .qb-btn { height: 44px; }
+        .fm-out { display: block; width: 100%; margin-top: 8px; }
+        .fm-big { display: block; width: 100%; margin-top: 16px; }
+        .fm-empty { padding: 22px 0; text-align: center; font-size: 13px; color: var(--dim); }
+        @@media (prefers-reduced-motion: reduce) { .fm-sw button::after, .fm-row.flash { transition: none; } }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div><span id="waitText">저장하는 중이에요</span><small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb-pop" id="pop"><div class="box">
+    <h3 id="popTitle"></h3>
+    <p>지금까지의 기록은 지워지지 않아요.<br />나중에 "다시 넣기"로 되돌릴 수 있어요.</p>
+    <div class="bt"><button type="button" id="popNo">취소</button><button type="button" id="popYes" style="background:#FDEEEE;color:#D9534F">빼기</button></div>
+</div></div>
+
+<div class="qb">
+
+@if (!detail)
+{
+    @* ═════════ ① 팀 목록 ═════════ *@
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>가족팀</span>
+        <span>FAMILY</span>
+    </div>
+
+    <div class="qb-k">FAMILY TEAM</div>
+    <h1 class="qb-h1">가족팀 관리<small>@(activeTeams)팀 활성</small></h1>
+    <div class="qb-sub">도전성경을 함께하는 가족을 묶어요. 팀을 누르면 구성원을 고칠 수 있어요.</div>
+
+    @if (!string.IsNullOrWhiteSpace(err)) { <div class="fm-toast err">@err</div> }
+    else if (!string.IsNullOrWhiteSpace(info)) { <div class="fm-toast">@info</div> }
+
+    <div class="fm-search"><input id="teamQ" type="search" placeholder="팀 이름이나 메모로 찾기" aria-label="팀 찾기" /></div>
+    <div class="qb-chips" id="teamFilter">
+        <button type="button" class="on" data-f="on">활성</button>
+        <button type="button" data-f="off">비활성</button>
+        <button type="button" data-f="all">전체</button>
+    </div>
+
+    <div id="teamList">
+        @foreach (var t in Model.Teams)
+        {
+            <a class="fm-row@(t.IsActive ? "" : " off")" href="/DailyMission2FamilyAdmin?teamId=@t.FamilyTeamId"
+               data-on="@(t.IsActive ? "1" : "0")" data-name="@($"{Safe(t.TeamName)} {Safe(t.Memo)}".ToLowerInvariant())">
+                <span class="n"></span>
+                <span class="t">
+                    <b>@(t.TeamName)@if (!t.IsActive) {<span class="fm-tg off">비활성</span>}</b>
+                    <small>구성원 @(t.MemberCount)명@(string.IsNullOrWhiteSpace(t.Memo) ? "" : " · " + t.Memo)</small>
+                </span>
+                <span class="g">›</span>
+            </a>
+        }
+    </div>
+    <div class="fm-empty" id="teamEmpty" hidden>찾는 팀이 없어요</div>
+
+    <button type="button" class="qb-btn fm-big" id="btnNewTeam">+ 새 가족팀 만들기</button>
+    <form class="fm-panel" id="newTeam" method="post" action="/DailyMission2FamilyAdmin/CreateTeam" hidden data-wait="만드는 중이에요">
+        <div class="qb-f"><label for="ntName">팀 이름</label><input class="qb-in" id="ntName" name="teamName" placeholder="예: 반유주 가족" maxlength="50" /></div>
+        <div class="qb-f"><label for="ntMemo">메모 (선택)</label><input class="qb-in" id="ntMemo" name="memo" placeholder="예: 3남매" maxlength="100" /></div>
+        <span class="error" id="ntErr" hidden>팀 이름을 적어 주세요</span>
+        <div class="qb-btns"><button type="button" class="qb-btn g" data-close="newTeam">취소</button><button type="submit" class="qb-btn p">만들기</button></div>
+        <div class="fm-hint">만들면 바로 그 팀 화면으로 들어가요.</div>
+    </form>
+
+    <div class="qb-ft">
+        <span>가족팀</span>
+        <span><a href="/DailyMission2/Participants">참여자 목록</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+}
+else if (team == null)
+{
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/DailyMission2FamilyAdmin">가족팀</a></span>
+        <span>FAMILY</span>
+    </div>
+    <div class="qb-empty">이 가족팀을 찾을 수 없어요.</div>
+    <a class="qb-btn fm-big" href="/DailyMission2FamilyAdmin">가족팀 목록으로</a>
+}
+else
+{
+    @* ═════════ ② 팀 상세 ═════════ *@
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/DailyMission2FamilyAdmin">가족팀</a><span class="sep">›</span>@team.TeamName</span>
+        <span>FAMILY</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(err)) { <div class="fm-toast err">@err</div> }
+    else if (!string.IsNullOrWhiteSpace(info)) { <div class="fm-toast">@info</div> }
+
+    <div class="fm-team">
+        <div class="t"><b>@team.TeamName</b><small>@(team.IsActive ? "사용 중" : "사용 안 함")@(string.IsNullOrWhiteSpace(team.Memo) ? "" : " · " + team.Memo)</small></div>
+        <button type="button" data-toggle="teamEdit">팀 정보</button>
+    </div>
+
+    <form class="fm-panel" id="teamEdit" method="post" action="/DailyMission2FamilyAdmin/UpdateTeam" hidden>
+        <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+        <input type="hidden" name="isActive" id="teIsActive" value="@(team.IsActive ? "true" : "false")" />
+        <div class="qb-f"><label for="teName">팀 이름</label><input class="qb-in" id="teName" name="teamName" value="@team.TeamName" maxlength="50" /></div>
+        <div class="qb-f"><label for="teMemo">메모 (선택)</label><input class="qb-in" id="teMemo" name="memo" value="@Safe(team.Memo)" maxlength="100" /></div>
+        <div class="qb-f">
+            <div class="fm-sw"><span>이 팀 사용하기</span><button type="button" class="@(team.IsActive ? "on" : "")" data-switch="teIsActive" aria-pressed="@(team.IsActive ? "true" : "false")" aria-label="이 팀 사용하기"></button></div>
+            <div class="fm-hint">끄면 홈 화면과 도전성경에서 이 팀이 보이지 않아요.</div>
+        </div>
+        <div class="qb-btns"><button type="button" class="qb-btn g" data-close="teamEdit">닫기</button><button type="submit" class="qb-btn p">팀 저장</button></div>
+    </form>
+
+    <div class="qb-sec">구성원 <small>@(activeM.Count)명@(offM.Count > 0 ? $" · 뺀 사람 {offM.Count}명" : "")</small></div>
+
+    @if (members.Count == 0)
+    {
+        <div class="fm-empty">아직 구성원이 없어요. 아래에서 추가해 주세요.</div>
+    }
+
+    int no = 0;
+    foreach (var m in activeM.Concat(offM))
+    {
+        bool isStu = m.RoleCode == 0;
+        string key = "m" + (no++);
+        if (m == offM.FirstOrDefault())
+        {
+            <div class="qb-sec" style="font-size:13px;color:#6B7280">뺀 구성원 <small>@(offM.Count)명</small></div>
+        }
+        <button type="button" class="fm-row@(m.IsActive ? "" : " off")" data-toggle="@key" data-member="@m.UserName"
+                data-u="@m.UserName" data-role="@m.RoleCode" data-rel="@m.RelationCode" data-sort="@m.SortNo" data-active="@(m.IsActive ? "1" : "0")">
+            <span class="n">@(m.IsActive ? (activeM.IndexOf(m) + 1).ToString("00") : "–")</span>
+            <span class="t">
+                <b>@(m.FullName)<span class="fm-tg role">@RoleLabel(m.RoleCode)</span>@if (isStu && m.RelationCode == 0) {<span class="fm-tg me">본인</span>} else if (isStu && m.RelationCode != 9) {<span class="fm-tg">@RelLabel(m.RelationCode)</span>}</b>
+                <small>@m.UserName@(m.UserExists ? "" : " · 가입 정보를 찾을 수 없는 아이디")</small>
+            </span>
+            <span class="g">⌄</span>
+        </button>
+
+        <div class="fm-panel" id="@key" hidden>
+            <form method="post" action="/DailyMission2FamilyAdmin/UpdateMember" data-focus="@m.UserName">
+                <input type="hidden" name="teamId" value="@m.FamilyTeamId" />
+                <input type="hidden" name="userName" value="@m.UserName" />
+                <input type="hidden" name="sortNo" value="@m.SortNo" />
+                <input type="hidden" name="isActive" value="@(m.IsActive ? "true" : "false")" />
+
+                <div class="qb-f">
+                    <span class="lbl">역할</span>
+                    <div class="fm-seg">
+                        @foreach (var r in roles)
+                        {
+                            <label><input type="radio" name="roleCode" value="@r.Code" checked="@(m.RoleCode == r.Code)" data-rolepick /><span>@r.Label</span></label>
+                        }
+                    </div>
+                </div>
+                <div class="qb-f" data-relbox>
+                    <span class="lbl">형제 관계</span>
+                    <div class="fm-seg">
+                        @foreach (var r in rels)
+                        {
+                            <label><input type="radio" name="relationCode" value="@r.Code" checked="@(m.RelationCode == r.Code)" data-relpick /><span>@r.Label</span></label>
+                        }
+                    </div>
+                    <div class="fm-warn" data-mewarn hidden>@(me != null && me.UserName != m.UserName ? $"이미 {me.FullName} 님이 본인이에요. 본인은 팀에 한 명만 둘 수 있어서, 먼저 그 사람의 관계를 바꿔 주세요." : "")</div>
+                </div>
+                <div class="fm-hint" data-nonstu>형제 관계는 학생일 때만 정해요.</div>
+
+                @if (m.IsActive)
+                {
+                    <div class="qb-f">
+                        <span class="lbl">보이는 순서</span>
+                        <div class="fm-seg">
+                            <button type="button" data-move="-1" disabled="@(activeM.IndexOf(m) == 0)">위로</button>
+                            <button type="button" data-move="1" disabled="@(activeM.IndexOf(m) == activeM.Count - 1)">아래로</button>
+                        </div>
+                    </div>
+                }
+
+                <div class="qb-btns"><button type="button" class="qb-btn g" data-close="@key">닫기</button><button type="submit" class="qb-btn p">저장</button></div>
+            </form>
+
+            @if (m.IsActive)
+            {
+                <form method="post" action="/DailyMission2FamilyAdmin/DeleteMember" data-focus="@m.UserName" data-confirm="@m.FullName 님을 이 팀에서 뺄까요?" data-wait="빼는 중이에요">
+                    <input type="hidden" name="teamId" value="@m.FamilyTeamId" />
+                    <input type="hidden" name="userName" value="@m.UserName" />
+                    <button type="submit" class="qb-btn d fm-out">이 구성원 빼기</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" action="/DailyMission2FamilyAdmin/UpdateMember" data-focus="@m.UserName" data-wait="다시 넣는 중이에요">
+                    <input type="hidden" name="teamId" value="@m.FamilyTeamId" />
+                    <input type="hidden" name="userName" value="@m.UserName" />
+                    <input type="hidden" name="roleCode" value="@m.RoleCode" />
+                    <input type="hidden" name="relationCode" value="@(m.RelationCode == 0 && me != null ? 9 : m.RelationCode)" />
+                    <input type="hidden" name="sortNo" value="@nextSort" />
+                    <input type="hidden" name="isActive" value="true" />
+                    <button type="submit" class="qb-btn fm-out">다시 넣기</button>
+                </form>
+            }
+        </div>
+    }
+
+    <button type="button" class="qb-btn fm-big" data-toggle="addPanel">+ 구성원 추가</button>
+    <form class="fm-panel" id="addPanel" method="post" action="/DailyMission2FamilyAdmin/AddMember" hidden data-wait="추가하는 중이에요">
+        <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+        <input type="hidden" name="sortNo" value="@nextSort" />
+        <div class="qb-f">
+            <label for="addUser">아이디</label>
+            <input class="qb-in" id="addUser" name="userName" placeholder="예: jycherish" autocomplete="off" autocapitalize="off" spellcheck="false" />
+            <span class="error" id="addErr" hidden>아이디를 적어 주세요</span>
+            <div class="fm-hint">사이트에 가입할 때 쓴 아이디를 적어요.</div>
+        </div>
+        <div class="qb-f">
+            <span class="lbl">역할</span>
+            <div class="fm-seg">
+                @foreach (var r in roles)
+                {
+                    <label><input type="radio" name="roleCode" value="@r.Code" checked="@(r.Code == 0)" data-rolepick /><span>@r.Label</span></label>
+                }
+            </div>
+        </div>
+        <div class="qb-f" data-relbox>
+            <span class="lbl">형제 관계</span>
+            <div class="fm-seg">
+                @foreach (var r in rels)
+                {
+                    <label><input type="radio" name="relationCode" value="@r.Code" checked="@(r.Code == 9)" data-relpick /><span>@r.Label</span></label>
+                }
+            </div>
+            <div class="fm-warn" data-mewarn hidden>@(me != null ? $"이미 {me.FullName} 님이 본인이에요. 본인은 팀에 한 명만 둘 수 있어요." : "")</div>
+            <div class="fm-hint">"본인"은 이 팀의 기준이 되는 아이예요.</div>
+        </div>
+        <div class="fm-hint" data-nonstu>형제 관계는 학생일 때만 정해요.</div>
+        <div class="qb-btns"><button type="button" class="qb-btn g" data-close="addPanel">취소</button><button type="submit" class="qb-btn p">추가</button></div>
+        <div class="fm-hint">순서는 맨 뒤로 자동으로 정해져요.</div>
+    </form>
+
+    <div class="qb-ft">
+        <span>저장한 뒤에는 방금 고친 구성원 줄로 돌아와요</span>
+        <span><a href="/DailyMission2FamilyAdmin">가족팀 목록</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+}
+</div>
+
+<script>
+(function () {
+    var wait = document.getElementById('loadingOverlay');
+    function showWait(text) { document.getElementById('waitText').textContent = text || '저장하는 중이에요'; wait.classList.add('on'); }
+    window.addEventListener('pageshow', function () { wait.classList.remove('on'); });
+
+    function store(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) { } }
+    function load(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+
+    // ── 팀 목록: 찾기 + 활성/비활성/전체 ──
+    var teamList = document.getElementById('teamList');
+    if (teamList) {
+        var q = document.getElementById('teamQ'), mode = 'on';
+        var rows = Array.prototype.slice.call(teamList.querySelectorAll('.fm-row'));
+        function apply() {
+            var term = (q.value || '').trim().toLowerCase(), n = 0;
+            rows.forEach(function (a) {
+                var ok = (mode === 'all' || (mode === 'on') === (a.dataset.on === '1')) && (!term || a.dataset.name.indexOf(term) >= 0);
+                a.hidden = !ok;
+                if (ok) { n++; a.querySelector('.n').textContent = (n < 10 ? '0' : '') + n; }
+            });
+            document.getElementById('teamEmpty').hidden = n > 0;
+        }
+        q.addEventListener('input', apply);
+        document.getElementById('teamFilter').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-f]'); if (!b) return;
+            mode = b.dataset.f;
+            this.querySelectorAll('[data-f]').forEach(function (x) { x.classList.toggle('on', x === b); });
+            apply();
+        });
+        apply();
+
+        document.getElementById('btnNewTeam').addEventListener('click', function () {
+            document.getElementById('newTeam').hidden = false; this.hidden = true; document.getElementById('ntName').focus();
+        });
+        document.getElementById('newTeam').addEventListener('submit', function (e) {
+            var empty = !document.getElementById('ntName').value.trim();
+            document.getElementById('ntErr').hidden = !empty;
+            if (empty) { e.preventDefault(); e.stopImmediatePropagation(); }
+        }, true);
+    }
+
+    // ── 펼치기 / 닫기 (한 번에 하나만) ──
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-toggle]');
+        if (t) {
+            var p = document.getElementById(t.dataset.toggle); if (!p) return;
+            var opening = p.hidden;
+            if (t.classList.contains('fm-row')) {
+                document.querySelectorAll('.fm-row[data-toggle]').forEach(function (r) {
+                    var other = document.getElementById(r.dataset.toggle);
+                    if (other && other !== p) { other.hidden = true; r.querySelector('.g').textContent = '⌄'; }
+                });
+                t.querySelector('.g').textContent = opening ? '⌃' : '⌄';
+            }
+            p.hidden = !opening;
+            if (opening) syncPanel(p);
+            return;
+        }
+        var c = e.target.closest('[data-close]');
+        if (c) {
+            var panel = document.getElementById(c.dataset.close); panel.hidden = true;
+            var row = document.querySelector('.fm-row[data-toggle="' + c.dataset.close + '"]'); if (row) row.querySelector('.g').textContent = '⌄';
+            var nb = document.getElementById('btnNewTeam'); if (c.dataset.close === 'newTeam' && nb) nb.hidden = false;
+            return;
+        }
+        var s = e.target.closest('[data-switch]');
+        if (s) {
+            var on = !s.classList.contains('on');
+            s.classList.toggle('on', on); s.setAttribute('aria-pressed', on ? 'true' : 'false');
+            document.getElementById(s.dataset.switch).value = on ? 'true' : 'false';
+        }
+    });
+
+    // ── 역할이 학생일 때만 형제 관계 / 본인 중복 경고 ──
+    function syncPanel(scope) {
+        scope.querySelectorAll('form').forEach(syncForm);
+        if (scope.tagName === 'FORM') syncForm(scope);
+    }
+    function syncForm(f) {
+        var role = f.querySelector('[data-rolepick]:checked'); if (!role) return;
+        var stu = role.value === '0';
+        var box = f.querySelector('[data-relbox]'), non = f.querySelector('[data-nonstu]');
+        if (box) box.hidden = !stu;
+        if (non) non.hidden = stu;
+        var rel = f.querySelector('[data-relpick]:checked'), warn = f.querySelector('[data-mewarn]');
+        if (warn) warn.hidden = !(stu && rel && rel.value === '0' && warn.textContent.trim());
+    }
+    document.addEventListener('change', function (e) {
+        if (e.target.matches('[data-rolepick],[data-relpick]')) syncForm(e.target.form);
+    });
+    document.querySelectorAll('form').forEach(syncForm);
+
+    // ── 화면 안 확인창 ──
+    var pop = document.getElementById('pop'), pending = null;
+    document.getElementById('popNo').addEventListener('click', function () { pop.style.display = ''; pending = null; });
+    document.getElementById('popYes').addEventListener('click', function () {
+        pop.style.display = '';
+        if (pending) { var f = pending; pending = null; f.dataset.ok = '1'; f.requestSubmit ? f.requestSubmit() : f.submit(); }
+    });
+
+    // ── 제출: 확인 → 검증 → 대기카드 → 돌아올 줄 기억 ──
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (f.dataset.confirm && f.dataset.ok !== '1') {
+            e.preventDefault(); pending = f;
+            document.getElementById('popTitle').textContent = f.dataset.confirm;
+            pop.style.display = 'flex'; return;
+        }
+        if (f.id === 'addPanel') {
+            var u = document.getElementById('addUser'), empty = !u.value.trim();
+            document.getElementById('addErr').hidden = !empty;
+            if (empty) { e.preventDefault(); u.focus(); return; }
+            store('fmFocus', u.value.trim());
+        }
+        if (f.dataset.focus) store('fmFocus', f.dataset.focus);
+        showWait(f.dataset.wait);
+    });
+
+    // ── 위로 / 아래로: 활성 구성원 순서를 10,20,30… 으로 다시 매겨 기존 UpdateMember 로 저장 ──
+    document.addEventListener('click', async function (e) {
+        var b = e.target.closest('[data-move]'); if (!b || b.disabled) return;
+        var rows = Array.prototype.slice.call(document.querySelectorAll('.fm-row[data-active="1"]'));
+        var mine = document.querySelector('.fm-row[data-toggle="' + b.closest('.fm-panel').id + '"]');
+        var i = rows.indexOf(mine), j = i + parseInt(b.dataset.move, 10);
+        if (i < 0 || j < 0 || j >= rows.length) return;
+        rows.splice(j, 0, rows.splice(i, 1)[0]);
+        showWait('순서를 바꾸는 중이에요');
+        try {
+            for (var k = 0; k < rows.length; k++) {
+                var r = rows[k], sort = (k + 1) * 10;
+                if (parseInt(r.dataset.sort, 10) === sort) continue;
+                var fd = new FormData();
+                fd.append('teamId', '@(team?.FamilyTeamId ?? 0)');
+                fd.append('userName', r.dataset.u);
+                fd.append('roleCode', r.dataset.role);
+                fd.append('relationCode', r.dataset.rel);
+                fd.append('sortNo', sort);
+                fd.append('isActive', 'true');
+                var res = await fetch('/DailyMission2FamilyAdmin/UpdateMember', { method: 'POST', body: fd, credentials: 'same-origin' });
+                if (!res.ok) throw new Error(res.status);
+            }
+            store('fmFocus', mine.dataset.u);
+            location.href = '/DailyMission2FamilyAdmin?teamId=@(team?.FamilyTeamId ?? 0)';
+        } catch (err) {
+            wait.classList.remove('on');
+            alert('순서를 바꾸지 못했어요. 잠시 뒤 다시 해 주세요.');
+        }
+    });
+
+    // ── 저장 뒤 방금 고친 구성원 줄로 ──
+    var focus = load('fmFocus');
+    if (focus) {
+        store('fmFocus', null);
+        var row = document.querySelector('.fm-row[data-member="' + (window.CSS && CSS.escape ? CSS.escape(focus) : focus) + '"]');
+        if (row) {
+            row.scrollIntoView({ block: 'center' });
+            row.classList.add('flash');
+            setTimeout(function () { row.classList.remove('flash'); }, 1600);
+        }
+    }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@{
+    Layout = null;
+    var urlMyPhotoPick = "/Albums/MyPhotoPick";
+    var urlPhotoUpload = "/Albums";
+    var urlHome = "/";
+    var urlStory = "/Story/Index";
+    var videoBadge = "NEW"; // "NEW" or "HOT"
+
+    var menus = new[] {
+        new { No = "01", Label = "사진 보기 · 올리기", Desc = "앨범을 둘러보고 새 사진을 올려요 (올리기는 로그인 후)", Url = urlPhotoUpload, Tag = "" },
+        new { No = "02", Label = "활동 영상",          Desc = "예배와 활동 모습을 영상으로 만나요",                 Url = urlStory,       Tag = videoBadge },
+        new { No = "03", Label = "나의 사진 받기",     Desc = "우리 아이 사진을 한 번에 내려받아요",                Url = urlMyPhotoPick, Tag = "" },
+    };
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>사진 · 영상</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+        .bSec { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+        .bSecT { font-size: 16px; font-weight: 800; color: #111827; }
+
+        .mn { display: flex; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid #EEF0F3; }
+        .mn:last-of-type { border-bottom: 0; }
+        .mnNo { flex: none; width: 26px; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+        .mnTx { flex: 1; min-width: 0; }
+        .mnL { display: block; font-size: 16px; font-weight: 700; color: #111827; line-height: 1.4; }
+        .mnL .tag { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 10.5px; font-weight: 800; vertical-align: 2px; }
+        .mnD { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; word-break: keep-all; }
+        .mnA { flex: none; font-size: 20px; font-weight: 300; color: #D1D5DB; transition: transform .15s, color .15s; }
+        .mn:hover .mnA { color: #2F80ED; transform: translateX(3px); }
+        .mn:hover .mnL { color: #2F80ED; }
+
+        .homeBar { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; padding: 15px 16px; border-radius: 12px; background: #F4F6F9; }
+        .homeBar b { font-size: 15px; font-weight: 700; color: #111827; }
+        .homeBar i { font-style: normal; font-size: 20px; font-weight: 300; color: #2F80ED; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .ft a { color: #6B7280; }
+        .ft a:hover { color: #2F80ED; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><a href="@urlHome">← @ConstatsCommon.ToHome</a><span>@DateHelper.GetKoreaNow().Year</span></div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">사진 · 영상</h1>
+    </header>
+
+    <main class="sh">
+        <section class="bSec">
+            <div class="bSecT">바로가기</div>
+            @foreach (var m in menus)
+            {
+                <a class="mn" href="@m.Url">
+                    <span class="mnNo">@m.No</span>
+                    <span class="mnTx"><span class="mnL">@m.Label@if (!string.IsNullOrEmpty(m.Tag)) {<span class="tag">@m.Tag</span>}</span><span class="mnD">@m.Desc</span></span>
+                    <span class="mnA">›</span>
+                </a>
+            }
+        </section>
+
+        <a class="homeBar" href="@urlHome">
+            <b>@ConstatsCommon.ToHome 가기</b>
+            <i>›</i>
+        </a>
+
+        <div class="ft">
+            <span>© 유년부 · 사진 &amp; 영상</span>
+            <span><a href="@urlPhotoUpload">앨범</a> · <a href="@urlStory">영상</a> · <a href="@urlMyPhotoPick">사진 받기</a></span>
+        </div>
+    </main>
+
+    <script src="/js/GlobalCookie.js"></script>
+</body>
+</html>

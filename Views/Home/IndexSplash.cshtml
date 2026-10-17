@@ -1,0 +1,84 @@
+@{
+    Layout = null;
+}
+@*  ══════════════════════════════════════════════════════════════
+    홈 대기 화면 — "잠실새내교회 유년부로 가요." (B안: 도토리가 자라요 + 아래 도는 원)
+    홈(/)에 처음 들어오면 이 가벼운 화면을 먼저 보내고, 곧바로 진짜 홈(?_full=1)을 불러온다.
+    · HomeController.Index 의 ShouldShowHomeSplash() 가 이 화면을 쓸지 정한다.
+    · 진짜 홈이 열리면 주소창의 _full=1 은 홈 화면에서 지운다(Index.cshtml 맨 위 스크립트).
+    · 가볍게: 이미지 없이 이모지 · CSS 로만 그린다. 글꼴(Jua)은 늦게 와도 기본 글꼴로 먼저 보인다.
+    ══════════════════════════════════════════════════════════════ *@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#FBF4E4" />
+    <title>잠실새내교회 유년부로 가요</title>
+    <link rel="manifest" href="/manifest.json?v=1">
+    <link rel="apple-touch-icon" href="/images/ICON/church/pwa-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <style>
+        html, body { margin: 0; height: 100%; background: #FBF4E4; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #16181C; }
+        .wrap { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 22px; box-sizing: border-box; }
+        .card { width: 100%; max-width: 300px; background: #fff; border: 2px solid #F0E2C3; border-radius: 22px; text-align: center;
+                padding: 28px 22px 22px; box-shadow: 0 16px 36px -18px rgba(120,80,30,.4); box-sizing: border-box; }
+
+        .tree { height: 60px; display: flex; align-items: flex-end; justify-content: center; gap: 8px; }
+        .tree span { display: inline-block; line-height: 1; animation: grow 1.6s ease-out infinite; }
+        .tree span:nth-child(1) { font-size: 22px; animation-delay: 0s; }
+        .tree span:nth-child(2) { font-size: 32px; animation-delay: .3s; }
+        .tree span:nth-child(3) { font-size: 44px; animation-delay: .6s; }
+
+        .t { font-family: "Jua", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 24px; line-height: 1.35; color: #7A4E1D; margin-top: 12px; word-break: keep-all; }
+        .s { font-size: 13px; color: #9A7B4F; margin-top: 6px; }
+        .tip { margin-top: 14px; font-size: 12px; color: #8A7A62; background: #FBF4E4; border-radius: 12px; padding: 9px 10px; line-height: 1.6; word-break: keep-all; }
+
+        .ld { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed #EADBBE; font-size: 12.5px; color: #9A7B4F; }
+        .ld i { width: 16px; height: 16px; border: 2px solid #F0E2C3; border-top-color: #C98B2C; border-radius: 50%; animation: spin .8s linear infinite; }
+
+        .slow { display: none; font-size: 11.5px; color: #9A7B4F; margin-top: 12px; line-height: 1.6; }
+        .slow a { color: #7A4E1D; font-weight: 600; }
+
+        @@keyframes grow { 0% { transform: scale(.2); opacity: 0; } 60% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); } }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        @@media (prefers-reduced-motion: reduce) { .tree span, .ld i { animation: none; } }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="card" role="status" aria-live="polite">
+            <div class="tree" aria-hidden="true"><span>🌰</span><span>🌱</span><span>🌳</span></div>
+            <div class="t">잠실새내교회<br>유년부로 가요.</div>
+            <div class="s">말씀 도토리를 모으러 출발~</div>
+            <div class="ld"><i aria-hidden="true"></i>잠시만 기다려 주세요</div>
+            <div class="slow" id="slow">조금 오래 걸리고 있어요<br><a href="/?_full=1" id="retry">다시 불러오기</a></div>
+        </div>
+    </div>
+    <noscript><p style="text-align:center"><a href="/?_full=1">홈으로 가기</a></p></noscript>
+    <script>
+        /* 카드를 실제로 화면에 그린 뒤 진짜 홈으로 (아이폰 Safari 는 이동이 시작되면 화면을 다시 그리지 않는다)
+           지금 주소(쿼리 · # 포함)에 _full=1 을 붙이고 replace — 뒤로 가기에 대기 화면이 남지 않는다. */
+        (function () {
+            var full = '/?_full=1';
+            try { var u = new URL(location.href); u.searchParams.set('_full', '1'); full = u.href; } catch (e) { }
+            window.__homeFull = full;
+            function go() { location.replace(full); }
+            if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(go, 30); }); });
+            else setTimeout(go, 50);
+        })();
+
+        // 15초가 지나도 안 열리면 "다시 불러오기" 안내
+        setTimeout(function () {
+            var s = document.getElementById('slow'), r = document.getElementById('retry');
+            if (r && window.__homeFull) r.href = window.__homeFull;
+            if (s) s.style.display = 'block';
+        }, 15000);
+    </script>
+</body>
+</html>

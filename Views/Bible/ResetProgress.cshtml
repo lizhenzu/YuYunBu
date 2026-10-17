@@ -1,0 +1,334 @@
+@using BulletinBoard.Helpers
+@{
+    Layout = null;
+
+    var userName      = ViewBag.UserName      as string ?? "";
+    var fullName      = ViewBag.FullName      as string ?? "";
+    var userId        = ViewBag.UserId        as string ?? "";
+    var readCount     = (int)(ViewBag.ReadCount     ?? 0);
+    var totalVerses   = (int)(ViewBag.TotalVerses   ?? 0);
+    var readVerses    = (int)(ViewBag.ReadVerses    ?? 0);
+    int nextCount     = readCount + 1;
+    double pct        = totalVerses > 0 ? Math.Round(readVerses * 100.0 / totalVerses, 1) : 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>성경 완독 기록 처리</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+    min-height: 100vh;
+    background: #f0f4ff;
+    font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 36px 16px 80px;
+    color: #1e293b;
+}
+
+/* ── 뒤로가기 ── */
+.back-row { width: 100%; max-width: 480px; margin-bottom: 24px; }
+.back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: #6366f1; font-size: 13px; font-weight: 700;
+    text-decoration: none;
+    background: #fff;
+    border: 1.5px solid #e0e7ff;
+    padding: 7px 16px; border-radius: 30px;
+    transition: all .15s;
+    box-shadow: 0 1px 4px rgba(99,102,241,.08);
+}
+.back-btn:hover { background: #eef2ff; border-color: #c7d2fe; }
+
+/* ── 카드 ── */
+.card {
+    width: 100%; max-width: 480px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 28px;
+    padding: 40px 36px;
+    box-shadow: 0 8px 32px rgba(99,102,241,.08);
+}
+
+/* ── 축하 헤더 ── */
+.confetti-icon {
+    font-size: 56px;
+    display: block; text-align: center;
+    margin-bottom: 18px;
+    animation: floatBounce 3s ease-in-out infinite;
+}
+@@keyframes floatBounce {
+    0%,100% { transform: translateY(0) rotate(-3deg); }
+    50%      { transform: translateY(-10px) rotate(3deg); }
+}
+
+.congrats-badge {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: linear-gradient(90deg, #fef3c7, #fde68a);
+    border: 1.5px solid #fcd34d;
+    border-radius: 30px; padding: 5px 18px;
+    font-size: 12px; font-weight: 800; color: #92400e;
+    letter-spacing: .5px; text-transform: uppercase;
+    margin: 0 auto 16px; width: fit-content;
+}
+
+.card-title {
+    font-size: 22px; font-weight: 900;
+    text-align: center; line-height: 1.35;
+    color: #1e293b; margin-bottom: 5px;
+}
+.card-sub {
+    font-size: 13.5px; color: #94a3b8;
+    text-align: center; margin-bottom: 28px;
+}
+
+/* ── 정보 박스 ── */
+.info-box {
+    background: #f8faff;
+    border: 1.5px solid #e0e7ff;
+    border-radius: 18px; padding: 20px 22px;
+    margin-bottom: 24px;
+    display: flex; flex-direction: column; gap: 13px;
+}
+.info-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.info-label { font-size: 12.5px; color: #94a3b8; font-weight: 600; white-space: nowrap; }
+.info-value { font-size: 14px; font-weight: 800; color: #1e293b; text-align: right; }
+.info-value.gold {
+    background: linear-gradient(90deg, #d97706, #f59e0b);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; font-size: 18px;
+}
+.info-divider { height: 1px; background: #e2e8f0; margin: 1px 0; }
+
+/* ── 진도 바 ── */
+.prog-wrap { margin-bottom: 24px; }
+.prog-label-row {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: #94a3b8; margin-bottom: 8px; font-weight: 600;
+}
+.prog-track { height: 9px; background: #e2e8f0; border-radius: 10px; overflow: hidden; }
+.prog-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    border-radius: 10px;
+    transition: width 1.2s cubic-bezier(.25,.46,.45,.94);
+    width: 0%;
+}
+
+/* ── 경고 박스 ── */
+.warn-box {
+    background: #fff5f5;
+    border: 1.5px solid #fecaca;
+    border-radius: 14px; padding: 15px 18px;
+    margin-bottom: 24px;
+    font-size: 13px; font-weight: 600;
+    color: #b91c1c; line-height: 1.75;
+}
+.warn-box strong { color: #dc2626; font-weight: 800; }
+
+/* ── 처리 버튼 ── */
+.btn-reset {
+    display: block; width: 100%;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff; font-size: 15px; font-weight: 900;
+    border: none; border-radius: 14px; padding: 15px;
+    cursor: pointer; letter-spacing: .3px;
+    box-shadow: 0 4px 16px rgba(220,38,38,.25);
+    transition: transform .12s, box-shadow .15s;
+    text-align: center; font-family: inherit;
+}
+.btn-reset:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(220,38,38,.35); }
+.btn-reset:active { transform: translateY(0); }
+.btn-reset:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── 모달 ── */
+.modal-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,23,42,.45);
+    backdrop-filter: blur(4px);
+    z-index: 500; align-items: center; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal-box {
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 24px; padding: 36px 28px;
+    max-width: 340px; width: 90%;
+    box-shadow: 0 16px 48px rgba(15,23,42,.15);
+    text-align: center;
+    animation: modalIn .22s cubic-bezier(.34,1.56,.64,1);
+}
+@@keyframes modalIn {
+    from { opacity: 0; transform: scale(.9) translateY(12px); }
+    to   { opacity: 1; transform: none; }
+}
+.modal-icon { font-size: 44px; margin-bottom: 12px; }
+.modal-title { font-size: 17px; font-weight: 900; color: #1e293b; margin-bottom: 10px; }
+.modal-desc { font-size: 13.5px; color: #64748b; line-height: 1.75; margin-bottom: 24px; }
+.modal-desc strong { color: #dc2626; font-weight: 700; }
+.modal-btns { display: flex; gap: 10px; }
+.modal-cancel {
+    flex: 1; padding: 12px;
+    background: #f1f5f9; border: 1.5px solid #e2e8f0;
+    color: #475569; border-radius: 12px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: background .15s; font-family: inherit;
+}
+.modal-cancel:hover { background: #e2e8f0; }
+.modal-confirm {
+    flex: 1; padding: 12px;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    border: none; color: #fff;
+    border-radius: 12px; font-size: 14px; font-weight: 900;
+    cursor: pointer; transition: opacity .15s; font-family: inherit;
+}
+.modal-confirm:hover { opacity: .88; }
+
+/* ── 성공 상태 ── */
+.result-wrap { display: none; text-align: center; }
+.result-icon { font-size: 56px; margin-bottom: 14px; display: block; }
+.result-title { font-size: 20px; font-weight: 900; color: #1e293b; margin-bottom: 8px; }
+.result-sub { font-size: 13.5px; color: #64748b; margin-bottom: 28px; line-height: 1.7; }
+.btn-go {
+    display: block; width: 100%;
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #fff; font-size: 15px; font-weight: 900;
+    border: none; border-radius: 14px; padding: 15px;
+    cursor: pointer; text-decoration: none;
+    box-shadow: 0 4px 16px rgba(5,150,105,.22);
+    transition: transform .12s; font-family: inherit;
+}
+.btn-go:hover { transform: translateY(-2px); color: #fff; }
+
+@@media (max-width: 480px) {
+    .card { padding: 28px 18px; }
+    .card-title { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+
+<div class="back-row">
+    <a class="back-btn" href="/Home/Index">← 메인으로</a>
+</div>
+
+<div class="card" id="mainCard">
+
+    <!-- 축하 헤더 -->
+    <span class="confetti-icon">🎊</span>
+    <div class="congrats-badge">👑 Bible Complete</div>
+    <div class="card-title">성경 완독을 축하합니다!</div>
+    <div class="card-sub">@(@fullName)님, 정말 대단해요 🙏</div>
+
+    <!-- 정보 박스 -->
+    <div class="info-box">
+        <div class="info-row">
+            <span class="info-label">👤 이름</span>
+            <span class="info-value">@(@fullName)님</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-row">
+            <span class="info-label">📖 기존 완독 횟수</span>
+            <span class="info-value gold">@readCount 독</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-row">
+            <span class="info-label">✅ 읽은 구절 수</span>
+            <span class="info-value">@readVerses.ToString("N0") / @totalVerses.ToString("N0") 절</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-row">
+            <span class="info-label">🔄 처리 후 완독 횟수</span>
+            <span class="info-value" style="color:#34d399">@nextCount 독으로 기록됩니다</span>
+        </div>
+    </div>
+
+    <!-- 진도 바 -->
+    <div class="prog-wrap">
+        <div class="prog-label-row">
+            <span>현재 진도율</span>
+            <span>@pct%</span>
+        </div>
+        <div class="prog-track">
+            <div class="prog-fill" id="progFill" data-pct="@pct"></div>
+        </div>
+    </div>
+
+    <!-- 경고 박스 -->
+    <div class="warn-box">
+        ⚠️ 아래 버튼을 누르면 다음이 처리됩니다:<br>
+        <strong>①</strong> 성경 읽기 히스토리 전체 초기화<br>
+        <strong>②</strong> 완독 횟수 @(readCount)독 → <strong>@(nextCount)독</strong>으로 업데이트<br>
+        <strong>③</strong> 성경 처음부터 다시 읽기 시작 가능<br><br>
+        이 작업은 <strong>되돌릴 수 없습니다.</strong>
+    </div>
+
+    <!-- 처리 버튼 -->
+    <button class="btn-reset" id="btnReset" type="button" onclick="openConfirm()">
+        🗑️ 읽기 기록 삭제 &amp; @(nextCount)독 등록하기
+    </button>
+
+    <!-- 성공 결과 (처리 후 표시) -->
+    <div class="result-wrap" id="resultWrap">
+        <span class="result-icon">✅</span>
+        <div class="result-title">처리 완료!</div>
+        <div class="result-sub">
+            읽기 기록이 초기화되고<br>
+            <strong style="color:#fcd34d">@(nextCount)독</strong>으로 등록되었습니다. 수고하셨습니다! 🙏
+        </div>
+        <a class="btn-go" href="/Bible2/Participants">📖 참여자 현황 보기</a>
+    </div>
+
+</div>
+
+<!-- ── 확인 모달 ── -->
+<div class="modal-backdrop" id="confirmModal">
+    <div class="modal-box">
+        <div class="modal-icon">⚠️</div>
+        <div class="modal-title">정말 처리하시겠습니까?</div>
+        <div class="modal-desc">
+            읽기 히스토리가 <strong>전체 삭제</strong>되고<br>
+            완독 횟수가 <strong>@(nextCount)독</strong>으로 기록됩니다.<br>
+            이 작업은 되돌릴 수 없습니다.
+        </div>
+        <div class="modal-btns">
+            <button class="modal-cancel" onclick="closeConfirm()">취소</button>
+            <button class="modal-confirm" id="btnConfirm" onclick="submitReset()">처리하기</button>
+        </div>
+    </div>
+</div>
+
+<form id="resetForm" method="post" action="/Bible2/ResetProgress" style="display:none">
+    <input type="hidden" name="userId" value="@userId" />
+    @Html.AntiForgeryToken()
+</form>
+
+<script>
+function openConfirm() {
+    document.getElementById('confirmModal').classList.add('open');
+}
+function closeConfirm() {
+    document.getElementById('confirmModal').classList.remove('open');
+}
+function submitReset() {
+    var btn = document.getElementById('btnConfirm');
+    btn.disabled = true;
+    btn.textContent = '처리 중...';
+    document.getElementById('resetForm').submit();
+}
+
+// 진도 바 애니메이션
+window.addEventListener('DOMContentLoaded', function () {
+    var fill = document.getElementById('progFill');
+    var pct  = parseFloat(fill.getAttribute('data-pct') || '0');
+    requestAnimationFrame(function () {
+        setTimeout(function () { fill.style.width = pct + '%'; }, 120);
+    });
+});
+</script>
+</body>
+</html>

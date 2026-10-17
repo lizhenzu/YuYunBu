@@ -1,0 +1,324 @@
+@model IEnumerable<BulletinBoard.Models.WeeklyWordToReads>
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 두 화면을 한 뷰로 그린다
+    //  · /WeeklyWordToRead/WeeklyWordToReadDetailList          → 단원 버튼 (1 ~ 마지막 단원)
+    //  · /WeeklyWordToRead/WeeklyWordToReadDetailList?unit=9   → 9단원의 공과(lesson) 목록
+    const int SpecialUnit = 13; // 13 = 절기 · 특별
+    const string ListUrl = "/WeeklyWordToRead/WeeklyWordToReadDetailList";
+}
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+@{
+    var visibleItems = Model.Where(x => isSuperAdmin || x.publishYn == "y").ToList();
+    int totalCount   = visibleItems.Count;
+    var today        = DateHelper.GetKoreaToday();
+
+    bool IsThisWeek(BulletinBoard.Models.WeeklyWordToReads x) => x.DateFrom.Date <= today.Date && today.Date <= x.DateTo.Date;
+    string UnitName(int dw) => dw == SpecialUnit ? "절기 · 특별" : $"{dw}단원";
+
+    // 단원별 묶음
+    var byUnit = visibleItems.GroupBy(x => x.WeekTitle_DW).ToDictionary(g => g.Key, g => g.OrderBy(x => x.WeekTitle_GUA).ThenBy(x => x.DateFrom).ToList());
+    int lastUnit = byUnit.Keys.Where(k => k > 0 && k != SpecialUnit).DefaultIfEmpty(0).Max();
+    var units = Enumerable.Range(1, lastUnit).ToList();
+    if (byUnit.ContainsKey(SpecialUnit)) units.Add(SpecialUnit);
+
+    var thisWeek = visibleItems.FirstOrDefault(IsThisWeek);
+
+    // 선택한 단원
+    int unit = int.TryParse(Context.Request.Query["unit"], out var _u) ? _u : 0;
+    bool unitMode = unit > 0;
+    var unitItems = unitMode && byUnit.TryGetValue(unit, out var _l) ? _l : new List<BulletinBoard.Models.WeeklyWordToReads>();
+    string unitTitle = unitItems.Select(x => x.WeekTitle_DW_Title).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t)) ?? "";
+    // 이전·다음 단원은 공과가 있는 단원으로만 넘어간다
+    var filledUnits = units.Where(u => byUnit.ContainsKey(u)).ToList();
+    int? prevUnit = filledUnits.Where(u => u < unit).Select(u => (int?)u).LastOrDefault();
+    int? nextUnit = filledUnits.Where(u => u > unit).Select(u => (int?)u).FirstOrDefault();
+
+    string Period(BulletinBoard.Models.WeeklyWordToReads item)
+    {
+        var sameYear  = item.DateFrom.Year == item.DateTo.Year;
+        var sameMonth = item.DateFrom.Month == item.DateTo.Month && sameYear;
+        string pfx = $"{item.DateFrom.Year}.{item.DateFrom.Month}.{item.DateFrom.Day}({SharedComm.GetKoreanDayOfWeek(item.DateFrom)})";
+        string sfx = sameMonth
+            ? $"{item.DateTo.Day}({SharedComm.GetKoreanDayOfWeek(item.DateTo)})"
+            : sameYear
+                ? $"{item.DateTo.Month}.{item.DateTo.Day}({SharedComm.GetKoreanDayOfWeek(item.DateTo)})"
+                : $"{item.DateTo.Year}.{item.DateTo.Month}.{item.DateTo.Day}({SharedComm.GetKoreanDayOfWeek(item.DateTo)})";
+        return $"{pfx} ~ {sfx}";
+    }
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(unitMode ? $"{UnitName(unit)} · 유년부 공과" : "유년부 공과")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .sh { max-width: 880px; }
+
+        /* 머리 통계 */
+        .st { display: flex; gap: 26px; margin-top: 20px; }
+        .st div { font-size: 11px; font-weight: 600; letter-spacing: .16em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+
+        /* 이번 주 공과 — 검정 띠 */
+        .now { display: flex; align-items: center; gap: 16px; margin-top: 22px; padding: 18px 20px; background: var(--card); border: 1px solid var(--tx); box-shadow: inset 0 3px 0 var(--acc); }
+        .now:hover .nowGo { color: var(--acc); transform: translateX(3px); }
+        .nowTx { flex: 1; min-width: 0; }
+        .nowK { font-size: 11px; font-weight: 600; letter-spacing: .16em; color: var(--acc); }
+        .nowT { margin-top: 4px; font-family: "Noto Serif KR", serif; font-size: 18px; line-height: 1.45; word-break: keep-all; }
+        .nowM { margin-top: 4px; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .nowGo { flex: none; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--dim); transition: transform .15s, color .15s; }
+
+        /* 단원 버튼 */
+        .units { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+        @@media (max-width: 640px) { .units { grid-template-columns: repeat(3, 1fr); } }
+        @@media (max-width: 360px) { .units { grid-template-columns: repeat(2, 1fr); } }
+        .unit { position: relative; display: flex; flex-direction: column; min-height: 118px; padding: 14px 14px 12px; background: var(--card); border: 1px solid var(--rule); transition: border-color .15s, background .15s; }
+        a.unit:hover { border-color: var(--tx); }
+        a.unit:hover .uNo { color: var(--tx); }
+        .uNo { font-family: "Inter", sans-serif; font-weight: 200; font-size: 38px; line-height: 1; color: var(--acc); font-variant-numeric: tabular-nums; transition: color .15s; }
+        .uNo.sp { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 20px; line-height: 1.2; padding-top: 8px; }
+        .uK { margin-top: 4px; font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--dim); }
+        .uT { margin-top: 6px; font-family: "Noto Serif KR", serif; font-size: 13px; line-height: 1.5; color: var(--dim2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+        .uC { margin-top: auto; padding-top: 8px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .unit .tag { position: absolute; top: 10px; right: 10px; }
+        .unit.cur { border-color: var(--tx); box-shadow: inset 0 3px 0 var(--acc); }
+        .unit.off { background: transparent; border-style: dashed; }
+        .unit.off .uNo { color: var(--rule); }
+        .unit.off .uC { color: var(--rule); }
+
+        /* 단원 안 — 이전/다음 단원 */
+        .un { display: flex; justify-content: space-between; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+        .un .nbtn.off { opacity: .35; pointer-events: none; }
+
+        /* 공과 카드 */
+        .book-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+        @@media (max-width: 640px) { .book-grid { grid-template-columns: 1fr; } }
+        .book { display: flex; flex-direction: column; background: var(--card); border: 1px solid var(--rule); transition: border-color .15s; }
+        .book:hover { border-color: var(--acc); }
+        .book.cur { border-color: var(--tx); box-shadow: inset 0 3px 0 var(--acc); }
+        .bkTop { display: flex; gap: 14px; padding: 18px 18px 14px; }
+        .bkNo { flex: none; width: 52px; text-align: center; padding-top: 2px; border-right: 1px solid var(--line); padding-right: 12px; }
+        .bkNo b { display: block; font-family: "Inter", sans-serif; font-weight: 200; font-size: 34px; line-height: 1; color: var(--acc); font-variant-numeric: tabular-nums; }
+        .bkNo small { display: block; margin-top: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--dim); }
+        .bkTx { flex: 1; min-width: 0; }
+        .bkK { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--dim); }
+        .bkK .tag { margin-left: 6px; }
+        .bkT { margin-top: 4px; font-family: "Noto Serif KR", serif; font-size: 18px; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; }
+        .bkP { margin-top: 6px; font-family: "Noto Serif KR", serif; font-size: 13.5px; line-height: 1.7; color: var(--dim2); word-break: keep-all; }
+        .bkP::before { content: "“"; color: var(--acc); }
+        .bkP::after { content: "”"; color: var(--acc); }
+        .bkM { margin-top: auto; padding: 11px 18px; border-top: 1px solid var(--line); display: grid; gap: 4px; font-size: 12.5px; color: var(--dim2); font-variant-numeric: tabular-nums; }
+        .bkM span { color: var(--dim); display: inline-block; width: 34px; }
+        .bkM .ms { color: var(--acc); }
+        .bkA { display: flex; border-top: 1px solid var(--line); }
+        .bkA a { flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; font-size: 14px; color: var(--tx); transition: background .15s, color .15s; }
+        .bkA a:hover { background: var(--tx); color: var(--bg); }
+        .bkA a i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 20px; }
+        .bkA .tg { flex: none; padding: 12px 14px; font-size: 12.5px; border-left: 1px solid var(--line); color: var(--dim2); }
+        .bkA .tg.hide:hover { background: var(--danger); color: #fff; }
+        .bkA .tg.show { color: var(--acc); }
+        .bkA .tg.show:hover { background: var(--acc); color: #fff; }
+    </style>
+</head>
+
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span>
+                    <a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span>
+                    @if (unitMode)
+                    {
+                        <a href="@ListUrl">공과 목록</a>
+                    }
+                    else
+                    {
+                        <a href="/WeeklyWordToRead/Branch">주일공과</a>
+                    }
+                </span>
+                <span class="hdAct">
+                    @if (!isSignedIn)
+                    {
+                        <a href="/Identity/Account/Login" class="nbtn">로그인</a>
+                    }
+                    @if (isSuperAdmin)
+                    {
+                        <a href="https://xn--9d0bp30cjhe9zk.com/main/bbs/board.php?bo_table=hana_3_1&sca=5-2%ED%95%99%EA%B8%B0" class="nbtn" target="_blank" rel="noopener">총회자료</a>
+                        <a href="/WeeklyWordToRead/EnrollWeeklyWordToRead" class="nbtn pri">＋ 공과 등록</a>
+                    }
+                </span>
+            </div>
+
+            @if (unitMode)
+            {
+                <div class="hdK">UNIT @(unit == SpecialUnit ? "SPECIAL" : unit.ToString())</div>
+                <h1 class="hdT">@UnitName(unit)@if (!string.IsNullOrWhiteSpace(unitTitle)) {<br /><small style="font-size:.62em;color:var(--headdim)">@unitTitle</small>}</h1>
+                <div class="st">
+                    <div>공과<b>@unitItems.Count</b></div>
+                    <div>열람<b>@(unitItems.Sum(x => x.visited).ToString("N0"))</b></div>
+                    <div class="k">미션 완료<b>@(unitItems.Count(x => x.CountCount > 0))</b></div>
+                </div>
+            }
+            else
+            {
+                <div class="hdK">WEEKLY LESSON</div>
+                <h1 class="hdT">단원을 골라<br />공과를 펼쳐 보세요</h1>
+                <div class="st">
+                    <div>단원<b>@byUnit.Count</b></div>
+                    <div>공과<b>@totalCount</b></div>
+                    <div class="k">미션 완료<b>@(visibleItems.Count(x => x.CountCount > 0))</b></div>
+                </div>
+            }
+        </div>
+    </header>
+
+    <main class="sh">
+        @if (!unitMode)
+        {
+            @* ── 단원 버튼 화면 ── *@
+            @if (thisWeek != null)
+            {
+                <a class="now" href="/WeeklyReport/IndexByID?Id=@thisWeek.Id">
+                    <span class="nowTx">
+                        <span class="nowK" style="display:block">이번 주 공과 · @UnitName(thisWeek.WeekTitle_DW) @(thisWeek.WeekTitle_GUA)과</span>
+                        <span class="nowT" style="display:block">@thisWeek.BibleTitle</span>
+                        <span class="nowM" style="display:block">@Period(thisWeek)</span>
+                    </span>
+                    <span class="nowGo">→</span>
+                </a>
+            }
+
+            <section class="sec">
+                <div class="secH">
+                    <div><div class="secK">UNITS</div><div class="secT">단원</div></div>
+                    <span class="secN">단원을 누르면 공과가 나와요</span>
+                </div>
+
+                @if (units.Count == 0)
+                {
+                    <div class="empty">등록된 공과가 없습니다.</div>
+                }
+                else
+                {
+                    <div class="units">
+                        @foreach (var dw in units)
+                        {
+                            var list = byUnit.TryGetValue(dw, out var _x) ? _x : null;
+                            if (list == null || list.Count == 0)
+                            {
+                                <div class="unit off" aria-disabled="true">
+                                    <span class="uNo @(dw == SpecialUnit ? "sp" : "")">@(dw == SpecialUnit ? "절기 · 특별" : dw.ToString())</span>
+                                    <span class="uK">@(dw == SpecialUnit ? "SPECIAL" : "UNIT")</span>
+                                    <span class="uC">공과 없음</span>
+                                </div>
+                                continue;
+                            }
+                            var title = list.Select(x => x.WeekTitle_DW_Title).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+                            bool cur = list.Any(IsThisWeek);
+                            int minG = list.Min(x => x.WeekTitle_GUA), maxG = list.Max(x => x.WeekTitle_GUA);
+                            <a class="unit @(cur ? "cur" : "")" href="@ListUrl?unit=@dw">
+                                @if (cur) { <span class="tag">이번 주</span> }
+                                <span class="uNo @(dw == SpecialUnit ? "sp" : "")">@(dw == SpecialUnit ? "절기 · 특별" : dw.ToString())</span>
+                                <span class="uK">@(dw == SpecialUnit ? "SPECIAL" : "UNIT")</span>
+                                @if (!string.IsNullOrWhiteSpace(title)) { <span class="uT">@title</span> }
+                                <span class="uC">@list.Count 과@(minG > 0 ? $" · {minG}~{maxG}과" : "")</span>
+                            </a>
+                        }
+                    </div>
+                }
+            </section>
+        }
+        else
+        {
+            @* ── 단원 안: 공과(lesson) 목록 ── *@
+            <div class="un">
+                <a class="nbtn @(prevUnit == null ? "off" : "")" href="@(prevUnit == null ? "#" : $"{ListUrl}?unit={prevUnit}")">‹ @(prevUnit == null ? "이전 단원" : UnitName(prevUnit.Value))</a>
+                <a class="nbtn" href="@ListUrl">단원 목록</a>
+                <a class="nbtn @(nextUnit == null ? "off" : "")" href="@(nextUnit == null ? "#" : $"{ListUrl}?unit={nextUnit}")">@(nextUnit == null ? "다음 단원" : UnitName(nextUnit.Value)) ›</a>
+            </div>
+
+            <section class="sec" style="margin-top:22px">
+                <div class="secH">
+                    <div><div class="secK">LESSONS</div><div class="secT">@UnitName(unit) 공과</div></div>
+                    <span class="secN">@unitItems.Count 과</span>
+                </div>
+
+                @if (unitItems.Count == 0)
+                {
+                    <div class="empty">이 단원에는 아직 공과가 없습니다.</div>
+                }
+                else
+                {
+                    <div class="book-grid">
+                        @foreach (var item in unitItems)
+                        {
+                            bool cur = IsThisWeek(item);
+                            <article class="book @(cur ? "cur" : "")">
+                                <div class="bkTop">
+                                    <div class="bkNo"><b>@item.WeekTitle_GUA</b><small>과</small></div>
+                                    <div class="bkTx">
+                                        <div class="bkK">LESSON @item.WeekTitle_GUA
+                                            @if (cur) { <span class="tag">이번 주</span> }
+                                            @if (isSuperAdmin && item.publishYn != "y") { <span class="tag line">비공개</span> }
+                                        </div>
+                                        <div class="bkT">@item.BibleTitle</div>
+                                        @if (!string.IsNullOrWhiteSpace(item.OnePoint))
+                                        {
+                                            <div class="bkP">@item.OnePoint</div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="bkM">
+                                    <div><span>기간</span>@Period(item)</div>
+                                    <div><span>열람</span>@item.visited 회</div>
+                                    @if (item.CountCount > 0)
+                                    {
+                                        <div class="ms"><span>미션</span>@SharedComm.FormatDateRange(item.ClickDate_Min, item.ClickDate_Max) · @item.CountCount 명</div>
+                                    }
+                                </div>
+                                <div class="bkA">
+                                    <a href="/WeeklyReport/IndexByID?Id=@item.Id">공과 열람 <i>→</i></a>
+                                    @if (isSuperAdmin)
+                                    {
+                                        if (item.publishYn == "y")
+                                        {
+                                            <a class="tg hide" href="/WeeklyWordToRead/MakePublishYn?Id=@item.Id&publishYn=n" title="비공개로 바꾸기">숨기기</a>
+                                        }
+                                        else
+                                        {
+                                            <a class="tg show" href="/WeeklyWordToRead/MakePublishYn?Id=@item.Id&publishYn=y" title="공개로 바꾸기">공개</a>
+                                        }
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+                }
+            </section>
+        }
+
+        <div class="ft">
+            <span>© 유년부 · 공과</span>
+            <span><a href="/WeeklyWordToRead/IntroBook">공과 안내</a> · <a href="/">@ConstatsCommon.ToHome</a></span>
+        </div>
+    </main>
+</body>
+</html>

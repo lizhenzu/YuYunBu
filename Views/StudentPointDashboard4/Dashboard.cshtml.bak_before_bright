@@ -1,0 +1,252 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.ViewModels.Dashboard.StudentPointDashboardVM
+
+@*  ══════════════════════════════════════════════════════════════
+    도토리 보드 — Bone 스킨 (A안 장부형 목록 + 비율 막대)
+    이전 화면은 Dashboard_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var urlChallengeMain  = "/DailyMission4/Index";
+    var urlBibleReading   = "/Bible2/Welcome";
+    var urlAttendance     = "/Attendance/DashboardAll";
+    var urlWorldview      = "/Worldview/Intro";
+    var urlThanksDetail   = "/DevotionPoints/MyMonthly";
+    var urlGift           = "/StudentPointDashboard4/MyGiftBox3";
+    var urlIntegratedRank = "/StudentPointDashboard4/TotalRank";
+
+    string N(int v) => v.ToString("N0");
+
+    var ChurchName     = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var name = ((ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string)
+               ?? HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserFullName.ToString())
+               ?? "").Trim();
+
+    bool isStudent     = (ViewBag.ShowGiftList as bool?) ?? false;
+    bool hasAffordable = (ViewBag.GiftHasAffordable as bool?) ?? false;
+
+    int total   = Math.Max(0, Model.IntegratedTotal);
+    int spent   = Model.SpentMilestone;
+    int remain  = Math.Max(0, total - spent);
+    int credit  = Model.AvailableCredit;
+
+    // 다음 선물 = 다음 100점 단위 (최대 2000점)
+    const int GiftCap = 2000;
+    int nextMs    = Math.Min(GiftCap, (total / 100 + 1) * 100);
+    bool capped   = total >= GiftCap;
+    int toNext    = capped ? 0 : Math.Max(0, nextMs - total);
+    int stepPct   = capped ? 100 : (int)Math.Round((total % 100) / 100.0 * 100);
+
+    // 구성 네 항목
+    var parts = new[]
+    {
+        new { No = 1, Name = ConstatsCommon.MainKeyTitle,            Sub = "말씀 · 기도 · 암송 · 퀴즈",                        Val = Model.BiblePoint,       Color = "#9A7B4F", Url = urlChallengeMain },
+        new { No = 2, Name = ConstatsCommon.MissionBibleWithparent,  Sub = "과별 점수 합",                                     Val = Model.MissionBookPoint, Color = "#C4A77C", Url = urlWorldview },
+        new { No = 3, Name = ConstatsCommon.HolyWordAndRead,         Sub = "감사 기록",                                        Val = Model.ThanksPointTotal, Color = "#DCCBAE", Url = urlThanksDetail },
+        new { No = 4, Name = $"출석 × {ConstatsCommon.attendancePoint}", Sub = $"올해 {Model.AttendanceWeeksTotal}주 중 {Model.AttendanceCount}주", Val = Model.AttendancePoint, Color = "#16181C", Url = urlAttendance },
+    };
+    int partSum = Math.Max(1, parts.Sum(p => Math.Max(0, p.Val)));
+    int Pct(int v) => (int)Math.Round(Math.Max(0, v) * 100.0 / partSum);
+}
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator  = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    bool isStaff     = (isAdmin || isSuperAdmin || isModerator);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>@ConstatsCommon.myDoToRi 보드 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .dbPgm { padding: 2px 0 18px; border-bottom: 1px solid var(--rule); }
+    .qz .dbK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin-bottom: 9px; }
+    .qz .dbT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.45; }
+    .qz .dbWho { font-size: 26px; font-weight: 500; background-image: linear-gradient(transparent 62%, var(--mark) 62%); padding: 0 2px; }
+    .qz .dbWhoS { font-size: 14px; color: var(--dim2); margin-left: 5px; }
+    .qz .dbS { font-size: 11.5px; color: var(--dim); margin-top: 7px; }
+
+    .qz .dbLbl { font-size: 9.5px; font-weight: 600; letter-spacing: .18em; color: var(--dim); }
+    .qz .dbTot { padding: 22px 0 16px; border-bottom: 1px solid var(--rule); }
+    .qz .dbBig { font-family: "Inter", sans-serif; font-weight: 200; font-size: 56px; line-height: 1; color: var(--acc); margin-top: 9px; font-variant-numeric: tabular-nums; }
+    .qz .dbBig u { text-decoration: none; font-size: 13px; font-weight: 400; color: var(--dim); margin-left: 4px; }
+    .qz .dbProg { height: 3px; background: var(--rule); margin-top: 16px; position: relative; }
+    .qz .dbProg i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); }
+    .qz .dbPn { display: flex; justify-content: space-between; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); margin-top: 7px; font-variant-numeric: tabular-nums; }
+
+    .qz .db3 { display: flex; border-bottom: 1px solid var(--rule); }
+    .qz .db3 > div { flex: 1; text-align: center; padding: 14px 0 13px; border-right: 1px solid var(--rule); }
+    .qz .db3 > div:last-child { border-right: 0; }
+    .qz .db3 .v { font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px; margin-top: 7px; font-variant-numeric: tabular-nums; }
+    .qz .db3 .v.acc { color: var(--acc); }
+
+    .qz .dbGift { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--tx); color: var(--bg); padding: 17px 18px; margin-top: 18px; text-decoration: none; }
+    .qz .dbGift b { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 15px; }
+    .qz .dbGift small { display: block; font-size: 10.5px; color: #B9B3A8; margin-top: 4px; }
+    .qz .dbGift span.go { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; border: 1px solid var(--acc); color: #D9C29B; padding: 8px 12px; white-space: nowrap; }
+
+    .qz .dbSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 30px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .dbSecT { font-family: "Noto Serif KR", serif; font-size: 15px; }
+    .qz .dbSecS { font-size: 10.5px; color: var(--dim); }
+
+    .qz .dbStack { display: flex; height: 12px; margin: 14px 0 4px; background: var(--rule); }
+    .qz .dbStack i { display: block; }
+
+    .qz .dbLn { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--rule); color: inherit; text-decoration: none; }
+    .qz a.dbLn:hover .dbLnN { color: var(--acc); }
+    .qz .dbSw { width: 9px; height: 9px; flex: 0 0 auto; }
+    .qz .dbLnT { flex: 1 1 auto; min-width: 0; }
+    .qz .dbLnN { font-size: 13.5px; line-height: 1.35; word-break: keep-all; }
+    .qz .dbLnS { font-size: 10px; color: var(--dim); margin-top: 3px; }
+    .qz .dbMini { height: 2px; background: var(--rule); margin-top: 8px; position: relative; }
+    .qz .dbMini i { position: absolute; left: 0; top: 0; bottom: 0; }
+    .qz .dbLnV { text-align: right; font-family: "Inter", sans-serif; font-weight: 300; font-size: 17px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .qz .dbLnV u { text-decoration: none; font-size: 10px; color: var(--dim); margin-left: 2px; }
+    .qz .dbPct { font-size: 9.5px; color: var(--dim); margin-top: 2px; }
+    .qz .dbGo { font-size: 13px; color: var(--dim); flex: 0 0 auto; width: 8px; }
+
+    .qz .dbFoot { text-align: center; font-size: 10px; color: var(--dim); padding: 30px 0 10px; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">@ConstatsCommon.myDoToRi 보드</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="dbPgm">
+            <div class="dbK">@ConstatsCommon.MainKeyTitle</div>
+            <div class="dbT">
+                @if (!string.IsNullOrWhiteSpace(name))
+                {
+                    <span class="dbWho">@name</span><span class="dbWhoS">님의</span><br />
+                }
+                @ConstatsCommon.myDoToRi 보드
+            </div>
+            <div class="dbS">네 가지를 모두 더한 점수가 @(ConstatsCommon.myDoToRi)예요</div>
+        </div>
+
+        @* ── 나의 도토리 ── *@
+        <div class="dbTot">
+            <div class="dbLbl">@ConstatsCommon.myDoToRi</div>
+            <div class="dbBig">@N(total)<u>점</u></div>
+            <div class="dbProg"><i style="width:@(stepPct)%"></i></div>
+            <div class="dbPn">
+                @if (capped)
+                {
+                    <span>최고 단계 @N(GiftCap)점에 도달했어요</span><span></span>
+                }
+                else
+                {
+                    <span>다음 단계 @(N(nextMs))점</span><span>@(N(toNext))점 남음</span>
+                }
+            </div>
+        </div>
+
+        <div class="db3">
+            <div><div class="dbLbl">소멸</div><div class="v">@N(spent)</div></div>
+            <div><div class="dbLbl">잔여</div><div class="v">@N(remain)</div></div>
+            <div><div class="dbLbl">크레딧</div><div class="v acc">@N(credit)</div></div>
+        </div>
+
+        @if (isStudent && hasAffordable)
+        {
+            <a class="dbGift" href="@urlGift">
+                <div><b>선물을 고를 수 있어요</b><small>@(N(credit)) credit 사용 가능</small></div>
+                <span class="go">내 선물함</span>
+            </a>
+        }
+
+        @* ── 나의 도토리 구성 + 비율 막대 ── *@
+        <div class="dbSec">
+            <span class="dbSecT">@ConstatsCommon.myDoToRi 구성</span>
+            <span class="dbSecS">네 가지 합산</span>
+        </div>
+        <div class="dbStack" role="img" aria-label="@ConstatsCommon.myDoToRi 구성 비율">
+            @foreach (var p in parts.Where(x => x.Val > 0))
+            {
+                <i style="flex:@p.Val;background:@p.Color" title="@p.Name @Pct(p.Val)%"></i>
+            }
+        </div>
+        @foreach (var p in parts)
+        {
+            <a class="dbLn" href="@p.Url">
+                <span class="dbSw" style="background:@p.Color"></span>
+                <span class="dbLnT">
+                    <span class="dbLnN" style="display:block">@p.Name</span>
+                    <span class="dbLnS" style="display:block">@p.Sub</span>
+                    <span class="dbMini" style="display:block"><i style="width:@(Pct(p.Val))%;background:@p.Color"></i></span>
+                </span>
+                <span class="dbLnV">@N(p.Val)<u>점</u><span class="dbPct" style="display:block">@(Pct(p.Val))%</span></span>
+                <span class="dbGo">›</span>
+            </a>
+        }
+
+        @* ── 따로 보는 기록 ── *@
+        <div class="dbSec">
+            <span class="dbSecT">따로 보는 기록</span>
+            <span class="dbSecS">@(ConstatsCommon.myDoToRi)와 별도</span>
+        </div>
+        <div class="dbLn">
+            <span class="dbLnT">
+                <span class="dbLnN" style="display:block">전도상</span>
+                <span class="dbLnS" style="display:block">친구에게 교회 이야기를 전해요</span>
+            </span>
+            <span class="dbLnV">@N(Model.EvangelismCount)<u>명</u></span>
+            <span class="dbGo"></span>
+        </div>
+        <a class="dbLn" href="@urlBibleReading">
+            <span class="dbLnT">
+                <span class="dbLnN" style="display:block">@ConstatsCommon.ReadBibleAllTitleButton</span>
+                <span class="dbLnS" style="display:block">진행률만 보여요</span>
+                <span class="dbMini" style="display:block"><i style="width:@(Model.BibleReadPercent)%;background:var(--acc)"></i></span>
+            </span>
+            <span class="dbLnV">@(Model.BibleReadPercent)<u>%</u></span>
+            <span class="dbGo">›</span>
+        </a>
+
+        @* ── 더보기 ── *@
+        <div class="dbSec">
+            <span class="dbSecT">더보기</span>
+            <span class="dbSecS"></span>
+        </div>
+        @if (isStudent)
+        {
+            <a class="dbLn" href="@urlGift"><span class="dbLnT dbLnN">내 선물함</span><span class="dbGo">›</span></a>
+        }
+        <a class="dbLn" href="@urlIntegratedRank"><span class="dbLnT dbLnN">친구들 현황 한눈에 보기</span><span class="dbGo">›</span></a>
+ @if (isAdmin || isSuperAdmin)
+        {
+        <a class="dbLn" href="/StudentPointDashboard4/AdminPurchaseList"><span class="dbLnT dbLnN">선물 받는 친구들</span><span class="dbGo">›</span></a>
+        }
+
+        <div class="dbFoot">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+    </div>
+</div>
+
+</body>
+</html>

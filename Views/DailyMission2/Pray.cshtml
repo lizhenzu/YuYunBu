@@ -1,0 +1,519 @@
+﻿@using System
+@using System.Globalization
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+<link rel="stylesheet" href="/css/mission2/missionButtons.css" />
+
+@{
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    bool canAct = Model.IsActionable;
+
+    bool doneToMe = Model.DayStatus?.Pray_ToMe ?? false;
+    bool doneToParent = Model.DayStatus?.Pray_ToParent ?? false;
+    bool doneToFriend = Model.DayStatus?.Pray_ToFriend ?? false;
+    bool doneParentOrFriend = (doneToParent || doneToFriend);
+    bool doneAny = doneToMe || doneParentOrFriend;
+}
+@{
+    dynamic prayRow = ViewBag.TodayPrayPhraseRow;
+    eBibles _eBibles = ViewBag.TodayWordToReadRow as eBibles;
+
+    var rangeLabel = GetRangeLabel(_eBibles);
+    var verses = _eBibles?.eBibleDatas;
+    var wholeText = GetWholeBibleText(_eBibles);
+}
+
+
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var toast = (ViewBag.Toast ?? "").ToString();
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+
+    // ✅ 완료 상태
+ 
+ 
+
+    // ✅ 네비(공용)용 상태 세팅
+    ViewBag.DM2Page = "pray";
+    ViewBag.DM2Done = doneAny; // 기존 pray 완료 계산값
+}
+
+<style>
+    .box {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+    }
+
+    .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .title {
+        font-size: 20px;
+        /* font-weight: 950; */
+    }
+
+    .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+        /* font-weight: 950; */
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toast {
+        background: rgba(15,23,42,.86);
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 14px;
+        /* font-weight: 900; */
+        margin: 12px 0;
+    }
+
+    .card {
+        margin-top: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        border-radius: 18px;
+        background: rgba(255,255,255,.92);
+        padding: 14px;
+        box-shadow: 0 10px 22px rgba(15,23,42,.10);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        /* font-weight: 950; */
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        white-space: nowrap;
+    }
+
+    .btnPrimary {
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+        border-color: rgba(34,197,94,.18);
+    }
+
+        .btn:disabled, .btnPrimary:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+    .warn {
+        color: #b45309;
+        /* font-weight: 900; */
+        margin-top: 10px;
+        line-height: 1.35;
+    }
+
+    .lockBar {
+        margin-top: 12px;
+        border: 1px dashed rgba(148,163,184,.65);
+        background: rgba(241,245,249,.70);
+        border-radius: 16px;
+        padding: 10px 12px;
+        /* font-weight: 900; */
+        color: rgba(15,23,42,.86);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lockIcon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15,23,42,.08);
+        border: 1px solid rgba(226,232,240,.95);
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+
+    .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+    }
+
+    .mini {
+        font-size: 13px;
+        color: rgba(71,85,105,.92);
+        /* font-weight: 900; */
+    }
+
+    .badgeDone {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        /* font-weight: 950; */
+        font-size: 12.5px;
+        border: 1px solid rgba(34,197,94,.28);
+        background: rgba(34,197,94,.12);
+        color: rgba(20,83,45,.96);
+    }
+
+    .sectionTitle {
+     /*    font-weight: 950; */
+        font-size: 15px;
+        margin: 0;
+    }
+
+    .block {
+/*         margin-top: 12px;
+ */      /*   border-top: 1px solid rgba(226,232,240,.95); */
+        padding-top: 12px;
+    }
+
+    .toggleTitle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+        .toggleTitle:hover {
+            color: rgba(34,197,94,.95);
+        }
+
+    /* ✅ 성경본문 */
+    .bibleHead {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    .bibleRef {
+        /* font-weight: 950; */
+        font-size: 18px;
+    }
+
+    .bibleHint {
+        /* font-weight: 900; */
+        color: rgba(71,85,105,.92);
+        font-size: 13px;
+    }
+
+    .bibleBox {
+        margin-top: 10px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(248,250,252,.75);
+        border-radius: 16px;
+        padding: 10px;
+    }
+
+    .verseRow {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 8px;
+        border-radius: 14px;
+    }
+
+        .verseRow + .verseRow {
+            border-top: 1px dashed rgba(148,163,184,.35);
+        }
+
+    .vNo {
+        flex: 0 0 auto;
+        min-width: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(34,197,94,.12);
+        border: 1px solid rgba(34,197,94,.22);
+        /* font-weight: 950; */
+        color: rgba(20,83,45,.96);
+    }
+
+    .vText {
+        flex: 1 1 auto;
+        /* font-weight: 900; */
+        color: rgba(15,23,42,.92);
+        line-height: 1.6;
+        white-space: pre-line;
+    }
+
+    /* ✅ 기도문 */
+    .prayTitle {
+        font-weight: 950;
+        font-size: 18px;
+        margin-top: 10px;
+    }
+
+    .textBox {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        /* font-weight: 850; */
+        color: rgba(15,23,42,.92);
+        line-height: 1.55;
+        white-space: pre-line;
+    }
+</style>
+
+<div class="box">
+    <div class="top">
+        <div class="title">🙏 오늘의 기도</div>
+        <div class="chip">📅 @d</div>
+    </div>
+
+    @* ✅ 공용 네비(페이지 이동) *@
+  
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="toast">@toast</div>
+    }
+
+    @if (!canAct)
+    {
+        <div class="lockBar">
+            <div class="lockIcon">🔒</div>
+            <div>
+                오늘/어제/그저께만 저장할 수 있어요.
+                <div class="mini">※ 읽기/기도/퀴즈/암송 수행은 최근 3일만 허용</div>
+            </div>
+        </div>
+    }
+
+    <div class="card">
+@*         <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center;">
+            <div>
+                <div class="sectionTitle">콘텐츠</div>
+                <div class="mini" style="margin-top:4px;">
+                    PrayPhraseId: <b>@(Model.Content.PrayPhraseId?.ToString() ?? "없음")</b>
+                </div>
+            </div>
+        </div> *@
+
+        @if (Model.Content.PrayPhraseId == null)
+        {
+            <div class="warn">이 날짜(@d)에 해당하는 PrayPhrase 콘텐츠가 없어요.</div>
+        }
+        else
+        {
+            @* await Html.PartialAsync("~/Views/DailyMission2/Partials/_PrayPhraseSection.cshtml", Model) *@
+
+
+@functions {
+    string S(object v) { try { return v == null ? "" : v.ToString(); } catch { return ""; } }
+
+    object G(dynamic o, params string[] names)
+    {
+        if (o == null) return null;
+        var t = (object)o;
+        var tp = t.GetType();
+        foreach (var n in names)
+        {
+            var p = tp.GetProperty(n);
+            if (p != null) return p.GetValue(t);
+        }
+        return null;
+    }
+}
+
+
+<div class="block">
+    <div class="sectionTitle">🙏 오늘의 성품기도</div>
+
+    @if (prayRow != null && prayRow?.PrayPhraseData != null)
+    {
+        var title = S(G(prayRow.PrayPhraseData, "PrayTitle", "Title"));
+        var c1 = S(G(prayRow.PrayPhraseData, "PrayContent1", "Content1", "Body1"));
+        var c2 = S(G(prayRow.PrayPhraseData, "PrayContent2", "Content2", "Body2"));
+        var c3 = S(G(prayRow.PrayPhraseData, "PrayContent3", "Content3", "Body3"));
+
+        <div class="prayTitle">@(!string.IsNullOrWhiteSpace(title) ? title : "오늘의 기도")</div>
+
+        @* c2(자녀가 자기 자신을 위해 드리는 기도)는 화면에 노출하지 않는다 *@
+        <div class="textBox">@BulletinBoard.Helpers.PrayTextHelper.MarkNamesInline(c1)</div>
+@*             @if (!string.IsNullOrWhiteSpace(c1))
+            {
+            }
+            @if (!string.IsNullOrWhiteSpace(c2))
+            {
+                @c2
+            }
+            @if (!string.IsNullOrWhiteSpace(c3))
+            {
+                @c3
+            } *@
+    }
+    else
+    {
+        <div class="mini">※ (관리자) PrayPhraseData가 없습니다. (ViewBag.TodayPrayPhraseRow.PrayPhraseData)</div>
+    }
+</div>
+
+
+
+@functions {
+    string GetRangeLabel(eBibles b)
+    {
+        if (b == null) return "";
+        var s = !string.IsNullOrWhiteSpace(b.JanZulString) ? b.JanZulString : b.JanZulStringOnly;
+        return s ?? "";
+    }
+
+    string GetWholeBibleText(eBibles b)
+    {
+        if (b == null) return "";
+        return b.BibleText ?? "";
+    }
+}
+
+<div class="block">
+    <div class="toggleTitle sectionTitle" onclick="toggleBlock(this)">📖 오늘의 성경본문 (펼치기 ▶)</div>
+    <div style="display:none; margin-top:10px;">
+
+        <div class="bibleHead">
+            <div class="bibleRef">
+                @(!string.IsNullOrWhiteSpace(rangeLabel) ? rangeLabel : "오늘의 말씀")
+            </div>
+            <div class="bibleHint">※ 본문은 절 단위로 표시됩니다</div>
+        </div>
+
+        <div class="bibleBox">
+            @if (verses != null && verses.Count > 0)
+            {
+                foreach (var vv in verses)
+                {
+                    // vv 구조: vv.zul / vv.BibleData (프로젝트 기준)
+                    var no = vv.zul;
+                    var tx = vv.BibleData;
+                    if (string.IsNullOrWhiteSpace(tx)) { continue; }
+
+                    <div class="verseRow">
+                        <div class="vNo">@(no > 0 ? $"{no}절" : "절")</div>
+                        <div class="vText">@tx</div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="verseRow">
+                    <div class="vNo">본문</div>
+                    <div class="vText">@wholeText</div>
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
+
+
+            @* await Html.PartialAsync("~/Views/DailyMission2/Partials/_PrayActionButtons.cshtml", Model) *@
+
+
+<div class="block">
+ 
+    <div class="missionBtnRow" style="margin-top:12px;">
+        @* 버튼 1: 나를 위해 기도 *@
+        <form method="post" action="/DailyMission2/SavePray" class="missionForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="date" value="@d" />
+            <input type="hidden" name="prayPhraseId" value="@Model.Content.PrayPhraseId.Value" />
+            <input type="hidden" name="toMe" value="true" />
+
+            <button class="missionBtn @(doneToMe ? "isDone" : "")"
+                    type="submit"
+                    @((canAct && !doneToMe) ? "" : "disabled")>
+                @(doneToMe ? "✅ 나를 위해 기도 완료" : "나를 위해 기도 했어요")    
+            </button>
+        </form>
+
+        @* 버튼 2: 부모님/친구 위해 기도 (요청: 항상 toParent=true로 저장) *@
+        <form method="post" action="/DailyMission2/SavePray" class="missionForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="date" value="@d" />
+            <input type="hidden" name="prayPhraseId" value="@Model.Content.PrayPhraseId.Value" />
+            <input type="hidden" name="toParent" value="true" />
+
+            <button class="missionBtn @(doneParentOrFriend ? "isDone" : "")"
+                    type="submit"
+                    @((canAct && !doneParentOrFriend) ? "" : "disabled")>
+
+                        @(doneParentOrFriend ? "✅ 가족/친구를 위해 기도 완료" : "가족/친구를 위해서 기도 했어요")
+
+                    </button>
+        </form>
+@* 
+        <a class="btn" href="javascript:history.back()">닫기</a> *@
+    </div>
+
+    @if (!canAct)
+    {
+        <div class="warn">🔒 오늘/어제/그저께만 수행할 수 있어요.</div>
+    }
+</div>
+
+
+        }
+    </div>
+
+    @await Html.PartialAsync("~/Views/DailyMission2/Partials/_Dm2Nav.cshtml", Model)
+</div>
+
+@{ 
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+
+
+@* ✅ 팝업(공용 Partial 재사용) *@
+@await Html.PartialAsync("~/Views/DailyMission2/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+
+<script>
+    // ✅ 섹션 타이틀 클릭 시 내용 펼침/접힘 (공용)
+    function toggleBlock(titleEl) {
+        const body = titleEl.nextElementSibling;
+        if (!body) return;
+
+        const isOpen = body.style.display !== 'none';
+
+        if (isOpen) {
+            body.style.display = 'none';
+            titleEl.innerText = titleEl.innerText.replace('▼', '▶');
+            if (!titleEl.innerText.includes('▶')) titleEl.innerText += ' ▶';
+        } else {
+            body.style.display = 'block';
+            titleEl.innerText = titleEl.innerText.replace('▶', '▼');
+            if (!titleEl.innerText.includes('▼')) titleEl.innerText += ' ▼';
+        }
+    }
+</script>

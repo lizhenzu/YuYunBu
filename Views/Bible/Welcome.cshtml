@@ -1,0 +1,854 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+
+@{
+    ViewData["Title"] = "성경통독 허브";
+    Layout = null;
+
+    // 커뮤니티 데이터 (Controller에서 ViewBag으로 전달)
+    var communityUsers = ViewBag.CommunityUsers as List<BulletinBoard.Models.BibleLastReadRateByUserSimple>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserSimple>();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ConstatsCommon.ReadBibleAllTitleButton 허브</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f172a; }
+    </style>
+</head>
+<body>
+
+<style>
+    /* ── 전체 페이지 ── */
+    .welcome-page {
+        min-height: 100vh;
+        background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 50%, #0f2744 100%);
+        padding: 0 0 60px;
+        font-family: 'Noto Serif KR', 'Malgun Gothic', serif;
+    }
+
+    /* ── 히어로 배너 ── */
+    .hero {
+        position: relative;
+        text-align: center;
+        padding: 30px 20px 60px;
+        overflow: hidden;
+    }
+    .hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background:
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,179,237,0.18) 0%, transparent 70%),
+            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(167,139,250,0.15) 0%, transparent 60%);
+        pointer-events: none;
+    }
+    /* 별 파티클 */
+    .hero::after {
+        content: '✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦';
+        position: absolute; top: 18px; left: 0; right: 0;
+        text-align: center; font-size: 11px;
+        color: rgba(255,255,255,0.2); letter-spacing: 14px;
+        animation: twinkle 3s ease-in-out infinite;
+    }
+    @@keyframes twinkle {
+        0%,100% { opacity: 0.2; }
+        50%      { opacity: 0.6; }
+    }
+
+    .hero-cross {
+        font-size: 52px;
+        margin-bottom: 14px;
+        display: block;
+        filter: drop-shadow(0 0 20px rgba(147,197,253,0.6));
+        animation: float 4s ease-in-out infinite;
+    }
+    @@keyframes float {
+        0%,100% { transform: translateY(0); }
+        50%      { transform: translateY(-8px); }
+    }
+
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(99,179,237,0.15);
+        border: 1px solid rgba(99,179,237,0.3);
+        color: #93c5fd;
+        font-size: 12px; font-weight: 600; letter-spacing: 2px;
+        padding: 5px 14px; border-radius: 20px;
+        margin-bottom: 22px;
+        text-transform: uppercase;
+    }
+
+    .hero h1 {
+        font-size: clamp(28px, 6vw, 48px);
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.25;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+    }
+    .hero h1 span {
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd, #f9a8d4);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-sub {
+        font-size: 15px; color: rgba(255,255,255,0.55);
+        margin-bottom: 0; font-weight: 400; line-height: 1.6;
+    }
+
+    /* ── 구분선 ── */
+    .divider {
+        width: 60px; height: 3px; margin: 28px auto;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+        border-radius: 10px;
+    }
+
+    /* ── 설명 카드 ── */
+    .desc-card {
+        max-width: 680px; margin: 0 auto 48px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 20px;
+        padding: 28px 32px;
+        text-align: center;
+        backdrop-filter: blur(12px);
+    }
+    .desc-card p {
+        color: rgba(255,255,255,0.75);
+        font-size: 15px; line-height: 1.85; margin: 0;
+    }
+    .desc-card strong { color: #93c5fd; font-weight: 600; }
+
+    /* ── 버튼 그리드 ── */
+    .btn-grid {
+        max-width: 900px; margin: 0 auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 320px));
+        justify-content: center;
+        gap: 20px;
+        padding: 0 20px;
+    }
+
+    /* ── 허브 버튼 카드 ── */
+    .hub-card {
+        display: flex; flex-direction: column; align-items: center;
+        text-decoration: none;
+        border-radius: 24px;
+        padding: 36px 24px 30px;
+        position: relative; overflow: hidden;
+        transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.25s;
+        cursor: pointer;
+    }
+    .hub-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        text-decoration: none;
+    }
+    .hub-card::before {
+        content: '';
+        position: absolute; inset: 0; border-radius: 24px;
+        opacity: 0; transition: opacity 0.25s;
+        background: rgba(255,255,255,0.07);
+    }
+    .hub-card:hover::before { opacity: 1; }
+
+    /* 카드 1 — 기존 성경통독 */
+    .hub-card-1 {
+        background: linear-gradient(145deg, #1e3a5f 0%, #1a4480 100%);
+        border: 1px solid rgba(147,197,253,0.25);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .hub-card-1:hover { box-shadow: 0 20px 50px rgba(59,130,246,0.35), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+    /* 카드 2 — 새 성경통독 */
+    .hub-card-2 {
+        background: linear-gradient(145deg, #3b1f6e 0%, #5b21b6 100%);
+        border: 1px solid rgba(196,181,253,0.25);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .hub-card-2:hover { box-shadow: 0 20px 50px rgba(139,92,246,0.4), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+    /* 카드 3 — 건의함 */
+    .hub-card-3 {
+        background: linear-gradient(145deg, #4a1942 0%, #831843 100%);
+        border: 1px solid rgba(249,168,212,0.25);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
+    }
+    .hub-card-3:hover { box-shadow: 0 20px 50px rgba(236,72,153,0.4), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+    .hub-icon-wrap {
+        width: 80px; height: 80px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 36px; margin-bottom: 20px;
+        position: relative;
+    }
+    .hub-card-1 .hub-icon-wrap {
+        background: rgba(147,197,253,0.15);
+        box-shadow: 0 0 0 8px rgba(147,197,253,0.07), 0 0 0 16px rgba(147,197,253,0.04);
+    }
+    .hub-card-2 .hub-icon-wrap {
+        background: rgba(196,181,253,0.15);
+        box-shadow: 0 0 0 8px rgba(196,181,253,0.07), 0 0 0 16px rgba(196,181,253,0.04);
+    }
+    .hub-card-3 .hub-icon-wrap {
+        background: rgba(249,168,212,0.15);
+        box-shadow: 0 0 0 8px rgba(249,168,212,0.07), 0 0 0 16px rgba(249,168,212,0.04);
+    }
+
+    .hub-tag {
+        font-size: 10px; font-weight: 700; letter-spacing: 2px;
+        text-transform: uppercase; margin-bottom: 8px;
+        opacity: 0.65;
+    }
+    .hub-card-1 .hub-tag { color: #93c5fd; }
+    .hub-card-2 .hub-tag { color: #c4b5fd; }
+    .hub-card-3 .hub-tag { color: #f9a8d4; }
+
+    .hub-title {
+        font-size: 18px; font-weight: 700; color: #fff;
+        margin-bottom: 10px; text-align: center; line-height: 1.3;
+    }
+    .hub-desc {
+        font-size: 12.5px; color: rgba(255,255,255,0.5);
+        text-align: center; line-height: 1.7; margin-bottom: 24px;
+    }
+
+    .hub-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 11px 22px; border-radius: 30px;
+        font-size: 13px; font-weight: 700; letter-spacing: 0.3px;
+        border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .hub-card-1 .hub-btn {
+        background: rgba(147,197,253,0.2);
+        color: #bfdbfe;
+        border: 1px solid rgba(147,197,253,0.3);
+    }
+    .hub-card-1:hover .hub-btn { background: rgba(147,197,253,0.35); color: #fff; }
+
+    .hub-card-2 .hub-btn {
+        background: rgba(196,181,253,0.2);
+        color: #ddd6fe;
+        border: 1px solid rgba(196,181,253,0.3);
+    }
+    .hub-card-2 .hub-btn { position: relative; }
+    .hub-card-2 .hub-btn::after {
+        content: 'NEW';
+        position: absolute; top: -8px; right: -8px;
+        background: #f59e0b; color: #000;
+        font-size: 8px; font-weight: 800;
+        padding: 2px 5px; border-radius: 6px; letter-spacing: 0.5px;
+    }
+    .hub-card-2:hover .hub-btn { background: rgba(196,181,253,0.35); color: #fff; }
+
+    .hub-card-3 .hub-btn {
+        background: rgba(249,168,212,0.2);
+        color: #fbcfe8;
+        border: 1px solid rgba(249,168,212,0.3);
+    }
+    .hub-card-3:hover .hub-btn { background: rgba(249,168,212,0.35); color: #fff; }
+
+    /* NEW 뱃지 */
+    .new-badge {
+        position: absolute; top: 16px; right: 16px;
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        color: white; font-size: 9px; font-weight: 800;
+        padding: 3px 8px; border-radius: 10px; letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+
+    /* ── 참여자 버튼 ── */
+    .participants-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        margin-top: 18px;
+        background: rgba(99,179,237,0.14);
+        border: 1px solid rgba(99,179,237,0.35);
+        color: #93c5fd;
+        font-size: 13px; font-weight: 700;
+        padding: 10px 22px; border-radius: 30px;
+        text-decoration: none; cursor: pointer;
+        transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+        animation: participantsPulse 2.6s ease-in-out infinite;
+    }
+    .participants-btn:hover {
+        background: rgba(99,179,237,0.28);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(99,179,237,0.25);
+        text-decoration: none;
+        animation: none;
+    }
+    @@keyframes participantsPulse {
+        0%,100% { box-shadow: 0 0 0 0   rgba(99,179,237,0.35); }
+        50%      { box-shadow: 0 0 0 7px rgba(99,179,237,0); }
+    }
+
+    /* ── 홈 버튼 (히어로 우측 상단) ── */
+    .home-btn {
+        position: absolute; top: 16px; right: 16px; z-index: 10;
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 7px 14px; border-radius: 50px;
+        background: rgba(255,255,255,0.09);
+        border: 1px solid rgba(255,255,255,0.18);
+        color: rgba(255,255,255,0.80);
+        font-size: 12px; font-weight: 700;
+        text-decoration: none;
+        transition: background .18s, color .18s, transform .14s, box-shadow .18s;
+        backdrop-filter: blur(8px);
+    }
+    .home-btn:hover {
+        background: rgba(255,255,255,0.18);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+        text-decoration: none;
+    }
+    .home-btn:active { transform: scale(.97); }
+
+    /* ── 하단 안내 ── */
+    .footer-note {
+        text-align: center; margin-top: 40px;
+        color: rgba(255,255,255,0.3); font-size: 12px;
+    }
+
+    /* ══════════════════════════════════════════════
+       현대인성경 추가 안내 배너
+    ══════════════════════════════════════════════ */
+    .hd-announce {
+        max-width: 700px; margin: 0 auto 36px;
+        padding: 0 20px;
+    }
+    .hd-announce-inner {
+        position: relative; overflow: hidden;
+        border-radius: 22px;
+        background: linear-gradient(135deg,
+            rgba(3,105,161,0.28) 0%,
+            rgba(14,165,233,0.18) 50%,
+            rgba(6,182,212,0.22) 100%);
+        border: 1.5px solid rgba(14,165,233,0.40);
+        box-shadow: 0 0 40px rgba(14,165,233,0.12), 0 8px 32px rgba(0,0,0,0.3);
+        padding: 26px 28px 22px;
+    }
+    /* shimmer sweep */
+    .hd-announce-inner::before {
+        content: '';
+        position: absolute; top: 0; left: -110%; width: 60%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+        transform: skewX(-18deg);
+        animation: hdShimmer 3.2s ease-in-out infinite;
+        pointer-events: none;
+    }
+    @@keyframes hdShimmer {
+        0%   { left: -110%; }
+        60%  { left: 150%; }
+        100% { left: 150%; }
+    }
+    /* 배경 glow blob */
+    .hd-announce-inner::after {
+        content: '';
+        position: absolute; top: -30px; right: -30px;
+        width: 180px; height: 180px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(14,165,233,0.18) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .hd-top-row {
+        display: flex; align-items: center; gap: 10px;
+        margin-bottom: 14px; position: relative; z-index: 1;
+    }
+    .hd-new-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+        color: #fff; font-size: 10px; font-weight: 800;
+        letter-spacing: 1.5px; text-transform: uppercase;
+        padding: 4px 10px; border-radius: 20px;
+        box-shadow: 0 3px 10px rgba(14,165,233,0.40);
+        animation: hdPulse 2.4s ease-in-out infinite;
+        flex-shrink: 0;
+    }
+    @@keyframes hdPulse {
+        0%,100% { box-shadow: 0 3px 10px rgba(14,165,233,.40); }
+        50%      { box-shadow: 0 3px 18px rgba(14,165,233,.70); }
+    }
+    .hd-date-badge {
+        font-size: 11px; font-weight: 600;
+        color: rgba(147,224,255,0.55);
+        letter-spacing: 0.5px;
+    }
+    .hd-title {
+        font-size: 19px; font-weight: 800; color: #fff;
+        line-height: 1.3; margin-bottom: 8px;
+        position: relative; z-index: 1;
+        text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+    }
+    .hd-title em {
+        font-style: normal;
+        background: linear-gradient(90deg, #7dd3fc, #38bdf8, #22d3ee);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .hd-desc {
+        font-size: 13.5px; color: rgba(186,230,255,0.80);
+        line-height: 1.75; margin-bottom: 16px;
+        position: relative; z-index: 1;
+        word-break: keep-all;
+    }
+    .hd-trans-row {
+        display: flex; align-items: center; gap: 8px;
+        flex-wrap: wrap;
+        position: relative; z-index: 1; margin-bottom: 18px;
+    }
+    .hd-trans-label {
+        font-size: 11px; font-weight: 700;
+        color: rgba(147,224,255,0.55);
+        letter-spacing: 0.5px;
+    }
+    .hd-chip {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 5px 13px; border-radius: 20px;
+        font-size: 12px; font-weight: 700;
+        letter-spacing: 0.2px;
+    }
+    .hd-chip--ko {
+        background: rgba(99,102,241,0.22);
+        border: 1px solid rgba(165,180,252,0.35);
+        color: #c4b5fd;
+    }
+    .hd-chip--hd {
+        background: rgba(14,165,233,0.25);
+        border: 1.5px solid rgba(125,211,252,0.50);
+        color: #7dd3fc;
+        box-shadow: 0 0 10px rgba(14,165,233,0.22);
+    }
+    .hd-chip--en {
+        background: rgba(16,185,129,0.18);
+        border: 1px solid rgba(110,231,183,0.30);
+        color: #6ee7b7;
+    }
+    .hd-chip-plus {
+        font-size: 13px; font-weight: 900;
+        color: rgba(255,255,255,0.3);
+    }
+    .hd-link {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 10px 22px; border-radius: 30px;
+        background: linear-gradient(135deg, rgba(14,165,233,0.30), rgba(6,182,212,0.25));
+        border: 1.5px solid rgba(14,165,233,0.50);
+        color: #7dd3fc; font-size: 13px; font-weight: 800;
+        text-decoration: none;
+        transition: all .18s;
+        position: relative; z-index: 1;
+    }
+    .hd-link:hover {
+        background: linear-gradient(135deg, rgba(14,165,233,0.50), rgba(6,182,212,0.42));
+        color: #fff; text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(14,165,233,0.30);
+    }
+
+    /* ── 반응형 ── */
+    @@media (max-width: 700px) {
+        .btn-grid { grid-template-columns: 1fr; max-width: 380px; }
+        .hero { padding: 50px 16px 40px; }
+        .desc-card { padding: 22px 18px; margin: 0 16px 36px; }
+    }
+    @@media (min-width: 701px) and (max-width: 900px) {
+        .btn-grid { grid-template-columns: repeat(2, 1fr); }
+        .hub-card:last-child { grid-column: 1 / -1; max-width: 360px; margin: 0 auto; }
+    }
+
+    /* ══════════════════════════════════════════════
+       COMMUNITY SECTION — 함께 읽는 말씀
+    ══════════════════════════════════════════════ */
+    .section-sep {
+        max-width: 1100px; margin: 56px auto 0;
+        padding: 0 20px;
+    }
+    .section-sep-line {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+    }
+
+    .community-section {
+        max-width: 1100px; margin: 0 auto;
+        padding: 48px 20px 72px;
+    }
+
+    /* ── 섹션 헤더 ── */
+    .comm-header {
+        display: flex; align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap; gap: 16px;
+        margin-bottom: 26px;
+    }
+    .comm-title-wrap {
+        display: flex; align-items: center;
+        gap: 12px; flex-wrap: wrap;
+    }
+    .comm-icon { font-size: 30px; filter: drop-shadow(0 0 10px rgba(147,197,253,0.55)); }
+    .comm-title {
+        font-size: 24px; font-weight: 800; margin: 0;
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .comm-count-badge {
+        background: rgba(99,179,237,0.15);
+        border: 1px solid rgba(99,179,237,0.3);
+        color: #93c5fd; font-size: 12px; font-weight: 600;
+        padding: 4px 12px; border-radius: 20px;
+    }
+
+    /* ── 컨트롤 (검색 + 정렬) ── */
+    .comm-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .comm-search-wrap {
+        display: flex; align-items: center; gap: 8px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 12px; padding: 8px 14px;
+    }
+    .comm-search {
+        background: none; border: none; outline: none;
+        color: #fff; font-size: 13px; width: 150px;
+        font-family: inherit;
+    }
+    .comm-search::placeholder { color: rgba(255,255,255,0.3); }
+    .comm-sort-btns { display: flex; gap: 6px; }
+    .csort-btn {
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.55);
+        padding: 8px 14px; border-radius: 10px;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        transition: all 0.2s; font-family: inherit;
+    }
+    .csort-btn.active {
+        background: rgba(99,179,237,0.2);
+        border-color: rgba(99,179,237,0.4); color: #93c5fd;
+    }
+    .csort-btn:hover:not(.active) { background: rgba(255,255,255,0.12); color: #fff; }
+
+    /* ── 통계 바 ── */
+    .comm-stats-bar {
+        display: flex; align-items: center;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.09);
+        border-radius: 18px; padding: 18px 28px;
+        margin-bottom: 36px; backdrop-filter: blur(10px);
+        gap: 0;
+    }
+    .cstat { flex: 1; text-align: center; }
+    .cstat-num {
+        display: block; font-size: 28px; font-weight: 900;
+        line-height: 1.1;
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .cstat-lbl { font-size: 11px; color: rgba(255,255,255,0.38); margin-top: 3px; display: block; }
+    .cstat-div { width: 1px; height: 38px; background: rgba(255,255,255,0.09); }
+
+    /* ── 카드 그리드 ── */
+    .comm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 18px;
+    }
+
+    /* ── 카드 기본 ── */
+    .comm-card {
+        position: relative;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 24px; padding: 22px 16px 18px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        overflow: hidden; backdrop-filter: blur(12px);
+        transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s;
+        opacity: 0; transform: translateY(22px);
+        animation: commCardIn 0.55s ease forwards;
+    }
+    .comm-card:hover {
+        transform: translateY(-7px) scale(1.025);
+        box-shadow: 0 22px 52px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.13);
+    }
+    @@keyframes commCardIn {
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 완독자 카드 (골드 테마) ── */
+    .comm-card--complete {
+        background: linear-gradient(145deg, rgba(28,18,0,0.92) 0%, rgba(44,30,0,0.92) 100%);
+        border-color: rgba(245,158,11,0.38);
+        box-shadow: 0 0 36px rgba(245,158,11,0.13), 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .comm-card--complete:hover {
+        box-shadow: 0 22px 56px rgba(245,158,11,0.28), 0 0 0 1px rgba(245,158,11,0.32);
+    }
+
+    /* 골드 shimmer */
+    .card-shimmer {
+        position: absolute; inset: 0; border-radius: inherit;
+        background: linear-gradient(
+            115deg,
+            transparent 0%, transparent 38%,
+            rgba(245,158,11,0.13) 50%,
+            transparent 62%, transparent 100%
+        );
+        background-size: 300% 300%;
+        animation: goldShimmer 2.8s ease-in-out infinite;
+    }
+    @@keyframes goldShimmer {
+        0%   { background-position: 120% 120%; }
+        100% { background-position: -120% -120%; }
+    }
+
+    /* 완독 크라운 뱃지 */
+    .card-crown {
+        display: flex; align-items: center; gap: 5px;
+        background: linear-gradient(90deg, rgba(245,158,11,0.22), rgba(251,191,36,0.18));
+        border: 1px solid rgba(245,158,11,0.42);
+        border-radius: 20px; padding: 4px 12px;
+        font-size: 11px; font-weight: 700; color: #fcd34d;
+        letter-spacing: 0.3px; white-space: nowrap; z-index: 1;
+    }
+
+    /* ── 진행 링 영역 ── */
+    .ring-area {
+        position: relative; width: 118px; height: 118px; flex-shrink: 0;
+    }
+    .pring {
+        width: 118px; height: 118px;
+        transform: rotate(-90deg);
+        overflow: visible;
+    }
+    .pring-bg {
+        fill: none;
+        stroke: rgba(255,255,255,0.06);
+        stroke-width: 7;
+    }
+    .pring-fill {
+        fill: none; stroke-width: 7;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* 아바타 skeleton shimmer (이미지 로드 전) */
+    .ring-avatar.img-loading {
+        background: linear-gradient(90deg,
+            rgba(255,255,255,0.06) 25%,
+            rgba(255,255,255,0.13) 50%,
+            rgba(255,255,255,0.06) 75%);
+        background-size: 200% 100%;
+        animation: avatarSkeleton 1.4s ease-in-out infinite;
+    }
+    @@keyframes avatarSkeleton {
+        0%   { background-position:  200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    /* 로드 완료 후 부드럽게 나타남 */
+    .ring-avatar img.img-loaded {
+        animation: avatarFadeIn 0.45s ease;
+    }
+    @@keyframes avatarFadeIn {
+        from { opacity: 0; transform: scale(0.92); }
+        to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* 아바타 — 링 중앙 */
+    .ring-avatar {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 74px; height: 74px; border-radius: 50%;
+        overflow: hidden;
+        background: rgba(255,255,255,0.08);
+        border: 2.5px solid rgba(255,255,255,0.14);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .ring-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ring-avatar-fb {
+        width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; font-weight: 800;
+        color: rgba(255,255,255,0.75);
+        background: linear-gradient(135deg, #3b4280, #5b21b6);
+    }
+
+    /* % 오버레이 — 링 하단 */
+    .ring-pct {
+        position: absolute; bottom: -5px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(11,17,34,0.92);
+        border: 1px solid rgba(255,255,255,0.13);
+        border-radius: 10px; padding: 2px 9px;
+        font-size: 13px; font-weight: 800; color: #fff;
+        white-space: nowrap; backdrop-filter: blur(6px); z-index: 2;
+    }
+    .ring-pct small { font-size: 9px; opacity: 0.65; }
+    .ring-pct--gold { color: #fcd34d; }
+
+    /* ── 이름 ── */
+    .card-name {
+        font-size: 15px; font-weight: 700; color: #fff;
+        text-align: center; margin-top: 4px; z-index: 1;
+    }
+
+    /* ── 정보 칩 ── */
+    .card-info { display: flex; flex-direction: column; gap: 5px; width: 100%; z-index: 1; }
+    .ci-chip {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 11.5px; color: rgba(255,255,255,0.5);
+        background: rgba(255,255,255,0.04);
+        border-radius: 8px; padding: 5px 10px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── 하단 진행 바 ── */
+    .card-prog-bar {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.07);
+        border-radius: 10px; overflow: hidden;
+        margin-top: auto; z-index: 1;
+    }
+    .card-prog-fill {
+        height: 100%; border-radius: 10px; width: 0%;
+        transition: width 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* ── 빈 상태 ── */
+    .comm-empty { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.3); }
+    .comm-empty-icon { font-size: 52px; margin-bottom: 14px; }
+
+    /* ── 반응형 ── */
+    @@media (max-width: 640px) {
+        .comm-header { flex-direction: column; }
+        .comm-controls { width: 100%; }
+        .comm-search-wrap { flex: 1; }
+        .comm-search { width: 100%; }
+        .comm-stats-bar { padding: 14px 14px; gap: 0; }
+        .cstat-num { font-size: 20px; }
+        .comm-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        .ring-area { width: 100px; height: 100px; }
+        .pring { width: 100px; height: 100px; }
+        .ring-avatar { width: 62px; height: 62px; }
+    }
+</style>
+<style>
+        .card-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #fff;
+            text-align: center;
+            margin-top: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* 🔥 아이디 디자인 */
+        .user-id-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: #93c5fd;
+            background: rgba(147,197,253,0.12);
+            border: 1px solid rgba(147,197,253,0.3);
+            padding: 3px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.3px;
+        }
+
+    </style>
+<div class="welcome-page">
+
+    <!-- ══ 히어로 배너 ══ -->
+    <div class="hero">
+        <a class="home-btn" href="/Home/Index">🏠 홈으로</a>
+    
+            <div class="hero-cross"
+                  style="
+        color:#ffffff;
+        font-size:48px;
+        text-shadow:
+          0 0 5px rgba(255,255,255,0.8),
+          0 0 10px rgba(255,255,255,0.8),
+          0 0 20px rgba(255,255,255,0.9),
+          0 0 40px rgba(255,255,255,1);
+      ">
+                ✝
+            </div>
+
+        <div class="hero-badge">📖 Bible Reading Hub</div>
+            <h1>@(@ConstatsCommon.ReadBibleAllTitleButton)에 <span>오신 것을 환영합니다</span></h1>
+        <p class="hero-sub">하나님의 말씀을 매일 읽고, 기록하며, 성장하세요.</p>
+        <div class="divider"></div>
+    </div>
+
+    <!-- ══ 설명 카드 ══ -->
+    <div class="desc-card">
+        <p>
+            <strong>새로운 성경통독</strong>이 오픈되었습니다!<br/>
+            아래 두 버튼의 기능은 <strong>동일</strong>합니다.<br/>
+        </p>
+        <a href="/Bible/Participants" class="participants-btn">
+            👥 참여자 @(communityUsers.Any() ? communityUsers.Count + "명 " : "")보기 →
+        </a>
+    </div>
+
+    <!-- ══ 현대인성경 추가 안내 배너 ══ -->
+    <div class="hd-announce">
+        <div class="hd-announce-inner">
+            <div class="hd-top-row">
+                <span class="hd-new-badge">✨ NEW</span>
+                <span class="hd-date-badge">2026년5월 업데이트</span>
+            </div>
+            <div class="hd-title">📖 <em>현대인의 성경</em>이 추가되었습니다!</div>
+            <div class="hd-desc">
+                이제 <strong style="color:#7dd3fc;">개역개정 · 현대인성경 · NIV</strong>
+                세 가지 번역을 한 화면에서 함께 볼 수 있어요.<br/>
+                말씀을 더 깊이, 더 넓게 이해하는 시간이 되길 바랍니다.
+            </div>
+            <div class="hd-trans-row">
+                <span class="hd-trans-label">지원 번역</span>
+                <span class="hd-chip hd-chip--ko">🇰🇷 개역개정</span>
+                <span class="hd-chip-plus">+</span>
+                <span class="hd-chip hd-chip--hd">📖 현대인성경</span>
+                <span class="hd-chip-plus">+</span>
+                <span class="hd-chip hd-chip--en">🇺🇸 NIV</span>
+            </div>
+            <a href="/Bible" class="hd-link">지금 읽어보기 →</a>
+        </div>
+    </div>
+
+    <!-- ══ 버튼 3개 ══ -->
+    <div class="btn-grid">
+
+        <!-- 3. 건의함 -->
+        <a href="/Board/Create2?boardName=Anonymous" class="hub-card hub-card-3">
+            <div class="hub-icon-wrap">💌</div>
+            <div class="hub-tag">소통 창구</div>
+            <div class="hub-title">개선사항</div>
+            <div class="hub-desc">
+                더 나은 서비스를 위한<br/>의견을 보내주세요.
+            </div>
+            <div class="hub-btn">의견 보내기 →</div>
+        </a>
+
+    </div>
+
+    <!-- 하단 안내 -->
+    <div class="footer-note">
+        📖 말씀을 읽는 것이 복입니다 — 요한계시록 1:3
+    </div>
+
+</div>
+
+</body>
+</html>

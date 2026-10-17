@@ -1,0 +1,565 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model IEnumerable<BulletinBoard.Models.QuestionBankData>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>성경 퀴즈 뱅크</title>
+    <style>
+        :root {
+            --bg1: #f8fbff;
+            --bg2: #eef5ff;
+            --ink: #121417;
+            --muted: #6b7785;
+            --primary: #2a7fde;
+            --primary-weak: #e7f1ff;
+            --accent: #12b886;
+            --accent-weak: #e6fcf5;
+            --danger: #ff6b6b;
+            --card: #ffffffcc; /* 살짝 투명 */
+            --stroke: #e9eef5;
+            --chip: #f1f5f9;
+            --shadow: 0 10px 30px rgba(31,41,55,.08);
+            --radius: 16px;
+            --radius-sm: 12px;
+            --radius-lg: 22px;
+        }
+
+        /* ===== 배경 & 베이스 ===== */
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            font-family: 'Noto Sans KR', system-ui, -apple-system, Segoe UI, Roboto, Apple SD Gothic Neo, Arial, sans-serif;
+            line-height: 1.55;
+            background: radial-gradient(1200px 600px at -10% -10%, #e8f3ff 0%, transparent 60%), radial-gradient(900px 500px at 110% 10%, #f3fff9 0%, transparent 60%), linear-gradient(180deg, var(--bg1), var(--bg2));
+            position: relative;
+            overflow-x: hidden;
+        }
+            /* 도트 질감 */
+            body::before {
+                content: "";
+                position: fixed;
+                inset: 0;
+                background: radial-gradient(#cfe4ff 1px, transparent 1px) 0 0 / 22px 22px, radial-gradient(#e9f7ff 1px, transparent 1px) 11px 11px / 22px 22px;
+                opacity: .35;
+                pointer-events: none;
+            }
+
+        /* ===== 상단 타이틀 리본 ===== */
+        h1 {
+            margin: 10px auto 18px;
+            text-align: center;
+            font-size: clamp(26px, 3.8vw, 44px);
+            font-weight: 800;
+            letter-spacing: .02em;
+        }
+
+        .title-ribbon {
+            display: inline-flex;
+            align-items: center;
+            gap: .7em;
+            padding: 12px 22px;
+            border-radius: 999px;
+            background: radial-gradient(120% 120% at 50% 0%, #fff 0%, #fffaf2 60%, #fff5e1 100%);
+            border: 1px solid #ffe08a;
+            box-shadow: 0 8px 28px rgba(255,193,7,.18), inset 0 0 0 6px rgba(255,216,102,.14);
+        }
+
+        .spark {
+            color: #ffb703;
+        }
+
+        .sub-progress {
+            display: inline-flex;
+            align-items: center;
+            gap: .4em;
+            font-size: .9rem;
+            color: var(--muted);
+            background: var(--chip);
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-left: .6rem;
+        }
+
+        /* ===== 푸터 버튼 바 ===== */
+        .footer {
+            margin: 18px auto 16px;
+            text-align: center;
+            padding: 6px;
+        }
+
+            .footer button {
+                --btn-pad: 11px 16px;
+                appearance: none;
+                border: 1px solid var(--stroke);
+                background: #fff;
+                color: var(--ink);
+                padding: var(--btn-pad);
+                border-radius: 14px;
+                cursor: pointer;
+                font-weight: 700;
+                transition: transform .06s ease, box-shadow .25s ease, background .25s ease;
+                box-shadow: 0 2px 0 rgba(0,0,0,.03);
+                margin: 6px 6px;
+            }
+
+                .footer button:hover {
+                    background: #f8fafc;
+                    box-shadow: 0 10px 22px rgba(2,6,23,.06);
+                }
+
+                .footer button:active {
+                    transform: translateY(1px);
+                }
+
+        /* ===== 퀴즈 카드 ===== */
+        .quiz-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 22px;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 4px 6px;
+        }
+
+        .quiz-card {
+            width: min(980px, calc(100% - 24px));
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            border: 1px solid var(--stroke);
+            box-shadow: var(--shadow);
+            padding: clamp(14px, 2vw, 22px);
+            backdrop-filter: saturate(1.05) blur(2px);
+            position: relative;
+            overflow: hidden;
+            animation: fadeUp .45s ease both;
+        }
+
+            .quiz-card::after {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(600px 180px at 120% -10%, rgba(42,127,222,.08), transparent 60%);
+                pointer-events: none;
+            }
+
+            /* 첫 질문(본문)과 예시(추가 question) 시각 구분 */
+            .quiz-card .question:first-of-type {
+                font-size: clamp(18px, 2.2vw, 22px);
+                font-weight: 800;
+                line-height: 1.55;
+                margin-bottom: 10px;
+                color: var(--ink);
+            }
+
+                .quiz-card .question:first-of-type > span:first-child {
+                    /* sequenceNo 배지화 */
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(180deg, var(--primary), #1c6fc7);
+                    color: #fff;
+                    border-radius: 10px;
+                    padding: 2px 10px;
+                    margin-right: .45rem;
+                    font-size: .95em;
+                    box-shadow: 0 6px 16px rgba(42,127,222,.25);
+                }
+
+            .quiz-card .question:not(:first-of-type) {
+                font-size: clamp(15px, 1.8vw, 17px);
+                color: #27313b;
+                background: #f8fbff;
+                border: 1px dashed var(--stroke);
+                padding: 8px 10px;
+                border-radius: 10px;
+                margin: 6px 0;
+            }
+
+            /* 객관식 리스트 카드화 */
+            .quiz-card ol {
+                margin: 12px 0 4px 0;
+                padding-left: 0;
+                list-style: none;
+                counter-reset: qn;
+                display: grid;
+                gap: 8px;
+            }
+
+                .quiz-card ol li {
+                    counter-increment: qn;
+                    background: #fff;
+                    border: 1px solid var(--stroke);
+                    border-radius: 12px;
+                    padding: 10px 12px 10px 44px;
+                    position: relative;
+                    box-shadow: 0 4px 12px rgba(2,6,23,.03);
+                }
+
+                    .quiz-card ol li::before {
+                        content: counter(qn);
+                        position: absolute;
+                        left: 12px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        width: 26px;
+                        height: 26px;
+                        border-radius: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: var(--primary-weak);
+                        color: var(--primary);
+                        font-weight: 800;
+                        border: 1px solid #d8e7ff;
+                    }
+
+        /* 성경구절 칩 */
+        .verse {
+            display: inline-flex;
+            align-items: center;
+            gap: .5em;
+            margin-top: 12px;
+            background: var(--accent-weak);
+            color: #0a7a5a;
+            border: 1px solid #b2f2e2;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-style: normal;
+            font-weight: 700;
+        }
+
+            .verse::before {
+                content: "📖";
+            }
+
+        /* 정답 박스 */
+        .answer {
+            margin-top: 12px;
+            background: linear-gradient(180deg, #fff8f8, #fff);
+            border: 1px solid #ffd8d8;
+            border-left: 4px solid var(--danger);
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-weight: 800;
+            color: #9c3434;
+            text-align: right; /* 기존 유지 */
+        }
+
+            /* 관리자 링크 미세 스타일 */
+            .answer a {
+                color: var(--primary);
+                text-decoration: none;
+                font-weight: 800;
+                padding: 2px 6px;
+                border-radius: 8px;
+            }
+
+                .answer a:hover {
+                    background: var(--primary-weak);
+                }
+
+        /* 애니메이션 */
+        @@keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 반응형 */
+        @@media screen and (max-width: 768px) {
+            .quiz-card {
+                border-radius: 14px;
+            }
+
+            .footer button {
+                margin: 5px 4px;
+            }
+        }
+
+        @@media screen and (max-width: 480px) {
+            .quiz-card {
+                padding: 14px;
+            }
+        }
+
+        /* 출력 스타일 (페이지 분리 & 배경 제거) */
+        @@media print {
+            body {
+                background: #fff !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                margin: 0;
+                padding: 0;
+            }
+
+                body::before {
+                    display: none !important;
+                }
+
+            .quiz-card {
+                page-break-inside: avoid;
+                page-break-after: auto;
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+
+            .footer {
+                display: none;
+            }
+
+            .title-ribbon {
+                border: 1px solid #ddd;
+                box-shadow: none;
+            }
+        }
+
+        /* 입력 그대로 표시 */
+        .formatted-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+    <style>
+        /* 타이틀을 세 줄로 쌓아 정렬 */
+        .title-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .title-stack .sub-progress {
+                display: inline-flex;
+                margin-left: 0; /* 기존 chip의 왼쪽 마진 제거 */
+            }
+
+        /* 날짜 칩 */
+        .date-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .4em;
+            font-size: .95rem;
+            color: #334155;
+            background: #ffffff;
+            border: 1px solid var(--stroke);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-weight: 700;
+        }
+
+            .date-chip::before {
+                content: "📅";
+            }
+
+    </style>
+
+    <style>
+        .total-count {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: 800;
+        }
+
+    </style>
+</head>
+
+@{
+    // 숫자도, 문자열도 모두 안전하게 처리
+    //var rawCodeObj = @ViewBag.queryCode; // 예: 20250928 (int/long 등)
+
+    // 1) 문자열로 변환 (InvariantCulture 사용)
+    string quizCode = @ViewBag.queryCode;
+
+            // 2) 혹시 공백이 섞였으면 제거
+            quizCode = quizCode.Trim();
+
+            // 3) 혹시 자릿수가 8 미만이면 8자리로 패딩(예외 상황 대비)
+            //    예: 2025013 -> 02025013 (실전에서는 거의 필요 없지만 안전장치)
+            if (quizCode.Length < 8 && int.TryParse(quizCode, out var qcNum))
+            {
+                        quizCode = qcNum.ToString("D8"); // 항상 8자리
+            }
+
+            // 4) 앞 8자리만 사용해 yyyyMMdd 파싱
+            string formattedQuizDate = "";
+            if (quizCode.Length >= 8)
+            {
+                        var ymd = quizCode.Substring(0, 8);
+                        try
+                        {
+                                    var dt = DateTime.ParseExact(
+                                                    ymd,
+                                                    "yyyyMMdd",
+                                                    System.Globalization.CultureInfo.InvariantCulture
+                                    );
+                                    formattedQuizDate = dt.ToString("yyyy년MM월dd일", System.Globalization.CultureInfo.InvariantCulture);
+                        }
+                        catch
+                        {
+                                    // 파싱 실패 시, 눈에 거슬리지 않게 직접 조합
+                                    formattedQuizDate = $"{ymd.Substring(0, 4)}년{ymd.Substring(4, 2)}월{ymd.Substring(6, 2)}일";
+                        }
+            }
+}
+
+
+
+<body>
+    @*    <h1>
+        <span class="title-ribbon">
+            <span class="spark">✦</span> 성경퀴즈 <span class="spark">✦</span>
+        </span>
+        <span class="sub-progress">진행중</span>
+    </h1> *@
+
+    <h1 class="title-stack">
+        <span class="title-ribbon">
+            <span class="spark">✦</span> 성경골든벨 <span class="spark">✦</span>
+        </span>
+        <span class="sub-progress">진행예정</span>
+
+        @if (!string.IsNullOrEmpty(formattedQuizDate))
+        {
+            <span class="date-chip">@formattedQuizDate</span>
+        }
+    </h1>
+
+    <div class="footer">
+        <button onclick="window.location.href='/'">홈으로</button>
+        @if (isAdmin)
+        {
+            <button onclick="window.location.href='/QuestionBank/Indexslide'">한문제씩 보기(큰화면,관리자)</button>
+        }
+        @if (isSuperAdmin)
+        {
+            <button onclick="window.location.href='/BibleBulk/BibleMissingList'">관리자</button>
+        }
+    </div>
+
+    @{
+        var totalCount = Model?.Count() ?? 0;
+    }
+    <div class="total-count">총 문항수 : @(totalCount.ToString("D2"))개</div>
+
+    @foreach (var item in Model)
+    {
+        string pdata = $"{@item.QuestionQ}";
+        <div class="quiz-container">
+            <div class="quiz-card">
+                <div class="question formatted-text"><span style=" font-size: 34px;">@item.sequenceNo.</span>@pdata</div>
+                @if (!string.IsNullOrEmpty(@item.example1))
+                {
+                    <div class="question">@item.example1</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example2))
+                {
+                    <div class="question">@item.example2</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example3))
+                {
+                    <div class="question">@item.example3</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example4))
+                {
+                    <div class="question">@item.example4</div>
+                }
+                @if (item.QuestionType == "o")
+                {
+                    <ol>
+                        @if (!string.IsNullOrEmpty(@item.Question1))
+                        {
+                            <li>@item.Question1</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question2))
+                        {
+                            <li>@item.Question2</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question3))
+                        {
+                            <li>@item.Question3</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question4))
+                        {
+                            <li>@item.Question4</li>
+                        }
+                    </ol>
+                }
+                @if (@item.Jang > 0)
+                {
+                    if (@item.Zul > 0 && @item.Zul1 > 0)
+                    {
+                        <div class="verse">성경구절: @item.BibleText @item.Jang:@item.Zul-@item.Zul1</div>
+                    }
+                    else
+                    {
+                        <div class="verse">성경구절: @item.BibleText @item.Jang:@item.Zul</div>
+                    }
+                }
+                <div class="answer" style="text-align:left;">정답: @item.CorrectAnswer</div>
+
+                @if (isAdmin)
+                {
+                    <div class="answer">
+                        <a href="/QuestionBank/DeleteQuestionBank?Id=@item.Id"> 삭제 </a> | 
+                        <a href="/QuestionBank/ModifyQuestionBank?Id=@item.Id"> 수정 </a> 
+@*                         <a href="/QuestionBank/VerifyQuestionBank?Id=@item.Id"> Bottom </a> |
+                        <a href="/QuestionBank/MinifyQuestionBank?Id=@item.Id"> Top </a> |
+                        <a href="/QuestionBank/UpdatePrevRecordUpdateDT?Id=@item.Id"> Prev </a> |
+                        <a href="/QuestionBank/UpdateNextRecordUpdateDT?Id=@item.Id"> Next </a>
+ *@                    </div>
+                }
+            </div>
+        </div>
+    }
+
+
+    <div class="footer">
+        <button onclick="window.location.href='/'">홈으로</button>
+        @if (isAdmin)
+        {
+            <button onclick="window.location.href='/QuestionBank/Indexslide'">한문제씩 보기(큰화면,관리자)</button>
+        }
+        @if (isSuperAdmin)
+        {
+            <button onclick="window.location.href='/BibleBulk/BibleMissingList'">관리자</button>
+        }
+</div>
+    <script>
+        function ManageUserInfo(UserId) {
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+        }
+    </script>
+</body>
+</html>

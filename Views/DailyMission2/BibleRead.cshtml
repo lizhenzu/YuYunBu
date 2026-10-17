@@ -1,0 +1,1390 @@
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using BulletinBoard.Models
+@using BulletinBoard.Models.DailyMission2
+
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var d    = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var detail          = ViewBag.TodayWordToReadRow as TodayWordDetailResult;
+    var bible           = detail?.TodayeBiblesData;
+    var todayWordToRead = ViewBag.TodayWordToReadData as TodayWordToRead;
+    var ov              = ViewBag._BibleBookOverviewDetail as BibleBookOverviewDetail;
+    var bi              = ViewBag._BibleBasicInfos2 as BibleBasicInfos2;
+
+    var lang = (ViewBag.Lang ?? "ko").ToString().ToLowerInvariant();
+    if (lang != "ko" && lang != "en" && lang != "al" && lang != "modern" && lang != "ko+modern" && lang != "all") lang = "ko";
+
+    var modernMap = ViewBag.ModernMap as System.Collections.Generic.Dictionary<int, string>
+                    ?? new System.Collections.Generic.Dictionary<int, string>();
+
+    // 절별 KO+EN 페어 그룹핑
+    var verseGroups = bible?.eBibleDatas?
+        .GroupBy(v => new { v.Jang, v.zul })
+        .OrderBy(g => g.Key.Jang).ThenBy(g => g.Key.zul)
+        .ToList();
+
+    var totalVerses = verseGroups?.Count ?? 0;
+    var readVerses  = verseGroups?.Count(g => g.FirstOrDefault(v => v.LangCD == "ko")?.readDone == "t") ?? 0;
+    bool isAllRead  = totalVerses > 0 && readVerses == totalVerses;
+
+    // 성경 전체 통독률
+    var totalProgressRate   = (decimal)(ViewBag.TotalProgressRate ?? 0m);
+    var todayReadVerseCount = (int)(ViewBag.TodayReadVerseCount   ?? 0);
+    int overallPct = (int)Math.Round(totalProgressRate);
+
+    // 유튜브
+    string y1="",y2="",y3="",y4="",y5="";
+    int s1=0,e1=0,s2=0,e2=0,s3=0,e3=0,s4=0,e4=0,s5=0,e5=0;
+
+    var wordDataList = ViewBag.TodayWordToReadDataList as List<BulletinBoard.Models.TodayWordToReads>;
+
+    if (wordDataList != null && wordDataList.Count > 1)
+    {
+        // ✅ 다중 행(다중 장): 각 행의 URL을 순서대로 세그먼트로 사용
+        //    예) 49장 row → y1/s1/e1,  50장 row → y2/s2/e2
+        void SetSeg(BulletinBoard.Models.TodayWordToReads w, out string yo, out int so, out int eo) {
+            yo = w.URL ?? ""; so = (w.YouTuBuStartMM*60)+w.YouTuBuStartSS; eo = (w.YouTuBuEndMM*60)+w.YouTuBuEndSS;
+        }
+        if (wordDataList.Count >= 1) { SetSeg(wordDataList[0], out y1, out s1, out e1); }
+        if (wordDataList.Count >= 2) { SetSeg(wordDataList[1], out y2, out s2, out e2); }
+        if (wordDataList.Count >= 3) { SetSeg(wordDataList[2], out y3, out s3, out e3); }
+        if (wordDataList.Count >= 4) { SetSeg(wordDataList[3], out y4, out s4, out e4); }
+        if (wordDataList.Count >= 5) { SetSeg(wordDataList[4], out y5, out s5, out e5); }
+    }
+    else if (todayWordToRead != null)
+    {
+        // ✅ 단일 행: URL/URL2/.../URL5 컬럼 사용 (기존 방식)
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL))  { y1=todayWordToRead.URL;  s1=(todayWordToRead.YouTuBuStartMM*60)+todayWordToRead.YouTuBuStartSS;  e1=(todayWordToRead.YouTuBuEndMM*60)+todayWordToRead.YouTuBuEndSS; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL2)) { y2=todayWordToRead.URL2; s2=(todayWordToRead.YouTuBuStartMM2*60)+todayWordToRead.YouTuBuStartSS2; e2=(todayWordToRead.YouTuBuEndMM2*60)+todayWordToRead.YouTuBuEndSS2; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL3)) { y3=todayWordToRead.URL3; s3=(todayWordToRead.YouTuBuStartMM3*60)+todayWordToRead.YouTuBuStartSS3; e3=(todayWordToRead.YouTuBuEndMM3*60)+todayWordToRead.YouTuBuEndSS3; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL4)) { y4=todayWordToRead.URL4; s4=(todayWordToRead.YouTuBuStartMM4*60)+todayWordToRead.YouTuBuStartSS4; e4=(todayWordToRead.YouTuBuEndMM4*60)+todayWordToRead.YouTuBuEndSS4; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL5)) { y5=todayWordToRead.URL5; s5=(todayWordToRead.YouTuBuStartMM5*60)+todayWordToRead.YouTuBuStartSS5; e5=(todayWordToRead.YouTuBuEndMM5*60)+todayWordToRead.YouTuBuEndSS5; }
+    }
+    bool hasYouTube = !string.IsNullOrWhiteSpace(y1);
+}
+
+<!-- ── Bible/Read 테마 CSS ── -->
+<style>
+/* ── CSS 변수 (Bible/Read와 동일) ── */
+.bible-reader {
+    --primary:       #6366f1;
+    --primary-light: #eef2ff;
+    --text:          #1e293b;
+    --text2:         #64748b;
+    --bg3:           #f1f5f9;
+    --card-bg:       #ffffff;
+    --border:        #e2e8f0;
+    --success:       #22c55e;
+    --gold:          #f0a500;
+    max-width: 780px;
+    margin: 0 auto;
+}
+
+/* ── 헤더 ── */
+.bible-header    { margin-bottom: 20px; }
+.bible-book-name { font-size: 1.8rem; font-weight: 900; color: var(--text); }
+.bible-chapter   { font-size: 1rem; color: var(--text2); margin-top: 4px; }
+
+/* ── 미디어 바 ── */
+.media-bar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:12px 16px; margin:8px 0 14px; background:var(--card-bg); border-radius:16px; border:1.5px solid var(--border); box-shadow:0 2px 12px rgba(0,0,0,.07); }
+.media-bar-label { font-size:.72rem; font-weight:900; color:var(--text2); letter-spacing:.06em; padding-right:10px; border-right:1.5px solid var(--border); margin-right:2px; white-space:nowrap; align-self:center; }
+.media-btn { display:inline-flex; align-items:center; gap:9px; padding:9px 16px; border-radius:12px; border:none; cursor:pointer; font-family:inherit; text-align:left; transition:transform .15s,box-shadow .15s,filter .15s; flex-shrink:0; }
+.media-btn:hover  { transform:translateY(-2px); filter:brightness(1.07); }
+.media-btn:active { transform:scale(.97); }
+.media-btn-icon  { font-size:1.4rem; line-height:1; flex-shrink:0; }
+.media-btn-text  { display:flex; flex-direction:column; gap:2px; }
+.media-btn-title { font-size:.88rem; font-weight:900; color:#fff; line-height:1.2; }
+.media-btn-sub   { font-size:.7rem; font-weight:600; color:rgba(255,255,255,.78); line-height:1; }
+.media-btn--yt  { background:linear-gradient(135deg,#ff2d2d 0%,#c40000 100%); box-shadow:0 4px 14px rgba(196,0,0,.30); }
+
+/* ── 챕터 완료 배너 ── */
+.chapter-done-banner { display:none; margin:10px 0 14px; padding:12px 16px; border-radius:12px; background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; font-size:.96rem; font-weight:900; text-align:center; box-shadow:0 6px 20px rgba(34,197,94,.25); }
+.chapter-done-banner.show { display:block; }
+
+/* ── 모드 필 ── */
+.mode-pills { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+.mode-pill { padding:8px 20px; border-radius:50px; border:2px solid var(--border); background:var(--card-bg); color:var(--text); font-size:.9rem; font-weight:600; cursor:pointer; transition:all .2s; font-family:inherit; }
+.mode-pill.active { background:var(--primary); border-color:var(--primary); color:#fff; }
+.mode-pill:hover:not(.active) { border-color:var(--primary); color:var(--primary); }
+
+/* ── 연속 사각형 버튼 그룹 ── */
+.lang-pills {
+    display:inline-flex; flex-wrap:nowrap;
+    margin:6px 0 14px;
+    border:1.5px solid var(--border);
+    border-radius:10px; overflow:hidden;
+    background:var(--card-bg);
+}
+.lang-pill {
+    padding:8px 15px;
+    border:none; border-right:1.5px solid var(--border);
+    background:transparent; color:var(--text2);
+    font-size:.82rem; font-weight:600;
+    cursor:pointer; transition:background .15s, color .15s;
+    font-family:inherit; white-space:nowrap; line-height:1.4;
+}
+.lang-pill:last-child { border-right:none; }
+.lang-pill:hover:not(.active) { background:var(--bg3); color:var(--text); }
+/* ── 활성 버튼: 번역별 배경 채움 ── */
+.lang-pill.active { font-weight:900; color:#fff; }
+.lang-pill[data-lang="all"].active    { background:#475569; }  /* slate-600  */
+.lang-pill[data-lang="ko"].active     { background:#4f46e5; }  /* indigo-600 */
+.lang-pill[data-lang="modern"].active { background:#0284c7; }  /* sky-600    */
+.lang-pill[data-lang="en"].active     { background:#0d9488; }  /* teal-600   */
+
+/* ── 진도 바 ── */
+.reader-progress { margin-bottom:20px; }
+.prog-label { display:flex; justify-content:space-between; font-size:.82rem; color:var(--text2); margin-bottom:5px; }
+.prog-track { height:10px; background:var(--bg3); border-radius:99px; overflow:hidden; }
+.prog-fill  { height:100%; border-radius:99px; transition:width .8s cubic-bezier(.4,0,.2,1); }
+.prog-fill.green  { background:linear-gradient(90deg,#22c55e,#86efac); }
+.prog-fill.purple { background:linear-gradient(90deg,var(--primary),#9b5df5); }
+
+/* ── 페이지 이동 ── */
+.page-nav-r { display:flex; justify-content:space-between; align-items:center; margin:16px 0; }
+.page-btn { padding:10px 24px; border-radius:50px; border:2px solid var(--primary); background:var(--card-bg); color:var(--primary); font-weight:700; font-size:.9rem; cursor:pointer; transition:all .2s; font-family:inherit; }
+.page-btn:hover { background:var(--primary); color:#fff; }
+.page-btn:disabled { opacity:.3; cursor:default; pointer-events:none; }
+
+/* ── 절 카드 ── */
+.verse-card-r { background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:8px; display:flex; gap:12px; align-items:flex-start; transition:all .25s; border-left:4px solid transparent; }
+.verse-card-r.is-read { border-left-color:var(--success); background:#f0fdf4; }
+.verse-card-r.bookmarked { border-left-color:var(--gold); background:#fffbeb; }
+.vnum { font-size:.85rem; font-weight:900; color:var(--primary); min-width:26px; padding-top:4px; text-align:center; flex-shrink:0; }
+.vtext-wrap { flex:1; min-width:0; display:flex; flex-direction:column; }
+.vtext-ko-line { display:block; line-height:1.9; }
+.vtext-ko-line .vtext-ko { display:inline; font-size:1.23rem; flex:none; }
+.vactions-inline { display:inline-flex; align-items:center; gap:3px; margin-left:7px; vertical-align:middle; flex-shrink:0; }
+.vactions-inline .vbtn { padding:2px 5px; font-size:1rem; border:none; border-radius:6px; cursor:pointer; background:transparent; line-height:1; transition:transform .12s,background .12s; font-family:inherit; }
+.vactions-inline .vbtn:hover  { background:var(--bg3); transform:scale(1.15); }
+.vactions-inline .vbtn:active { transform:scale(.92); }
+.vtext-en-line { display:block; line-height:1.7; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); }
+.vtext-en-line .vtext-en { display:inline; font-size:1.13em; color:#374151; font-style:italic; letter-spacing:.01em; }
+
+/* ── 현대인성경 안내 배너 ─────────────────────────────────── */
+.hd-notice {
+    position: relative; overflow: hidden;
+    display: flex; align-items: flex-start; gap: 12px;
+    margin: 0 0 14px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 60%, #ecfeff 100%);
+    border: 1.5px solid #7dd3fc;
+    box-shadow: 0 2px 12px rgba(14,165,233,.14);
+    animation: hdNoticeIn .4s ease;
+}
+@@keyframes hdNoticeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+/* shimmer */
+.hd-notice::before {
+    content: '';
+    position: absolute; top: 0; left: -120%; width: 55%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+    transform: skewX(-18deg);
+    animation: hdNShimmer 3.5s ease-in-out infinite;
+    pointer-events: none;
+}
+@@keyframes hdNShimmer {
+    0%,40% { left: -120%; }
+    70%,100% { left: 150%; }
+}
+.hd-notice-icon {
+    font-size: 1.55rem; flex-shrink: 0; margin-top: 1px;
+    filter: drop-shadow(0 0 6px rgba(14,165,233,.40));
+}
+.hd-notice-body { flex: 1; min-width: 0; }
+.hd-notice-title {
+    font-size: .88rem; font-weight: 900; color: #0369a1;
+    margin-bottom: 4px; display: flex; align-items: center; gap: 7px;
+    flex-wrap: wrap;
+}
+.hd-notice-new {
+    display: inline-block;
+    background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+    color: #fff; font-size: .65rem; font-weight: 800;
+    letter-spacing: 1px; padding: 2px 8px; border-radius: 20px;
+    vertical-align: middle;
+    animation: hdNPulse 2.2s ease-in-out infinite;
+}
+@@keyframes hdNPulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(14,165,233,.4); }
+    50%      { box-shadow: 0 0 0 5px rgba(14,165,233,.0); }
+}
+.hd-notice-desc {
+    font-size: .80rem; color: #164e63;
+    line-height: 1.65; word-break: keep-all; margin-bottom: 8px;
+}
+.hd-notice-chips {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.hd-nc {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 3px 10px; border-radius: 20px;
+    font-size: .72rem; font-weight: 700;
+}
+.hd-nc--ko { background: #ede9fe; border: 1px solid #c4b5fd; color: #5b21b6; }
+.hd-nc--hd { background: #dbeafe; border: 1.5px solid #60a5fa; color: #1d4ed8; }
+.hd-nc--en { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+.hd-nc-plus { font-size: .78rem; font-weight: 900; color: #94a3b8; }
+.hd-notice-close {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    border: none; cursor: pointer; font-size: .82rem; line-height: 1;
+    background: rgba(14,165,233,.12); color: #0369a1;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s, color .15s;
+    margin-top: 1px;
+}
+.hd-notice-close:hover { background: rgba(14,165,233,.25); color: #0c4a6e; }
+
+/* ── 현대인성경 라인 ─────────────────────────────────────── */
+.vtext-modern-line { display:block; line-height:1.7; margin-top:6px; padding-top:6px; border-top:1px dashed #bae6fd; }
+.vtext-modern-line .vtext-modern { display:inline; font-size:1.13em; color:#0369a1; letter-spacing:.01em; }
+/* 현대인 단독 모드: primary 텍스트로 표시 */
+body.lang-modern .vtext-modern-line { border-top:none; margin-top:0; padding-top:0; line-height:1.9; }
+body.lang-modern .vtext-modern-line .vtext-modern { font-size:1.23rem; color:var(--text); }
+
+/* 언어 표시 제어 */
+body.lang-en .vtext-ko { display:none !important; }
+body.lang-en .vtext-en-line { border-top:none; margin-top:0; padding-top:0; line-height:1.9; }
+body.lang-en .vtext-en-line .vtext-en { display:inline; font-style:normal; font-size:1.23rem; color:var(--text); }
+body.lang-ko .vtext-en-line { display:none !important; }
+body.lang-ko .vtext-modern-line { display:none !important; }
+
+/* 읽은 절 */
+.verse-card-r.is-read .vtext-ko { color:#374151; }
+
+/* ── 요약 카드 ── */
+.summary-card { background:linear-gradient(135deg,#eef2ff,#f5f3ff); border:1.5px solid rgba(99,102,241,.25); border-left:4px solid #6366f1; border-radius:14px; padding:14px 16px; margin-bottom:6px; box-shadow:0 2px 10px rgba(99,102,241,.10); }
+.summary-range { font-size:.78rem; font-weight:800; color:#6366f1; margin-bottom:6px; display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.summary-keyword { font-size:.84rem; font-weight:700; color:#4f46e5; margin-bottom:8px; line-height:1.5; }
+.summary-body { font-size:.92rem; color:var(--text); line-height:1.75; word-break:keep-all; }
+
+/* ── 완료 버튼 (리디자인) ── */
+.mark-all-wrap { margin: 16px 0 12px; }
+
+.complete-mega {
+    width: 100%; display: flex; align-items: center; gap: 14px;
+    padding: 18px 20px; border: none; border-radius: 20px;
+    cursor: pointer; color: #fff; font-family: inherit;
+    position: relative; overflow: hidden; text-align: left;
+    transition: transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .22s;
+}
+.complete-mega:hover  { transform: translateY(-3px) scale(1.01); }
+.complete-mega:active { transform: scale(.97); }
+.complete-mega:disabled { opacity: .65; cursor: not-allowed; transform: none; }
+
+/* 상태별 배경 */
+.complete-mega.is-not-done {
+    background: linear-gradient(135deg, #10b981 0%, #059669 55%, #047857 100%);
+    box-shadow: 0 10px 36px rgba(16,185,129,.38), 0 2px 8px rgba(0,0,0,.10);
+}
+.complete-mega.is-done {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #3730a3 100%);
+    box-shadow: 0 10px 32px rgba(99,102,241,.32), 0 2px 8px rgba(0,0,0,.10);
+}
+
+/* shimmer 스윕 */
+.complete-mega::before {
+    content: '';
+    position: absolute; top: 0; left: -110%; width: 55%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+    transform: skewX(-15deg);
+    transition: left .6s ease;
+    pointer-events: none;
+}
+.complete-mega:hover::before { left: 130%; }
+
+/* is-not-done 펄스 글로우 */
+.complete-mega.is-not-done::after {
+    content: '';
+    position: absolute; inset: -2px; border-radius: 22px;
+    background: transparent;
+    border: 2px solid rgba(110,231,183,.50);
+    animation: megaPulse 2.4s ease-in-out infinite;
+    pointer-events: none;
+}
+.complete-mega.is-done::after { display: none; }
+@@keyframes megaPulse {
+    0%,100% { opacity: .55; transform: scale(1); }
+    50%      { opacity: 0;   transform: scale(1.03); }
+}
+
+/* 왼쪽: 아이콘 원 */
+.cm-icon-circle {
+    flex-shrink: 0;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(255,255,255,.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.55rem; line-height: 1;
+    border: 2px solid rgba(255,255,255,.28);
+    box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    transition: transform .2s;
+}
+.complete-mega:hover .cm-icon-circle { transform: rotate(-8deg) scale(1.08); }
+
+/* 중앙: 텍스트 */
+.cm-body { flex: 1; min-width: 0; }
+.complete-mega-title {
+    font-size: 1.08rem; font-weight: 950; line-height: 1.35;
+    display: block; letter-spacing: -.2px;
+}
+.complete-mega-desc {
+    font-size: .78rem; font-weight: 700;
+    opacity: .78; margin-top: 3px; display: block;
+    letter-spacing: .01em;
+}
+.complete-mega-desc.desc-hide { display: none !important; }
+
+/* 오른쪽: 진도 배지 */
+.cm-badge {
+    flex-shrink: 0; display: flex; flex-direction: column;
+    align-items: center; gap: 3px;
+}
+.complete-mega-count {
+    font-size: .82rem; font-weight: 900;
+    background: rgba(255,255,255,.20);
+    border: 1px solid rgba(255,255,255,.30);
+    padding: 5px 12px; border-radius: 999px;
+    white-space: nowrap; letter-spacing: .02em;
+    backdrop-filter: blur(4px);
+}
+.cm-arrow {
+    font-size: 1.1rem; opacity: .65;
+    transition: transform .2s, opacity .2s;
+}
+.complete-mega:hover .cm-arrow { transform: translateX(4px); opacity: 1; }
+
+/* ── 챕터 네비 / 대시보드 ── */
+.chapter-nav-r { display:flex; justify-content:space-between; align-items:center; margin:20px 0 10px; flex-wrap:wrap; gap:8px; }
+.chapter-nav-r a { color:var(--primary); font-weight:700; text-decoration:none; font-size:.9rem; }
+.chapter-nav-r a:hover { text-decoration:underline; }
+.dashboard-btn-wrap { text-align:center; margin:20px 0 32px; }
+.dashboard-btn { display:inline-flex; align-items:center; gap:8px; padding:12px 32px; border-radius:50px; background:var(--card-bg); border:2px solid var(--border); color:var(--text2); font-size:.92rem; font-weight:700; text-decoration:none; transition:all .2s; }
+.dashboard-btn:hover { border-color:var(--primary); color:var(--primary); background:var(--primary-light); transform:translateY(-2px); }
+
+/* ── 개요 카드 ── */
+.ov-card { margin:10px 0 14px; border-radius:18px; overflow:hidden; border:1.5px solid rgba(99,102,241,.22); background:var(--card-bg); box-shadow:0 4px 20px rgba(99,102,241,.08); }
+.ov-head { width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px; background:linear-gradient(135deg,rgba(99,102,241,.10),rgba(99,102,241,.06)); border:none; cursor:pointer; text-align:left; transition:background .16s; font-family:inherit; }
+.ov-head:hover { background:rgba(99,102,241,.14); }
+.ov-head-left  { display:flex; align-items:center; gap:8px; min-width:0; }
+.ov-icon       { font-size:1.1rem; flex-shrink:0; }
+.ov-title      { font-size:1rem; font-weight:900; color:var(--text); letter-spacing:-.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ov-chevron    { flex-shrink:0; font-size:1rem; color:var(--text2); transition:transform .22s ease; }
+.ov-card.is-open .ov-chevron { transform:rotate(180deg); }
+.ov-body { display:none; padding:0 16px 16px; border-top:1px solid var(--border); }
+.ov-card.is-open .ov-body { display:block; }
+.ov-row { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); align-items:flex-start; }
+.ov-row:last-child { border-bottom:none; }
+.ov-label { flex-shrink:0; min-width:90px; font-size:.8rem; font-weight:900; color:var(--primary); padding-top:1px; }
+.ov-val   { font-size:.9rem; color:var(--text); line-height:1.65; word-break:keep-all; }
+.ov-section { margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--border); }
+.ov-section:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+.ov-sec-title { font-size:.82rem; font-weight:900; color:var(--primary); margin-bottom:6px; display:flex; align-items:center; gap:5px; padding-left:6px; border-left:3px solid var(--primary); }
+.ov-sec-body  { font-size:.9rem; color:var(--text); line-height:1.7; word-break:keep-all; padding-left:9px; }
+.ov-sec-body p { margin:4px 0 0; }
+.ov-kw-chip { display:inline-block; margin:3px 4px 3px 0; padding:4px 11px; border-radius:999px; background:rgba(99,102,241,.12); color:var(--primary); border:1px solid rgba(99,102,241,.24); font-size:.8rem; font-weight:800; }
+.ov-list { margin:0; padding-left:18px; color:var(--text); line-height:1.75; }
+.ov-list li { margin-bottom:4px; font-size:.9rem; }
+.ov-final-note { margin:10px 0 0; font-size:.88rem; font-weight:700; color:var(--text2); background:rgba(99,102,241,.08); border-radius:10px; padding:9px 12px; border-left:3px solid var(--primary); }
+.ov-switch-bar { display:flex; gap:6px; margin:14px 0 12px; }
+.ov-sw-btn { padding:7px 18px; border-radius:999px; border:1.5px solid var(--border); background:transparent; color:var(--text2); font-size:.82rem; font-weight:800; cursor:pointer; transition:all .16s; font-family:inherit; }
+.ov-sw-btn:hover { border-color:var(--primary); color:var(--primary); }
+.ov-sw-btn.ov-sw-active { background:var(--primary); border-color:var(--primary); color:#fff; box-shadow:0 3px 10px rgba(99,102,241,.28); }
+
+/* ── 유튜브 모달 ── */
+#ytModal { display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); align-items:center; justify-content:center; padding:16px; }
+.yt-modal-box { background:#ffffff; border-radius:20px; width:100%; max-width:480px; max-height:88vh; overflow-y:auto; box-shadow:0 16px 60px rgba(0,0,0,.45); display:flex; flex-direction:column; }
+.yt-modal-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #e2e8f0; }
+.yt-modal-title { font-size:.95rem; font-weight:900; color:#1e293b; display:flex; align-items:center; gap:8px; }
+.yt-modal-controls { display:flex; gap:8px; align-items:center; }
+.yt-ctrl-btn { padding:6px 14px; border-radius:50px; border:none; cursor:pointer; font-size:.8rem; font-weight:800; transition:all .15s; font-family:inherit; }
+.yt-stop-btn  { background:#ef4444; color:#fff; }
+.yt-stop-btn:hover  { background:#dc2626; }
+.yt-close-btn { background:#f1f5f9; color:#1e293b; }
+.yt-close-btn:hover { background:#e2e8f0; }
+.yt-iframe-wrap { position:relative; width:100%; padding-bottom:56.25%; height:0; background:#000; overflow:hidden; flex-shrink:0; }
+#ytFrameHost, #ytFrameHost iframe { position:absolute; top:0; left:0; width:100% !important; height:100% !important; border:0; }
+.yt-modal-foot { padding:8px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:.78rem; color:#64748b; flex-wrap:wrap; }
+.yt-loop-badge { display:inline-flex; align-items:center; gap:5px; background:#6366f1; color:#fff; padding:2px 10px; border-radius:999px; font-size:.75rem; font-weight:800; }
+
+/* ── 로딩 스피너 ── */
+@@keyframes spinAnim { to { transform:rotate(360deg); } }
+
+@@media (max-width:480px) {
+    .bible-book-name { font-size:1.5rem; }
+    .verse-card-r { padding:10px 12px; gap:8px; border-radius:10px; }
+    .vtext-ko-line .vtext-ko { font-size:1.18rem; }
+    .vnum { font-size:.78rem; min-width:22px; }
+    .mode-pill { padding:7px 14px; font-size:.85rem; }
+    .page-btn { padding:8px 16px; font-size:.85rem; }
+
+    /* ── 완료 버튼 모바일 레이아웃 개선 ─────────────────────
+       배지를 두 번째 줄로 내려 → 텍스트가 아이콘 옆 전체 너비 확보
+    ──────────────────────────────────────────────────────── */
+    .complete-mega {
+        flex-wrap: wrap;
+        padding: 14px 16px;
+        gap: 6px 10px;
+        border-radius: 16px;
+        align-items: center;
+    }
+    /* 아이콘: 약간 축소 */
+    .cm-icon-circle {
+        width: 40px; height: 40px;
+        font-size: 1.22rem;
+    }
+    /* 텍스트 영역: 남은 너비 전부 */
+    .cm-body {
+        flex: 1;
+        min-width: 0;
+    }
+    .complete-mega-title {
+        font-size: .92rem;
+        line-height: 1.4;
+        word-break: keep-all;
+    }
+    .complete-mega-desc {
+        font-size: .72rem;
+        margin-top: 2px;
+    }
+    /* 배지: 두 번째 줄, 오른쪽 정렬 */
+    .cm-badge {
+        flex: 0 0 100%;
+        flex-direction: row;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 8px;
+        border-top: 1px solid rgba(255,255,255,.18);
+        padding-top: 8px;
+        margin-top: 2px;
+    }
+    .complete-mega-count {
+        font-size: .76rem;
+        padding: 4px 12px;
+    }
+    .cm-arrow { font-size: .88rem; }
+}
+
+/* ── 성경 전체 통독률 카드 ── */
+.bible-overall-card {
+    margin: 12px 0 10px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border: 1.5px solid rgba(6,182,212,.22);
+    border-radius: 16px;
+    padding: 16px 18px 14px;
+    box-shadow: 0 4px 16px rgba(6,182,212,.10);
+}
+.boc-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+}
+.boc-title {
+    font-size: .88rem; font-weight: 900; color: #0369a1;
+    display: flex; align-items: center; gap: 6px;
+}
+.boc-pct {
+    font-size: 1.45rem; font-weight: 950; color: #0284c7; line-height: 1;
+}
+.boc-bar-track {
+    height: 10px; border-radius: 999px;
+    background: rgba(14,165,233,.15); overflow: hidden; margin-bottom: 8px;
+}
+.boc-bar-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+}
+.boc-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; flex-wrap: wrap;
+}
+.boc-sub {
+    font-size: .78rem; font-weight: 800; color: #0369a1; opacity: .80;
+}
+.boc-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 7px 16px; border-radius: 50px;
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: #fff; font-size: .82rem; font-weight: 900;
+    text-decoration: none; border: none; cursor: pointer;
+    box-shadow: 0 3px 12px rgba(14,165,233,.30);
+    transition: transform .12s, box-shadow .12s;
+}
+.boc-link:hover  { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(14,165,233,.38); }
+.boc-link:active { transform: scale(.97); }
+</style>
+
+<form id="antiForm" method="post" style="display:none;">@Html.AntiForgeryToken()</form>
+
+<div class="bible-reader">
+
+    <!-- ── 헤더 ── -->
+    <div class="bible-header d-flex align-items-start justify-content-between flex-wrap gap-3" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
+        <div>
+            @{
+                var bookTitle = bible?.BibleText ?? detail?.BibleText ?? "성경";
+                var rangeStr  = bible != null && !string.IsNullOrWhiteSpace(bible.JanZulString)
+                                ? bible.JanZulString
+                                : (detail != null ? $"{detail.FromJang}:{detail.FromZul} ~ {detail.ToJang}:{detail.ToZul}" : "");
+            }
+            <div class="bible-book-name">@bookTitle</div>
+            <div class="bible-chapter">@rangeStr · @totalVerses 절 · @d</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding-top:4px;flex-wrap:wrap;">
+            <a href="/DailyMission2/Word?date=@d" style="color:var(--text2);font-size:.9rem">← 말씀 미션</a>
+            <a href="/DailyMission2?date=@d"      style="color:var(--text2);font-size:.9rem">🎯 미션 홈</a>
+        </div>
+    </div>
+
+    <!-- ── 미디어 바 ── -->
+    @if (hasYouTube)
+    {
+        <div class="media-bar">
+            <span class="media-bar-label">🎬 미디어</span>
+            <button class="media-btn media-btn--yt" type="button" onclick="openYoutube()">
+                <span class="media-btn-icon">🎧</span>
+                <span class="media-btn-text">
+                    <span class="media-btn-title">말씀 듣기</span>
+                    <span class="media-btn-sub">@bookTitle @rangeStr</span>
+                </span>
+            </button>
+        </div>
+    }
+
+    <!-- ── 완료 배너 ── -->
+    <div id="chapterDoneBanner"
+         class="chapter-done-banner @(isAllRead ? "show" : "")"
+         style="display:none !important;">
+        이 페이지 다 읽었어요 🎉
+    </div>
+
+    <!-- ── 모드 필 ── -->
+    <div class="mode-pills">
+        <button class="mode-pill" data-mode="1" type="button" onclick="setMode(1)">🌱 한 절씩</button>
+        <button class="mode-pill" data-mode="3" type="button" onclick="setMode(3)">📖 3절씩</button>
+        <button class="mode-pill" data-mode="5" type="button" onclick="setMode(5)">📚 5절씩</button>
+        <button class="mode-pill" data-mode="0" type="button" onclick="setMode(0)">📋 전체</button>
+    </div>
+
+    <!-- ── 언어 필 ── -->
+    <div class="lang-pills">
+        <button class="lang-pill" data-lang="all"    type="button" onclick="toggleLang('all')">모두</button>
+        <button class="lang-pill" data-lang="ko"     type="button" onclick="toggleLang('ko')">🇰🇷 개역개정</button>
+        <button class="lang-pill" data-lang="modern" type="button" onclick="toggleLang('modern')">📖 현대인</button>
+        <button class="lang-pill" data-lang="en" type="button" onclick="toggleLang('en')">🌎 NIV</button>
+    </div>
+
+    <!-- ── 현대인성경 안내 배너 ── -->
+    <div class="hd-notice" id="hdNotice">
+        <span class="hd-notice-icon">📖</span>
+        <div class="hd-notice-body">
+            <div class="hd-notice-title">
+                현대인의 성경이 추가되었어요
+                <span class="hd-notice-new">NEW</span>
+            </div>
+            <div class="hd-notice-desc">
+                위 버튼으로 <strong style="color:#0284c7;">개역개정 · 현대인성경 · NIV</strong>를 자유롭게 전환하거나 함께 볼 수 있습니다.
+            </div>
+            <div class="hd-notice-chips">
+                <span class="hd-nc hd-nc--ko">🇰🇷 개역개정</span>
+                <span class="hd-nc-plus">+</span>
+                <span class="hd-nc hd-nc--hd">📖 현대인성경</span>
+                <span class="hd-nc-plus">+</span>
+                <span class="hd-nc hd-nc--en">🇺🇸 NIV</span>
+            </div>
+        </div>
+        <button class="hd-notice-close" type="button" onclick="dismissHdNotice()" title="닫기">✕</button>
+    </div>
+
+    <!-- ── 진도 바 ── -->
+    <div class="reader-progress">
+        <div class="prog-label">
+            <span id="progLbl">📊 @readVerses / @totalVerses 절</span>
+            <span id="progPct">@(totalVerses == 0 ? 0 : (int)Math.Round(readVerses * 100.0 / totalVerses))%</span>
+        </div>
+        <div class="prog-track">
+            <div class="prog-fill green" id="progFill"
+                 style="width:@(totalVerses == 0 ? 0 : readVerses * 100.0 / totalVerses)%"></div>
+        </div>
+    </div>
+
+    <!-- ── 페이지 이동 ── -->
+    <div class="page-nav-r" id="pageNav" style="display:none">
+        <button class="page-btn" id="prevPg" type="button" onclick="prevPage()">◀ 이전</button>
+        <span id="pgInfo" style="color:var(--text2);font-size:.9rem"></span>
+        <button class="page-btn" id="nextPg" type="button" onclick="nextPage()">다음 ▶</button>
+    </div>
+
+    <!-- ── 개요 카드 ── -->
+    @if (ov != null || bi != null)
+    {
+        <div class="ov-card" id="ovCard">
+            <button class="ov-head" type="button" onclick="ovToggleOpen()" aria-expanded="false" id="ovHead">
+                <span class="ov-head-left">
+                    <span class="ov-icon">📖</span>
+                    <span class="ov-title">@(ov?.BookName ?? bookTitle) 개요</span>
+                </span>
+                <span class="ov-chevron" id="ovChevron">▾</span>
+            </button>
+            <div class="ov-body" id="ovBody">
+                @if (bi != null)
+                {
+                    <div class="ov-switch-bar">
+                        <button class="ov-sw-btn ov-sw-active" id="ovBtnSimple" type="button" onclick="ovSetMode('simple')">간략본</button>
+                        <button class="ov-sw-btn" id="ovBtnDetail" type="button" onclick="ovSetMode('detail')">상세본</button>
+                    </div>
+                    <div id="ovSimple">
+                        @if (!string.IsNullOrWhiteSpace(bi.Author))
+                        { <div class="ov-row"><span class="ov-label">✍️ 저자</span><span class="ov-val">@bi.Author</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.WhenWritten))
+                        { <div class="ov-row"><span class="ov-label">📅 기록 시기</span><span class="ov-val">@bi.WhenWritten</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.OverView))
+                        { <div class="ov-row"><span class="ov-label">📜 개요</span><span class="ov-val">@bi.OverView</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.Purpose))
+                        { <div class="ov-row"><span class="ov-label">🎯 기록 목적</span><span class="ov-val">@bi.Purpose</span></div> }
+                    </div>
+                }
+                @if (ov != null)
+                {
+                    <div id="ovDetail" style="@(bi != null ? "display:none" : "")">
+                        @if (!string.IsNullOrWhiteSpace(ov.Author))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">✍️ 저자</div>
+                                <div class="ov-sec-body"><strong>@ov.Author</strong>
+                                    @if (!string.IsNullOrWhiteSpace(ov.AuthorDescription))
+                                    { <p>@ov.AuthorDescription</p> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.WrittenDateFrom))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📅 저작 연대</div>
+                                <div class="ov-sec-body">@ov.WrittenDateFrom @(!string.IsNullOrWhiteSpace(ov.WrittenDateTo) ? " ~ " + ov.WrittenDateTo : "")
+                                    @if (!string.IsNullOrWhiteSpace(ov.AlternativeDate)) { <p>@ov.AlternativeDate</p> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.WrittenPlace))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📍 기록 장소</div>
+                                <div class="ov-sec-body">@ov.WrittenPlace</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.Keywords))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">🔑 핵심어</div>
+                                <div class="ov-sec-body">
+                                    @foreach (var kw in ov.Keywords.Split(new[]{",","·","、"}, StringSplitOptions.RemoveEmptyEntries))
+                                    { <span class="ov-kw-chip">@kw.Trim()</span> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.ContentSummary))
+                        {
+                            var cLines = ov.ContentSummary.Split(new[]{"\\n","\n"}, StringSplitOptions.RemoveEmptyEntries);
+                            var nItems = new List<string>();
+                            var fNote  = "";
+                            foreach (var ln in cLines)
+                            {
+                                if (Regex.IsMatch(ln.Trim(), @"^\d+\.\s"))
+                                    nItems.Add(Regex.Replace(ln.Trim(), @"^\d+\.\s*",""));
+                                else fNote = ln.Trim();
+                            }
+                            <div class="ov-section">
+                                <div class="ov-sec-title">📜 핵심 내용 요약</div>
+                                <div class="ov-sec-body">
+                                    @if (nItems.Any())
+                                    { <ol class="ov-list">@foreach(var n in nItems){<li>@n</li>}</ol> }
+                                    @if (!string.IsNullOrWhiteSpace(fNote))
+                                    { <p class="ov-final-note">💡 @fNote</p> }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ── 절 목록 ── -->
+    <div id="verseList">
+        @if (verseGroups == null || verseGroups.Count == 0)
+        {
+            <div style="padding:32px;text-align:center;color:#64748b;">
+                @(detail == null ? "본문 데이터를 불러오지 못했어요." : "표시할 절이 없습니다.")
+            </div>
+        }
+        else
+        {
+            int gIdx = 0;
+            @foreach (var grp in verseGroups)
+            {
+                var ko = grp.FirstOrDefault(v => v.LangCD == "ko");
+                var en = grp.FirstOrDefault(v => v.LangCD == "en");
+                var rep = ko ?? en;
+                if (rep == null) { gIdx++; continue; }
+
+                var isRead       = ko?.readDone == "t";
+                var isBookmarked = ko?.bookmarkDone == "t";
+                var useId        = ko?.Id ?? en?.Id ?? 0;
+                var keyword      = ko?.BibleKeyWord ?? en?.BibleKeyWord;
+                var summary      = ko?.BibleSummary ?? en?.BibleSummary;
+
+                // 요약 카드
+                if (!string.IsNullOrWhiteSpace(keyword))
+                {
+                    var ss = BulletinBoard.Common.SharedComm.MakeBibleSerialJangZul(
+                        rep.BibleText, rep.FromJang, rep.FromZul, rep.ToJang, rep.ToZul);
+                    <div class="summary-card" data-idx="@gIdx">
+                        <div class="summary-range">📝 @ss</div>
+                        @if (!string.IsNullOrWhiteSpace(keyword))
+                        { <div class="summary-keyword">🔑 @keyword</div> }
+                        @if (!string.IsNullOrWhiteSpace(summary))
+                        { <div class="summary-body">@summary</div> }
+                    </div>
+                }
+
+                <!-- 절 카드 -->
+                <div class="verse-card-r @(isRead ? "is-read" : "") @(isBookmarked ? "bookmarked" : "")"
+                     id="vc-@useId"
+                     data-idx="@gIdx"
+                     data-zul="@rep.zul"
+                     data-verse-id="@useId"
+                     style="scroll-margin-top:80px">
+
+                    <div class="vnum">@rep.zul</div>
+                    <div class="vtext-wrap">
+                        <div class="vtext-ko-line">
+                            <span class="vtext vtext-ko">@(ko?.BibleData ?? "")</span>
+                            <span class="vactions-inline">
+                                <button class="vbtn vbtn-read @(isRead ? "done" : "unread")"
+                                        id="vr-@useId" type="button"
+                                        onclick="toggleVerse(@useId, @rep.Jang, @rep.zul, this)">
+                                    @(isRead ? "📖" : "📗")
+                                </button>
+                                <button class="vbtn vbtn-bm @(isBookmarked ? "bm-on" : "")"
+                                        id="vbm-@useId" type="button"
+                                        onclick="toggleBm(@useId, @rep.Jang, @rep.zul, this)">
+                                    @(isBookmarked ? "📚" : "🔖")
+                                </button>
+                            </span>
+                        </div>
+                        @{
+                            var koId = ko?.Id ?? 0;
+                            var modernText = (koId > 0 && modernMap.TryGetValue(koId, out var mt)) ? mt : null;
+                        }
+                        @if (!string.IsNullOrWhiteSpace(modernText))
+                        {
+                            <div class="vtext-modern-line">
+                                <span class="vtext-modern">@modernText</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(en?.BibleData))
+                        {
+                            <div class="vtext-en-line">
+                                <span class="vtext-en">@en.BibleData</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                gIdx++;
+            }
+        }
+    </div>
+
+    <!-- ── 완료 버튼 ── -->
+    <div class="mark-all-wrap">
+        <button class="complete-mega @(isAllRead ? "is-done" : "is-not-done")"
+                id="completeMega" type="button"
+                onclick="markPageAjax()">
+            <div class="cm-icon-circle" id="cmIconCircle">
+                @(isAllRead ? "📗" : "📖")
+            </div>
+            <div class="cm-body">
+                <span class="complete-mega-title" id="completeMegaTitle">
+                    @(isAllRead ? "이 페이지 읽음 표시 취소할까요?" : "이 페이지 읽음으로 표시할까요?")
+                </span>
+                <span class="complete-mega-desc @(isAllRead ? "desc-hide" : "")"
+                      id="completeMegaDesc">(클릭하면 성경통독에 자동 반영돼요)</span>
+            </div>
+            <div class="cm-badge">
+                <span class="complete-mega-count" id="completeMegaCount">읽은 절: @readVerses / @totalVerses</span>
+            </div>
+        </button>
+    </div>
+
+    <!-- ── 성경 전체 통독률 ── -->
+    <div class="bible-overall-card">
+        <div class="boc-header">
+            <div class="boc-title">📖 성경 전체 통독률</div>
+            <div class="boc-pct" id="bocPct">@overallPct<span style="font-size:.9rem;font-weight:800">%</span></div>
+        </div>
+        <div class="boc-bar-track">
+            <div class="boc-bar-fill" id="bocBarFill" style="width:@overallPct%"></div>
+        </div>
+        <div class="boc-footer">
+            <div class="boc-sub">
+                오늘 읽은 절: <b id="bocTodayCnt">@todayReadVerseCount</b>절
+                &nbsp;·&nbsp;
+                누적 통독률 <b id="bocPctSub">@totalProgressRate.ToString("0.##")</b>%
+            </div>
+            <a class="boc-link" href="/Bible/Welcome">
+                📚 성경통독 바로가기 →
+            </a>
+        </div>
+    </div>
+
+    <!-- ── 하단 네비 ── -->
+    <div class="dashboard-btn-wrap">
+        <a href="/DailyMission2?date=@d" class="dashboard-btn">🎯 미션 홈으로</a>
+    </div>
+
+</div><!-- /bible-reader -->
+
+<!-- ── 유튜브 모달 ── -->
+@if (hasYouTube)
+{
+    <div id="ytModal" onclick="closeYoutube(event)" style="display:none;">
+        <div class="yt-modal-box" onclick="event.stopPropagation()">
+            <div class="yt-modal-head">
+                <div class="yt-modal-title">🎵 말씀 듣기</div>
+                <div class="yt-modal-controls">
+                    <button class="yt-ctrl-btn yt-stop-btn"  type="button" onclick="ytStop(event)">⏹ 정지</button>
+                    <button class="yt-ctrl-btn yt-close-btn" type="button" onclick="closeYoutube(event)">✕ 닫기</button>
+                </div>
+            </div>
+            <div class="yt-iframe-wrap"><div id="ytFrameHost"></div></div>
+            <div class="yt-modal-foot">
+                <span id="ytStatusMsg">▶ 준비 중...</span>
+                <span class="yt-loop-badge">∞ 무한 반복</span>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── 로딩 모달 ── -->
+<div id="loadingModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:20px;padding:36px 44px;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.35);min-width:220px;">
+        <div style="display:flex;justify-content:center;margin-bottom:18px">
+            <div style="width:44px;height:44px;border-radius:50%;border:5px solid #e2e8f0;border-top-color:#f97316;animation:spinAnim .75s linear infinite;"></div>
+        </div>
+        <div style="font-size:1.05rem;font-weight:800;color:#1e293b;margin-bottom:6px">처리 중...</div>
+        <div style="font-size:.85rem;color:#64748b">잠시만 기다려 주세요</div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    /* ── 현대인 안내 배너 dismiss ── */
+    (function () {
+        var KEY = 'hdNoticeDismissed_dm2';
+        var el  = document.getElementById('hdNotice');
+        if (!el) return;
+        if (localStorage.getItem(KEY) === '1') { el.style.display = 'none'; return; }
+        el.style.display = '';
+    })();
+    window.dismissHdNotice = function () {
+        var el = document.getElementById('hdNotice');
+        if (el) {
+            el.style.transition = 'opacity .25s, transform .25s, max-height .3s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(function () { el.style.display = 'none'; }, 280);
+        }
+        localStorage.setItem('hdNoticeDismissed_dm2', '1');
+    };
+
+    /* ── 상수 ── */
+    var D          = '@d';
+    var LANG_PARAM = '@lang';
+    var BIBLE_TEXT = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(bible?.BibleText ?? ""));
+    var FROM_JANG  = @(bible?.FromJang ?? 0);
+    var FROM_ZUL   = @(bible?.FromZul  ?? 0);
+    var TO_JANG    = @(bible?.ToJang   ?? 0);
+    var TO_ZUL     = @(bible?.ToZul    ?? 0);
+    var TOTAL      = @totalVerses;
+    var OV_MODE_KEY = 'bibleOvMode';
+    var OV_OPEN_KEY = 'bibleOvOpen';
+
+    /* ── 개요 토글 ── */
+    function ovInit() {
+        var savedMode = localStorage.getItem(OV_MODE_KEY) || 'simple';
+        _applyMode(savedMode, false);
+        if (localStorage.getItem(OV_OPEN_KEY) === '1') _setOpen(true, false);
+    }
+    function _setOpen(open, save) {
+        var card = document.getElementById('ovCard');
+        var head = document.getElementById('ovHead');
+        if (!card) return;
+        card.classList.toggle('is-open', open);
+        if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (save) localStorage.setItem(OV_OPEN_KEY, open ? '1' : '0');
+    }
+    function _applyMode(mode, save) {
+        var simple = document.getElementById('ovSimple');
+        var detail = document.getElementById('ovDetail');
+        var btnS   = document.getElementById('ovBtnSimple');
+        var btnD   = document.getElementById('ovBtnDetail');
+        if (!simple && !detail) return;
+        var isDetail = (mode === 'detail');
+        if (simple) simple.style.display = isDetail ? 'none' : '';
+        if (detail) detail.style.display = isDetail ? ''     : 'none';
+        if (btnS)   btnS.classList.toggle('ov-sw-active', !isDetail);
+        if (btnD)   btnD.classList.toggle('ov-sw-active',  isDetail);
+        if (save) localStorage.setItem(OV_MODE_KEY, mode);
+    }
+    window.ovToggleOpen = function () {
+        var card = document.getElementById('ovCard');
+        if (!card) return;
+        _setOpen(!card.classList.contains('is-open'), true);
+    };
+    window.ovSetMode = function (mode) { _applyMode(mode, true); };
+
+    /* ── 언어 (다중 토글 Set 기반) ── */
+    function _loadLangSet() {
+        var s = localStorage.getItem('bibleLang') || '@lang';
+        if (s==='all'||s==='al')   return new Set(['ko','modern','en']);
+        if (s==='both')            return new Set(['ko','en']);
+        if (s==='ko+modern')       return new Set(['ko','modern']);
+        var parts = s.split(',').filter(function(x){ return x==='ko'||x==='modern'||x==='en'; });
+        return parts.length > 0 ? new Set(parts) : new Set(['ko']);
+    }
+    var activeLangs = _loadLangSet();
+    function _saveLang(){ localStorage.setItem('bibleLang', Array.from(activeLangs).join(',')); }
+
+    function toggleLang(l) {
+        var ALL = ['ko','modern','en'];
+        if (l === 'all') {
+            activeLangs = ALL.every(function(x){ return activeLangs.has(x); }) ? new Set(['ko']) : new Set(ALL);
+        } else {
+            if (activeLangs.has(l)) { activeLangs.delete(l); if (activeLangs.size===0) activeLangs.add('ko'); }
+            else activeLangs.add(l);
+        }
+        _saveLang(); applyLang();
+    }
+    window.toggleLang = toggleLang;
+
+    function applyLang() {
+        var showKo=activeLangs.has('ko'), showModern=activeLangs.has('modern'), showEn=activeLangs.has('en');
+        var isAll = showKo && showModern && showEn;
+
+        document.querySelector('[data-lang="all"]').classList.toggle('active', isAll);
+        document.querySelector('[data-lang="ko"]').classList.toggle('active', showKo);
+        document.querySelector('[data-lang="modern"]').classList.toggle('active', showModern);
+        document.querySelector('[data-lang="en"]').classList.toggle('active', showEn);
+
+        document.body.classList.remove('lang-ko','lang-en','lang-modern','lang-ko_modern','lang-all','lang-both','lang-al');
+        if (showKo&&!showModern&&!showEn)       document.body.classList.add('lang-ko');
+        else if (!showKo&&showModern&&!showEn)  document.body.classList.add('lang-modern');
+        else if (!showKo&&!showModern&&showEn)  document.body.classList.add('lang-en');
+
+        document.querySelectorAll('.verse-card-r').forEach(function (card) {
+            var koLine     = card.querySelector('.vtext-ko-line');
+            var modernLine = card.querySelector('.vtext-modern-line');
+            var enLine     = card.querySelector('.vtext-en-line');
+            var koText     = card.querySelector('.vtext-ko');
+            var actions    = card.querySelector('.vactions-inline');
+
+            if (koText)     koText.style.display    = showKo     ? '' : 'none';
+            if (modernLine) modernLine.style.display = showModern ? '' : 'none';
+            if (enLine)     enLine.style.display     = showEn     ? '' : 'none';
+
+            if (actions) {
+                if (!showKo && showModern && modernLine) modernLine.appendChild(actions);
+                else if (!showKo && !showModern && showEn && enLine) enLine.appendChild(actions);
+                else if (koLine) koLine.appendChild(actions);
+            }
+        });
+    }
+
+    /* ── 표시 모드 ── */
+    var mode    = parseInt(localStorage.getItem('bibleMode') || '0', 10);
+    var curPage = 0;
+    function setMode(m) { mode = m; localStorage.setItem('bibleMode', m); curPage = 0; applyMode(m); }
+    function applyMode(m) {
+        document.querySelectorAll('.mode-pill').forEach(function (b) { b.classList.toggle('active', parseInt(b.dataset.mode, 10) === m); });
+        var nav = document.getElementById('pageNav');
+        if (m === 0) { if (nav) nav.style.display = 'none'; showAll(); }
+        else         { if (nav) nav.style.display = 'flex'; showPage(0); }
+    }
+    function showAll() {
+        document.querySelectorAll('.verse-card-r').forEach(function(c){ c.style.display=''; });
+        document.querySelectorAll('.summary-card').forEach(function(s){ s.style.display=''; });
+    }
+    function showPage(p) {
+        var cards = document.querySelectorAll('.verse-card-r');
+        var totalPage = Math.ceil(cards.length / mode);
+        curPage = Math.max(0, Math.min(p, totalPage - 1));
+        var startIdx = curPage * mode, endIdx = (curPage + 1) * mode;
+        cards.forEach(function(c,i){ c.style.display = (i>=startIdx && i<endIdx) ? '' : 'none'; });
+        document.querySelectorAll('.summary-card').forEach(function(s){
+            var idx = parseInt(s.dataset.idx, 10);
+            s.style.display = (idx>=startIdx && idx<endIdx) ? '' : 'none';
+        });
+        document.getElementById('pgInfo').textContent = (curPage+1) + ' / ' + totalPage + ' 페이지';
+        document.getElementById('prevPg').disabled = (curPage === 0);
+        document.getElementById('nextPg').disabled = (curPage >= totalPage-1);
+    }
+    function prevPage() { showPage(curPage - 1); }
+    function nextPage() { showPage(curPage + 1); }
+    window.setMode  = setMode;
+    window.prevPage = prevPage;
+    window.nextPage = nextPage;
+
+    /* ── 진도 업데이트 ── */
+    function updateProg(readCnt, totalCnt) {
+        var pct = totalCnt > 0 ? Math.round(readCnt / totalCnt * 100) : 0;
+        var fill  = document.getElementById('progFill');
+        var lbl   = document.getElementById('progLbl');
+        var pctEl = document.getElementById('progPct');
+        var cnt   = document.getElementById('completeMegaCount');
+        if (fill)  fill.style.width = pct + '%';
+        if (lbl)   lbl.textContent  = '📊 ' + readCnt + ' / ' + totalCnt + ' 절';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (cnt)   cnt.textContent   = '읽은 절: ' + readCnt + ' / ' + totalCnt;
+    }
+    function checkDone() {
+        var readCards = document.querySelectorAll('.verse-card-r.is-read').length;
+        var allCards  = document.querySelectorAll('.verse-card-r').length;
+        var banner    = document.getElementById('chapterDoneBanner');
+        var mega      = document.getElementById('completeMega');
+        var title     = document.getElementById('completeMegaTitle');
+        var desc      = document.getElementById('completeMegaDesc');
+        var icon      = document.getElementById('cmIconCircle');
+        var isDone    = (allCards > 0 && readCards === allCards);
+        if (banner) banner.classList.toggle('show', isDone);
+        if (mega)   { mega.classList.toggle('is-done', isDone); mega.classList.toggle('is-not-done', !isDone); }
+        if (title)  title.textContent = isDone ? '이 페이지 읽음 표시 취소할까요?' : '이 페이지 읽음으로 표시할까요?';
+        if (desc)   desc.classList.toggle('desc-hide', isDone);
+        if (icon)   icon.textContent  = isDone ? '📗' : '📖';
+        updateProg(readCards, allCards);
+    }
+
+    /* ── 로딩 표시 헬퍼 ── */
+    function showLoading() { var m = document.getElementById('loadingModal'); if (m) m.style.display = 'flex'; }
+    function hideLoading() { var m = document.getElementById('loadingModal'); if (m) m.style.display = 'none'; }
+
+    /* ── 페이지 전체 읽음/취소 (AJAX 토글, 반복 가능) ── */
+    window.markPageAjax = async function () {
+        var btn = document.getElementById('completeMega');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        showLoading();
+        try {
+            /* JSON 전송 — application/json은 UTF-8이 보장되어 한글 깨짐 없음 */
+            var res = await fetch('/DailyMission2/ToggleBibleRange', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'RequestVerificationToken': getToken()
+                },
+                body: JSON.stringify({
+                    bibleText: BIBLE_TEXT,
+                    fromJang:  FROM_JANG,
+                    fromZul:   FROM_ZUL,
+                    toJang:    TO_JANG,
+                    toZul:     TO_ZUL
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!res.ok) {
+                console.error('ToggleBibleRange HTTP', res.status);
+                return;   /* finally 에서 btn 복구 */
+            }
+
+            var json = null;
+            try { json = await res.json(); } catch(pe) { console.error('JSON parse error', pe); }
+            if (!json || !json.ok) { console.error('ToggleBibleRange ok=false', json); return; }
+
+            /* ── UI 업데이트 ── */
+            document.querySelectorAll('.verse-card-r').forEach(function (card) {
+                var vid = card.dataset.verseId;
+                var rb  = document.getElementById('vr-' + vid);
+                if (json.isRead) {
+                    card.classList.add('is-read');
+                    if (rb) { rb.textContent = '📖'; rb.classList.add('done'); rb.classList.remove('unread'); }
+                } else {
+                    card.classList.remove('is-read');
+                    if (rb) { rb.textContent = '📗'; rb.classList.remove('done'); rb.classList.add('unread'); }
+                }
+            });
+            var iconEl = document.getElementById('cmIconCircle');
+            if (iconEl) iconEl.textContent = json.isRead ? '📗' : '📖';
+            checkDone();
+
+            /* ── 전체 통독률 갱신 (비동기, 실패해도 무시) ── */
+            refreshOverallProgress();
+
+        } catch (e) {
+            console.error('markPageAjax error', e);
+        } finally {
+            /* 성공·실패·예외 모든 경우에 반드시 복구 */
+            hideLoading();
+            btn.disabled = false;
+        }
+    };
+
+    /* ── 전체 통독률 카드 갱신 ── */
+    async function refreshOverallProgress() {
+        try {
+            var res = await fetch('/DailyMission2/GetBibleProgressJson', {
+                method: 'GET', cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            });
+            if (!res.ok) return;
+            var j = await res.json().catch(function() { return null; });
+            if (!j || !j.ok) return;
+
+            var pct = Math.round(j.progressRate);
+            var pctEl   = document.getElementById('bocPct');
+            var fillEl  = document.getElementById('bocBarFill');
+            var subEl   = document.getElementById('bocPctSub');
+            var todayEl = document.getElementById('bocTodayCnt');
+            if (pctEl)   pctEl.innerHTML = pct + '<span style="font-size:.9rem;font-weight:800">%</span>';
+            if (fillEl)  fillEl.style.width = pct + '%';
+            if (subEl)   subEl.textContent  = j.progressRate.toFixed(2).replace(/\.?0+$/, '') || '0';
+            if (todayEl) todayEl.textContent = j.todayReadVerseCount;
+        } catch(e) { /* 조용히 무시 */ }
+    }
+
+    /* ── 안티포저리 토큰 ── */
+    function getToken() {
+        var el = document.querySelector('#antiForm input[name="__RequestVerificationToken"]');
+        return el ? el.value : '';
+    }
+    async function postJson(url, data) {
+        var fd = new FormData();
+        Object.keys(data).forEach(function(k){ fd.append(k, data[k]); });
+        var res = await fetch(url, {
+            method:'POST',
+            headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json','RequestVerificationToken':getToken()},
+            body: fd, credentials:'same-origin'
+        });
+        var ct = res.headers.get('content-type')||'';
+        if (!ct.includes('application/json')) { window.location.reload(); return null; }
+        return await res.json();
+    }
+
+    /* ── 절 읽음 토글 ── */
+    window.toggleVerse = async function (verseId, jang, zul, btn) {
+        var card    = btn.closest('.verse-card-r');
+        var isRead  = card.classList.contains('is-read');
+        var url     = isRead ? '/DailyMission2/MarkVerseUnread' : '/DailyMission2/MarkVerseRead';
+        var data    = { date:D, lang:LANG_PARAM, bibleText:BIBLE_TEXT, jang:jang, zul:zul, Id:verseId };
+        try {
+            var json = await postJson(url, data);
+            if (!json) return;
+            if (!json.ok) return;
+            var nowRead = json.isRead;
+            card.classList.toggle('is-read', !!nowRead);
+            btn.textContent = nowRead ? '📖' : '📗';
+            btn.classList.toggle('done', !!nowRead);
+            btn.classList.toggle('unread', !nowRead);
+            checkDone();
+            refreshOverallProgress();
+        } catch(e) { console.error(e); }
+    };
+
+    /* ── 북마크 토글 ── */
+    window.toggleBm = async function (verseId, jang, zul, btn) {
+        var card = document.getElementById('vc-' + verseId);
+        var data = { date:D, lang:LANG_PARAM, bibleText:BIBLE_TEXT, jang:jang, zul:zul, Id:verseId };
+        try {
+            var json = await postJson('/DailyMission2/ToggleBookmark', data);
+            if (!json) return;
+            if (!json.ok) return;
+            if (json.isBookmarked) {
+                btn.textContent = '📚';
+                btn.classList.add('bm-on');
+                if (card) card.classList.add('bookmarked');
+            } else {
+                btn.textContent = '🔖';
+                btn.classList.remove('bm-on');
+                if (card) card.classList.remove('bookmarked');
+            }
+        } catch(e) { console.error(e); }
+    };
+
+    /* ── 유튜브 (IFrame API 기반 멀티 세그먼트 순차 재생) ── */
+    function extractId(url) {
+        if (!url) return null;
+        var u = url.trim(), m;
+        m = u.match(/[?&]v=([^&#\s]+)/);       if (m) return m[1];
+        m = u.match(/youtu\.be\/([^?&#\s]+)/);  if (m) return m[1];
+        m = u.match(/\/embed\/([^?&#\s]+)/);    if (m) return m[1];
+        if (/^[A-Za-z0-9_-]{11}$/.test(u)) return u;
+        return null;
+    }
+
+    // ✅ Razor 변수 → 재생 세그먼트 배열 [{id, start, end}, ...]
+    //    y1~y5 중 URL이 있는 것만 추가 (장이 바뀌면 y2, y3... 로 제공됨)
+    var ytSegs = (function () {
+        var list = [];
+        function add(url, s, e) { var id = extractId(url); if (id) list.push({ id:id, start:s, end:e }); }
+        add('@y1', @s1, @e1);
+        add('@y2', @s2, @e2);
+        add('@y3', @s3, @e3);
+        add('@y4', @s4, @e4);
+        add('@y5', @s5, @e5);
+        return list;
+    })();
+
+    var ytPlayer   = null;   // YT.Player 인스턴스
+    var ytIdx      = 0;      // 현재 재생 중인 세그먼트 인덱스
+    var ytApiOk    = false;  // IFrame API 준비 완료 여부
+    var ytPending  = false;  // API 로드 전 openYoutube() 호출 여부
+    var ytTimer    = null;   // ✅ 구간 종료 감지 폴링 타이머
+
+    // IFrame API 스크립트 동적 로드
+    (function () {
+        var s = document.createElement('script');
+        s.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(s);
+    })();
+
+    // ✅ IFrame API 준비 완료 콜백 (YouTube SDK가 전역으로 호출)
+    window.onYouTubeIframeAPIReady = function () {
+        ytApiOk = true;
+        if (ytPending) { ytPending = false; _ytDoOpen(); }
+    };
+
+    function _ytUpdateStatus() {
+        var stat  = document.getElementById('ytStatusMsg');
+        var badge = document.querySelector('.yt-loop-badge');
+        var multi = ytSegs.length > 1;
+        var range = ytSegs.some(function (s) { return s.start > 0 || s.end > 0; });
+        if (stat) stat.textContent = multi
+            ? '▶ ' + (ytIdx + 1) + ' / ' + ytSegs.length + ' 재생 중...'
+            : (range ? '▶ 구간 반복 재생 중...' : '▶ 무한 반복 재생 중...');
+        if (badge) badge.textContent = multi
+            ? '🔁 ' + ytSegs.length + '개 순차'
+            : (range ? '🔁 구간 반복' : '∞ 무한 반복');
+    }
+
+    // ✅ 폴링 정지
+    function _ytStopCheck() {
+        if (ytTimer) { clearInterval(ytTimer); ytTimer = null; }
+    }
+
+    // ✅ 구간 종료 감지 폴링 시작
+    //    YouTube IFrame API의 endSeconds는 ENDED 이벤트를 보장하지 않으므로
+    //    getCurrentTime()을 직접 폴링해서 구간 끝을 감지한다.
+    function _ytStartCheck(endSec) {
+        _ytStopCheck();
+        if (!endSec || endSec <= 0) return;
+        ytTimer = setInterval(function () {
+            try {
+                if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
+                var t = ytPlayer.getCurrentTime();
+                if (t >= endSec - 0.5) {               // 종료 0.5초 전에 전환
+                    _ytStopCheck();
+                    _ytLoadSeg((ytIdx + 1) % ytSegs.length);
+                }
+            } catch (err) { _ytStopCheck(); }
+        }, 300);   // 300ms 간격으로 체크
+    }
+
+    function _ytLoadSeg(idx) {
+        if (!ytPlayer || !ytSegs[idx]) return;
+        _ytStopCheck();                                  // 이전 폴링 중단
+        ytIdx = idx;
+        var seg  = ytSegs[idx];
+        var opts = { videoId: seg.id, startSeconds: seg.start || 0 };
+        if (seg.end > 0) opts.endSeconds = seg.end;
+        ytPlayer.loadVideoById(opts);
+        _ytUpdateStatus();
+        // 1.5초 후 폴링 시작 (seek 완료 대기)
+        if (seg.end > 0) {
+            setTimeout(function () { _ytStartCheck(seg.end); }, 1500);
+        }
+    }
+
+    function _ytDoOpen() {
+        if (!ytSegs.length) return;
+        var modal = document.getElementById('ytModal');
+        var host  = document.getElementById('ytFrameHost');
+        if (!modal || !host) return;
+        ytIdx = 0;
+        var seg0  = ytSegs[0];
+        if (ytPlayer) {
+            // ✅ 플레이어 재활용 — 첫 번째 세그먼트부터 다시 재생
+            _ytLoadSeg(0);
+        } else {
+            // ✅ 최초 플레이어 생성
+            //    playerVars에 end를 넣지 않음 → loadVideoById의 endSeconds만 사용
+            host.innerHTML = '<div id="_ytPlayerEl"></div>';
+            var pvars = { autoplay:1, rel:0, modestbranding:1, playsinline:1 };
+            if (seg0.start > 0) pvars.start = seg0.start;
+            // pvars.end는 설정하지 않음 — 폴링으로 제어
+            ytPlayer = new YT.Player('_ytPlayerEl', {
+                width: '100%', height: '100%',
+                videoId: seg0.id,
+                playerVars: pvars,
+                events: {
+                    onStateChange: function (ev) {
+                        if (ev.data === 1) {
+                            // ✅ 재생 시작(PLAYING) → 폴링 시작
+                            _ytStartCheck(ytSegs[ytIdx] ? ytSegs[ytIdx].end : 0);
+                        } else if (ev.data === 0) {
+                            // ✅ 자연 종료(ENDED) — 폴링 없이도 대비
+                            _ytStopCheck();
+                            _ytLoadSeg((ytIdx + 1) % ytSegs.length);
+                        }
+                    }
+                }
+            });
+            // 최초 세그먼트 폴링: onStateChange(PLAYING)이 늦게 오는 경우 대비
+            if (seg0.end > 0) {
+                setTimeout(function () { _ytStartCheck(seg0.end); }, 3000);
+            }
+        }
+        _ytUpdateStatus();
+        modal.style.display = 'flex';
+    }
+
+    window.openYoutube = function () {
+        if (!ytApiOk) { ytPending = true; return; }
+        _ytDoOpen();
+    };
+    window.ytStop = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        _ytStopCheck();
+        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        var stat = document.getElementById('ytStatusMsg');
+        if (stat) stat.textContent = '⏹ 정지됨';
+    };
+    window.closeYoutube = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        _ytStopCheck();
+        if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+        var modal = document.getElementById('ytModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    /* ── 초기화 ── */
+    document.addEventListener('DOMContentLoaded', function () {
+        applyMode(mode);
+        applyLang();
+        ovInit();
+        checkDone();
+        // 첫 미읽은 절로 스크롤
+        var firstUnread = Array.from(document.querySelectorAll('.verse-card-r')).find(function(c){ return !c.classList.contains('is-read'); });
+        if (firstUnread) setTimeout(function(){ firstUnread.scrollIntoView({ behavior:'smooth', block:'center' }); }, 300);
+    });
+})();
+</script>
+}

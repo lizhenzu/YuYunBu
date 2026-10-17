@@ -1,0 +1,226 @@
+@*  ══════════════════════════════════════════════════════════════
+    Bible2 공통 레이아웃 — B 종이 목차 + 밝게/어둡게 스위치 · 넓은 화면은 왼쪽 고정, 좁은 화면은 ☰ 서랍
+    · 상단 줄: ☰ · 화면 이름 (검색창 없음 — 검색은 메뉴의 "성경 검색" 화면)
+    · 서랍: 목차 · 빠른 이동 · 맨 아래 밝게/어둡게 스위치 · 홈
+    · 다크 모드는 기존과 같은 방식(html[data-theme], localStorage 'theme') 이라
+      아직 새 테마를 입히지 않은 다른 Bible2 화면도 그대로 따라온다.
+    이전 레이아웃은 _Bible2Layout_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    string _pg = ViewData["Page"]?.ToString() ?? "";
+    // 화면이 자기 검정 머리 안에 경로·☰ 를 그리면 공통 상단 줄을 뺀다 (Read)
+    bool _noTop = ViewData["B2NoTop"] is bool _nt && _nt;
+    // 목차(왼쪽 메뉴 · ☰ 서랍)를 아예 빼는 화면 (Welcome — /Bible/Welcome 과 같게)
+    bool _noSide = ViewData["B2NoSide"] is bool _ns && _ns;
+    string On(string key) => _pg == key ? "on" : "";
+}
+<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - 성경 통독</title>
+    <script>
+        /* 깜빡임 없이 저장된 모드를 먼저 입힌다 */
+        try { document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light'); } catch (e) { }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;600;700&family=Inter:wght@200;300;400;500;600&family=Gothic+A1:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site2.css" asp-append-version="true" />
+    <style>
+        /* ── 공통 색 (밝게) ── */
+        :root {
+            --b2-bg: #F7F6F3; --b2-tx: #16181C; --b2-dim: #83868C; --b2-dim2: #5C5F66;
+            --b2-rule: #E2E0DB; --b2-line: #E7E5E1; --b2-acc: #9A7B4F; --b2-mark: #EDE5D8;
+            --b2-card: #FFFFFF; --b2-side: #EFEDE8; --b2-head: #16181C; --b2-headtx: #F7F6F3; --b2-headk: #C9AE82; --b2-headdim: #9A9690;
+        }
+        /* ── 어둡게 ── */
+        html[data-theme="dark"] {
+            --b2-bg: #15171A; --b2-tx: #E9E6E0; --b2-dim: #8A8C91; --b2-dim2: #B3B1AC;
+            --b2-rule: #2C2E33; --b2-line: #24262A; --b2-acc: #D9C29B; --b2-mark: #3A3226;
+            --b2-card: #1D1F23; --b2-side: #1B1D21; --b2-head: #0C0D0F; --b2-headtx: #F2EFEA; --b2-headk: #D9C29B; --b2-headdim: #8A8C91;
+        }
+
+        body.b2 { background: var(--b2-bg); color: var(--b2-tx); font-family: "Gothic A1", sans-serif; }
+
+        /* ── 상단 줄 (선 없음) ── */
+        .b2 .main-content { margin-left: 0 !important; background: var(--b2-bg); }
+        .b2top {
+            position: sticky; top: 0; z-index: 900; height: 56px;
+            display: flex; align-items: center; gap: 12px;
+            padding: 0 18px; background: var(--b2-bg);
+        }
+        .b2hb {
+            width: 34px; height: 30px; flex: none; cursor: pointer; background: transparent;
+            border: 1px solid var(--b2-rule); display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 0 8px;
+        }
+        .b2hb i { display: block; height: 1px; background: currentColor; }
+        .b2title { flex: 1; min-width: 0; font-family: "Noto Serif KR", serif; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ── 목차 판 : 선 없이 한 톤 어두운 종이색 ── */
+        .b2dr {
+            position: fixed; top: 0; bottom: 0; left: 0; z-index: 1000;
+            width: 272px; max-width: 86vw;
+            display: flex; flex-direction: column;
+            background: var(--b2-side); color: var(--b2-tx);
+            transform: translateX(-102%); transition: transform .22s ease;
+            overflow-y: auto; box-shadow: 6px 0 24px rgba(0,0,0,.18);
+        }
+        .b2dr.open { transform: translateX(0); }
+        .b2dr-hd { height: 56px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0 22px; }
+        .b2dr-hd a { font-family: "Noto Serif KR", serif; font-size: 18px; color: var(--b2-tx); text-decoration: none; }
+        .b2dr-x { background: none; border: 0; font-size: 20px; line-height: 1; color: var(--b2-dim); cursor: pointer; padding: 0 2px; }
+        .b2lbl { font-size: 9.5px; font-weight: 700; letter-spacing: .2em; color: var(--b2-acc); padding: 14px 22px 4px; }
+        .b2it { display: flex; align-items: center; margin: 0 10px; padding: 9px 12px; font-size: 13.5px; color: var(--b2-tx); text-decoration: none; }
+        .b2it:hover { color: var(--b2-acc); }
+        .b2it.on { font-weight: 600; background: var(--b2-bg); }
+        .b2it.on::before { content: ""; width: 6px; height: 6px; background: var(--b2-acc); margin-right: 10px; flex: none; }
+        .b2q { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 22px 4px; }
+        .b2q a { border: 1px solid var(--b2-rule); background: var(--b2-bg); padding: 9px 10px; font-size: 12px; color: var(--b2-tx); text-decoration: none; }
+        .b2q a small { display: block; font-family: "Inter", sans-serif; font-size: 10px; color: var(--b2-dim); margin-top: 2px; }
+        .b2q a:hover { border-color: var(--b2-acc); }
+        .b2ft { margin-top: auto; padding: 16px 22px; display: flex; justify-content: space-between; align-items: center; }
+        .b2ft > a { font-size: 11.5px; color: var(--b2-dim); text-decoration: none; }
+
+        /* 밝게 / 어둡게 스위치 */
+        .b2sw { display: flex; align-items: center; gap: 9px; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
+        .b2sw .t { width: 40px; height: 22px; border: 1px solid var(--b2-tx); position: relative; background: var(--b2-bg); flex: none; }
+        .b2sw .t i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: var(--b2-tx); transition: left .2s; }
+        html[data-theme="dark"] .b2sw .t i { left: 20px; background: var(--b2-acc); }
+        .b2sw b { font-size: 11.5px; font-weight: 600; color: var(--b2-tx); }
+
+        /* ── 넓은 화면 : 목차 늘 펼침, ☰ 숨김 (/Bible 과 같은 기준) ── */
+        @@media (min-width: 769px) {
+            .b2dr { width: 240px; transform: none; box-shadow: none; transition: none; }
+            .b2dr-x, .b2hb { display: none !important; }
+            .b2 .main-content { margin-left: 240px !important; }
+            .b2 .overlay { display: none !important; }
+            .b2top { padding: 0 32px; }
+        }
+        .b2 .overlay { background: rgba(0,0,0,.45); }
+
+        /* 목차 없는 화면 */
+        .b2noside .b2dr, .b2noside .overlay, .b2noside .b2hb { display: none !important; }
+        .b2noside .main-content { margin-left: 0 !important; }
+
+        /* 이동 대기 카드 (A안) — data-b2wait 링크를 누르면 */
+        .b2wait { position: fixed; inset: 0; z-index: 3000; background: rgba(22,24,28,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
+        .b2wait.show { display: flex; }
+        .b2wait .card { width: 100%; max-width: 260px; background: var(--b2-bg); color: var(--b2-tx); text-align: center; padding: 28px 18px 22px; }
+        .b2wait .sp { width: 34px; height: 34px; margin: 0 auto; border: 2px solid var(--b2-rule); border-top-color: var(--b2-acc); border-radius: 50%; animation: b2spin .8s linear infinite; }
+        .b2wait .t { font-family: "Noto Serif KR", serif; font-size: 17px; margin-top: 16px; }
+        .b2wait .t span { animation: b2dots 1.2s infinite; }
+        .b2wait .t span:nth-child(2) { animation-delay: .2s; }
+        .b2wait .t span:nth-child(3) { animation-delay: .4s; }
+        .b2wait .s { font-size: 12px; color: var(--b2-dim); margin-top: 6px; }
+        @@keyframes b2spin { to { transform: rotate(360deg); } }
+        @@keyframes b2dots { 0%, 20% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
+        @@media (prefers-reduced-motion: reduce) { .b2dr, .b2sw .t i { transition: none; } }
+    </style>
+</head>
+<body class="b2 @(_noSide ? "b2noside" : "")">
+    <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+    <nav class="b2dr" id="sidebar" aria-label="성경 통독 메뉴">
+        <div class="b2dr-hd">
+            <a href="/Bible2">성경 통독</a>
+            <button type="button" class="b2dr-x" onclick="closeSidebar()" aria-label="메뉴 닫기">✕</button>
+        </div>
+
+        <div class="b2lbl">목차</div>
+        <a href="/Bible2" class="b2it @On("home")">대시보드</a>
+        <a href="/Bible2/List?testament=구약" class="b2it @On("ot")">구약 읽기</a>
+        <a href="/Bible2/List?testament=신약" class="b2it @On("nt")">신약 읽기</a>
+        <a href="/Bible2/Search" class="b2it @On("search")">성경 검색</a>
+        <a href="/Bible2/Bookmarks" class="b2it @On("bookmark")">북마크</a>
+        <a href="/Bible2/Participants" class="b2it @On("participants")">참여자 현황</a>
+        <a href="/Bible2/Welcome" class="b2it @On("welcome")">허브</a>
+
+        <div class="b2lbl">빠른 이동</div>
+        <div class="b2q">
+            <a href="/Bible2/Read?bookName=창세기&jang=1">창세기<small>1장</small></a>
+            <a href="/Bible2/Read?bookName=마태복음&jang=1">마태복음<small>1장</small></a>
+            <a href="/Bible2/Read?bookName=시편&jang=23">시편<small>23편</small></a>
+            <a href="/Bible2/Read?bookName=요한복음&jang=3">요한복음<small>3장</small></a>
+        </div>
+
+        <div class="b2ft">
+            <button type="button" class="b2sw" onclick="toggleDark()" aria-label="밝게 / 어둡게 바꾸기">
+                <span class="t"><i></i></span><b id="b2swTx">밝게</b>
+            </button>
+            <a href="/" data-b2wait="홈으로 이동하고 있어요">홈 →</a>
+        </div>
+    </nav>
+
+    <div class="app-wrapper">
+        <div class="main-content">
+            @if (!_noTop)
+            {
+            <header class="b2top">
+                <button type="button" class="b2hb" onclick="toggleSidebar()" aria-label="메뉴 열기"><i></i><i></i><i></i></button>
+                <span class="b2title">@(ViewData["Title"] ?? "성경 통독")</span>
+            </header>
+            }
+
+            <div class="page-body">
+                @RenderBody()
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const html = document.documentElement;
+
+        function _b2SyncSwitch() {
+            var t = document.getElementById('b2swTx');
+            if (t) t.textContent = html.getAttribute('data-theme') === 'dark' ? '어둡게' : '밝게';
+        }
+
+        // 밝게 / 어둡게 — 기존과 같은 저장 키
+        function toggleDark() {
+            const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            try { localStorage.setItem('theme', next); } catch (e) { }
+            _b2SyncSwitch();
+        }
+        _b2SyncSwitch();
+
+        // 서랍
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+        }
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSidebar(); });
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+    <div class="b2wait" id="b2wait" role="status" aria-live="polite">
+        <div class="card">
+            <div class="sp" aria-hidden="true"></div>
+            <div class="t">잠시만 기다려 주세요<span>.</span><span>.</span><span>.</span></div>
+            <div class="s" id="b2waitMsg">이동하고 있어요</div>
+        </div>
+    </div>
+    <script>
+        /* data-b2wait 링크: 누르는 즉시 메뉴를 닫고 대기 카드를 띄운 채 이동 */
+        (function () {
+            var box = document.getElementById('b2wait'), msg = document.getElementById('b2waitMsg');
+            document.addEventListener('click', function (e) {
+                var a = e.target.closest('a[data-b2wait]');
+                if (!a || e.ctrlKey || e.metaKey || e.shiftKey || a.target === '_blank') return;
+                if (msg) msg.textContent = a.getAttribute('data-b2wait') || '이동하고 있어요';
+                if (typeof closeSidebar === 'function') closeSidebar();
+                box.classList.add('show');
+            });
+            /* 뒤로 가기로 돌아왔을 때 카드가 남아 있지 않게 */
+            window.addEventListener('pageshow', function () { box.classList.remove('show'); });
+        })();
+    </script>
+</body>
+</html>

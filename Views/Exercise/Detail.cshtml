@@ -1,0 +1,497 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.ExerciseDetail
+@using System.Linq
+
+@{
+    Layout = null;
+
+    var hasBasic = Model != null && Model.Basic != null && Model.Basic.Count > 0;
+    var basic = hasBasic ? Model.Basic[0] : null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+@functions {
+    public string DiffBadgeClass(string? diff)
+    {
+        switch (diff)
+        {
+            case "초급": return "badge badge-success";
+            case "중급": return "badge badge-warn";
+            case "고급": return "badge badge-danger";
+            default: return "badge badge-muted";
+        }
+    }
+}
+
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>@(hasBasic ? basic!.Name : "운동 상세")</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --card: #101623;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --line: #1f2937;
+            --accent: #60a5fa;
+            --accent-2: #a78bfa;
+            --chip-bg: #171e2c;
+            --chip-br: #22314a;
+            --success: #22c55e;
+            --warn: #f59e0b;
+            --danger: #ef4444;
+            color-scheme: dark;
+        }
+
+        [data-theme="light"] {
+            --bg: #f7f8fa;
+            --card: #ffffff;
+            --text: #111827;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --accent: #2563eb;
+            --accent-2: #7c3aed;
+            --chip-bg: #f3f4f6;
+            --chip-br: #e5e7eb;
+            color-scheme: light;
+        }
+
+        html, body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        * {
+            box-sizing: border-box;
+            min-width: 0;
+        }
+
+        img, video {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            line-height: 1.6;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .title, .subtitle, .chip, .badge, td, th, li, p, div {
+            overflow-wrap: anywhere;
+            word-break: break-word;
+        }
+
+        .hero {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(2,6,23,.06);
+            margin-bottom: 16px;
+        }
+
+        .hero-top {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .hero-right {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .title {
+            margin: 0;
+            font-size: clamp(1.25rem, 5vw, 1.8rem);
+            font-weight: 700;
+            letter-spacing: -.015em;
+        }
+
+        .subtitle {
+            margin: .25rem 0 0 0;
+            color: var(--muted);
+            font-size: .95rem;
+        }
+
+        .badge, .chip {
+            display: inline-block;
+            padding: .35rem .6rem;
+            border-radius: 999px;
+            background: var(--chip-bg);
+            border: 1px solid var(--chip-br);
+            font-size: .9rem;
+            line-height: 1.2;
+            margin: 3px 6px 3px 0;
+            white-space: normal;
+        }
+
+        .badge-success {
+            background: color-mix(in srgb, var(--success) 15%, var(--chip-bg));
+            border-color: color-mix(in srgb, var(--success) 35%, var(--chip-br));
+            color: #064e3b;
+        }
+
+        .badge-warn {
+            background: color-mix(in srgb, var(--warn) 15%, var(--chip-bg));
+            border-color: color-mix(in srgb, var(--warn) 35%, var(--chip-br));
+            color: #7c2d12;
+        }
+
+        .badge-danger {
+            background: color-mix(in srgb, var(--danger) 15%, var(--chip-bg));
+            border-color: color-mix(in srgb, var(--danger) 35%, var(--chip-br));
+            color: #7f1d1d;
+        }
+
+        .badge-muted {
+            opacity: .85;
+        }
+
+        .grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: 1fr;
+        }
+
+        @@media (min-width: 992px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(2,6,23,.06);
+        }
+
+        .section-title {
+            margin: 0 0 10px 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -.01em;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        ol.steps {
+            margin: 0;
+            padding-left: 1.1rem;
+        }
+
+        .step-item {
+            margin-bottom: .45rem;
+        }
+
+        .step-phase {
+            font-weight: 700;
+        }
+
+        .table-wrap {
+            width: 100%;
+            overflow: auto;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            background: var(--card);
+        }
+
+        th, td {
+            padding: .7rem .6rem;
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            vertical-align: top;
+        }
+
+        th {
+            font-size: .9rem;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+            th[style], td[style] {
+                width: auto !important;
+            }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0 10px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            padding: .7rem 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: var(--card);
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 700;
+            transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
+            box-shadow: 0 8px 26px rgba(2,6,23,.05);
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 34px rgba(2,6,23,.08);
+            }
+
+        .btn-primary {
+            background: linear-gradient(180deg, var(--accent), var(--accent-2));
+            color: white;
+            border: 0;
+        }
+
+        .btn-outline {
+            background: transparent;
+        }
+
+        .footer-note {
+            text-align: center;
+            color: var(--muted);
+            font-size: .9rem;
+            margin: 10px 0 30px;
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        @if (!hasBasic)
+        {
+            <div class="card">
+                <p class="muted">해당 운동 정보를 찾을 수 없습니다.</p>
+                <div class="actions">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline">홈으로 가기</a>
+                    <a asp-controller="Exercise" asp-action="Index" class="btn btn-primary">목록으로 가기</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- 대표 이미지 -->
+            <div style="text-align:center; margin-bottom:16px;">
+                <img src="/images/Health/TypeA/@(@basic.NameEn).png"
+                     alt="@basic?.Name"
+                     style="max-width:100%; height:auto; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08);" />
+            </div>
+
+            <!-- 헤더/요약 -->
+            <section class="hero">
+                <div class="hero-top">
+                    <div>
+                        <h1 class="title">
+                            @basic!.Name
+                            @if (!string.IsNullOrEmpty(basic.NameEn))
+                            {
+                                <small class="muted">(@basic.NameEn)</small>
+                            }
+                        </h1>
+                        @if (!string.IsNullOrEmpty(basic.Description))
+                        {
+                            <p class="subtitle">@basic.Description</p>
+                        }
+                    </div>
+                    <div class="hero-right">
+                        <span class="@DiffBadgeClass(basic.Difficulty)">@basic.Difficulty</span>
+                        <span class="badge">@((basic.IsAnaerobic) ? "무산소" : "유산소")</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 본문 -->
+            <section class="grid">
+                <div class="stack">
+                    <div class="card">
+                        <h2 class="section-title">단계별 동작</h2>
+                        @if (Model.Steps != null && Model.Steps.Count > 0)
+                        {
+                            <ol class="steps">
+                                @foreach (var s in Model.Steps.OrderBy(x => x.StepNo))
+                                {
+                                    <li class="step-item">
+                                        <span class="step-phase">@s.Phase</span>
+                                        @if (!string.IsNullOrWhiteSpace(s.Title))
+                                        {
+                                            <em> — @s.Title</em>
+                                        }
+                                        : @s.Instruction
+                                    </li>
+                                }
+                            </ol>
+                        }
+                        else
+                        {
+                            <p class="muted">등록된 단계가 없습니다.</p>
+                        }
+                    </div>
+
+                    <div class="card">
+                        <h2 class="section-title">어린이용 설명</h2>
+                        @if (Model.KidsInfo != null && Model.KidsInfo.Count > 0)
+                        {
+                            <ul style="margin:0; padding-left:1.1rem;">
+                                @foreach (var k in Model.KidsInfo)
+                                {
+                                    <li><strong>@k.Audience</strong> — @k.Explanation</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <p class="muted">어린이용 설명이 없습니다.</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="stack">
+                    <div class="card">
+                        <h2 class="section-title">권장 처방</h2>
+                        @if (basic.RepsMin.HasValue)
+                        {
+                            <div style="display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px;">
+                                <div>
+                                    <div class="muted">반복</div>
+                                    <div>@basic.RepsMin - @basic.RepsMax 회</div>
+                                </div>
+                                <div>
+                                    <div class="muted">세트</div>
+                                    <div>@basic.SetsMin - @basic.SetsMax 세트</div>
+                                </div>
+                                <div>
+                                    <div class="muted">휴식</div>
+                                    <div>@basic.RestSecMin - @basic.RestSecMax 초</div>
+                                </div>
+                                <div>
+                                    <div class="muted">템포</div>
+                                    <div>@basic.Tempo</div>
+                                </div>
+                                @if (!string.IsNullOrEmpty(basic.PrescriptionNotes))
+                                {
+                                    <div style="grid-column:1 / -1;">
+                                        <div class="muted">비고</div>
+                                        <div>@basic.PrescriptionNotes</div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="muted">등록된 처방 정보가 없습니다.</p>
+                        }
+                    </div>
+
+                    <div class="card">
+                        <h2 class="section-title">주요/보조 근육</h2>
+                        @if (Model.Muscles != null && Model.Muscles.Count > 0)
+                        {
+                            var ordered = Model.Muscles
+                            .OrderBy(m => m.Role == "주요" ? 0 : 1)
+                            .ThenBy(m => m.SortOrder.HasValue ? m.SortOrder.Value : 999)
+                            .ThenBy(m => m.MuscleName);
+
+                            <div class="table-wrap">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>구분</th>
+                                            <th>근육</th>
+                                            <th>부위</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var m in ordered)
+                                        {
+                                            <tr>
+                                                <td>@m.Role</td>
+                                                <td>@m.MuscleName</td>
+                                                <td>@m.Region</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="muted">근육 정보가 없습니다.</p>
+                        }
+                    </div>
+
+                    <div class="card">
+                        <h2 class="section-title">운동 효과</h2>
+                        @if (Model.Benefits != null && Model.Benefits.Count > 0)
+                        {
+                            <div style="display:flex; flex-wrap:wrap;">
+                                @foreach (var b in Model.Benefits)
+                                {
+                                    <span class="chip">@b.EffectText</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="muted">운동 효과 정보가 없습니다.</p>
+                        }
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="actions">
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline" aria-label="홈으로 가기">홈으로 가기</a>
+                    <a asp-controller="Exercise" asp-action="Index" class="btn btn-primary" aria-label="목록으로 가기">목록으로 가기</a>
+                </div>
+                <p class="footer-note">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</p>
+            </section>
+        }
+    </main>
+</body>
+</html>

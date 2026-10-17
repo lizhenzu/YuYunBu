@@ -1,0 +1,207 @@
+@model StockBulletinBoard.Models.DailyEnglish
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daily English — 문장 수정</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+    --bg:#f0f4ff; --white:#ffffff; --primary:#4f46e5; --pri2:#6366f1;
+    --pri-lt:#eef2ff; --pri-md:#c7d2fe; --text:#1e293b; --text2:#475569;
+    --muted:#94a3b8; --border:#e2e8f0; --success:#10b981; --danger:#ef4444; --dan-lt:#fee2e2;
+}
+html,body { min-height:100vh; background:var(--bg); font-family:'Inter',sans-serif; color:var(--text); }
+body::before {
+    content:''; position:fixed; inset:0; pointer-events:none;
+    background:radial-gradient(ellipse 65% 45% at 5% 0%,rgba(99,102,241,.07),transparent 55%);
+}
+a { text-decoration:none; color:var(--primary); font-weight:500; }
+a:hover { text-decoration:underline; }
+
+.page {
+    position:relative; max-width:640px; margin:0 auto;
+    padding: clamp(32px,6vw,56px) clamp(14px,4vw,24px) 80px;
+    animation: riseUp .6s cubic-bezier(.22,1,.36,1) both;
+}
+
+.breadcrumb {
+    display:flex; align-items:center; gap:8px;
+    font-size:13px; color:var(--muted); margin-bottom: clamp(20px,4vw,32px);
+}
+.breadcrumb a { color:var(--primary); font-weight:500; }
+.breadcrumb .sep { color:var(--border); }
+
+.form-header { margin-bottom: clamp(20px,4vw,30px); }
+.form-eyebrow { font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--primary); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.form-eyebrow::before { content:''; display:inline-block; width:20px; height:1.5px; background:var(--primary); border-radius:2px; }
+.form-title { font-size: clamp(22px,5vw,30px); font-weight:700; color:var(--text); letter-spacing:-.02em; }
+.form-id { display:inline-block; margin-top:6px; font-size:12px; font-weight:600; background:var(--pri-lt); color:var(--primary); border-radius:8px; padding:3px 10px; letter-spacing:.04em; }
+
+.form-card {
+    background:var(--white); border-radius: clamp(16px,3vw,24px);
+    border:1.5px solid var(--border);
+    box-shadow:0 4px 24px rgba(0,0,0,.06);
+    padding: clamp(24px,5vw,40px) clamp(20px,5vw,40px);
+    position:relative; overflow:hidden;
+}
+.form-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,var(--success),#059669,#34d399);
+    border-radius:24px 24px 0 0;
+}
+
+.field { margin-bottom: clamp(16px,3vw,22px); }
+.field label {
+    display:block; font-size:13px; font-weight:600; color:var(--text2);
+    margin-bottom:7px; letter-spacing:.02em;
+}
+.field label .req { color:var(--primary); margin-left:2px; }
+input[type=text], textarea {
+    width:100%; padding: clamp(11px,2vw,13px) 14px;
+    background:var(--bg); border:1.5px solid var(--border); border-radius:12px;
+    color:var(--text); font-family:'Inter',sans-serif; font-size: clamp(13px,2.8vw,15px);
+    outline:none; transition:border-color .2s, box-shadow .2s;
+    -webkit-appearance:none; resize:vertical;
+}
+input[type=text]:focus, textarea:focus {
+    border-color:var(--primary); background:var(--white);
+    box-shadow:0 0 0 3px rgba(99,102,241,.1);
+}
+input[type=text]::placeholder, textarea::placeholder { color:var(--muted); }
+textarea { min-height:100px; line-height:1.6; }
+
+.sep-line { height:1px; background:var(--border); margin: clamp(18px,3vw,26px) 0; }
+
+.form-actions { display:flex; gap:12px; flex-wrap:wrap; }
+.btn-save {
+    flex:1; min-width:140px; min-height: clamp(46px,8vw,52px);
+    border:none; border-radius:12px; cursor:pointer;
+    background:linear-gradient(135deg,var(--success),#059669);
+    color:#fff; font-size: clamp(14px,3vw,15px); font-weight:600;
+    letter-spacing:.03em;
+    box-shadow:0 4px 16px rgba(16,185,129,.25); transition:all .22s;
+}
+.btn-save:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(16,185,129,.35); }
+.btn-save:active { transform:scale(.98); }
+
+.btn-back {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:100px; min-height: clamp(46px,8vw,52px);
+    padding:0 20px; border-radius:12px;
+    border:1.5px solid var(--border); background:transparent; color:var(--text2);
+    font-size: clamp(13px,2.8vw,14px); font-weight:500; cursor:pointer; transition:all .2s;
+    white-space:nowrap;
+}
+.btn-back:hover { background:var(--bg); border-color:var(--primary); color:var(--primary); }
+
+@@media (max-width:400px) {
+    .form-actions { flex-direction:column; }
+    .btn-save, .btn-back { width:100%; }
+}
+@@keyframes riseUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+/* ── 햄버거 드로어 ── */
+.hbg-btn{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4.5px;width:36px;height:36px;border:none;background:none;cursor:pointer;border-radius:8px;transition:background .15s;flex-shrink:0;}
+.hbg-btn span{display:block;width:18px;height:1.5px;background:var(--text);border-radius:2px;}
+.drw-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);backdrop-filter:blur(2px);z-index:200;}
+.drw-overlay.open{display:block;}
+.drw-panel{position:fixed;top:0;left:0;bottom:0;width:min(280px,80vw);background:#fff;z-index:201;transform:translateX(-100%);transition:transform .28s cubic-bezier(.22,1,.36,1);display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.drw-panel.open{transform:translateX(0);}
+.drw-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:12px;text-decoration:none;color:var(--text2);font-size:14px;font-weight:500;transition:background .15s;}
+.drw-item:hover{background:var(--bg);}
+.drw-ico{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.drw-lbl{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:4px 10px 8px;}
+</style>
+</head>
+<body>
+<!-- 드로어 -->
+<div class="drw-overlay" id="drwOverlay" onclick="drwClose()"></div>
+<div class="drw-panel" id="drwPanel">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:15px;font-weight:700;">Daily English</span>
+        <button style="width:30px;height:30px;border:none;background:var(--bg);border-radius:8px;cursor:pointer;font-size:16px;" onclick="drwClose()">✕</button>
+    </div>
+    <div style="flex:1;padding:12px 10px;overflow-y:auto;">
+        <div class="drw-lbl">학습</div>
+        <a class="drw-item" href="/DailyEnglish"><div class="drw-ico" style="background:#e8f0fe;">📖</div>학습 시작</a>
+        <a class="drw-item" href="/DailyEnglish/Video"><div class="drw-ico" style="background:#fce4ec;">📹</div>영상 목록</a>
+        <div class="drw-lbl" style="margin-top:6px;">관리</div>
+        <a class="drw-item" href="/DailyEnglish/AdminList"><div class="drw-ico" style="background:#e8f5e9;">📋</div>문장 목록</a>
+        <a class="drw-item" href="/DailyEnglish/Create"><div class="drw-ico" style="background:#fff3e0;">✏️</div>새 문장 등록</a>
+        <div class="drw-lbl" style="margin-top:6px;">홈</div>
+        <a class="drw-item" href="/"><div class="drw-ico" style="background:#f3e5f5;">🏠</div>잠실새내 유년부</a>
+    </div>
+</div>
+<div class="page">
+
+    <div class="breadcrumb">
+        <button class="hbg-btn" onclick="drwOpen()" style="margin-right:4px;"><span></span><span></span><span></span></button>
+        <a href="/DailyEnglish/AdminList">← 목록으로</a>
+        <span class="sep">/</span>
+        <span>문장 수정</span>
+    </div>
+
+    <div class="form-header">
+        <div class="form-eyebrow">Daily English</div>
+        <h1 class="form-title">문장 수정</h1>
+        <span class="form-id">NO. #@Model.Id</span>
+    </div>
+
+    <div class="form-card">
+        <form method="post" action="/DailyEnglish/Edit">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="Id" value="@Model.Id" />
+
+            <div class="field">
+                <label>영어 문장 <span class="req">*</span></label>
+                <input type="text" name="EnglishText" value="@Model.EnglishText"
+                       placeholder="e.g. Every day is a new beginning." />
+            </div>
+
+            <div class="field">
+                <label>한글 뜻 <span class="req">*</span></label>
+                <input type="text" name="KoreanText" value="@Model.KoreanText"
+                       placeholder="e.g. 매일이 새로운 시작이야." />
+            </div>
+
+            <div class="field">
+                <label>발음 (선택)</label>
+                <input type="text" name="Pronunciation" value="@Model.Pronunciation"
+                       placeholder="e.g. ˈɛvri deɪ ɪz ə njuː bɪˈɡɪnɪŋ" />
+            </div>
+
+            <div class="sep-line"></div>
+
+            <div class="field">
+                <label>설명 (선택)</label>
+                <textarea name="Description" placeholder="문법 포인트나 표현 설명을 입력하세요.">@Model.Description</textarea>
+            </div>
+
+            <div class="field">
+                <label>예문 영어 (선택)</label>
+                <textarea name="Example" placeholder="예) Every day is a new beginning.">@Model.Example</textarea>
+            </div>
+
+            <div class="field">
+                <label>예문 한글 번역 (선택)</label>
+                <textarea name="ExampleKorean" placeholder="예) 매일이 새로운 시작이야.">@Model.ExampleKorean</textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-save">✓ &nbsp;수정 저장</button>
+                <a href="/DailyEnglish/AdminList" class="btn-back">취소</a>
+            </div>
+        </form>
+    </div>
+
+</div>
+<script>
+function drwOpen(){ document.getElementById('drwPanel').classList.add('open'); document.getElementById('drwOverlay').classList.add('open'); }
+function drwClose(){ document.getElementById('drwPanel').classList.remove('open'); document.getElementById('drwOverlay').classList.remove('open'); }
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') drwClose(); });
+</script>
+</body>
+</html>

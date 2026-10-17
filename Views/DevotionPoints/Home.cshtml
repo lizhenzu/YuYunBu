@@ -1,0 +1,413 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Globalization
+@model BulletinBoard.Controllers.DevotionPointsController.EntryPageVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 포인트 입력 — 전체 아이 한 화면(반별) · 이름 누르면 아래에서 입력창 · ±1/±5/±10 누를 때마다 저장
+    ViewData["PointTab"] = "entry";
+    ViewData["PointYm"] = Model.Ym;
+
+    bool isThisMonth = Model.Month == Model.ThisMonth;
+    string Url(DateTime m) => $"/DevotionPoints/Home?ym={m.ToString("yyyy-MM", CultureInfo.InvariantCulture)}";
+    string Name(BulletinBoard.Services.Abstract.DevotionRowVM k) => string.IsNullOrWhiteSpace(k.FullName) ? "" : k.FullName.Trim();
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>포인트 입력 · @Model.Month.ToString("M월")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        button, input { font-family: inherit; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .mn { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+        .mn a, .mn span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-size: 26px; font-weight: 300; color: #2F80ED; }
+        .mn a:hover { color: #1F6FDB; }
+        .mn span.off { color: #D1D5DB; }
+        .mn h1 { margin: 0; text-align: center; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #111827; }
+        .mn h1 small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .mn h1 small.past { color: #B4531F; }
+        .st { display: flex; gap: 28px; margin-top: 8px; }
+        .st div { font-size: 11.5px; color: #9CA3AF; }
+        .st b { display: block; margin-top: 2px; font-weight: 300; font-size: 28px; line-height: 1.2; color: #111827; font-variant-numeric: tabular-nums; }
+        .st b small { font-size: 14px; color: #9CA3AF; }
+        .st .k b { color: #2F80ED; }
+
+        /* 검색 · 반 바로가기 — 스크롤해도 위에 붙음 */
+        .tools { position: sticky; top: 0; z-index: 40; margin-top: 14px; background: #FFFFFF; border-bottom: 1px solid #EEF0F3; }
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .srch { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; background: #F4F6F9; }
+        .srch:focus-within { box-shadow: 0 0 0 2px #CFE0FA; }
+        .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 15px; color: #111827; }
+        .srch input::placeholder { color: #9CA3AF; }
+        .srch button { border: 0; background: none; color: #9CA3AF; font-size: 12.5px; font-weight: 700; padding: 4px; cursor: pointer; }
+        .srch button:hover { color: #2F80ED; }
+        .jump { display: flex; gap: 6px; overflow-x: auto; padding-top: 8px; scrollbar-width: none; }
+        .jump::-webkit-scrollbar { display: none; }
+        .jump a { flex: none; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; background: #F4F6F9; color: #6B7280; white-space: nowrap; }
+        .jump a:hover { color: #2F80ED; }
+        .jump a.has { background: #EAF2FD; color: #2B5FA8; font-weight: 700; }
+        .jump a b { font-weight: 800; margin-left: 4px; }
+
+        /* 반 묶음 · 아이 줄 */
+        .grp { padding-top: 18px; scroll-margin-top: 120px; }
+        .gH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 4px; }
+        .gH b { font-size: 16px; font-weight: 800; color: #111827; }
+        .gH span { font-size: 12px; color: #9CA3AF; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .gH span em { font-style: normal; color: #2F80ED; font-weight: 800; }
+        .kr { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 0; border: 0; border-bottom: 1px solid #EEF0F3; background: none; color: #111827; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .kr:hover, .kr.sel { background: #F4F6F9; }
+        .kr .nm { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .kr .nm small { font-size: 11.5px; font-weight: 400; color: #9CA3AF; margin-left: 6px; }
+        .kr .nm.noname { color: #B4531F; font-weight: 400; font-size: 13.5px; }
+        .kr .pt { min-width: 48px; text-align: right; font-size: 20px; font-weight: 300; color: #111827; font-variant-numeric: tabular-nums; }
+        .kr .pt.z { color: #D1D5DB; }
+        .kr em { font-style: normal; color: #D1D5DB; font-size: 18px; font-weight: 300; }
+        .searching .kr .nm small { display: inline; }
+        .kr .nm small.cl { display: none; }
+        .searching .kr .nm small.cl { display: inline; }
+        .hidden { display: none !important; }
+        .none { padding: 40px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+        .ft { margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+
+        /* 입력창 — 아래에서 올라옴 */
+        .scrim { position: fixed; inset: 0; z-index: 950; background: rgba(17,24,39,.45); opacity: 0; pointer-events: none; transition: opacity .18s; }
+        .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 960; max-width: 760px; margin: 0 auto; background: #FFFFFF; border-radius: 20px 20px 0 0;
+                 padding: 10px 20px calc(20px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; max-height: 92vh; overflow-y: auto; }
+        .open .scrim { opacity: 1; pointer-events: auto; }
+        .open .sheet { transform: none; }
+        .grab { width: 40px; height: 4px; border-radius: 999px; background: #E5E7EB; margin: 0 auto 12px; }
+        .shH { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .shH b { font-size: 21px; font-weight: 800; color: #111827; }
+        .shH small { font-size: 12px; color: #9CA3AF; margin-left: 6px; }
+        .shH .ym { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; }
+        .shH .ym.other { color: #B4531F; }
+        .shX { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .big { display: flex; align-items: center; justify-content: center; margin: 12px 0 14px; }
+        .big .v { font-weight: 300; font-size: 64px; line-height: 1; color: #111827; font-variant-numeric: tabular-nums; }
+        .big .v small { font-size: 16px; color: #9CA3AF; margin-left: 2px; }
+        .stp { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+        .stp button { position: relative; height: 52px; border: 0; border-radius: 999px; background: #F4F6F9; font-size: 16px; font-weight: 700; color: #111827; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .stp button.m { background: #FBEFE7; color: #B4531F; }
+        .stp button.p { background: #EAF2FD; color: #2B5FA8; }
+        .stp button:active { transform: scale(.96); }
+        .stp button:disabled { cursor: progress; }
+        /* 저장 대기 — 누른 버튼 안에서 동그라미 */
+        .stp button.busy, .num button.busy { color: transparent !important; }
+        .stp button.busy::after, .num button.busy::after { content: ""; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid #E5E7EB; border-top-color: #2F80ED; border-radius: 50%; animation: spin .8s linear infinite; }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        @@media (prefers-reduced-motion: reduce) { .busy::after { animation-duration: 2s; } }
+        .num { display: flex; gap: 6px; margin-top: 8px; }
+        .num input { flex: 1; min-width: 0; height: 46px; padding: 0 18px; border: 0; border-radius: 999px; background: #F4F6F9; font-size: 16px; color: #111827; outline: none; }
+        .num input:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+        .num button { position: relative; flex: none; width: 92px; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .num button:hover { background: #1F6FDB; }
+        .msg { min-height: 20px; margin-top: 8px; font-size: 12.5px; text-align: center; color: #2B5FA8; }
+        .msg.err { color: #B4531F; }
+        .yr { margin-top: 10px; padding-top: 12px; border-top: 1px solid #EEF0F3; }
+        .yr .t { display: flex; justify-content: space-between; font-size: 12px; color: #9CA3AF; }
+        .yr .t b { color: #111827; font-weight: 800; }
+        .yb { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin-top: 8px; }
+        .yb button { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; height: 78px; padding: 0; border: 0; background: none; cursor: pointer; }
+        .yb button:disabled { cursor: default; opacity: .35; }
+        .yb em { font-style: normal; font-size: 10px; color: #6B7280; text-align: center; }
+        .yb i { display: block; background: #CFE0FA; border-radius: 4px 4px 0 0; min-height: 2px; }
+        .yb i.o { background: #EEF0F3; }
+        .yb span { font-size: 10px; color: #9CA3AF; text-align: center; padding-top: 2px; border-top: 2px solid transparent; }
+        .yb button.cur span { color: #2F80ED; font-weight: 800; border-top-color: #2F80ED; }
+        .yb button.cur i { background: #2F80ED; }
+        .yLoad { font-size: 12px; color: #9CA3AF; padding: 20px 0; text-align: center; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><span><a href="/Admin/TeacherOnly">‹ 교사 대시보드</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">@ConstatsCommon.HolyWordAndRead</div>
+        <div class="mn">
+            <a href="@Url(Model.Month.AddMonths(-1))" aria-label="지난달">‹</a>
+            <h1>@Model.Month.ToString("yyyy년 M월")<small class="@(isThisMonth ? "" : "past")">@(isThisMonth ? "이번 달 입력" : "지난달 · 고치는 중")</small></h1>
+            @if (isThisMonth) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Url(Model.Month.AddMonths(1))" aria-label="다음 달">›</a> }
+        </div>
+        <div class="st">
+            <div class="k">이달 합계<b id="sumN">@Model.TotalPoints</b></div>
+            <div>받은 아이<b><span id="gotN">@Model.GotCount</span><small> / @Model.KidCount</small></b></div>
+            <div>최고<b id="maxN">@Model.MaxPoints</b></div>
+        </div>
+    </header>
+
+    <div class="tools">
+        <div class="sh">
+            <label class="srch">
+                <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="이름 검색 (초성도 돼요 · 예: ㅊㄹ)" aria-label="이름 검색" />
+                <button type="button" id="qClear" class="hidden" aria-label="검색어 지우기">지우기</button>
+            </label>
+            <nav class="jump" aria-label="반으로 이동">
+                @foreach (var c in Model.Classes)
+                {
+                    var cs = c.Kids.Sum(k => k.Points);
+                    <a href="#g-@c.ClassYear-@c.ClassBan" data-g="@c.ClassYear-@c.ClassBan" class="@(cs > 0 ? "has" : "")">@c.ClassName<b>@(cs > 0 ? cs.ToString() : "")</b></a>
+                }
+            </nav>
+        </div>
+    </div>
+
+    <main class="sh" id="board">
+        @if (Model.Classes.Count == 0)
+        {
+            <div class="none">등록된 반이 없습니다.</div>
+        }
+        @foreach (var c in Model.Classes)
+        {
+            <section class="grp" id="g-@c.ClassYear-@c.ClassBan" data-g="@c.ClassYear-@c.ClassBan">
+                <div class="gH"><b>@c.ClassName</b><span>@(c.Kids.Count)명 · 합계 <em class="gs">@c.Kids.Sum(k => k.Points)</em></span></div>
+                @foreach (var k in c.Kids)
+                {
+                    var nm = Name(k);
+                    <button type="button" class="kr" data-id="@k.PersonId" data-name="@(nm == "" ? $"이름 없음 (#{k.PersonId})" : nm)" data-cls="@c.ClassName" data-pt="@k.Points">
+                        @if (nm == "")
+                        {
+                            <span class="nm noname">이름 없음 (#@k.PersonId)<small class="cl">@c.ClassName</small></span>
+                        }
+                        else
+                        {
+                            <span class="nm">@nm<small class="cl">@c.ClassName</small></span>
+                        }
+                        <span class="pt @(k.Points == 0 ? "z" : "")">@k.Points</span><em aria-hidden="true">›</em>
+                    </button>
+                }
+                @if (c.Kids.Count == 0) { <div class="none" style="padding:14px 0">아이가 없어요.</div> }
+            </section>
+        }
+        <div class="none hidden" id="noHit">찾는 아이가 없어요.</div>
+        <div class="ft"><span>이름을 누르면 점수를 고칠 수 있어요. ±버튼은 누를 때마다 바로 저장돼요.</span></div>
+    </main>
+
+    @* 입력창 *@
+    <div class="scrim" id="scrim"></div>
+    <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="shName" aria-hidden="true">
+        <div class="grab"></div>
+        <div class="shH">
+            <div><b id="shName">이름</b><small id="shCls"></small><span class="ym" id="shYm"></span></div>
+            <button type="button" class="shX" id="shClose" aria-label="닫기">닫기</button>
+        </div>
+        <div class="big"><span class="v"><span id="shVal">0</span><small>점</small></span></div>
+        <div class="stp" id="stp">
+            <button type="button" class="m" data-d="-10">−10</button>
+            <button type="button" class="m" data-d="-5">−5</button>
+            <button type="button" class="m" data-d="-1">−1</button>
+            <button type="button" class="p" data-d="1">+1</button>
+            <button type="button" class="p" data-d="5">+5</button>
+            <button type="button" class="p" data-d="10">+10</button>
+        </div>
+        <form class="num" id="numF" autocomplete="off">
+            <input id="numIn" type="number" inputmode="numeric" min="0" step="1" placeholder="숫자로 바로 입력" aria-label="점수 숫자로 입력" />
+            <button type="submit" id="numBtn">적용</button>
+        </form>
+        <div class="msg" id="shMsg" aria-live="polite"></div>
+        <div class="yr">
+            <div class="t"><span><b style="font-family:inherit">1년 보기</b> · 막대를 누르면 그 달로</span><span><span id="yrY"></span>년 누적 <b id="yrSum">0</b></span></div>
+            <div class="yb" id="yb"><div class="yLoad" style="grid-column:1/-1">불러오는 중…</div></div>
+        </div>
+    </section>
+
+    @await Html.PartialAsync("_PointTabs")
+
+<script>
+(function () {
+    const PAGE_YM = '@Model.Ym';
+    const THIS_YM = '@Model.ThisMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture)';
+    const MIN_SPIN = 400; // 응답이 빨라도 동그라미가 보이도록
+    const board = document.getElementById('board');
+    const rows = Array.from(document.querySelectorAll('.kr'));
+    const q = document.getElementById('q'), qClear = document.getElementById('qClear');
+
+    // ── 초성 검색 ──
+    const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+    const cho = s => Array.from(s).map(ch => { const c = ch.charCodeAt(0) - 0xAC00; return (c >= 0 && c <= 11171) ? CHO[Math.floor(c / 588)] : ch; }).join('');
+    rows.forEach(r => { r.dataset.cho = cho(r.dataset.name); });
+    function applySearch() {
+        const t = (q.value || '').replace(/\s+/g, '');
+        board.classList.toggle('searching', !!t);
+        qClear.classList.toggle('hidden', !t);
+        const choOnly = /^[ㄱ-ㅎ]+$/.test(t);
+        let hits = 0;
+        rows.forEach(r => {
+            const nm = r.dataset.name.replace(/\s+/g, '');
+            const show = !t || (choOnly ? r.dataset.cho.includes(t) : nm.includes(t));
+            r.classList.toggle('hidden', !show);
+            if (show) hits++;
+        });
+        document.querySelectorAll('.grp').forEach(g => g.classList.toggle('hidden', !!t && !g.querySelector('.kr:not(.hidden)')));
+        document.getElementById('noHit').classList.toggle('hidden', hits > 0);
+    }
+    q.addEventListener('input', applySearch);
+    qClear.addEventListener('click', () => { q.value = ''; applySearch(); q.focus(); });
+
+    // ── 합계 다시 세기 (이 달 목록) ──
+    function recount() {
+        let sum = 0, got = 0, max = 0;
+        rows.forEach(r => { const p = +r.dataset.pt || 0; sum += p; if (p > 0) got++; if (p > max) max = p; });
+        document.getElementById('sumN').textContent = sum;
+        document.getElementById('gotN').textContent = got;
+        document.getElementById('maxN').textContent = max;
+        document.querySelectorAll('.grp').forEach(g => {
+            const s = Array.from(g.querySelectorAll('.kr')).reduce((a, r) => a + (+r.dataset.pt || 0), 0);
+            const gs = g.querySelector('.gs'); if (gs) gs.textContent = s;
+            const j = document.querySelector('.jump a[data-g="' + g.dataset.g + '"]');
+            if (j) { j.classList.toggle('has', s > 0); j.querySelector('b').textContent = s > 0 ? s : ''; }
+        });
+    }
+    function setRow(r, v) {
+        r.dataset.pt = v;
+        const pt = r.querySelector('.pt');
+        pt.textContent = v;
+        pt.classList.toggle('z', v === 0);
+        recount();
+    }
+
+    // ── 입력창 ──
+    const root = document.documentElement;
+    const sheet = document.getElementById('sheet');
+    const shVal = document.getElementById('shVal'), shMsg = document.getElementById('shMsg'), shYm = document.getElementById('shYm');
+    const numIn = document.getElementById('numIn'), numBtn = document.getElementById('numBtn');
+    const yb = document.getElementById('yb');
+    let cur = null;       // 열려 있는 아이의 줄
+    let curYm = PAGE_YM;  // 입력창에서 고치는 달
+    let year = null;      // 1년 보기 [{ym, points}]
+    let busy = false;
+
+    const ymLabel = ym => { const [y, m] = ym.split('-'); return `${y}년 ${+m}월 점수`; };
+    function say(text, err) { shMsg.textContent = text || ''; shMsg.classList.toggle('err', !!err); }
+    function showVal(v) { shVal.textContent = v; }
+    function showYm() {
+        shYm.textContent = ymLabel(curYm) + (curYm === PAGE_YM ? '' : ' · 목록과 다른 달');
+        shYm.classList.toggle('other', curYm !== PAGE_YM);
+    }
+
+    function drawYear() {
+        if (!year) return;
+        const max = Math.max(1, ...year.map(x => x.points));
+        let sum = 0;
+        yb.innerHTML = year.map(x => {
+            sum += x.points;
+            const m = +x.ym.slice(5), h = Math.round(x.points / max * 56);
+            const future = x.ym > THIS_YM;
+            return `<button type="button" data-ym="${x.ym}" class="${x.ym === curYm ? 'cur' : ''}" ${future ? 'disabled' : ''} aria-label="${m}월 ${x.points}점">`
+                 + `<em>${x.points || ''}</em><i class="${x.points ? '' : 'o'}" style="height:${Math.max(2, h)}px"></i><span>${m}</span></button>`;
+        }).join('');
+        document.getElementById('yrSum').textContent = sum;
+    }
+    async function loadYear() {
+        const y = +PAGE_YM.slice(0, 4);
+        document.getElementById('yrY').textContent = y;
+        yb.innerHTML = '<div class="yLoad" style="grid-column:1/-1">불러오는 중…</div>';
+        year = null;
+        const id = cur.dataset.id;
+        try {
+            const res = await fetch(`/DevotionPoints/StudentYear?personId=${id}&year=${y}`, { credentials: 'include' });
+            const j = await res.json();
+            if (!cur || cur.dataset.id !== id) return;
+            if (!j.ok) throw new Error(j.message || '불러오지 못했어요');
+            year = (j.rows || []).map(r => ({ ym: r.ym ?? r.Ym, points: +(r.points ?? r.Points) || 0 }));
+            drawYear();
+        } catch (e) {
+            yb.innerHTML = '<div class="yLoad" style="grid-column:1/-1">1년 점수를 불러오지 못했어요.</div>';
+        }
+    }
+    yb.addEventListener('click', e => {
+        const b = e.target.closest('button[data-ym]');
+        if (!b || busy || !year) return;
+        curYm = b.dataset.ym;
+        const x = year.find(v => v.ym === curYm);
+        showVal(x ? x.points : 0);
+        showYm(); say(''); drawYear();
+    });
+
+    function open(r) {
+        if (cur) cur.classList.remove('sel');
+        cur = r; curYm = PAGE_YM;
+        r.classList.add('sel');
+        document.getElementById('shName').textContent = r.dataset.name;
+        document.getElementById('shCls').textContent = r.dataset.cls;
+        showVal(+r.dataset.pt || 0);
+        showYm(); say(''); numIn.value = '';
+        root.classList.add('open');
+        sheet.setAttribute('aria-hidden', 'false');
+        loadYear();
+        setTimeout(() => document.getElementById('shClose').focus({ preventScroll: true }), 50);
+    }
+    function close() {
+        if (busy) return;
+        root.classList.remove('open');
+        sheet.setAttribute('aria-hidden', 'true');
+        if (cur) { cur.classList.remove('sel'); cur.focus({ preventScroll: true }); }
+        cur = null;
+    }
+    rows.forEach(r => r.addEventListener('click', () => open(r)));
+    document.getElementById('scrim').addEventListener('click', close);
+    document.getElementById('shClose').addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && root.classList.contains('open')) close(); });
+
+    // ── 저장 (버튼 누를 때마다) ──
+    async function save(btn, url, body) {
+        if (busy || !cur) return;
+        busy = true;
+        const before = +shVal.textContent || 0;
+        const t0 = performance.now();
+        btn.classList.add('busy');
+        sheet.querySelectorAll('.stp button, .num button').forEach(b => b.disabled = true);
+        say('');
+        try {
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
+            const j = await res.json();
+            if (!j || !j.ok) throw new Error(j && j.message || '저장 실패');
+            const v = +j.newValue || 0;
+            const left = MIN_SPIN - (performance.now() - t0);
+            if (left > 0) await new Promise(r => setTimeout(r, left));
+            showVal(v);
+            if (year) { const x = year.find(y => y.ym === body.ym); if (x) { x.points = v; drawYear(); } }
+            if (body.ym === PAGE_YM) setRow(cur, v);
+            say(`저장됨 · ${before} → ${v}`);
+        } catch (e) {
+            const left = MIN_SPIN - (performance.now() - t0);
+            if (left > 0) await new Promise(r => setTimeout(r, left));
+            say('저장하지 못했어요 · ' + (e.message || '네트워크 오류') + ' · 다시 눌러 주세요', true);
+        } finally {
+            btn.classList.remove('busy');
+            sheet.querySelectorAll('.stp button, .num button').forEach(b => b.disabled = false);
+            busy = false;
+        }
+    }
+    document.getElementById('stp').addEventListener('click', e => {
+        const b = e.target.closest('button[data-d]');
+        if (!b || !cur) return;
+        save(b, '/DevotionPoints/Adjust', { personId: +cur.dataset.id, ym: curYm, delta: +b.dataset.d });
+    });
+    document.getElementById('numF').addEventListener('submit', e => {
+        e.preventDefault();
+        if (!cur) return;
+        const v = parseInt(numIn.value, 10);
+        if (isNaN(v) || v < 0) { say('0 이상의 숫자를 넣어 주세요', true); numIn.focus(); return; }
+        save(numBtn, '/DevotionPoints/SetMonthly', { personId: +cur.dataset.id, ym: curYm, points: v }).then(() => { numIn.value = ''; });
+    });
+
+    // 다른 화면에서 "#g-학년-반" 으로 들어오면 그 반으로
+    if (location.hash.indexOf('#g-') === 0) document.getElementById(location.hash.slice(1))?.scrollIntoView();
+})();
+</script>
+</body>
+</html>

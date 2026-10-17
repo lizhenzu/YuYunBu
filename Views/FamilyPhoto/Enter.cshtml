@@ -1,0 +1,85 @@
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+
+@*  STEP 1 — 가족명 + 비밀번호 4자리.  처음이면 새로 만들고, 있으면 비밀번호가 맞을 때 그 가족으로. *@
+
+@{
+    Layout = null;
+    string? error = ViewBag.Error as string;
+    bool canUpload = ViewBag.CanUpload == true;
+    string DM(DateTime d) => $"{d.Month}.{d.Day}";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>우리 가족 사진 올리기 — @ConstatsCommon.MainKeyTitle</title>
+<partial name="_FamilyPhotoStyle" />
+<style>
+    .qz .fld { margin-top: 16px; }
+    .qz .fld label { display: block; font-size: 10px; letter-spacing: .16em; color: var(--dim); font-weight: 600; margin-bottom: 6px; }
+    .qz .fld input { width: 100%; box-sizing: border-box; border: 1px solid var(--rule); background: #fff; padding: 12px; font: inherit; font-size: 15px; outline: none; }
+    .qz .fld input:focus { border-color: var(--acc); }
+    .qz .fld input.pin { font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; letter-spacing: .6em; text-align: center; }
+    .qz .fld small { display: block; font-size: 10.5px; color: var(--dim); margin-top: 5px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/FamilyPhoto">가족 사진</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>올리기</em></span>
+            </div>
+            <div class="qzDate">@DM(Cfg.UploadStart) –</div>
+        </div>
+
+        <div class="brK">STEP 1 · 우리 가족</div>
+        <div class="brH1"><b>가족명</b>과 <b>비밀번호</b>를 정해요</div>
+        <div class="brSum">처음이면 새로 만들어지고, 이미 올린 가족이면 비밀번호가 맞을 때 그 가족으로 들어가요. 비밀번호는 나중에 사진을 바꾸거나 지울 때 써요.</div>
+
+        @if (!string.IsNullOrWhiteSpace(error))
+        {
+            <div class="msg err">@error</div>
+        }
+        @if (!canUpload)
+        {
+            <div class="msg">지금은 사진 올리기 기간이 아니에요. 이미 올린 가족은 가족명과 비밀번호로 들어가 사진을 볼 수 있어요.</div>
+        }
+
+        <form method="post" action="/FamilyPhoto/Enter" autocomplete="off">
+            @Html.AntiForgeryToken()
+            <div class="fld">
+                <label for="familyName">FAMILY NAME</label>
+                <input id="familyName" name="familyName" maxlength="@Cfg.FamilyNameMax" required placeholder="예: 김하늘네" />
+                <small>@(Cfg.FamilyNameMax)자까지 · 갤러리에 이 이름으로 보여요</small>
+            </div>
+            <div class="fld">
+                <label for="pin">PIN · 숫자 4자리</label>
+                <input id="pin" name="pin" class="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="····" />
+                <small>잊으면 선생님께 초기화를 부탁해요</small>
+            </div>
+            <div class="acts">
+                <button type="submit" class="btn">다음 →</button>
+                <a class="btn line" href="/FamilyPhoto">갤러리로</a>
+            </div>
+        </form>
+
+        <div class="hint">가족명은 띄어쓰기와 대소문자를 빼고 비교해요. "김하늘네" 와 "김 하늘네" 는 같은 가족이에요.</div>
+
+        <div class="brFoot"><a href="/FamilyPhoto">갤러리로 →</a></div>
+
+    </div>
+</div>
+
+<script>
+    // 숫자만
+    document.getElementById('pin').addEventListener('input', function () { this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4); });
+</script>
+</body>
+</html>

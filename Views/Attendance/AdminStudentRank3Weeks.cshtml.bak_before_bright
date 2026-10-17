@@ -1,0 +1,322 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.Attendance.AttendanceAdminStudentRankVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 아이별 출석 등수 — 올해 1.1 ~ 기준 주일 누적 출석 횟수 (등수는 DENSE_RANK)
+    ViewData["AttTab"] = "more";
+
+    var latestSunday = Model.ThisSunday.Date;
+    var thisSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    bool atLatest = latestSunday >= thisSunday;
+    var prevUrl = $"/Attendance/AdminStudentRank3Weeks?date={latestSunday.AddDays(-7):yyyy-MM-dd}";
+    var nextUrl = $"/Attendance/AdminStudentRank3Weeks?date={latestSunday.AddDays(7):yyyy-MM-dd}";
+
+    var denom = (Model.WeeksCount <= 0) ? 1 : Model.WeeksCount;
+    int Rate(int present) => (int)Math.Round(present * 100.0 / denom);
+    const int LowRate = 50; // 이 아래는 관심 필요
+
+    var rows = Model.Rows.OrderBy(r => r.RankNo).ThenBy(r => r.StudentName).ToList();
+    int kids = rows.Count;
+    int avg = kids == 0 ? 0 : (int)Math.Round(rows.Average(r => r.PresentCount) * 100.0 / denom);
+    int perfect = rows.Count(r => r.PresentCount >= Model.WeeksCount && Model.WeeksCount > 0);
+    int lowCount = rows.Count(r => Rate(r.PresentCount) < LowRate);
+    var grades = rows.Where(r => r.ClassYear > 0).Select(r => r.ClassYear).Distinct().OrderBy(x => x).ToList();
+
+    // 시상대 — 1·2·3등 묶음
+    var podium = rows.Where(r => r.RankNo <= 3).GroupBy(r => r.RankNo).OrderBy(g => g.Key).ToList();
+    string Short(BulletinBoard.ViewModels.Attendance.AttendanceAdminStudentRankVM.Row r) => r.ClassYear > 0 ? $"{r.ClassYear}학년 {r.ClassBan}반" : "-";
+    var watch = rows.Where(r => Rate(r.PresentCount) < LowRate).OrderBy(r => r.PresentCount).ThenBy(r => r.StudentName).Take(5).ToList();
+
+    // 반별 보기 — 반마다 다시 등수(DENSE)
+    var byClass = rows.GroupBy(r => new { r.ClassYear, r.ClassBan })
+                      .OrderBy(g => g.Key.ClassYear).ThenBy(g => g.Key.ClassBan)
+                      .ToList();
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>아이별 출석 등수 · @latestSunday.Year</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .sh { max-width: 980px; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .hdRow { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+        .dn { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--headdim); font-variant-numeric: tabular-nums; }
+        .dn a, .dn span.off { width: 32px; height: 32px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--headdim); }
+        .dn a:hover { color: var(--headk); }
+        .dn span.off { opacity: .25; }
+        .st { display: flex; gap: 22px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+        .st .lo b { color: #E08A72; }
+
+        .tools { position: sticky; top: 0; z-index: 30; background: var(--card); border-bottom: 1px solid var(--rule); }
+        .tools .sh { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 10px; padding-bottom: 10px; }
+        .chips { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+        .chips button { flex: none; font-family: inherit; font-size: 13px; padding: 8px 12px; border: 1px solid var(--rule); background: var(--card); color: var(--dim2); cursor: pointer; }
+        .chips button.on { background: var(--tx); border-color: var(--tx); color: var(--bg); font-weight: 600; }
+        .tg { display: flex; border: 1px solid var(--rule); margin-left: auto; }
+        .tg button { font-family: inherit; font-size: 13px; padding: 8px 14px; background: var(--card); border: 0; color: var(--dim2); cursor: pointer; }
+        .tg button + button { border-left: 1px solid var(--rule); }
+        .tg button.on { background: var(--mark); color: var(--tx); font-weight: 600; }
+        @@media (max-width: 520px) { .tg { margin-left: 0; width: 100%; } .tg button { flex: 1; } }
+
+        .lay { display: block; }
+        @@media (min-width: 900px) { .lay { display: grid; grid-template-columns: 290px 1fr; gap: 28px; align-items: start; } .lay aside { position: sticky; top: 76px; } .lay:has(> aside.hidden) { display: block; } }
+
+        /* 시상대 */
+        .pod { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 6px; align-items: end; margin-top: 20px; }
+        .pd { background: var(--card); border: 1px solid var(--rule); text-align: center; padding: 12px 6px 10px; min-width: 0; }
+        .pd.p1 { order: 2; border-color: var(--tx); box-shadow: inset 0 3px 0 var(--acc); padding-top: 16px; }
+        .pd.p2 { order: 1; } .pd.p3 { order: 3; }
+        .pd i { font-style: normal; display: block; font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; line-height: 1; color: var(--acc); }
+        .pd.p1 i { font-size: 40px; }
+        .pd b { display: block; margin-top: 6px; font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pd small { display: block; font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pd em { display: block; margin-top: 5px; font-style: normal; font-family: "Inter", sans-serif; font-size: 12px; font-variant-numeric: tabular-nums; }
+        .pd .more { display: none; } /* 휴대폰: "공동 N명" 표시로 대신 */
+        @@media (min-width: 900px) { .pd .more { display: inline; font-family: "Gothic A1", sans-serif; font-size: 12px; color: var(--dim); } }
+        .pd .tie { display: inline-block; margin-top: 4px; font-size: 10px; letter-spacing: .06em; padding: 1px 5px; border: 1px solid var(--acc); color: var(--acc); }
+        @@media (min-width: 900px) {
+            .pod { grid-template-columns: 1fr; margin-top: 24px; }
+            .pd, .pd.p1 { order: 0; display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px 14px; }
+            .pd i, .pd.p1 i { font-size: 32px; width: 34px; text-align: center; flex: none; }
+            .pd b { margin: 0; } .pd .who { flex: 1; min-width: 0; }
+            .pd em { margin: 0; } .pd .tie { display: none; }
+        }
+        .asH { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--acc); margin: 22px 0 8px; display: none; }
+        .watch { display: none; }
+        @@media (min-width: 900px) { .asH, .watch { display: block; } }
+        .wr { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--card); border: 1px solid var(--rule); margin-bottom: 6px; }
+        .wr i { font-style: normal; flex: none; width: 44px; font-family: "Inter", sans-serif; font-size: 16px; color: var(--danger); font-variant-numeric: tabular-nums; }
+        .wr span { flex: 1; min-width: 0; } .wr b { font-size: 14px; } .wr small { font-size: 11.5px; color: var(--dim); margin-left: 4px; }
+        .wr em { font-style: normal; font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); }
+
+        /* 목록 */
+        .r { display: flex; align-items: center; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+        .rk { flex: none; width: 34px; text-align: right; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--acc); font-variant-numeric: tabular-nums; }
+        .rk.same { color: var(--rule); }
+        /* B안 — 등수 묶음 머리 + 일련번호 */
+        .gh { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; padding: 8px 12px; background: var(--mark); border-left: 2px solid var(--acc); }
+        .gh b { font-family: "Inter", sans-serif; font-weight: 200; font-size: 24px; line-height: 1; color: var(--acc); font-variant-numeric: tabular-nums; }
+        .gh span { font-family: "Noto Serif KR", serif; font-size: 15px; }
+        .gh i { font-style: normal; font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); margin-left: 4px; }
+        .gh em { margin-left: auto; font-style: normal; font-family: "Inter", "Gothic A1", sans-serif; font-size: 12.5px; color: var(--dim2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .gh.sm { margin-top: 8px; padding: 6px 10px; }
+        .gh.sm b { font-size: 19px; }
+        .sq { flex: none; width: 30px; text-align: right; font-family: "Inter", sans-serif; font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .nm { flex: 1; min-width: 0; }
+        .nm b { font-size: 15px; font-weight: 600; }
+        .nm small { font-size: 11.5px; color: var(--dim); margin-left: 5px; }
+        .bar { height: 4px; background: var(--line); margin-top: 6px; max-width: 360px; }
+        .bar i { display: block; height: 4px; background: var(--acc); }
+        .bar.lo i { background: var(--danger); }
+        .nb { flex: none; text-align: right; min-width: 60px; font-variant-numeric: tabular-nums; }
+        .nb b { display: block; font-family: "Inter", sans-serif; font-weight: 500; font-size: 15px; }
+        .nb small { font-family: "Inter", sans-serif; font-size: 11px; color: var(--dim); }
+        .nb.lo b { color: var(--danger); }
+        .ab { flex: none; width: 54px; text-align: right; font-family: "Inter", sans-serif; font-size: 12.5px; color: var(--dim); display: none; }
+        @@media (min-width: 900px) { .ab { display: block; } }
+        .cH { display: flex; justify-content: space-between; align-items: baseline; margin-top: 22px; padding-bottom: 6px; border-bottom: 1px solid var(--tx); }
+        .cH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 16px; }
+        .cH span { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .sum { margin-top: 14px; padding: 12px 14px; background: var(--card); border: 1px solid var(--rule); font-size: 13.5px; color: var(--dim2); }
+        .sum b { color: var(--danger); }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/Index">출석부</a><span class="sep">›</span><a href="/Attendance/More">더보기</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdRow">
+                <div>
+                    <div class="hdK">RANKING · @latestSunday.Year</div>
+                    <h1 class="hdT">아이별 출석 등수</h1>
+                    <div class="dn">
+                        <a href="@prevUrl" aria-label="한 주 전">‹</a>
+                        <span>1.1 ~ @latestSunday.ToString("M.d") · @(Model.WeeksCount)주일 누적</span>
+                        @if (atLatest) { <span class="off" aria-hidden="true">›</span> } else { <a href="@nextUrl" aria-label="한 주 뒤">›</a> }
+                    </div>
+                </div>
+                <div class="st">
+                    <div>아이<b>@kids</b></div>
+                    <div>평균 출석률<b>@(avg)%</b></div>
+                    <div class="k">개근<b>@perfect</b></div>
+                    <div class="lo">@(LowRate)% 미만<b>@lowCount</b></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="tools">
+        <div class="sh">
+            <div class="chips" role="tablist" aria-label="학년">
+                <button type="button" data-g="0" class="on">전체</button>
+                @foreach (var g in grades) { <button type="button" data-g="@g">@(g)학년</button> }
+            </div>
+            <div class="tg" role="tablist" aria-label="정렬">
+                <button type="button" data-m="rank" class="on">등수순</button>
+                <button type="button" data-m="class">반별로 보기</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="sh">
+        @if (kids == 0)
+        {
+            <div class="empty">올해 출석 기록이 없습니다.</div>
+        }
+        else
+        {
+            <div class="lay">
+                <aside id="side">
+                    <div class="asH">TOP 3</div>
+                    <div class="pod" id="podium">
+                        @foreach (var g in podium)
+                        {
+                            var first = g.First();
+                            int n = g.Count();
+                            <div class="pd p@(g.Key)">
+                                <i>@g.Key</i>
+                                <span class="who">
+                                    <b>@first.StudentName@if (n > 1) {<span class="more"> 외 @(n - 1)명</span>}</b>
+                                    <small>@string.Join(" · ", g.Take(3).Select(Short))</small>
+                                </span>
+                                <em>@first.PresentCount/@Model.WeeksCount</em>
+                                @if (n > 1) { <span class="tie">공동 @(n)명</span> }
+                            </div>
+                        }
+                    </div>
+
+                    @if (watch.Count > 0)
+                    {
+                        <div class="asH">관심이 필요한 아이</div>
+                        <div class="watch">
+                            @foreach (var w in watch)
+                            {
+                                <div class="wr"><i>@Rate(w.PresentCount)%</i><span><b>@w.StudentName</b><small>@w.ClassLabel</small></span><em>@w.PresentCount/@Model.WeeksCount</em></div>
+                            }
+                        </div>
+                    }
+                </aside>
+
+                <div>
+                    @* ── 등수순 ── *@
+                    <section class="sec" id="viewRank">
+                        <div class="secH">
+                            <div><div class="secK">ALL</div><div class="secT">전체 등수</div></div>
+                            <span class="secN" id="rankTotal">@(kids)명</span>
+                        </div>
+                        @* B안 — 등수마다 묶음 머리(몇 명 · 몇~몇 번) + 줄 앞에는 1~N 일련번호 *@
+                        @{ int seq = 0; }
+                        @foreach (var g in rows.GroupBy(r => r.RankNo))
+                        {
+                            var first = g.First();
+                            int gRate = Rate(first.PresentCount);
+                            int from = seq + 1, to = seq + g.Count();
+                            <div class="rg">
+                                <div class="gh"><b>@g.Key</b><span>등</span><i>@first.PresentCount/@Model.WeeksCount · @(gRate)%</i><em class="ghN">@g.Count()명 · @(from == to ? $"{from}번" : $"{from}~{to}번")</em></div>
+                                @foreach (var r in g)
+                                {
+                                    seq++;
+                                    int rate = Rate(r.PresentCount);
+                                    bool lo = rate < LowRate;
+                                    <div class="r" data-g="@r.ClassYear">
+                                        <span class="sq">@seq</span>
+                                        <div class="nm"><b>@r.StudentName</b><small>@r.ClassLabel</small><div class="bar @(lo ? "lo" : "")"><i style="width:@(rate)%"></i></div></div>
+                                        <span class="ab">결석 @Math.Max(0, Model.WeeksCount - r.PresentCount)</span>
+                                        <div class="nb @(lo ? "lo" : "")"><b>@(rate)%</b><small>@r.PresentCount/@Model.WeeksCount</small></div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </section>
+
+                    @* ── 반별 ── *@
+                    <section class="sec hidden" id="viewClass">
+                        @foreach (var c in byClass)
+                        {
+                            var list = c.OrderByDescending(x => x.PresentCount).ThenBy(x => x.StudentName).ToList();
+                            int cAvg = (int)Math.Round(list.Average(x => x.PresentCount) * 100.0 / denom);
+                            <div class="cBlock" data-g="@c.Key.ClassYear">
+                                <div class="cH"><b>@(c.Key.ClassYear > 0 ? $"{c.Key.ClassYear}학년 {c.Key.ClassBan}반" : "반 없음")</b><span>@list.Count 명 · 평균 @(cAvg)%</span></div>
+                                @* 반은 인원이 적어 묶음 머리 대신 줄마다 "반 N등 · 전체 M등" + 반 일련번호 *@
+                                @{ int cRank = 0, cSeq = 0; }
+                                @foreach (var cg in list.GroupBy(x => x.PresentCount))
+                                {
+                                    cRank++;
+                                    bool tie = cg.Count() > 1;
+                                    @foreach (var r in cg)
+                                    {
+                                        cSeq++;
+                                        int rate = Rate(r.PresentCount);
+                                        bool lo = rate < LowRate;
+                                        <div class="r">
+                                            <span class="sq">@cSeq</span>
+                                            <div class="nm"><b>@r.StudentName</b><small>반 @(tie ? "공동 " : "")@(cRank)등 · 전체 @(r.RankNo)등</small><div class="bar @(lo ? "lo" : "")"><i style="width:@(rate)%"></i></div></div>
+                                            <span class="ab">결석 @Math.Max(0, Model.WeeksCount - r.PresentCount)</span>
+                                            <div class="nb @(lo ? "lo" : "")"><b>@(rate)%</b><small>@r.PresentCount/@Model.WeeksCount</small></div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        }
+                    </section>
+
+                    @if (lowCount > 0)
+                    {
+                        <div class="sum">출석률 @(LowRate)% 미만인 아이 <b>@(lowCount)명</b> · <a href="/Attendance/LongAbsent?absentDays=21" style="text-decoration:underline">돌봄에서 연락하기</a></div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="ft"><span>올해 @Model.WeeksCount 주일 기준 · 같은 출석 횟수는 공동 등수</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    let grade = '0', mode = 'rank';
+    const podium = document.getElementById('side');
+    function apply() {
+        document.querySelectorAll('#viewRank .r').forEach(r => r.classList.toggle('hidden', grade !== '0' && r.dataset.g !== grade));
+        // 보이는 아이만으로 일련번호 · 묶음 인원을 다시 센다
+        let seq = 0;
+        document.querySelectorAll('#viewRank .rg').forEach(g => {
+            const vis = Array.from(g.querySelectorAll('.r:not(.hidden)'));
+            g.classList.toggle('hidden', vis.length === 0);
+            if (!vis.length) return;
+            const from = seq + 1;
+            vis.forEach(r => { r.querySelector('.sq').textContent = ++seq; });
+            g.querySelector('.ghN').textContent = vis.length + '명 · ' + (from === seq ? from + '번' : from + '~' + seq + '번');
+        });
+        const tot = document.getElementById('rankTotal'); if (tot) tot.textContent = seq + '명';
+        document.querySelectorAll('#viewClass .cBlock').forEach(b => b.classList.toggle('hidden', grade !== '0' && b.dataset.g !== grade));
+        document.getElementById('viewRank')?.classList.toggle('hidden', mode !== 'rank');
+        document.getElementById('viewClass')?.classList.toggle('hidden', mode !== 'class');
+        // 시상대 · 관심 목록은 '전체'일 때만 (학년을 거르면 숫자가 맞지 않음)
+        if (podium) podium.classList.toggle('hidden', grade !== '0');
+    }
+    document.querySelectorAll('.chips button').forEach(b => b.addEventListener('click', () => {
+        grade = b.dataset.g;
+        document.querySelectorAll('.chips button').forEach(x => x.classList.toggle('on', x === b));
+        apply();
+    }));
+    document.querySelectorAll('.tg button').forEach(b => b.addEventListener('click', () => {
+        mode = b.dataset.m;
+        document.querySelectorAll('.tg button').forEach(x => x.classList.toggle('on', x === b));
+        apply();
+    }));
+})();
+</script>
+</body>
+</html>

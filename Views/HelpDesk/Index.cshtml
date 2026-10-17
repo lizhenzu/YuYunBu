@@ -1,0 +1,307 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Mvc;
+@using Microsoft.AspNetCore.Http;
+
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>요청 접수 페이지</title>
+    <style>
+        /* 기본 HTML과 Body 설정 */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            background: url('/images/home/HelpDesk/helpdesk.webp') no-repeat center center fixed;
+            background-size: cover;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 중앙 배치 설정 */
+        .centered-content {
+            width: 300px;
+            text-align: center;
+            color: white;
+            background-color: rgba(0, 0, 0, 0.8); /* Semi-transparent black background */
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        /* 버튼 및 모달 스타일 */
+        .button-row, .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 13px;
+            margin-top: 15px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+            button:hover {
+                background-color: #45a049;
+            }
+
+        /* 모달 스타일 */
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 500px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        /* 모달 차단 배경 */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        textarea, input[type="text"] {
+            width: 97%;
+            margin-top: 8px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* 반응형 미디어 쿼리 */
+        @@media (max-width: 600px) {
+            button {
+                padding: 12px 15px;
+            }
+
+            .modal {
+                width: 90%;
+            }
+        }
+
+        #confirmationModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%; /* 모달의 너비를 전체의 75%로 설정 */
+            max-width: 600px; /* 최대 너비 설정, 필요에 따라 조정 가능 */
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        #alertModal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 75%; /* 모달의 너비를 전체의 75%로 설정 */
+            max-width: 600px; /* 최대 너비 설정, 필요에 따라 조정 가능 */
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+    </style>
+
+    <script src="/js/common2.js"></script>
+</head>
+<body>
+    <div class="centered-content">
+        <h2 style="margin:5px">안녕하세요</h2>
+        <p>수정/개선 사항을 접수하는 곳입니다.</p>
+        <p>[요청접수]버튼을 눌러서 입력해 주세요.</p>
+        <div class="button-row">
+            <button onclick="openModal()">요청접수</button>
+            <button onclick="goList()">답변목록</button>
+            <button onclick="goHome()">Home</button>
+        </div>
+    </div>
+
+    <div id="requestModal" class="modal" style="display:none;">
+        <div>
+            <p>개선(수정)사항을 적어 주세요.</p>
+            <textarea rows="3" id="RequestContents" name="RequestContents" placeholder="개선(수정)사항을 입력하세요."></textarea>
+            <input type="text" id="UserName" name="UserName" placeholder="입력자(입력필수 아님 ^^)" value="@Html.Raw(@UserFullName)">
+            <div class="modal-buttons">
+                <button onclick="submitRequest()">제출</button>
+                <button onclick="closeModal()">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="backdrop" class="modal-backdrop" style="display:none;" onclick="preventClose()"></div>
+
+    <div id="confirmationModal" class="modal" style="display:none;">
+        <p>정상적으로 처리되었습니다.</p>
+        <div class="modal-buttons">
+            <button onclick="closeConfirmation()">확인</button>
+        </div>
+    </div>
+
+    <div id="alertModal" class="modal" style="display:none;">
+        <p>요청사항을 입력해 주세요.</p>
+        <div class="modal-buttons">
+            <button onclick="closeAlert()">확인</button>
+        </div>
+    </div>
+
+
+
+    <script>
+        //document.addEventListener('DOMContentLoaded', function () {
+        //    document.getElementById('UserName').value = "@UserFullName"; 
+        //});
+
+        function openModal() {
+            document.getElementById('requestModal').style.display = 'block';
+            document.getElementById('backdrop').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('requestModal').style.display = 'none';
+            document.getElementById('backdrop').style.display = 'none';
+        }
+
+        async function submitRequestOK() {
+            let result = await confirmMessage(false); // 취소 버튼 표시
+            if (result === 'y') {
+                goRefresh();
+                //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                // 여기에 다음 작업을 넣습니다
+            } else if (result === 'c') {
+                //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                // 작업 취소 로직
+            }
+            return;
+        }
+
+        function closeConfirmation() {
+            document.getElementById('confirmationModal').style.display = 'none';
+            document.getElementById('backdrop').style.display = 'none';
+            goRefresh();
+        }
+
+
+        function closeAlert() {
+            document.getElementById('alertModal').style.display = 'none';
+            document.getElementById('backdrop').style.display = 'none';
+        }
+
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function goHome() {
+            window.location.href = '/';
+        }
+
+        function goRefresh() {
+            window.location.href = '/HelpDesk/Index';
+        }
+        function goList() {
+            window.location.href = '/Board/IndexByBoard?boardName=HelpDesk';
+        }
+
+
+        function preventClose() {
+            // 모달 백드롭 클릭시 모달이 닫히지 않도록 처리
+            return false;
+        }
+
+        async function submitRequest() {
+
+            var userName = document.getElementById('UserName').value;
+            var requestContents = document.getElementById('RequestContents').value;
+
+            if (typeof requestContents === "string" && requestContents.length === 0) {
+                console.log("The string is empty");
+
+
+                let result = await confirmMessage(false, ['개선(수정)사항을 입력하세요.']); // 취소 버튼 표시
+                if (result === 'y') {
+                    //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                    // 여기에 다음 작업을 넣습니다
+                } else if (result === 'c') {
+                    //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                    // 작업 취소 로직
+                }
+                return;
+
+            }
+
+            //const data = { Content: requestContents, Title: '', UserName: userName }; // 이곳에 보낼 int 값을 지정
+
+            const data = new FormData();
+            data.append('Content', requestContents);
+            data.append('Title', 'HelpDesk요청'); // 여기에 int 값으로 보낼 Title을 지정
+            data.append('UserName', userName);
+
+
+              
+            console.log('data:', data);
+
+            fetch('/Board/Create?boardName=HelpDesk', {
+                method: 'POST',
+                body: data // FormData 객체를 사용하여 전송
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Success:', data);
+                    submitRequestOK();
+
+
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+
+
+        }
+
+    </script>
+
+
+</body>
+</html>

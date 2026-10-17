@@ -1,0 +1,82 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css) · Notice/Branch 와 같은 구성
+    var urlPersonSearch = "/AddressBook";   // 인명검색
+    var urlRoster = "/ChurchRecord";        // 교적부
+    var urlHome = "/";
+
+    var menus = new[] {
+        new { No = "01", Label = "인명검색", Desc = "이름 · 전화번호로 빠르게 찾기",  En = "SEARCH", Url = urlPersonSearch },
+        new { No = "02", Label = "교적부",   Desc = "학년 · 반별 명단과 정보 확인",   En = "ROSTER", Url = urlRoster },
+    };
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>인명검색 · 교적부</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .bSec { margin-top: 34px; }
+        .bSecH { padding-bottom: 10px; border-bottom: 1px solid var(--tx); }
+        .bSecK { font-size: 12px; font-weight: 600; letter-spacing: .2em; color: var(--acc); }
+        .bSecT { font-family: "Noto Serif KR", serif; font-size: 19px; font-weight: 500; margin-top: 4px; }
+
+        /* 바로가기 목록 */
+        .mn { display: flex; align-items: center; gap: 16px; padding: 20px 2px; border-bottom: 1px solid var(--line); color: var(--tx); transition: background .15s; }
+        .mn:hover { background: var(--card); }
+        .mnNo { flex: none; width: 30px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 24px; color: var(--acc); }
+        .mnTx { flex: 1; min-width: 0; }
+        .mnL { display: block; font-family: "Noto Serif KR", serif; font-size: 20px; line-height: 1.35; }
+        .mnD { display: block; margin-top: 3px; font-size: 13.5px; color: var(--dim2); }
+        .mnE { flex: none; font-family: "Inter", sans-serif; font-size: 11px; letter-spacing: .16em; color: var(--dim); }
+        .mnA { flex: none; font-size: 16px; color: var(--dim); transition: transform .15s, color .15s; }
+        .mn:hover .mnA { color: var(--acc); transform: translateX(3px); }
+        @@media (max-width: 480px) { .mnE { display: none; } }
+
+        /* 홈 — 검정 띠 */
+        .homeBar { display: flex; align-items: center; justify-content: space-between; margin-top: 36px; background: var(--head); color: var(--headtx); padding: 18px 20px; }
+        .homeBar b { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 17px; }
+        .homeBar small { display: block; font-size: 12.5px; color: var(--headdim); margin-top: 2px; }
+        .homeBar i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--headk); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><a href="@urlHome">← @ConstatsCommon.ToHome</a><span>YUNYUNBU · @DateHelper.GetKoreaNow().Year</span></div>
+            <div class="hdK">ADDRESS BOOK</div>
+            <h1 class="hdT">인명검색 · 교적부</h1>
+            <div class="hdS">아이와 선생님을 찾고, 반별 명단을 확인해요.</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <section class="bSec">
+            <div class="bSecH"><div class="bSecK">SHORTCUTS</div><div class="bSecT">바로가기</div></div>
+            @foreach (var m in menus)
+            {
+                <a class="mn" href="@m.Url">
+                    <span class="mnNo">@m.No</span>
+                    <span class="mnTx"><span class="mnL">@m.Label</span><span class="mnD">@m.Desc</span></span>
+                    <span class="mnE">@m.En</span>
+                    <span class="mnA">→</span>
+                </a>
+            }
+        </section>
+
+        <a class="homeBar" href="@urlHome">
+            <span><b>@ConstatsCommon.ToHome 가기</b><small>메인 화면으로 돌아가기</small></span>
+            <i>→</i>
+        </a>
+
+        <div class="ft">
+            <span>© 유년부 · 인명검색 &amp; 교적부</span>
+            <span><a href="@urlPersonSearch">인명검색</a> · <a href="@urlRoster">교적부</a></span>
+        </div>
+    </main>
+</body>
+</html>

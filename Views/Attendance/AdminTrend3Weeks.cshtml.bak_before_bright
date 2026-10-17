@@ -1,0 +1,213 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Globalization
+@model BulletinBoard.ViewModels.Attendance.AttendanceAdminTrendVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 전체 출석현황 — 최근 3주(주일 3번) 출석 추이
+    ViewData["AttTab"] = "more";
+
+    var sunday = Model.ThisSunday.Date;
+    var sundayStr = sunday.ToString("yyyy-MM-dd");
+    var thisSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    bool atLatest = sunday >= thisSunday;
+    var prevUrl = $"/Attendance/AdminTrend3Weeks?date={sunday.AddDays(-7):yyyy-MM-dd}";
+    var nextUrl = $"/Attendance/AdminTrend3Weeks?date={sunday.AddDays(7):yyyy-MM-dd}";
+
+    // 올해 첫 주일 ~ 기준 주일까지 주일 수 (아이별 주별 출석표(52주) 링크용)
+    var jan1 = new DateTime(sunday.Year, 1, 1);
+    var firstSunday = jan1.AddDays((7 - (int)jan1.DayOfWeek) % 7);
+    int weeksYtd = sunday < firstSunday ? 1 : (sunday - firstSunday).Days / 7 + 1;
+
+    const decimal LowRate = 70m; // 이 아래는 빨간 막대 (기존 기준)
+    var ko = new CultureInfo("ko-KR");
+    var weeksAsc = (Model.Weeks ?? new()).OrderBy(w => w.SundayDate).ToList();
+    var weeksDesc = weeksAsc.AsEnumerable().Reverse().ToList();
+    var now = weeksDesc.FirstOrDefault();
+    var prev = weeksDesc.Skip(1).FirstOrDefault();
+    decimal? diff = (now != null && prev != null) ? now.Rate - prev.Rate : null;
+
+    string Pct(decimal r) => r == Math.Floor(r) ? ((int)r).ToString() : r.ToString("0.#");
+    string Label(int idxFromNow) => idxFromNow == 0 ? "이번 주" : idxFromNow == 1 ? "지난주" : $"{idxFromNow}주 전";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>전체 출석현황 · @sunday.ToString("M월 d일")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .sh { max-width: 900px; }
+        .hd .sh { padding-top: 16px; padding-bottom: 22px; }
+        .hdRow { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+        .dn { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--headdim); }
+        .dn a, .dn span.off { width: 32px; height: 32px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--headdim); }
+        .dn a:hover { color: var(--headk); }
+        .dn span.off { opacity: .25; }
+        .big { display: flex; align-items: flex-end; gap: 16px; margin-top: 14px; }
+        .big .pct { font-family: "Inter", sans-serif; font-weight: 200; font-size: 60px; line-height: .9; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .big .pct small { font-size: 26px; }
+        .big .sub { font-size: 13px; color: var(--headdim); line-height: 1.65; }
+        .big .sub b { color: var(--headtx); font-weight: 400; font-family: "Inter", sans-serif; }
+        .chg { display: inline-block; margin-top: 3px; font-family: "Inter", "Gothic A1", sans-serif; font-size: 12px; padding: 1px 7px; border: 1px solid #3A3C40; color: #E08A72; }
+        .chg.up { color: #8FC7A6; }
+        .chg.eq { color: var(--headdim); }
+
+        /* 3주 막대 */
+        .ch { display: flex; align-items: flex-end; gap: 12px; height: 170px; padding: 18px 0 0; margin-top: 20px; background: var(--card); border: 1px solid var(--rule); }
+        .cb { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+        .cb .v { font-family: "Inter", sans-serif; font-size: 13.5px; font-weight: 500; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+        .cb .col { width: 60%; max-width: 72px; height: 100px; background: var(--mark); position: relative; }
+        .cb .col i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--acc); transition: height .6s ease; }
+        .cb.lo .col i { background: var(--danger); }
+        .cb.now .col i { background: var(--tx); }
+        .cb.now.lo .col i { background: var(--danger); }
+        .cb .dt { font-size: 12px; color: var(--dim); padding: 8px 0 10px; }
+        .cb.now .dt { color: var(--tx); font-weight: 600; }
+
+        /* 주별 카드 */
+        .wks { display: grid; grid-template-columns: 1fr; gap: 0; }
+        @@media (min-width: 760px) { .wks { grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; } .wk { background: var(--card); border: 1px solid var(--rule); padding: 16px; } .wk.now { border-color: var(--tx); box-shadow: inset 0 3px 0 var(--acc); } .wkT .p { display: none; } .pp { display: block !important; } }
+        .wk { padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        @@media (min-width: 760px) { .wk.o1 { order: 1; } .wk.o2 { order: 2; } .wk.o3 { order: 3; } } /* PC: 오래된 주 → 이번 주 */
+        .wkK { font-size: 11px; font-weight: 600; letter-spacing: .12em; color: var(--dim); }
+        .wkT { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
+        .wkT b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 17px; }
+        .wkT .p { margin-left: auto; font-family: "Inter", sans-serif; font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+        .wk.lo .wkT .p, .wk.lo .pp { color: var(--danger); }
+        .pp { display: none; font-family: "Inter", sans-serif; font-weight: 200; font-size: 46px; line-height: 1; margin-top: 12px; font-variant-numeric: tabular-nums; }
+        .pp small { font-size: 20px; }
+        .bar { height: 5px; background: var(--line); margin-top: 9px; }
+        .bar i { display: block; height: 5px; background: var(--acc); }
+        .wk.lo .bar i { background: var(--danger); }
+        .wkM { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 7px; font-size: 12.5px; color: var(--dim2); font-variant-numeric: tabular-nums; }
+        .wkM .a { color: var(--ok); } .wkM .x { color: var(--danger); }
+        .wkA { display: flex; gap: 6px; margin-top: 12px; }
+        .wkA a { flex: 1; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); }
+        .wkA + .wkA { margin-top: 6px; }
+        .wkA a:hover { border-color: var(--acc); color: var(--acc); }
+        .wkA a.pri { background: var(--tx); color: var(--bg); border-color: var(--tx); }
+        .wkA a.pri:hover { background: var(--acc); border-color: var(--acc); color: #fff; }
+
+        /* 더 보기 */
+        .more { display: grid; grid-template-columns: 1fr; gap: 0 24px; }
+        @@media (min-width: 760px) { .more { grid-template-columns: 1fr 1fr; } }
+        .more a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 2px; border-bottom: 1px solid var(--line); }
+        .more a:hover .mL { color: var(--acc); }
+        .mL { display: block; font-family: "Noto Serif KR", serif; font-size: 16px; }
+        .mD { display: block; margin-top: 2px; font-size: 12.5px; color: var(--dim); }
+        .more i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 20px; color: var(--dim); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/Index">출석부</a><span class="sep">›</span><a href="/Attendance/More">더보기</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdRow">
+                <div>
+                    <div class="hdK">ATTENDANCE · 3 WEEKS</div>
+                    <h1 class="hdT">최근 전체 출석현황(3주)</h1>
+                    <div class="dn">
+                        <a href="@prevUrl" aria-label="한 주 전">‹</a>
+                        <span>@sunday.ToString("M월 d일") 주일 기준</span>
+                        @if (atLatest) { <span class="off" aria-hidden="true">›</span> } else { <a href="@nextUrl" aria-label="한 주 뒤">›</a> }
+                    </div>
+                </div>
+                @if (now != null)
+                {
+                    <div class="big">
+                        <div class="pct">@Pct(now.Rate)<small>%</small></div>
+                        <div class="sub">
+                            이번 주 <b>@now.Present</b> / @(now.Total)명 출석<br />
+                            결석 <b>@now.Absent</b>명<br />
+                            @if (diff.HasValue)
+                            {
+                                var d = diff.Value;
+                                <span class="chg @(d > 0 ? "up" : d == 0 ? "eq" : "")">@(d > 0 ? "▲" : d == 0 ? "―" : "▼") @(d == 0 ? "지난주와 같아요" : $"{Pct(Math.Abs(d))}%p 지난주보다")</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        @if (weeksAsc.Count == 0)
+        {
+            <div class="empty">출석 기록이 없습니다.</div>
+        }
+        else
+        {
+            <div class="ch" role="img" aria-label="최근 3주 출석률 막대그래프">
+                @for (int i = 0; i < weeksAsc.Count; i++)
+                {
+                    var w = weeksAsc[i];
+                    bool isNow = i == weeksAsc.Count - 1;
+                    var h = Math.Min(100, Math.Max(0, w.Rate));
+                    <div class="cb @(isNow ? "now" : "") @(w.Rate < LowRate ? "lo" : "")">
+                        <span class="v">@Pct(w.Rate)%</span>
+                        <div class="col"><i data-h="@h.ToString(CultureInfo.InvariantCulture)"></i></div>
+                        <span class="dt">@w.SundayDate.ToString("M.d")@(isNow ? " 이번 주" : "")</span>
+                    </div>
+                }
+            </div>
+
+            <section class="sec">
+                <div class="secH">
+                    <div><div class="secK">BY WEEK</div><div class="secT">주별 자세히</div></div>
+                    <span class="secN">@(LowRate)% 미만은 빨간 막대</span>
+                </div>
+                <div class="wks">
+                    @* 휴대폰은 최근 주부터, PC 는 왼쪽 오래된 주 → 오른쪽 이번 주 *@
+                    @for (int i = 0; i < weeksDesc.Count; i++)
+                    {
+                        var w = weeksDesc[i];
+                        var sp = w.SundayDate.ToString("yyyy-MM-dd");
+                        bool lo = w.Rate < LowRate;
+                        <article class="wk o@(weeksDesc.Count - i) @(i == 0 ? "now" : "") @(lo ? "lo" : "")">
+                            <div class="wkK">@Label(i)</div>
+                            <div class="wkT"><b>@w.SundayDate.ToString("M월 d일 (ddd)", ko)</b><span class="p">@Pct(w.Rate)%</span></div>
+                            <div class="pp">@Pct(w.Rate)<small>%</small></div>
+                            <div class="bar"><i style="width:@(Math.Min(100, Math.Max(0, w.Rate)).ToString(CultureInfo.InvariantCulture))%"></i></div>
+                            <div class="wkM"><span>총 @w.Total</span><span class="a">출석 @w.Present</span><span class="x">결석 @w.Absent</span></div>
+                            <div class="wkA">
+                                <a href="/Attendance/AdminTrendSundayDetail?sunday=@sp">반별 출석</a>
+                            </div>
+                            @* 명단은 기기와 상관없이 둘 다 고를 수 있게 *@
+                            <div class="wkA">
+                                <a href="/Attendance/SundayStudentsPC?sunday=@sp">명단 보기 (PC)</a>
+                                <a class="@(i == 0 ? "pri" : "")" href="/Attendance/SundayStudentsMobile?sunday=@sp">명단 보기 (모바일)</a>
+                            </div>
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="sec">
+            <div class="secH"><div><div class="secK">MORE</div><div class="secT">더 보기</div></div></div>
+            <div class="more">
+                <a href="/Attendance/AdminStudentRank3Weeks?date=@sundayStr"><span><span class="mL">아이별 출석 등수</span><span class="mD">올해 누적</span></span><i>→</i></a>
+                <a href="/Attendance/AdminStudentMatrixWeeks?date=@sundayStr&weeks=@weeksYtd"><span><span class="mL">아이별 주별 출석표(52주)</span><span class="mD">아이 × 주일 · 올해 @(weeksYtd)주</span></span><i>→</i></a>
+            </div>
+        </section>
+
+        <div class="ft"><span>총원은 지금 반 편성 기준 · 출석률 = 출석 ÷ 총원</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    // 막대 채우기 (0 → 목표 높이)
+    document.querySelectorAll('.cb .col i').forEach((el, i) =>
+        setTimeout(() => { el.style.height = (parseFloat(el.dataset.h) || 0) + '%'; }, 60 + i * 90));
+})();
+</script>
+</body>
+</html>

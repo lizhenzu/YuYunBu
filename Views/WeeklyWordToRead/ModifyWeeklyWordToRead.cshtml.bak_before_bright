@@ -1,0 +1,54 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.Models.WeeklyWordToRead
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공과 수정</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="@Url.Action("WeeklyWordToReadDetailList")">공과 목록</a></span>
+                <span>No. @Model.Id</span>
+            </div>
+            <div class="hdK">EDIT LESSON · @(Model.WeekTitle_DW)단원 @(Model.WeekTitle_GUA)과</div>
+            <h1 class="hdT">@(string.IsNullOrWhiteSpace(Model.BibleTitle) ? "공과 수정" : Model.BibleTitle)</h1>
+            <div class="hdS">고친 뒤 저장을 누르면 바로 반영돼요.</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="tb">
+            <a class="nbtn" href="@Url.Action("WeeklyWordToReadDetailList")">← 목록</a>
+            <a class="nbtn" href="/WeeklyReport/IndexByID?Id=@Model.Id">공과 보기</a>
+            <span class="grow"></span>
+            <a class="nbtn dan" href="@Url.Action("DeleteWeeklyWordToRead", new { id = Model.Id })" onclick="return confirm('이 공과를 삭제할까요? 되돌릴 수 없어요.');">삭제</a>
+        </div>
+
+        <form asp-action="UpdateWeeklyWordToRead" method="post" class="fm" style="margin-top:4px">
+            @await Html.PartialAsync("_LessonFields", Model)
+
+            <div class="fAct" style="margin-top:26px">
+                <a href="@Url.Action("WeeklyWordToReadDetailList")" class="nbtn">취소</a>
+                <button type="submit" class="nbtn pri">저장</button>
+            </div>
+        </form>
+        <div class="ft"><span>© 유년부 · 공과</span></div>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@3.2.12/dist/jquery.validate.unobtrusive.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+@page "/hanmadi/admin"
+@model BulletinBoard.Areas.Hanmadi.Pages.Admin.IndexModel
+@{
+    Layout = null;
+    ViewData["Title"] = "한마디 관리";
+    var total  = Model.Sessions.Count;
+    var live   = Model.Sessions.Count(s => s.Status == 1);
+    var waiting= Model.Sessions.Count(s => s.Status == 0);
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>세션 관리 · 한마디</title>
+<style>
+:root {
+  --bg:      #f1f5f9;
+  --surface: #ffffff;
+  --border:  #e2e8f0;
+  --accent:  #6366f1;
+  --accent2: #4f46e5;
+  --text:    #0f172a;
+  --muted:   #64748b;
+  --faint:   #94a3b8;
+  --live-bg: #dcfce7; --live-fg: #16a34a;
+  --wait-bg: #f1f5f9; --wait-fg: #64748b;
+  --done-bg: #fee2e2; --done-fg: #dc2626;
+  --del-bg:  #fff;    --del-bd: #fecaca; --del-fg: #ef4444;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── 상단바 ── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  height: 56px;
+  display: flex; align-items: center; gap: 10px;
+}
+.back-link {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--faint); font-size: 13px; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+  transition: color .15s;
+}
+.back-link:hover { color: var(--accent); }
+.back-link svg { width: 14px; height: 14px; flex-shrink: 0; }
+.topbar-title {
+  font-size: 16px; font-weight: 900; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topbar-title span { color: var(--accent); }
+.new-btn {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 10px;
+  text-decoration: none; transition: background .15s;
+  white-space: nowrap;
+}
+.new-btn:hover { background: var(--accent2); }
+
+/* ── 바디 컨테이너 ── */
+.container {
+  max-width: 680px; margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+/* ── 통계 카드 ── */
+.stats {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 10px; margin-bottom: 22px;
+}
+.stat {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 12px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.stat-n { font-size: 26px; font-weight: 900; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.stat-n.live { color: var(--live-fg); }
+.stat-n.muted { color: var(--faint); }
+.stat-l { font-size: 11px; font-weight: 700; color: var(--faint); margin-top: 5px; letter-spacing: .3px; }
+
+/* ── 섹션 헤더 ── */
+.section-hd {
+  font-size: 11px; font-weight: 800; color: var(--faint);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 10px; padding-left: 2px;
+}
+
+/* ── 세션 카드 ── */
+.card {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 16px; padding: 16px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: border-color .15s, box-shadow .15s;
+}
+.card:hover { border-color: #c4b5fd; box-shadow: 0 4px 16px rgba(99,102,241,.08); }
+
+.card-top {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 10px;
+  margin-bottom: 10px;
+}
+.card-title {
+  font-size: 15px; font-weight: 800; color: var(--text);
+  line-height: 1.35; word-break: keep-all;
+}
+.status-chip {
+  flex-shrink: 0;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px;
+}
+.c-wait { background: var(--wait-bg); color: var(--wait-fg); }
+.c-live { background: var(--live-bg); color: var(--live-fg); }
+.c-done { background: var(--done-bg); color: var(--done-fg); }
+
+.card-meta {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px; margin-bottom: 14px;
+}
+.code-chip {
+  background: #ede9fe; color: var(--accent);
+  font-size: 12px; font-weight: 900;
+  padding: 2px 10px; border-radius: 7px;
+  letter-spacing: 3px; font-variant-numeric: tabular-nums;
+}
+.meta-text { font-size: 12px; color: var(--faint); }
+
+/* ── 액션 버튼 ── */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 5px; padding: 9px 10px;
+  border-radius: 10px; font-size: 12px; font-weight: 700;
+  text-decoration: none; border: none; cursor: pointer;
+  transition: all .15s; white-space: nowrap;
+  font-family: inherit;
+}
+.btn-outline {
+  border: 1.5px solid var(--border); color: var(--muted);
+  background: var(--bg);
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: #ede9fe; }
+.btn-primary { background: var(--accent); color: #fff; border: 1.5px solid transparent; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-del {
+  border: 1.5px solid var(--del-bd); color: var(--del-fg);
+  background: var(--del-bg);
+}
+.btn-del:hover { background: #fef2f2; border-color: #fca5a5; }
+.btn-disabled {
+  border: 1.5px solid var(--border); color: var(--faint);
+  background: var(--bg); opacity: .5; cursor: not-allowed;
+}
+
+/* 4버튼일 때 전체 너비 */
+.actions.has-live  { grid-template-columns: 1fr 1fr; }
+.actions.no-live   { grid-template-columns: 1fr 1fr 1fr; }
+
+/* ── 빈 상태 ── */
+.empty {
+  text-align: center; padding: 60px 24px;
+  color: var(--faint); font-size: 14px;
+}
+.empty-icon { font-size: 48px; display: block; margin-bottom: 14px; opacity: .5; }
+.empty p { line-height: 1.7; }
+
+/* ── 반응형 ── */
+@@media (min-width: 480px) {
+  .actions.has-live  { grid-template-columns: repeat(4, auto); justify-content: start; }
+  .actions.no-live   { grid-template-columns: repeat(3, auto); justify-content: start; }
+  .btn { padding: 8px 14px; }
+}
+
+        @@media (max-width: 360px) {
+  .stat-n { font-size: 22px; }
+  .topbar-title { font-size: 14px; }
+  .new-btn { padding: 7px 12px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 상단바 -->
+<header class="topbar">
+  <a href="/hanmadi" class="back-link">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10 12L6 8l4-4"/>
+    </svg>
+    홈
+  </a>
+  <div class="topbar-title">🛠️ <span>세션</span> 관리</div>
+  <a href="/hanmadi/admin/sessions/create" class="new-btn">
+    + 새 세션
+  </a>
+</header>
+
+<div class="container">
+
+  <!-- 통계 -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-n">@total</div>
+      <div class="stat-l">전체</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n live">@live</div>
+      <div class="stat-l">진행중</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n muted">@waiting</div>
+      <div class="stat-l">대기</div>
+    </div>
+  </div>
+
+  @if (!Model.Sessions.Any())
+  {
+    <div class="empty">
+      <span class="empty-icon">📋</span>
+      <p>아직 세션이 없어요.<br/>위의 <strong>+ 새 세션</strong> 버튼으로 시작해보세요!</p>
+    </div>
+  }
+  else
+  {
+    <div class="section-hd">세션 목록</div>
+    @foreach (var s in Model.Sessions.OrderByDescending(s => s.CreatedAt))
+    {
+      var sc = s.Status == 1 ? "c-live" : s.Status == 2 ? "c-done" : "c-wait";
+      var sl = s.Status == 1 ? "🔴 진행중" : s.Status == 2 ? "종료" : "대기";
+      var isLive = s.Status != 2;
+      <div class="card">
+        <div class="card-top">
+          <div class="card-title">@s.Title</div>
+          <span class="status-chip @sc">@sl</span>
+        </div>
+        <div class="card-meta">
+          <span class="code-chip">@s.Code</span>
+          <span class="meta-text">문항 @(s.Questions.Count)개</span>
+          <span class="meta-text">· @s.CreatedAt.ToLocalTime().ToString("MM.dd HH:mm")</span>
+        </div>
+        <div class="actions @(isLive ? "has-live" : "no-live")">
+          <a href="/hanmadi/admin/sessions/@s.Id/questions" class="btn btn-outline">📝 문항</a>
+          <a href="/hanmadi/admin/sessions/@s.Id/participants" class="btn btn-outline">👥 참여자</a>
+          @if (isLive)
+          {
+            <a href="/hanmadi/admin/sessions/@s.Id/live" class="btn btn-primary">🔴 라이브</a>
+          }
+          else
+          {
+            <span class="btn btn-disabled">종료됨</span>
+          }
+          <form method="post" asp-page-handler="DeleteSession" style="display:contents"
+                onsubmit="return confirm('「@s.Title」 세션과 모든 데이터를 삭제합니다.\n복구할 수 없습니다. 계속할까요?')">
+            <input type="hidden" name="sessionId" value="@s.Id"/>
+            <button type="submit" class="btn btn-del">🗑 삭제</button>
+          </form>
+        </div>
+      </div>
+    }
+  }
+
+</div>
+</body>
+</html>

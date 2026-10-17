@@ -1,0 +1,706 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@model BulletinBoard.Services.Abstract.VBSParticipationSurveyAdminVM
+
+@{
+    Layout = null;
+
+    var viewMode = ((ViewBag.ViewMode as string) ?? "All").ToLowerInvariant();
+
+    DateTime[] days = Model.Days ?? new[]
+    {
+        ConstatsCommon.VBSParticipationStartDate,
+        ConstatsCommon.VBSParticipationStartDate.AddDays(1),
+        ConstatsCommon.VBSParticipationStartDate.AddDays(2)
+    };
+
+    string[] koDdd = { "일", "월", "화", "수", "목", "금", "토" };
+    string fmtD(DateTime d) => $"{d.Month}/{d.Day}({koDdd[(int)d.DayOfWeek]})";
+
+    bool? slotVal(VBSParticipationSurveyAdminRow r, DateTime d, string s)
+        => r.Slots != null && r.Slots.TryGetValue((d.Date, s), out var v) ? v : null;
+
+    // ViewAll 과 동일: T1001 만 학생, 나머지는 모두 교사/스탭
+    bool isStudentRole(string? c) =>
+        (c ?? "").Trim().Equals("T1001", StringComparison.OrdinalIgnoreCase);
+
+    // 학생: 학년/반 · 교사/스탭: RoleNM 그대로 (ViewAll 동일 로직)
+    string infoOf(VBSParticipationSurveyAdminRow r)
+    {
+        if (isStudentRole(r.RoleCode))
+        {
+            var y = r.ClassYear ?? 0;
+            var b = r.ClassBan  ?? 0;
+            return (y > 0 && b > 0) ? $"{y}학년 {b}반" : "학생";
+        }
+        var roleNm   = (r.RoleNM   ?? "").Trim();
+        var roleCode = (r.RoleCode ?? "").Trim();
+        return string.IsNullOrWhiteSpace(roleNm) ? roleCode : roleNm;
+    }
+
+    // full / partial / none
+    string statusOf(VBSParticipationSurveyAdminRow r)
+    {
+        bool any = false, allFull = true;
+        foreach (var d in days)
+        {
+            var am = slotVal(r, d, "AM"); var pm = slotVal(r, d, "PM");
+            if (am != null || pm != null) any = true;
+            if (am != true || pm != true) allFull = false;
+        }
+        if (!any) return "none";
+        return allFull ? "full" : "partial";
+    }
+
+    string stateStr(bool? v) => v == null ? "null" : (v == true ? "true" : "false");
+
+    string safeJs(string? s) => (s ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
+
+    // 서버 초기 통계
+    var rows = Model.Rows ?? new List<VBSParticipationSurveyAdminRow>();
+    int total     = rows.Count;
+    int responded = rows.Count(r => days.Any(d => slotVal(r, d, "AM") != null || slotVal(r, d, "PM") != null));
+    int missed    = total - responded;
+    int fullAtt   = rows.Count(r => days.All(d => slotVal(r, d, "AM") == true && slotVal(r, d, "PM") == true));
+    int partAtt   = rows.Count(r => {
+        bool any = days.Any(d => slotVal(r, d, "AM") == true || slotVal(r, d, "PM") == true);
+        bool all = days.All(d => slotVal(r, d, "AM") == true && slotVal(r, d, "PM") == true);
+        return any && !all;
+    });
+    int pct = total <= 0 ? 0 : (int)Math.Round(responded * 100.0 / total);
+    string vparam = viewMode == "student" ? "Student" : (viewMode == "teacher" ? "Teacher" : "All");
+
+    int cntAtt(DateTime d, string s) => rows.Count(r => slotVal(r, d, s) == true);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경학교 참석여부 · 관리</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --blue:  #2563eb; --blue2: #1d4ed8;
+            --green: #16a34a; --green2: #15803d;
+            --ok:    #22c55e; --bad: #ef4444; --amber: #f59e0b;
+            --ink:   #0f172a; --mut:  #64748b;
+            --line:  rgba(15,23,42,.10); --line2: rgba(15,23,42,.06);
+            --card:  #ffffff;
+            --shadow: 0 8px 24px rgba(2,6,23,.09);
+        }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(155deg, #dbeafe 0%, #f0f9ff 40%, #f8fafc 100%);
+            color: var(--ink);
+            font-family: system-ui, -apple-system, 'Noto Sans KR', sans-serif;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        /* ── Topbar ── */
+        .topbar {
+            position: sticky; top: 0; z-index: 30;
+            background: rgba(255,255,255,.96);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(14px);
+        }
+        .tb-row1 {
+            display: flex; align-items: center; gap: 10px;
+            padding: 0 16px; height: 50px;
+        }
+        .tb-brand { font-size: 15px; font-weight: 950; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tb-links { display: flex; gap: 6px; flex-shrink: 0; }
+        .tb-link {
+            padding: 6px 12px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 900;
+            background: rgba(15,23,42,.06);
+            transition: background .12s; white-space: nowrap;
+        }
+        .tb-link:hover { background: rgba(15,23,42,.12); }
+
+        .tb-row2 {
+            display: flex; gap: 4px; padding: 6px 16px 8px;
+            overflow-x: auto; border-top: 1px solid var(--line2);
+        }
+        .ftab {
+            padding: 6px 18px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 900; border: none; cursor: pointer;
+            background: rgba(15,23,42,.06); color: var(--mut);
+            font-family: inherit; transition: all .14s; white-space: nowrap; flex-shrink: 0;
+        }
+        .ftab:hover { background: rgba(15,23,42,.10); }
+        .ftab.act  { background: var(--blue); color: #fff; }
+
+        /* ── Stats strip ── */
+        .stats-strip {
+            position: sticky; top: 94px; z-index: 20;
+            background: rgba(255,255,255,.96);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(12px);
+            display: flex; align-items: stretch; overflow-x: auto;
+        }
+        .sc {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 7px 18px;
+            border-right: 1px solid var(--line2); flex-shrink: 0;
+            min-width: 70px;
+        }
+        .sc:last-child { border-right: none; flex: 1; }
+        .sc-v { font-size: 19px; font-weight: 950; line-height: 1; }
+        .sc-l { font-size: 10.5px; font-weight: 900; color: var(--mut); margin-top: 2px; }
+        .c-ok  { color: #166534; }
+        .c-bad { color: #991b1b; }
+        .c-amb { color: #92400e; }
+        .prog-wrap { width: 100%; height: 6px; background: rgba(15,23,42,.08); border-radius: 999px; overflow: hidden; margin-top: 5px; }
+        .prog-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--blue), var(--ok)); transition: width .3s; }
+
+        /* ── Main ── */
+        .main { max-width: 1140px; margin: 0 auto; padding: 16px 14px 40px; }
+
+        /* ── Search / top-action row ── */
+        .top-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .search-inp {
+            flex: 1; padding: 10px 16px; border-radius: 12px;
+            border: 1.5px solid var(--line);
+            background: rgba(255,255,255,.9); font-size: 13.5px;
+            font-weight: 750; font-family: inherit; outline: none;
+            box-shadow: 0 4px 12px rgba(2,6,23,.06); transition: border-color .15s;
+        }
+        .search-inp:focus { border-color: var(--blue); }
+        .upd-note { font-size: 11.5px; font-weight: 900; color: var(--mut); white-space: nowrap; flex-shrink: 0; }
+
+        /* ── Desktop table ── */
+        .tbl-wrap {
+            background: rgba(255,255,255,.88);
+            border: 1px solid var(--line);
+            border-radius: 18px; overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        table { width: 100%; border-collapse: collapse; }
+
+        thead th {
+            background: rgba(255,255,255,.98);
+            border-bottom: 2px solid var(--line);
+            padding: 9px 8px;
+            font-size: 11.5px; font-weight: 950;
+            color: var(--mut); text-align: center; white-space: nowrap;
+        }
+        .th-name { text-align: left; padding-left: 14px; min-width: 180px; }
+        .th-slot { min-width: 90px; }
+        .th-day-hdr { background: rgba(37,99,235,.05); font-size: 12px; }
+
+        tbody tr { transition: background .1s; }
+        tbody tr.r-student:hover td { background: rgba(37,99,235,.04); }
+        tbody tr.r-teacher:hover td { background: rgba(22,163,74,.04); }
+
+        tbody td {
+            border-bottom: 1px solid rgba(15,23,42,.07);
+            padding: 9px 8px; text-align: center; font-size: 13px;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        .td-name { text-align: left; padding-left: 12px; }
+
+        /* Name cell */
+        .nc { display: flex; align-items: center; gap: 10px; }
+        .nc-av {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
+        }
+        .r-student .nc-av { background: rgba(37,99,235,.10); }
+        .r-teacher .nc-av { background: rgba(22,163,74,.10); }
+        .nc-body { min-width: 0; }
+        .nc-name { font-size: 13.5px; font-weight: 950; white-space: nowrap; }
+        .nc-info { font-size: 11.5px; font-weight: 800; margin-top: 2px; }
+        .r-student .nc-info { color: var(--blue); }
+        .r-teacher .nc-info { color: var(--green); }
+
+        /* Status dot */
+        .sdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-left: auto; }
+        .sdot.full    { background: #22c55e; }
+        .sdot.partial { background: var(--amber); }
+        .sdot.none    { background: #cbd5e1; }
+
+        /* Toggle switch (table) */
+        .tog {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 8px 10px;
+            border: 1px solid var(--line); border-radius: 12px;
+            background: rgba(255,255,255,.9); cursor: pointer;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+            transition: border-color .14s, background .14s;
+        }
+        .tog:hover { border-color: var(--blue); }
+        .tog.on { background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.35); }
+        .tog-txt { font-size: 12px; font-weight: 950; color: var(--mut); white-space: nowrap; transition: color .14s; }
+        .tog.on .tog-txt { color: #166534; }
+        .tog.st-false .tog-txt { color: #991b1b; }
+        .sw { width: 36px; height: 20px; border-radius: 999px; background: #e2e8f0; position: relative; flex-shrink: 0; transition: background .2s; }
+        .kn { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.14); transition: left .2s; }
+        .tog.on .sw { background: var(--ok); }
+        .tog.on .kn { left: 18px; }
+
+        /* ── Mobile cards ── */
+        .m-cards { display: none; flex-direction: column; gap: 12px; }
+
+        .mc {
+            background: rgba(255,255,255,.92);
+            border: 1px solid var(--line);
+            border-radius: 18px; overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .mc.r-student { border-top: 3px solid rgba(37,99,235,.55); }
+        .mc.r-teacher { border-top: 3px solid rgba(22,163,74,.55); }
+
+        .mc-head {
+            display: flex; align-items: center; gap: 12px;
+            padding: 13px 14px;
+            border-bottom: 1px solid var(--line2);
+        }
+        .mc-av {
+            width: 42px; height: 42px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; flex-shrink: 0;
+        }
+        .mc.r-student .mc-av { background: rgba(37,99,235,.10); }
+        .mc.r-teacher .mc-av { background: rgba(22,163,74,.10); }
+        .mc-body { min-width: 0; flex: 1; }
+        .mc-name { font-size: 15px; font-weight: 950; }
+        .mc-info { font-size: 12px; font-weight: 800; margin-top: 3px; }
+        .mc.r-student .mc-info { color: var(--blue); }
+        .mc.r-teacher .mc-info { color: var(--green); }
+        .mc-prog { text-align: center; flex-shrink: 0; }
+        .mc-prog-n { font-size: 17px; font-weight: 950; line-height: 1; }
+        .mc-prog-l { font-size: 10px; font-weight: 900; color: var(--mut); margin-top: 2px; }
+
+        .mc-days { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+        .mc-day { border: 1px solid var(--line2); border-radius: 14px; overflow: hidden; }
+        .mc-day-ttl {
+            padding: 8px 12px; font-size: 12.5px; font-weight: 950;
+            background: rgba(15,23,42,.025); border-bottom: 1px solid var(--line2);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .mc-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; }
+        .mc-slot-lbl { font-size: 11px; font-weight: 950; color: var(--mut); margin-bottom: 6px; }
+        .m-tog {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; padding: 10px 10px;
+            border: 1px solid var(--line); border-radius: 12px;
+            background: rgba(255,255,255,.92); cursor: pointer;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+            transition: border-color .14s, background .14s;
+        }
+        .m-tog.on { background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.35); }
+        .m-badge {
+            padding: 4px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 950;
+            border: 1px solid var(--line); background: rgba(15,23,42,.03); flex-shrink: 0;
+        }
+        .m-badge.wait { color: var(--mut); }
+        .m-badge.on   { color: #166534; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.22); }
+        .m-badge.off  { color: #991b1b; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.22); }
+
+        /* ── Summary grid ── */
+        .sum-box {
+            margin-top: 16px; background: rgba(255,255,255,.88);
+            border: 1px solid var(--line); border-radius: 18px;
+            padding: 16px; box-shadow: var(--shadow);
+        }
+        .sum-title { font-size: 14px; font-weight: 950; margin-bottom: 12px; }
+        .sum-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .sum-card {
+            background: rgba(15,23,42,.025); border: 1px solid var(--line2);
+            border-radius: 14px; padding: 12px;
+        }
+        .sum-day { font-size: 12px; font-weight: 950; color: var(--mut); margin-bottom: 8px; }
+        .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .sum-row + .sum-row { border-top: 1px dashed var(--line2); }
+        .sum-slot { font-size: 12px; font-weight: 900; color: var(--mut); }
+        .sum-num { font-size: 18px; font-weight: 950; }
+
+        /* ── Loading modal ── */
+        .busy-back {
+            position: fixed; inset: 0; background: rgba(15,23,42,.45);
+            display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .busy-card {
+            background: #fff; border-radius: 18px; padding: 24px 28px; text-align: center;
+            box-shadow: 0 20px 50px rgba(2,6,23,.22);
+        }
+        .spin {
+            width: 28px; height: 28px; border-radius: 50%;
+            border: 3px solid rgba(37,99,235,.18); border-top-color: var(--blue);
+            margin: 0 auto 10px; animation: sp .9s linear infinite;
+        }
+        @@keyframes sp { to { transform: rotate(360deg); } }
+        .busy-txt { font-size: 14px; font-weight: 950; }
+
+        .hidden { display: none !important; }
+
+        @@media (max-width: 860px) {
+            .th-slot { min-width: 78px; }
+            tbody td { font-size: 12.5px; }
+        }
+        @@media (max-width: 680px) {
+            .tbl-wrap { display: none; }
+            .m-cards  { display: flex; }
+            .stats-strip { top: 94px; }
+            .sum-grid { grid-template-columns: 1fr; }
+        }
+        @@media (max-width: 400px) {
+            .mc-pair { grid-template-columns: 1fr; }
+            .tb-brand { font-size: 13.5px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ── Topbar ── -->
+    <div class="topbar">
+        <div class="tb-row1">
+            <div class="tb-brand">🏕️ 성경학교 참석 관리</div>
+            <div class="tb-links">
+                <a class="tb-link" href="/VBSParticipationSurvey/Survey">(나) 입력</a>
+                <a class="tb-link" href="/VBSParticipationSurvey/ViewAll?view=All">현황 보기</a>
+                <a class="tb-link" href="/Home/Index">🏠 홈</a>
+            </div>
+        </div>
+        <div class="tb-row2">
+            <button class="ftab @(viewMode == "all"     ? "act" : "")" onclick="location.href='/VBSParticipationSurvey/Admin?view=All'">전체</button>
+            <button class="ftab @(viewMode == "student" ? "act" : "")" onclick="location.href='/VBSParticipationSurvey/Admin?view=Student'">🎒 학생</button>
+            <button class="ftab @(viewMode == "teacher" ? "act" : "")" onclick="location.href='/VBSParticipationSurvey/Admin?view=Teacher'">👨‍🏫 교사·스탭</button>
+        </div>
+    </div>
+
+    <!-- ── Stats strip ── -->
+    <div class="stats-strip">
+        <div class="sc">
+            <div class="sc-v" id="ls-people">@total</div>
+            <div class="sc-l">전체</div>
+        </div>
+        <div class="sc">
+            <div class="sc-v" id="ls-responded">@responded</div>
+            <div class="sc-l">응답</div>
+        </div>
+        <div class="sc">
+            <div class="sc-v c-bad" id="ls-unresponded">@missed</div>
+            <div class="sc-l">미응답</div>
+        </div>
+        <div class="sc">
+            <div class="sc-v c-ok" id="ls-full">@fullAtt</div>
+            <div class="sc-l">전체참여</div>
+        </div>
+        <div class="sc">
+            <div class="sc-v c-amb" id="ls-partial">@partAtt</div>
+            <div class="sc-l">부분참여</div>
+        </div>
+        <div class="sc" style="min-width:120px;padding:7px 14px;">
+            <div style="font-size:11px;font-weight:900;color:var(--mut);align-self:flex-start;">
+                응답률 <span id="ls-respondedPct">@pct</span>%
+                <span style="font-size:10px;margin-left:6px;font-weight:750;" id="ls-updatedAt"></span>
+            </div>
+            <div class="prog-wrap" style="margin-top:5px;">
+                <div class="prog-fill" id="lsBarFill" style="width:@pct%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Main ── -->
+    <div class="main">
+
+        <!-- Search row -->
+        <div class="top-row">
+            <input class="search-inp" id="searchInp" type="text" placeholder="🔍  이름 검색…" oninput="applySearch()" />
+            <div class="upd-note">✔ 저장 시 자동 반영</div>
+        </div>
+
+        <!-- ──────────── Desktop Table ──────────── -->
+        <div class="tbl-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="th-name" rowspan="2">이름 / 정보</th>
+                        @foreach (var d in days)
+                        {
+                            <th class="th-day-hdr" colspan="2">📅 @fmtD(d)</th>
+                        }
+                    </tr>
+                    <tr>
+                        @foreach (var d in days)
+                        {
+                            <th class="th-slot" style="background:rgba(37,99,235,.03);">🌅 오전</th>
+                            <th class="th-slot" style="background:rgba(99,102,241,.03);">🌆 오후</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                    @foreach (var r in rows)
+                    {
+                        bool isT = !isStudentRole(r.RoleCode);
+                        string info = infoOf(r);
+                        string st   = statusOf(r);
+                        string avatar = isT ? "👨‍🏫" : "🎒";
+                        string trCls  = isT ? "r-teacher" : "r-student";
+
+                        int ans = 0, tot = days.Length * 2;
+                        foreach (var d in days) {
+                            if (slotVal(r, d, "AM") != null) ans++;
+                            if (slotVal(r, d, "PM") != null) ans++;
+                        }
+
+                        <tr class="@trCls" data-name="@((r.FullName ?? "").ToLowerInvariant())">
+                            <td class="td-name">
+                                <div class="nc">
+                                    <div class="nc-av">@avatar</div>
+                                    <div class="nc-body">
+                                        <div class="nc-name">@r.FullName</div>
+                                        <div class="nc-info">@info</div>
+                                    </div>
+                                    <div class="sdot @st" title="@(st == "full" ? "전체 참석" : st == "partial" ? "부분 참석" : "미응답")"></div>
+                                </div>
+                            </td>
+
+                            @foreach (var d in days)
+                            {
+                                var am = slotVal(r, d, "AM");
+                                var pm = slotVal(r, d, "PM");
+
+                                <td class="th-slot">
+                                    <div class="tog @(am == true ? "on" : am == false ? "st-false" : "")"
+                                         data-state="@stateStr(am)"
+                                         onclick="adminToggle(this,'@safeJs(r.UserName)','@safeJs(r.FullName)','@safeJs(r.RoleCode)','@d.ToString("yyyy-MM-dd")','AM')">
+                                        <span class="tog-txt">@(am == null ? "미응답" : am == true ? "참석" : "미참석")</span>
+                                        <div class="sw"><div class="kn"></div></div>
+                                    </div>
+                                </td>
+                                <td class="th-slot">
+                                    <div class="tog @(pm == true ? "on" : pm == false ? "st-false" : "")"
+                                         data-state="@stateStr(pm)"
+                                         onclick="adminToggle(this,'@safeJs(r.UserName)','@safeJs(r.FullName)','@safeJs(r.RoleCode)','@d.ToString("yyyy-MM-dd")','PM')">
+                                        <span class="tog-txt">@(pm == null ? "미응답" : pm == true ? "참석" : "미참석")</span>
+                                        <div class="sw"><div class="kn"></div></div>
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ──────────── Mobile Cards ──────────── -->
+        <div class="m-cards" id="mCards">
+            @foreach (var r in rows)
+            {
+                bool isT   = !isStudentRole(r.RoleCode);
+                string info   = infoOf(r);
+                string avatar = isT ? "👨‍🏫" : "🎒";
+                string mcCls  = isT ? "r-teacher" : "r-student";
+
+                int ans = 0; int tot = days.Length * 2;
+                foreach (var d in days) {
+                    if (slotVal(r, d, "AM") != null) ans++;
+                    if (slotVal(r, d, "PM") != null) ans++;
+                }
+                string st = statusOf(r);
+
+                <div class="mc @mcCls" data-name="@((r.FullName ?? "").ToLowerInvariant())">
+                    <div class="mc-head">
+                        <div class="mc-av">@avatar</div>
+                        <div class="mc-body">
+                            <div class="mc-name">@r.FullName</div>
+                            <div class="mc-info">@info</div>
+                        </div>
+                        <div class="mc-prog">
+                            <div class="mc-prog-n">@ans/@tot</div>
+                            <div class="mc-prog-l">응답</div>
+                        </div>
+                        <div class="sdot @st" style="margin-left:6px;" title="@(st == "full" ? "전체 참석" : st == "partial" ? "부분 참석" : "미응답")"></div>
+                    </div>
+
+                    <div class="mc-days">
+                        @foreach (var d in days)
+                        {
+                            var am = slotVal(r, d, "AM");
+                            var pm = slotVal(r, d, "PM");
+                            string amBadge = am == null ? "wait" : am == true ? "on" : "off";
+                            string pmBadge = pm == null ? "wait" : pm == true ? "on" : "off";
+
+                            <div class="mc-day">
+                                <div class="mc-day-ttl">📅 @fmtD(d)</div>
+                                <div class="mc-pair">
+                                    <div>
+                                        <div class="mc-slot-lbl">🌅 오전</div>
+                                        <div class="m-tog @(am == true ? "on" : "")"
+                                             data-state="@stateStr(am)"
+                                             onclick="adminToggle(this,'@safeJs(r.UserName)','@safeJs(r.FullName)','@safeJs(r.RoleCode)','@d.ToString("yyyy-MM-dd")','AM')">
+                                            <span class="m-badge @amBadge">@(am == null ? "미응답" : am == true ? "참석" : "미참석")</span>
+                                            <div class="sw"><div class="kn"></div></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="mc-slot-lbl">🌆 오후</div>
+                                        <div class="m-tog @(pm == true ? "on" : "")"
+                                             data-state="@stateStr(pm)"
+                                             onclick="adminToggle(this,'@safeJs(r.UserName)','@safeJs(r.FullName)','@safeJs(r.RoleCode)','@d.ToString("yyyy-MM-dd")','PM')">
+                                            <span class="m-badge @pmBadge">@(pm == null ? "미응답" : pm == true ? "참석" : "미참석")</span>
+                                            <div class="sw"><div class="kn"></div></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- ──────────── Summary ──────────── -->
+        <div class="sum-box">
+            <div class="sum-title">📊 날짜별 참석 합계</div>
+            <div class="sum-grid">
+                @foreach (var d in days)
+                {
+                    <div class="sum-card">
+                        <div class="sum-day">📅 @fmtD(d)</div>
+                        <div class="sum-row">
+                            <span class="sum-slot">🌅 오전</span>
+                            <span class="sum-num" id="sum-@d.ToString("yyyyMMdd")-AM">@cntAtt(d, "AM")</span>
+                        </div>
+                        <div class="sum-row">
+                            <span class="sum-slot">🌆 오후</span>
+                            <span class="sum-num" id="sum-@d.ToString("yyyyMMdd")-PM">@cntAtt(d, "PM")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div><!-- /main -->
+
+    <!-- Loading modal -->
+    <div class="busy-back" id="busy">
+        <div class="busy-card">
+            <div class="spin"></div>
+            <div class="busy-txt">저장 중…</div>
+        </div>
+    </div>
+
+    <script>
+        const vparam = '@vparam';
+        const busy = on => document.getElementById('busy').style.display = on ? 'flex' : 'none';
+
+        /* ── 상태 읽기 / 계산 ── */
+        function readState(el) {
+            const s = (el.dataset.state || '').trim();
+            if (s === 'true')  return true;
+            if (s === 'false') return false;
+            return null;
+        }
+        function nextState(cur) { return cur === null ? true : !cur; }
+
+        /* ── UI 반영 (테이블 .tog / 모바일 .m-tog 공용) ── */
+        function applyToggle(el, next) {
+            el.dataset.state = next === null ? 'null' : String(next);
+
+            // 스위치 on/off
+            el.classList.toggle('on', next === true);
+            el.classList.toggle('st-false', next === false);
+
+            // 테이블용 텍스트
+            const txt = el.querySelector('.tog-txt');
+            if (txt) {
+                txt.textContent = next === null ? '미응답' : next ? '참석' : '미참석';
+            }
+
+            // 모바일용 배지
+            const badge = el.querySelector('.m-badge');
+            if (badge) {
+                badge.classList.remove('wait', 'on', 'off');
+                if (next === null)       { badge.classList.add('wait'); badge.textContent = '미응답'; }
+                else if (next === true)  { badge.classList.add('on');   badge.textContent = '참석'; }
+                else                    { badge.classList.add('off');   badge.textContent = '미참석'; }
+            }
+        }
+
+        /* ── AJAX ── */
+        async function postJson(url, body) {
+            busy(true);
+            try {
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const j = await r.json().catch(() => ({ ok: false, message: '응답 오류' }));
+                if (!r.ok || !j.ok) { alert(j.message || '저장에 실패했습니다.'); return false; }
+                return true;
+            } finally { busy(false); }
+        }
+
+        /* ── 토글 (테이블 + 모바일 공용) ── */
+        async function adminToggle(el, userName, fullName, roleCode, dateStr, slot) {
+            const cur  = readState(el);
+            const next = nextState(cur);
+            const ok   = await postJson('/VBSParticipationSurvey/AdminSaveSlot', {
+                userName, fullName, roleCode, date: dateStr, slot, isAttend: next
+            });
+            if (!ok) return;
+            applyToggle(el, next);
+            await refreshStats();
+        }
+
+        /* ── 서버 통계 갱신 ── */
+        function setText(id, v) { const e = document.getElementById(id); if (e) e.textContent = v ?? ''; }
+
+        async function refreshStats() {
+            try {
+                const r = await fetch(
+                    `/VBSParticipationSurvey/AdminStats?view=${encodeURIComponent(vparam)}&t=${Date.now()}`,
+                    { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json' } }
+                );
+                const j = await r.json().catch(() => null);
+                if (!r.ok || !j?.ok) return;
+
+                setText('ls-people',       j.peopleTotal);
+                setText('ls-responded',    j.respondedPeople);
+                setText('ls-unresponded',  j.unrespondedPeople);
+                setText('ls-full',         j.fullAttendPeople);
+                setText('ls-partial',      j.partialAttendPeople);
+                setText('ls-respondedPct', j.respondedPct);
+
+                const bar = document.getElementById('lsBarFill');
+                if (bar) bar.style.width = (j.respondedPct ?? 0) + '%';
+
+                if (j.updatedAtText) setText('ls-updatedAt', j.updatedAtText);
+
+                (j.dayCounts || []).forEach(dc => {
+                    const k = (dc.date || '').replaceAll('-', '');
+                    if (!k) return;
+                    setText(`sum-${k}-AM`, dc.am ?? 0);
+                    if (dc.pm != null) setText(`sum-${k}-PM`, dc.pm);
+                });
+            } catch { /* 무시 */ }
+        }
+
+        /* ── 검색 ── */
+        function applySearch() {
+            const q = (document.getElementById('searchInp')?.value || '').trim().toLowerCase();
+            document.querySelectorAll('#tbody tr').forEach(tr => {
+                tr.classList.toggle('hidden', q !== '' && !(tr.dataset.name || '').includes(q));
+            });
+            document.querySelectorAll('#mCards .mc').forEach(mc => {
+                mc.classList.toggle('hidden', q !== '' && !(mc.dataset.name || '').includes(q));
+            });
+        }
+
+        /* ── 초기화 ── */
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStats();
+            setInterval(refreshStats, 10000);
+        });
+    </script>
+</body>
+</html>

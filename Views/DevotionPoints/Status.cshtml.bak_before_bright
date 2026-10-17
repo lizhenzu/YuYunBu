@@ -1,0 +1,215 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Globalization
+@model BulletinBoard.Controllers.DevotionPointsController.StatusPageVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 포인트 현황·순위 — 월 합계 · 최근 12개월 · 반별 합계 · 개인 순위 (예전 Dashboard + Participants)
+    ViewData["PointTab"] = "status";
+    ViewData["PointYm"] = Model.Ym;
+
+    string YmOf(DateTime m) => m.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+    string Url(string ym, int cy) => $"/DevotionPoints/Status?ym={ym}" + (cy > 0 ? $"&classYear={cy}" : "");
+    bool isThisMonth = Model.Month == Model.ThisMonth;
+    string Nm(string s) => string.IsNullOrWhiteSpace(s) ? "이름 없음" : s.Trim();
+    string Cls(int y, int b) => y > 0 ? $"{y}학년 {b}반" : "반 없음";
+
+    var rows = Model.Rows;
+    int kids = rows.Count;
+    int total = rows.Sum(r => r.Points);
+    int got = rows.Count(r => r.Points > 0);
+    int max = rows.Select(r => r.Points).DefaultIfEmpty(0).Max();
+    string avg = kids == 0 ? "0" : (total / (double)kids).ToString("0.#", CultureInfo.InvariantCulture);
+
+    // 반별 합계 — 합계 순
+    var classes = rows.GroupBy(r => new { r.ClassYear, r.ClassBan })
+        .Select(g => new { g.Key.ClassYear, g.Key.ClassBan, Count = g.Count(), Sum = g.Sum(x => x.Points) })
+        .OrderByDescending(c => c.Sum).ThenBy(c => c.ClassYear).ThenBy(c => c.ClassBan).ToList();
+    var classesOn = classes.Where(c => c.Sum > 0).ToList();
+    int classMax = Math.Max(1, classes.Select(c => c.Sum).DefaultIfEmpty(0).Max());
+
+    // 개인 순위 — 같은 점수는 같은 등수 (1, 2, 2, 2, 5)
+    var ranked = rows.Where(r => r.Points > 0).OrderByDescending(r => r.Points).ThenBy(r => r.ClassYear).ThenBy(r => r.ClassBan).ThenBy(r => r.FullName).ToList();
+    var zeros = rows.Where(r => r.Points <= 0).OrderBy(r => r.ClassYear).ThenBy(r => r.ClassBan).ThenBy(r => r.FullName).ToList();
+
+    var trend = Model.Trend;
+    int trendMax = Math.Max(1, trend.Select(t => t.TotalPoints).DefaultIfEmpty(0).Max());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>포인트 현황 · @Model.Month.ToString("M월")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .hd .sh { padding-top: 16px; padding-bottom: 18px; }
+        .hdK { margin-top: 14px; }
+        .mn { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+        .mn a, .mn span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--headdim); }
+        .mn a:hover { color: var(--headk); }
+        .mn span.off { opacity: .25; }
+        .mn h1 { margin: 0; text-align: center; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; }
+        .mn h1 small { display: block; font-family: "Gothic A1", sans-serif; font-size: 11px; letter-spacing: .14em; color: var(--headk); margin-top: 2px; }
+        .st { display: flex; gap: 22px; margin-top: 12px; flex-wrap: wrap; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st b small { font-size: 14px; color: var(--headdim); }
+        .st .k b { color: var(--headk); }
+
+        .seg { display: flex; border: 1px solid var(--rule); margin-top: 14px; }
+        .seg a { flex: 1; text-align: center; font-size: 13px; padding: 9px 2px; color: var(--dim2); background: var(--card); }
+        .seg a + a { border-left: 1px solid var(--rule); }
+        .seg a.on { background: var(--tx); color: var(--bg); font-weight: 600; }
+
+        .blk { margin-top: 24px; }
+        .bK { font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .2em; color: var(--acc); font-weight: 600; }
+        .bT { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 2px; padding-bottom: 7px; border-bottom: 1px solid var(--tx); font-family: "Noto Serif KR", serif; font-size: 17px; }
+        .bT small { font-family: "Gothic A1", sans-serif; font-size: 11.5px; color: var(--dim); }
+
+        /* 최근 12개월 */
+        .trend { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 12px; }
+        .trend a { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; height: 112px; font-family: "Inter", sans-serif; font-variant-numeric: tabular-nums; }
+        .trend em { font-style: normal; font-size: 10px; color: var(--dim2); text-align: center; }
+        .trend i { display: block; background: var(--acc); opacity: .5; min-height: 2px; }
+        .trend span { font-size: 10px; color: var(--dim); text-align: center; padding-top: 3px; border-top: 2px solid transparent; }
+        .trend a:hover i { opacity: .8; }
+        .trend a.on i { background: var(--tx); opacity: 1; }
+        .trend a.on span { color: var(--tx); font-weight: 600; border-top-color: var(--tx); }
+
+        /* 반별 합계 */
+        .cr { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+        .cr .c { width: 84px; flex: none; }
+        .cr .br { flex: 1; height: 6px; background: var(--line); }
+        .cr .br i { display: block; height: 6px; background: var(--acc); }
+        .cr .n { width: 74px; flex: none; text-align: right; font-family: "Inter", sans-serif; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; }
+        .cr .n small { color: var(--dim); font-weight: 400; font-size: 11.5px; }
+        .cr.z { color: var(--dim); font-size: 13px; }
+
+        /* 개인 순위 */
+        .rk { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+        .rk .r { width: 28px; flex: none; font-family: "Inter", sans-serif; font-size: 19px; font-weight: 200; color: var(--acc); font-variant-numeric: tabular-nums; }
+        .rk .r.top { font-weight: 500; }
+        .rk .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+        .rk .nm small { font-size: 11.5px; color: var(--dim); font-weight: 400; margin-left: 6px; }
+        .rk .nm.noname { color: var(--danger); font-weight: 400; }
+        .rk .p { font-family: "Inter", sans-serif; font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        details.zero { margin-top: 10px; background: var(--mark); }
+        details.zero summary { display: flex; justify-content: space-between; padding: 11px 12px; font-size: 13px; color: var(--dim2); cursor: pointer; list-style: none; }
+        details.zero summary::-webkit-details-marker { display: none; }
+        details.zero summary::after { content: "펼쳐 보기 ›"; color: var(--dim); }
+        details.zero[open] summary::after { content: "접기 ‹"; }
+        .zl { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 12px; }
+        .zl span { font-size: 12.5px; padding: 4px 8px; background: var(--card); border: 1px solid var(--rule); color: var(--dim2); }
+        .zl span small { color: var(--dim); margin-left: 4px; font-size: 11px; }
+        .none { padding: 26px 0; text-align: center; font-size: 13.5px; color: var(--dim); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Admin/TeacherOnly">교사 대시보드</a><span class="sep">›</span>포인트</span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdK">@ConstatsCommon.HolyWordAndRead</div>
+            <div class="mn">
+                <a href="@Url(YmOf(Model.Month.AddMonths(-1)), Model.ClassYear)" aria-label="지난달">‹</a>
+                <h1>@Model.Month.ToString("yyyy년 M월")<small>현황 · 순위</small></h1>
+                @if (isThisMonth) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Url(YmOf(Model.Month.AddMonths(1)), Model.ClassYear)" aria-label="다음 달">›</a> }
+            </div>
+            <div class="st">
+                <div class="k">합계<b>@total</b></div>
+                <div>받은 아이<b>@got<small> / @kids</small></b></div>
+                <div>평균<b>@avg</b></div>
+                <div>최고<b>@max</b></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <nav class="seg" aria-label="학년">
+            <a href="@Url(Model.Ym, 0)" class="@(Model.ClassYear == 0 ? "on" : "")">전체</a>
+            @foreach (var y in Model.ClassYears)
+            {
+                <a href="@Url(Model.Ym, y)" class="@(Model.ClassYear == y ? "on" : "")">@(y)학년</a>
+            }
+        </nav>
+
+        <section class="blk">
+            <div class="bK">TREND</div>
+            <div class="bT">최근 12개월 합계<small>막대를 누르면 그 달로</small></div>
+            @if (trend.Count == 0)
+            {
+                <div class="none">기록이 없어요.</div>
+            }
+            else
+            {
+                <div class="trend">
+                    @foreach (var t in trend)
+                    {
+                        var h = (int)Math.Round(t.TotalPoints * 84.0 / trendMax);
+                        var m = t.Ym.Length >= 7 ? int.Parse(t.Ym.Substring(5, 2)) : 0;
+                        <a href="@Url(t.Ym, Model.ClassYear)" class="@(t.Ym == Model.Ym ? "on" : "")" aria-label="@(m)월 @(t.TotalPoints)점">
+                            <em>@t.TotalPoints</em><i style="height:@(Math.Max(2, h))px"></i><span>@m</span>
+                        </a>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="blk">
+            <div class="bK">CLASSES</div>
+            <div class="bT">반별 합계<small>합계 순</small></div>
+            @foreach (var c in classesOn)
+            {
+                <div class="cr">
+                    <span class="c">@Cls(c.ClassYear, c.ClassBan)</span>
+                    <span class="br"><i style="width:@(Math.Round(c.Sum * 100.0 / classMax))%"></i></span>
+                    <span class="n">@c.Sum <small>/ @(c.Count)명</small></span>
+                </div>
+            }
+            @if (classes.Count > classesOn.Count)
+            {
+                <div class="cr z"><span class="c" style="width:auto;flex:1">@(classesOn.Count == 0 ? $"모든 반 ({classes.Count}개)" : $"나머지 {classes.Count - classesOn.Count}개 반")</span><span class="n">0</span></div>
+            }
+            @if (classes.Count == 0) { <div class="none">반 정보가 없어요.</div> }
+        </section>
+
+        <section class="blk">
+            <div class="bK">RANKING</div>
+            <div class="bT">개인 순위<small>점수 받은 아이만 · 같은 점수는 같은 등수</small></div>
+            @if (ranked.Count == 0)
+            {
+                <div class="none">이 달에 점수를 받은 아이가 없어요.</div>
+            }
+            @{ int rank = 0, prev = -1; }
+            @for (int i = 0; i < ranked.Count; i++)
+            {
+                var r = ranked[i];
+                if (r.Points != prev) { rank = i + 1; prev = r.Points; }
+                <div class="rk">
+                    <span class="r @(rank <= 3 ? "top" : "")">@rank</span>
+                    <span class="nm @(string.IsNullOrWhiteSpace(r.FullName) ? "noname" : "")">@Nm(r.FullName)<small>@Cls(r.ClassYear, r.ClassBan)</small></span>
+                    <span class="p">@r.Points</span>
+                </div>
+            }
+            @if (zeros.Count > 0)
+            {
+                <details class="zero">
+                    <summary><span>@(isThisMonth ? "이번 달" : "이 달") 0점 · @(zeros.Count)명</span></summary>
+                    <div class="zl">
+                        @foreach (var z in zeros)
+                        {
+                            <span>@Nm(z.FullName)<small>@Cls(z.ClassYear, z.ClassBan)</small></span>
+                        }
+                    </div>
+                </details>
+            }
+        </section>
+
+        <div class="ft"><span>점수는 아이마다 한 달 총점 · 기록이 없는 아이는 0점</span><a href="/DevotionPoints/Home?ym=@Model.Ym">점수 입력 →</a></div>
+    </main>
+
+    @await Html.PartialAsync("_PointTabs")
+</body>
+</html>

@@ -1,0 +1,253 @@
+﻿@model IEnumerable<BulletinBoard.Models.PointByUserName>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .award-image {
+            width: 85%;
+            max-width: 800px;
+            margin: 20px auto;
+            border: 5px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .section {
+        /*     max-width: 800px; */
+        max-width :80%;
+            margin: 1px 0;
+            /*
+                                            border-radius: 10px;
+                                            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);*/
+            padding: 10px;
+        }
+
+            .section h2 {
+                text-align: center;
+                margin-bottom: 10px;
+                font-size: 24px;
+                color: #007BFF;
+            }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .card {
+           
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+            .card:hover {
+                transform: scale(1.05);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            .card img {
+                width: 100%;
+                height: auto;
+            }
+
+            .card .info {
+                padding: 8px;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+                .card .info .row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 2px 0;
+                }
+
+                    .card .info .row span {
+                        font-size: 14px;
+                        color: #666;
+                    }
+
+                    .card .info .row .label {
+                        text-align: left;
+                        /* flex: 1;*/
+                    }
+
+                    .card .info .row .center {
+                        text-align: center;
+                        flex: 1;
+                        font-weight: bold;
+                    }
+
+                    .card .info .row .right {
+                        text-align: right;
+                        flex: 1;
+                    }
+
+                .card .info button {
+                    margin-top: 10px;
+                    padding: 5px 10px;
+                    background-color: #007BFF;
+                    border: none;
+                    color: #fff;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+
+                    .card .info button:hover {
+                        background-color: #0056b3;
+                    }
+
+        .footer {
+            margin-top: 20px;
+            padding: 8px;
+        }
+
+            .footer button {
+                padding: 10px 20px;
+                background-color: #28a745;
+                border: none;
+                color: #fff;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+                .footer button:hover {
+                    background-color: #218838;
+                    transform: translateY(-3px);
+                }
+    </style>
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+    <link rel="stylesheet" href="/css/ProcessBar.css">
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+
+    <script>
+
+        async function clickMission(userId, userName, value) {
+            let result = await confirmMessage(true, ['점수 반영할까요 ?']);
+
+            const data = { UserId: userId, UserName: userName, Value: value };
+
+            if (result === 'y') {
+                doProcess(data, 'UpdateAwardPoint');
+            }
+        }
+
+    </script>
+
+</head>
+<body>
+
+           @{
+            var user = await AuthService.GetSignedUser(User);
+            var isSignedIn = await AuthService.IsSignedIn(User);
+            var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+            var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+            var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+        }
+
+    <h1>보상 포인트 관리</h1>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+
+
+    <div class="section">
+        <div class="container">
+            @if (!Model.Any())
+            {
+                <div class="card">
+                    <img class="profile-picture" src="@ConstatsCommon.representFaceImage" alt="">
+                    <div class="card-title">아직 대상자 없어요.</div>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in Model)
+                {
+                    List<AwardBase> _AwardBase = ViewBag._AwardBase as List<AwardBase>;
+
+                    string YearBan = string.Empty;
+
+                    if (@item.ClassYear > 0)
+                    {
+                        YearBan = $"{@item.ClassYear}학년{@item.ClassBan}반";
+                    }
+                    else
+                    {
+                        YearBan = $"교사";
+                    }
+
+                    <div class="card">
+                        <img src="@item.ProfilePicturePath" alt="Profile Picture">
+                        <div class="info">
+                            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@item.LastName @item.FirstName</span></div>
+                            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@YearBan</span></div>
+                            <div class="row"><span class="label">도전성경 포인트 + 추가 포인트:</span><span class="right">@item.Total.ToString("N0")점</span></div>
+                            <div class="row"><span class="label">도전성경 포인트:</span><span class="right">@item.DC_Total.ToString("N0")점</span></div>
+                            <div class="row"><span class="label">이미 보상한 포인트:</span><span class="right">@item.AwardLevel 점</span></div>
+
+                            @foreach (var va in _AwardBase)
+                            {
+                                <button onclick="clickMission('@item.UserId', '@item.UserName', @(va.AwardLevel))">@(va.AwardLevel.ToString("N0"))점 시상완료</button>
+                            }
+                            <button onclick="clickMission('@item.UserId', '@item.UserName', 0)">시상 기록지우기</button>
+                        </div>
+                    </div>
+
+                }
+            }
+        </div>
+    </div>
+
+
+    <div class="button-bar no-select">
+        <div class="buttonCommon colorBaseHome" onclick="location.href='/'">홈으로</div>
+        <div class="buttonCommon colorBaseBrightBlue" onclick="window.location.href='/CheckPoint/GetThisWeekRewardingAward'">@ConstatsCommon.MainKeyTitle 시상관리</div>
+        <div class="buttonCommon colorBaseSoftTeal" onclick="window.location.href='/Home/MissionMainBoard'">@ConstatsCommon.MainKeyTitle</div>
+    </div>
+
+</body>
+</html>

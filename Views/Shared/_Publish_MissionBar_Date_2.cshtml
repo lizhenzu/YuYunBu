@@ -1,0 +1,37 @@
+﻿@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Common;
+
+@{
+    var sessionWorkDT = Context.Session.GetString(DateKind.WorkDT.ToString());
+    var sessionTodayDT = Context.Session.GetString(DateKind.TodayDT.ToString());
+
+    DateTime todayDT = BulletinBoard.Common.SharedComm.GetToday();
+    DateTime missionDT = BulletinBoard.Common.SharedComm.GetToday();
+
+    if (sessionWorkDT != null)
+    {
+        missionDT = DateTime.Parse(sessionWorkDT);
+    }
+
+    if (sessionTodayDT != null)
+    {
+        todayDT = DateTime.Parse(sessionTodayDT);
+    }
+
+    string TodayMesssage = $"오늘은 {@BulletinBoard.Common.SharedComm.GetTodayStringKor()} 입니다.";
+    string MissionMesssage = $"{missionDT.Month}월{missionDT.Day}일자 미션을 보고 계시네요.";
+
+}
+@if (missionDT.ToString("yyyy-MM-dd") != todayDT.ToString("yyyy-MM-dd"))
+{
+
+    <div class="mission-card no-select" style="background: #FF9800;color: white;     border: 3px solid white; box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);">
+        <div class="mission-text">
+            <div class="mission-title" style="text-align:center;">📢 알림 📢</div>
+            <h3 style="text-align:center;">@TodayMesssage</h3>
+            <h3 style="text-align:center;">@MissionMesssage</h3>
+        </div>
+    </div>
+
+}
+ 

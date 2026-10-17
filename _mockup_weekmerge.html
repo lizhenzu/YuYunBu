@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>포인트 카드 + 주간 띠 합치기 시안</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;300;400;500&family=Gothic+A1:wght@400;600;700&display=swap">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#E9E7E2;font-family:"Gothic A1",sans-serif;color:#16181C}
+.wrap{display:flex;flex-direction:column;gap:34px;align-items:center;padding:26px}
+.cap{font-size:12.5px;letter-spacing:.06em;color:#5C5F66;margin:0 0 4px;font-weight:600}.sub{font-size:11px;color:#83868C;margin:0 0 10px;line-height:1.6}
+.ph{width:620px;max-width:100%;background:#F7F6F3;padding:20px;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.box{border:1px solid #E2E0DB;background:#FBFAF8}
+.top{display:flex;align-items:center;gap:18px;padding:16px 18px}
+.ring{position:relative;width:88px;height:88px;flex:0 0 auto}.ring svg{transform:rotate(-90deg);display:block}
+.ring .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}.ring .c b{font-family:Inter;font-weight:300;font-size:24px;line-height:1}.ring .c small{font-size:10px;color:#83868C;margin-top:3px}
+.lbl{font-size:10px;font-weight:600;letter-spacing:.2em;color:#83868C}
+.big{font-family:Inter;font-weight:200;font-size:48px;line-height:1;color:#9A7B4F;margin-top:6px}.big small{font-size:13px;color:#83868C;margin-left:4px;font-weight:400}
+.today{font-size:11.5px;color:#5C5F66;margin-top:6px}.today b{font-family:Inter;color:#9A7B4F;font-weight:500}
+.facts{margin-left:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;flex:0 0 auto}
+.facts .k{font-size:10.5px;color:#83868C}.facts .v{font-family:Inter;font-size:16px}.facts .v u{text-decoration:none;font-size:10px;color:#83868C;margin-left:1px}
+.facts4{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #E2E0DB}
+.facts4 div{padding:10px 6px;text-align:center;border-right:1px solid #EFEDE8}.facts4 div:last-child{border:0}
+.facts4 .k{font-size:10.5px;color:#83868C}.facts4 .v{font-family:Inter;font-size:17px;margin-top:3px}.facts4 .v u{text-decoration:none;font-size:10px;color:#83868C}
+
+/* A: 주간 띠 칸 안에 막대 */
+.wk{border-top:1px solid #E2E0DB}
+.wkh{display:flex;justify-content:space-between;align-items:baseline;padding:10px 16px 0}
+.wkh .t{font-size:11.5px;font-weight:600;color:#5C5F66}.wkh .t b{font-family:Inter;color:#9A7B4F;font-weight:500;margin-left:5px}
+.wkh .nav{font-size:11px;color:#83868C}.wkh .nav span{margin-left:10px}
+.cells{display:grid;grid-template-columns:repeat(7,1fr);margin-top:8px}
+.cell{display:flex;flex-direction:column;align-items:center;padding:8px 2px 10px;border-right:1px solid #EFEDE8;position:relative}
+.cell:last-child{border:0}
+.cell .d{font-size:10.5px;color:#83868C}.cell .n{font-family:Inter;font-size:15px;margin-top:2px}
+.cell.sun .d{color:#B4531F}.cell.sat .d{color:#3B6EA8}
+.cell .barz{height:54px;width:100%;display:flex;align-items:flex-end;justify-content:center;margin-top:6px}
+.cell .barz i{display:block;width:60%;max-width:22px;background:#DCCBAE;min-height:2px}
+.cell .p{font-family:Inter;font-size:11px;color:#5C5F66;margin-top:4px}
+.cell.all .barz i{background:#C4A77C}.cell.all .ck{position:absolute;top:4px;right:6px;font-size:10px;color:#9A7B4F}
+.cell.sel{background:#EDE5D8}.cell.sel .barz i{background:#9A7B4F}.cell.sel .n{color:#9A7B4F;font-weight:500}
+.cell.fut .n{color:#C9C5BD}.cell.fut .p{color:#C9C5BD}
+.legend{display:flex;gap:12px;font-size:10px;color:#83868C;padding:0 16px 10px}.legend span::before{content:"";display:inline-block;width:8px;height:8px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+
+/* B: 막대 그래프 자체가 주간 띠 (날짜·요일 아래) */
+.bgraph{display:grid;grid-template-columns:repeat(7,1fr);gap:0;padding:10px 12px 0;border-top:1px solid #E2E0DB}
+.bcol{display:flex;flex-direction:column;align-items:center;padding:6px 0 8px;border-radius:0}
+.bcol .p{font-family:Inter;font-size:11px;color:#5C5F66;height:14px}
+.bcol .area{height:70px;width:100%;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid #E2E0DB}
+.bcol .area i{display:block;width:56%;max-width:28px;background:#DCCBAE;min-height:2px}
+.bcol .dd{margin-top:6px;text-align:center;line-height:1.2}.bcol .dd small{display:block;font-size:10px;color:#83868C}.bcol .dd b{font-family:Inter;font-weight:400;font-size:14px}
+.bcol.all .area i{background:#C4A77C}.bcol.all .p::after{content:" ✓";color:#9A7B4F;font-size:9px}
+.bcol.sel{background:#EDE5D8}.bcol.sel .area i{background:#9A7B4F}.bcol.sel .dd b,.bcol.sel .dd small{color:#9A7B4F;font-weight:600}
+.bcol.fut .dd b,.bcol.fut .p{color:#C9C5BD}
+.bh{display:flex;justify-content:space-between;align-items:baseline;padding:10px 16px 0}
+.bh .t{font-size:11.5px;font-weight:600;color:#5C5F66}.bh .t b{font-family:Inter;color:#9A7B4F;font-weight:500;margin-left:5px}.bh .m{font-size:10.5px;color:#83868C}
+@media(max-width:640px){.top{flex-wrap:wrap}.facts{margin-left:0;width:100%;grid-template-columns:repeat(4,1fr)}}
+</style></head><body>
+<div class="wrap">
+
+<div><p class="cap">A · 이번 주 띠 칸 안에 막대를 넣기</p>
+<p class="sub">기존 "이번 주 띠(일~토, 날짜, 점수)"를 그대로 두고 칸마다 막대를 세워 "최근 7일" 그래프를 대신해요. 칸을 누르면 그 날로 이동.</p>
+<div class="ph"><div class="box">
+ <div class="top">
+  <div class="ring"><svg width="88" height="88"><circle cx="44" cy="44" r="38" fill="none" stroke="#EFEDE8" stroke-width="7"/><circle cx="44" cy="44" r="38" fill="none" stroke="#9A7B4F" stroke-width="7" stroke-dasharray="238.8" stroke-dashoffset="0"/></svg><div class="c"><b>4/4</b><small>오늘 미션</small></div></div>
+  <div><div class="lbl">올해 총 포인트</div><div class="big">935<small>점</small></div><div class="today">오늘 <b>+5</b>점 받았어요</div></div>
+ </div>
+ <div class="wk">
+  <div class="wkh"><span class="t">이번 주<b>5점</b></span><span class="nav">하루 최대 6점</span></div>
+  <div class="cells">
+   <div class="cell sun sel"><span class="d">일</span><span class="n">13</span><span class="barz"><i style="height:83%"></i></span><span class="p">5</span></div>
+   <div class="cell fut"><span class="d">월</span><span class="n">14</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+   <div class="cell fut"><span class="d">화</span><span class="n">15</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+   <div class="cell fut"><span class="d">수</span><span class="n">16</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+   <div class="cell fut"><span class="d">목</span><span class="n">17</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+   <div class="cell fut"><span class="d">금</span><span class="n">18</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+   <div class="cell fut sat"><span class="d">토</span><span class="n">19</span><span class="barz"><i style="height:2px"></i></span><span class="p">–</span></div>
+  </div>
+  <div class="legend"><span style="--c:#9A7B4F">보고 있는 날</span><span style="--c:#C4A77C">네 가지 다 한 날 ✓</span><span style="--c:#DCCBAE">그 외</span></div>
+ </div>
+ <div class="facts4"><div><div class="k">이어온 날</div><div class="v">13<u>일</u></div></div><div><div class="k">이달 수행</div><div class="v">13<u>/13</u></div></div><div><div class="k">이달 점수</div><div class="v">62<u>점</u></div></div><div><div class="k">네 가지 다 한 날</div><div class="v">6<u>일</u></div></div></div>
+</div></div>
+<p class="sub" style="margin-top:8px">⚠ 이번 주가 일요일에 막 시작하면 막대가 하나뿐이라 그래프가 비어 보여요.</p>
+</div>
+
+<div><p class="cap">B · 최근 7일 막대에 날짜를 붙여 주간 띠를 대신하기 (추천)</p>
+<p class="sub">막대 아래에 요일·날짜를 달아 "이번 주 띠"를 없애요. 항상 보고 있는 날 기준 7일이라 그래프가 꽉 차고, 칸을 누르면 그 날로 이동.</p>
+<div class="ph"><div class="box">
+ <div class="top">
+  <div class="ring"><svg width="88" height="88"><circle cx="44" cy="44" r="38" fill="none" stroke="#EFEDE8" stroke-width="7"/><circle cx="44" cy="44" r="38" fill="none" stroke="#9A7B4F" stroke-width="7" stroke-dasharray="238.8" stroke-dashoffset="0"/></svg><div class="c"><b>4/4</b><small>오늘 미션</small></div></div>
+  <div><div class="lbl">올해 총 포인트</div><div class="big">935<small>점</small></div><div class="today">오늘 <b>+5</b>점 받았어요</div></div>
+  <div class="facts"><div><div class="k">이어온 날</div><div class="v">13<u>일</u></div></div><div><div class="k">이달 수행</div><div class="v">13<u>/13</u></div></div><div><div class="k">이달 점수</div><div class="v">62<u>점</u></div></div><div><div class="k">다 한 날</div><div class="v">6<u>일</u></div></div></div>
+ </div>
+ <div class="bh"><span class="t">최근 7일<b>34점</b></span><span class="m">하루 최대 6점 · 누르면 그 날로 이동</span></div>
+ <div class="bgraph">
+  <div class="bcol"><span class="p">4</span><span class="area"><i style="height:66%"></i></span><span class="dd"><small>월</small><b>7</b></span></div>
+  <div class="bcol"><span class="p">5</span><span class="area"><i style="height:83%"></i></span><span class="dd"><small>화</small><b>8</b></span></div>
+  <div class="bcol"><span class="p">4</span><span class="area"><i style="height:66%"></i></span><span class="dd"><small>수</small><b>9</b></span></div>
+  <div class="bcol"><span class="p">5</span><span class="area"><i style="height:83%"></i></span><span class="dd"><small>목</small><b>10</b></span></div>
+  <div class="bcol"><span class="p">5</span><span class="area"><i style="height:83%"></i></span><span class="dd"><small>금</small><b>11</b></span></div>
+  <div class="bcol all"><span class="p">6</span><span class="area"><i style="height:100%"></i></span><span class="dd"><small>토</small><b>12</b></span></div>
+  <div class="bcol sel all"><span class="p">5</span><span class="area"><i style="height:83%"></i></span><span class="dd"><small>오늘</small><b>13</b></span></div>
+ </div>
+ <div class="legend" style="padding-top:10px"><span style="--c:#9A7B4F">보고 있는 날</span><span style="--c:#C4A77C">네 가지 다 한 날 ✓</span><span style="--c:#DCCBAE">그 외</span></div>
+</div></div>
+<p class="sub" style="margin-top:8px">네 칸 기록은 총점 오른쪽으로 옮겨 카드 높이를 줄였어요. 휴대폰에서는 총점 아래 한 줄로 내려가요.</p>
+</div>
+
+</div></body></html>

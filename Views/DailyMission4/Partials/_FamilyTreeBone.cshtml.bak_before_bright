@@ -1,0 +1,119 @@
+﻿@using BulletinBoard.Services.Abstract
+@*  ══════════════════════════════════════════════════════════════
+    우리 가족 가계도 — Bone 스킨 (DailyMission4 전용)
+    데이터와 구조는 Shared/_FamilyTree 와 같다 (DailyMission2 는 그대로 그 파일을 쓴다).
+    흰 둥근 카드·파란 꼬리표·노란 점수칩 대신, 가는 선 · 세리프 이름 · 금색 숫자.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    var _ftree = ViewBag.FamilyTree as FamilyTreeVM;
+}
+@if (_ftree != null && _ftree.Members.Count > 0)
+{
+    var _parents  = _ftree.Members.Where(m => m.RoleCode >= 1 && m.RoleCode <= 4).OrderBy(m => m.RoleCode).ToList();
+    var _students = _ftree.Members.Where(m => m.RoleCode == 0).OrderBy(m => m.RelationCode).ToList();
+    var _others   = _ftree.Members.Where(m => m.RoleCode > 4).ToList();
+    _students.AddRange(_others);
+    int _sum = _ftree.Members.Sum(m => m.YearPoint);
+    var _kToday = BulletinBoard.Helpers.DateHelper.GetKoreaNow().Date;
+
+    string _Date(DateTime? d)
+    {
+        if (!d.HasValue) return "기록 없음";
+        var x = d.Value.Date;
+        if (x == _kToday) return "오늘";
+        if (x == _kToday.AddDays(-1)) return "어제";
+        return x.ToString("yyyy-MM-dd");
+    }
+    const string _DefaultPhoto = "/images/icon/people/people_01.webp";
+
+    <style>
+        /* 위 검정 선으로 시작, 아래 가는 선으로 닫아 달력·더 보기와 구분한다 */
+        .qz .ftb { margin-top: 28px; padding: 0 0 6px; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); }
+        .qz .ftb-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 14px 0 10px; }
+        .qz .ftb-k { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--acc); }
+        .qz .ftb-t { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 19px; margin-top: 5px; }
+        .qz .ftb-sum { text-align: right; flex: 0 0 auto; }
+        .qz .ftb-sum-l { font-size: 10px; font-weight: 600; letter-spacing: .14em; color: var(--dim); }
+        .qz .ftb-sum-v { font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; line-height: 1; color: var(--acc); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .qz .ftb-sum-v small { font-size: 11px; font-weight: 400; color: var(--dim); margin-left: 2px; }
+
+        .qz .ftb-tree { padding: 12px 0 16px; }
+        .qz .ftb-row { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 36px; position: relative; }
+        .qz .ftb-node { display: flex; flex-direction: column; align-items: center; text-align: center; width: 88px; }
+        .qz .ftb-av {
+            width: 52px; height: 52px; border-radius: 50%; object-fit: cover; display: block; background: var(--mark);
+            box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px #C9AE82;
+        }
+        .qz .ftb-node.me .ftb-av { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--acc); }
+        .qz .ftb-role { font-size: 10px; font-weight: 600; letter-spacing: .06em; color: var(--acc); margin-top: 9px; }
+        .qz .ftb-role em { font-style: normal; font-size: 9.5px; font-weight: 700; color: #fff; background: var(--acc); padding: 1px 6px; margin-left: 4px; }
+        .qz .ftb-nm { font-family: "Noto Serif KR", serif; font-size: 14px; margin-top: 2px; word-break: keep-all; }
+        .qz .ftb-pt { font-family: "Inter", sans-serif; font-weight: 300; font-size: 16px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .qz .ftb-pt small { font-size: 10px; color: var(--dim); margin-left: 1px; }
+        .qz .ftb-dt { font-family: "Inter", sans-serif; font-size: 10px; color: var(--dim); margin-top: 1px; }
+
+        /* 연결선 — 부모 줄 가운데에서 내려와 아이 줄로 */
+        .qz .ftb-link { position: relative; height: 26px; margin: 6px auto 8px; }
+        .qz .ftb-link::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px solid #C9C5BD; }
+        .qz .ftb-link.wide::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; border-top: 1px solid #C9C5BD; }
+
+        @@media (max-width: 400px) {
+            .qz .ftb-row { gap: 8px 18px; }
+            .qz .ftb-node { width: 76px; }
+            .qz .ftb-av { width: 46px; height: 46px; }
+            .qz .ftb-sum-v { font-size: 26px; }
+        }
+    </style>
+
+    <div class="ftb">
+        <div class="ftb-head">
+            <div class="ftb-t">우리 가족</div>
+            <div class="ftb-sum">
+                <div class="ftb-sum-l">합산</div>
+                <div class="ftb-sum-v">@_sum.ToString("N0")<small>점</small></div>
+            </div>
+        </div>
+
+        <div class="ftb-tree">
+            @if (_parents.Count > 0)
+            {
+                <div class="ftb-row">
+                    @foreach (var m in _parents)
+                    {
+                        <div class="ftb-node @(m.IsMe ? "me" : "")">
+                            <img class="ftb-av" src="@(string.IsNullOrWhiteSpace(m.Photo) ? _DefaultPhoto : m.Photo)" alt="@m.FullName"
+                                 loading="lazy" onerror="this.onerror=null;this.src='@_DefaultPhoto'" />
+                            <div class="ftb-role">@m.RelLabel@if (m.IsMe) {<em>본인</em>}</div>
+                            <div class="ftb-nm">@m.FullName</div>
+                            <div class="ftb-pt">@m.YearPoint.ToString("N0")<small>점</small></div>
+                            <div class="ftb-dt">@_Date(m.LastActionDate)</div>
+                        </div>
+                    }
+                </div>
+                @if (_students.Count > 0)
+                {
+                    @* 아이가 여럿이면 가로선까지, 하나면 세로선만 *@
+                    <div class="ftb-link @(_students.Count > 1 ? "wide" : "")"
+                         style="width:@(_students.Count > 1 ? Math.Min(88 * _students.Count + 36 * (_students.Count - 1) - 88, 320) + "px" : "2px")"></div>
+                }
+            }
+
+            @if (_students.Count > 0)
+            {
+                <div class="ftb-row">
+                    @foreach (var m in _students)
+                    {
+                        <div class="ftb-node @(m.IsMe ? "me" : "")">
+                            <img class="ftb-av" src="@(string.IsNullOrWhiteSpace(m.Photo) ? _DefaultPhoto : m.Photo)" alt="@m.FullName"
+                                 loading="lazy" onerror="this.onerror=null;this.src='@_DefaultPhoto'" />
+                            <div class="ftb-role">@(m.IsMe ? "본인" : m.RelLabel)</div>
+                            <div class="ftb-nm">@m.FullName</div>
+                            <div class="ftb-pt">@m.YearPoint.ToString("N0")<small>점</small></div>
+                            <div class="ftb-dt">@_Date(m.LastActionDate)</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

@@ -1,0 +1,124 @@
+@model BulletinBoard.Services.SiteVisit.SiteVisitStats
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    방문자 통계 — 2026-10-05 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/present-bright.css)
+    · 방문자 = 그날 www.jamsilkids.com 홈으로 처음 들어온 "브라우저" 하나 (같은 브라우저는 하루 1번)
+    · 누적 = 하루 방문자의 합.  누가 들어왔는지는 저장하지 않는다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    ViewData["Title"] = "방문자 통계";
+
+    string[] dow = { "일", "월", "화", "수", "목", "금", "토" };
+    int maxDay = Math.Max(1, Model.Recent.Count == 0 ? 1 : Model.Recent.Max(x => x.Count));
+    int maxMonth = Math.Max(1, Model.Months.Count == 0 ? 1 : Model.Months.Max(x => x.Count));
+    var today = BulletinBoard.Helpers.DateHelper.GetKoreaToday();
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+    <style>
+        .big { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+        .bigC { padding: 14px 12px; border: 1px solid #DDE2EA; border-radius: 16px; background: #fff; box-shadow: 0 1px 3px rgba(17,24,39,.07); text-align: center; }
+        .bigC small { display: block; font-size: 11.5px; font-weight: 700; color: #9CA3AF; }
+        .bigC b { display: block; margin-top: 4px; font-size: 26px; font-weight: 800; color: #111827; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+        .bigC.pri { background: #EAF2FD; border-color: #CFE0FA; }
+        .bigC.pri b { color: #2B5FA8; }
+        .adRow.td .adName { color: #2F80ED; }
+        .adName.wk { color: #D9534F; }
+        .adName small { margin-left: 6px; font-size: 11.5px; font-weight: 400; color: #9CA3AF; }
+        .adCnt { min-width: 36px; font-weight: 700; }
+        .adRow.zero { opacity: .5; pointer-events: auto; }
+        @@media (max-width: 380px) { .bigC b { font-size: 22px; } }
+    </style>
+</head>
+<body>
+    <div class="pw">
+        <div class="pbar">
+            <a href="/HumanResource/ManageUserInfo">‹ 정보 관리</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </div>
+
+        <div class="pK">잠실새내 유년부 입니다.</div>
+        <h1 class="pT">방문자 통계</h1>
+
+        <div class="big">
+            <div class="bigC pri"><small>오늘</small><b>@Model.Today.ToString("N0")</b></div>
+            <div class="bigC"><small>어제</small><b>@Model.Yesterday.ToString("N0")</b></div>
+            <div class="bigC"><small>누적</small><b>@Model.Total.ToString("N0")</b></div>
+        </div>
+
+        <div class="adSum">
+            @if (Model.FirstDate.HasValue)
+            {
+                <span>집계 시작 <b>@Model.FirstDate.Value.ToString("yyyy-MM-dd")</b></span>
+                <span>집계된 날 <b>@Model.DaysCounted</b>일</span>
+                <span>하루 평균 <b>@((Model.Total / (double)Math.Max(1, Model.DaysCounted)).ToString("N1"))</b>명</span>
+            }
+            else
+            {
+                <span>아직 집계된 방문자가 없어요</span>
+            }
+        </div>
+
+        <div class="ltNote">
+            방문자는 <b>그날 홈(www.jamsilkids.com)으로 처음 들어온 브라우저 하나</b>예요. 같은 브라우저는 하루에 몇 번 들어와도 한 명으로 세요.
+            폰과 컴퓨터로 따로 들어오면 두 명이고, 검색봇과 미리보기는 세지 않아요. 누가 들어왔는지는 저장하지 않아요.
+        </div>
+
+        <div class="psec">
+            <div class="psecT">최근 30일</div>
+            <div class="adList">
+                @foreach (var d in Model.Recent)
+                {
+                    bool isToday = d.Date == today;
+                    bool wk = d.Date.DayOfWeek == DayOfWeek.Sunday;
+                    int pct = d.Count == 0 ? 0 : Math.Max(3, (int)Math.Round(d.Count * 100.0 / maxDay));
+                    <div class="adRow @(isToday ? "td" : "") @(d.Count == 0 ? "zero" : "")">
+                        <div class="adMain">
+                            <span class="adName @(wk ? "wk" : "")">@d.Date.ToString("M월 d일")<small>@dow[(int)d.Date.DayOfWeek]요일@(isToday ? " · 오늘" : "")</small></span>
+                        </div>
+                        <div class="adRight">
+                            <div class="adTrack"><div class="adFill" style="width:@(pct)%"></div></div>
+                            <span class="adCnt">@d.Count.ToString("N0")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.Months.Count > 0)
+        {
+            <div class="psec">
+                <div class="psecT">월별</div>
+                <div class="adList">
+                    @foreach (var m in Model.Months)
+                    {
+                        int pct = m.Count == 0 ? 0 : Math.Max(3, (int)Math.Round(m.Count * 100.0 / maxMonth));
+                        <div class="adRow">
+                            <div class="adMain">
+                                <span class="adName">@m.Month.ToString("yyyy년 M월")<small>@(m.Days)일 집계</small></span>
+                            </div>
+                            <div class="adRight">
+                                <div class="adTrack"><div class="adFill" style="width:@(pct)%"></div></div>
+                                <span class="adCnt">@m.Count.ToString("N0")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <div class="pft"><span>© 유년부 · 방문자 통계</span><a href="/">@ConstatsCommon.ToHome</a></div>
+    </div>
+</body>
+</html>

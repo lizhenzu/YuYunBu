@@ -1,0 +1,71 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    string OneLineText = ViewData[HttpContextSessionCategory.OneLineText.ToString()] as string;
+    int OneLineTextID = (int)ViewData["OneLineTextID"];
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var sessionValue = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+
+    var visitDateInfoDatas = ViewBag.VisitDateInfoDatas as List<VisitDateInfoData>;
+    var DeptNM = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.DeptNM.ToString());
+}
+ 
+<header id="top">
+    <div class="header-inner">
+    
+        <div class="header-text">
+            <h3>안녕하세요.</h3>
+            <br />
+            <h2>@($"{@ChurchName} · {@DepartmentName}")입니다.</h2>
+            <br />
+            <div class="profile-avatar">
+                @if (string.IsNullOrEmpty(UserFullName))
+                {
+                    <img id="myImageL" src="@ConstatsCommon.representFaceImage" alt="대표 프로필" loading="lazy" onclick="location.href='/HumanResource/ManageUserInfo'" />
+                }
+                else
+                {
+                    <img id="myImage" src="@ViewData["ProfilePicturePath"]" alt="대표 프로필" loading="lazy" onclick="location.href='/HumanResource/ManageUserInfo?UserId=@ViewData["UserId"]'" />
+                }
+            </div>
+             <br />
+            @if (string.IsNullOrEmpty(UserFullName))
+            {
+                <p style="font-size:0.8rem;">(위 사진을 클릭해서 로그인할 수 있어요~)</p>
+            }
+            else
+            {
+                <h5 style="margin:10px;" >"@UserFullName"님!!!</h5>
+                  <p style="font-size:0.8rem;">(위 사진을 클릭해서 사진을 변경할 수 있어요~)</p>
+            }
+
+            <p style="margin-top : 10px;margin-bottom : 10px;">말씀 읽고, 찬양하고, 함께 기도하는 공간 입니다.</p>
+            <div class="tagline">
+                ✨ <span>@ConstatsCommon.MainKeyTitle · 밴드앨범 · 스토리 한 곳에 모였어요</span>
+            </div>
+
+        </div>
+    </div>
+</header>
+
+<script>
+    function loadLatestImage() {
+        const imageElement = document.getElementById('myImage');
+        const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+        imageElement.src = `@ViewData["ProfilePicturePath"]?${timestamp}`;
+    }
+
+    // 페이지 로드 시 실행 또는 필요할 때 호출
+    window.onload = loadLatestImage;
+                // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+</script>

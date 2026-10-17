@@ -1,0 +1,291 @@
+﻿@model PrayPhrasesDetails
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = "_Layout_Mission";
+    string keyWordTitle = "MIP";
+}
+
+<link rel="stylesheet" href="/css/missionCommon.css">
+<link rel="stylesheet" href="/css/missionC.css">
+<link rel="stylesheet" href="/css/common.layer.css">
+
+
+<style>
+    body {
+        background-size: cover;
+        margin: 0;
+        padding: 0;
+        color: #333;
+        display: flex;
+    }
+
+</style>
+
+<style>
+    .icon-container {
+        margin-top: 40px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .icon-background {
+        background: white;
+        width: 65px;
+        height: 65px;
+        position: absolute;
+        top: -36px;
+        left: 50%;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        transform: translateX(-35px);
+        z-index: 1; /* Behind the icon but in front of card background */
+    }
+
+    .icon-foreground {
+        background: #0d792d;
+        width: 59px;
+        height: 59px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        position: absolute;
+        top: -33px;
+        left: 50%;
+        transform: translateX(-32px);
+        z-index: 3; /* Above all */
+    }
+
+    .button-hyperlink {
+        border: none;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        display: block; /* Makes the button expand to the width of the container */
+        font-size: 18px;
+        margin: 10px 0; /* Adds space between buttons */
+        cursor: pointer;
+    }
+</style>
+
+<style>
+
+    .image-container {
+        border: 3.5px solid #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        width: 100%; /* 컨테이너의 너비에 맞춥니다 */
+        height: auto; /* 이미지의 비율에 따라 높이 조정 */
+        display: block; /* 이미지를 블록 요소로 만듭니다 */
+        align-items: center;
+        justify-content: center;
+        margin: auto; /* 자동 마진을 사용하여 중앙 정렬 */
+        margin-bottom: 10px; /* 자동 마진을 사용하여 중앙 정렬 */
+        max-width: 800px;
+    }
+</style>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #e6f7ff;
+    }
+
+    .container {
+    
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 20px;
+        background-color: #ffcccb;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+
+        .header p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+    
+
+    .button-group {
+        margin-top: 10px;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .button {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 3px;
+        background-color: #007bff;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+    .details {
+        display: none;
+        background-color: #ffffff;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .details p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+    .back-button {
+        text-align: center;
+        margin: 10px;
+    }
+
+        .back-button a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+            .back-button a:hover {
+                background-color: #0056b3;
+            }
+ 
+</style>
+
+<style>
+    .bible-text-line {
+        font-size: 20px;
+        margin: 5px 0;
+        padding: 5px;
+        text-align: left;
+    }
+
+</style>
+    <link rel="stylesheet" href="/css/asyncProcesing.css">
+
+<link rel="stylesheet" href="/css/textTextBackgroundColorAndColor.css">
+<link rel="stylesheet" href="/css/bibleOneByOne.css">
+<link rel="stylesheet" href="/css/ProcessBar.css">
+<link rel="stylesheet" href="/css/ButtonBase7.css">
+<link rel="stylesheet" href="/css/ColorBase7.css">
+
+<script src="/js/common2.js"></script>
+<script src="/js/ProcessBar73.js"></script>
+<script src="/js/bibleOneByOne.js"></script>
+
+<div class="container">
+
+        <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+    <div id="processingBox">
+        📖 처리 중입니다... 잠시만 기다려 주세요.
+    </div>
+
+    <div class="icon-container">
+        <div class="icon-background"></div>
+        <div class="icon-foreground">
+            <span class="material-icons">@keyWordTitle</span>
+        </div>
+    </div>
+    <div class="image-container">
+        <img src="/images/admin/admin002.webp"  alt="Descriptive Alt Text" style="width: 100%; height: auto;">
+    </div>
+
+    @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+    {        
+        <div class="back-button">
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@Model.PrayPhrasesDetailList[3].PrayPhrasesData.ExposeDate.Year&MMonth=@(Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month-1)">@(Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month-1)월 복구</a>
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@Model.PrayPhrasesDetailList[3].PrayPhrasesData.ExposeDate.Year&MMonth=@Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month">@(Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month+0)월 복구</a>
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@Model.PrayPhrasesDetailList[3].PrayPhrasesData.ExposeDate.Year&MMonth=@(Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month+1)">@(Model.PrayPhrasesDetailList[1].PrayPhrasesData.ExposeDate.Month + 1)월 복구</a>
+        </div>
+        <div class="back-button">
+            <a href="/Home/MissionMainBoard">Mission</a>
+            <a href="/">Home</a>
+        </div>
+    }
+    else
+    {
+        @*        <div class="back-button">
+    <a href="/">Go Home</a>
+    </div>*@
+    }
+    @foreach (var item in Model.PrayPhrasesDetailList)
+    {
+
+
+        <div class="card" style="margin:3px;border: 4px solid #008000;">
+            <div class="card-content">
+                <div class="bible-text-line " style="text-align:center;   font-size: 1.7em; font-weight:bold;">기도일자 : @item.PrayPhrasesData.ExposeDate.ToString("yyyy-MM-dd")</div>
+@*                <div class="bible-text-line " style="text-align:center">성경구절 : @SharedComm.MakeBibleSerialJangZul( @item.eBiblesData.BibleText,@item.eBiblesData.FromJang,@item.eBiblesData.FromZul ,@item.eBiblesData.ToJang, @item.eBiblesData.ToZul )</div>
+*@                @await Html.PartialAsync("_PublisheBible43", item.eBiblesData)
+                <div class="bible-text-line " style="text-align:center">기도제목 : @item.PrayPhrasesData.PrayTitle</div>
+                <div class="bible-text-line " style="text-align:left; white-space: pre-wrap;">기도내용 : @BulletinBoard.Helpers.PrayTextHelper.MarkNamesInline(item.PrayPhrasesData.PrayContent1)</div>
+                <p class="card-typeA-text text-right" style="padding-right :20px;">
+                    @Html.ActionLink("수정", "ModifyPrayPhrase", "PrayPhrase", new { Id = @item.PrayPhrasesData.Id})
+                </p>
+            </div>
+        </div>
+
+    }
+    @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+    {
+        <div class="back-button">
+            <a href="/Home/MissionMainBoard">Mission</a>
+            <a href="/">Home</a>
+        </div>
+    }
+    else
+    {
+        @*        <div class="back-button">
+    <a href="/">Go Home</a>
+    </div>*@
+    }
+
+
+</div>
+  <script src="/js/asyncProcesing.js"></script>
+
+<script>
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+</script>

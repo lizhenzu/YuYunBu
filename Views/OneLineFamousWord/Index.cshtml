@@ -1,0 +1,96 @@
+@model IEnumerable<BulletinBoard.Models.OneLineFamousWords>
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    명구 관리 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 컨트롤러가 Admin 전용이라 화면 안의 로그인 검사는 뺐다.  삭제는 확인창을 거친다.
+    · 이전 화면은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.OneLineFamousWords>();
+    int no = 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>명구 관리</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .fw-row { display: flex; gap: 12px; padding: 16px 2px; border-bottom: 1px solid var(--line); }
+        .fw-row .n { flex: none; width: 28px; font-size: 16px; font-weight: 800; color: #7FA3DB; }
+        .fw-row .t { flex: 1; min-width: 0; }
+        .fw-row .d { font-size: 12px; color: var(--dim2); }
+        .fw-row p { margin: 4px 0 0; font-size: 15px; line-height: 1.75; color: var(--ink); white-space: pre-wrap; word-break: keep-all; }
+        .fw-ac { display: flex; gap: 6px; margin-top: 10px; }
+        .fw-ac a, .fw-ac button { border: 0; font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: var(--grey); color: var(--dim2); cursor: pointer; }
+        .fw-ac a:hover, .fw-ac button:hover { color: var(--blue); }
+        .fw-ac .d { background: var(--redbg); color: var(--red); }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>명구</span>
+        <span>QUOTE</span>
+    </div>
+
+    <div class="qb-k">FAMOUS WORDS</div>
+    <h1 class="qb-h1">명구 관리<small>@(list.Count)개</small></h1>
+    <div class="qb-sub">매일 보여 줄 한 줄 명구를 등록하고 고쳐요.</div>
+
+    <div class="qb-chips">
+        <a class="on" href="/OneLineFamousWord/CreateOneLineFamousWord">+ 명구 등록</a>
+        <a href="/HumanResource/ManageUserInfo">정보 관리</a>
+    </div>
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">아직 등록한 명구가 없어요</div>
+    }
+
+    @foreach (var item in list)
+    {
+        no++;
+        <div class="fw-row">
+            <span class="n">@no.ToString("00")</span>
+            <div class="t">
+                <div class="d">@item.updateDT.ToString("yyyy-MM-dd")</div>
+                <p>@item.OneLineText</p>
+                <div class="fw-ac">
+                    <a href="/OneLineFamousWord/ModifyOneLineFamousWord?Id=@item.Id">수정</a>
+                    <button type="button" class="d" data-del="@item.Id">삭제</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>명구 @(list.Count)개</span>
+        <span><a href="/Admin/Index">관리자홈</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/common2.js"></script>
+<script>
+    // 삭제 — 예전에는 확인 없이 바로 지웠다. 확인창을 거친다.
+    document.addEventListener('click', async function (e) {
+        var b = e.target.closest('[data-del]');
+        if (!b) return;
+        var go = true;
+        if (typeof confirmMessage === 'function') {
+            go = (await confirmMessage(true, ['이 명구를 삭제 할까요?'], null, '진행')) === 'y';
+        } else {
+            go = confirm('이 명구를 삭제 할까요?');
+        }
+        if (go) location.href = '/OneLineFamousWord/DeleteOneLineFamousWord?Id=' + b.getAttribute('data-del');
+    });
+</script>
+</body>
+</html>

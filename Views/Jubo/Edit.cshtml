@@ -1,0 +1,333 @@
+@model BulletinBoard.Models.Jubo.JuboEditViewModel
+@using BulletinBoard.Models.Jubo
+@{
+    ViewData["Title"] = "주보 편집";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/jubo.css" />
+
+<style>
+    /* 블록 열림/닫힘 동작 보강 */
+    .jubo-block-item .jubo-block-body {
+        display: none;
+    }
+
+    .jubo-block-item.is-open .jubo-block-body {
+        display: block;
+    }
+
+    .jubo-block-toggle-btn {
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #475569;
+        transition: transform 0.2s ease;
+        margin-left: auto;
+    }
+
+    .jubo-block-item.is-open .jubo-block-toggle-btn {
+        transform: rotate(180deg);
+    }
+
+    .jubo-block-header {
+        cursor: pointer;
+        user-select: none;
+    }
+</style>
+
+<div class="jubo-page">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb" style="background:transparent; padding:0; font-size:0.85rem;">
+            <li class="breadcrumb-item"><a href="/Jubo" style="color:#3B82F6;">📋 주보 목록</a></li>
+            <li class="breadcrumb-item active">✏️ 편집</li>
+        </ol>
+    </nav>
+
+    <!-- Page Title Bar -->
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-3"
+         style="background:white; border-radius:18px; padding:1rem 1.5rem; box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+        <div style="flex:1;">
+            <div id="editPageTitle" style="font-size:1.2rem; font-weight:800; color:#2D3748;">
+                @Model.Title
+            </div>
+            <div style="font-size:0.8rem; color:#94A3B8;">
+                📅 @Model.JuboDate.ToString("yyyy년 MM월 dd일")
+                @if (!string.IsNullOrEmpty(Model.Season))
+                {
+                    <span class="ml-2">🌸 @Model.Season</span>
+                }
+            </div>
+        </div>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <a href="/Jubo/Preview/@Model.Id" target="_blank" class="btn-jubo btn-jubo-preview">👁 미리보기</a>
+            <a href="/Jubo/Print/@Model.Id" target="_blank" class="btn-jubo btn-jubo-print">🖨 출력</a>
+            <a href="/Jubo/Attendance/@Model.Id" class="btn-jubo btn-jubo-attend">📊 출석</a>
+            <form asp-action="TogglePublish" asp-route-id="@Model.Id" method="post" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn-jubo btn-jubo-publish">
+                    @(Model.IsPublished ? "🔒 비발행" : "🚀 발행")
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="jubo-editor-wrapper">
+        <!-- Left: Block Editor -->
+        <div>
+            <!-- Meta Section -->
+            <div class="jubo-meta-card mb-3">
+                <div class="jubo-meta-card-header">📌 기본 정보 편집</div>
+                <div class="jubo-meta-card-body">
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="jubo-label"><span class="label-emoji">📝</span> 제목</label>
+                            <input type="text" id="metaTitle" class="jubo-input" value="@Model.Title" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="jubo-label"><span class="label-emoji">🌸</span> 절기</label>
+                            <input type="text" id="metaSeason" class="jubo-input"
+                                   value="@Model.Season" placeholder="예: 부활절" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="jubo-label"><span class="label-emoji">🎨</span> 템플릿</label>
+                            <select id="metaTemplate" class="jubo-select">
+                                <option value="Normal">⛪ 일반</option>
+                                <option value="PalmSunday">🌿 종려주일</option>
+                                <option value="Easter">🥚 부활절</option>
+                            </select>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    var template = document.getElementById('metaTemplate');
+                                    if (template) {
+                                        template.value = '@Model.TemplateType';
+                                    }
+                                });
+                            </script>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button type="button" class="btn-jubo btn-jubo-save btn-jubo-full"
+                                    onclick="saveMeta(@Model.Id)">
+                                💾 기본 정보 저장
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blocks -->
+            <div class="jubo-block-list" id="blockList">
+                @foreach (var block in Model.Blocks)
+                {
+                    var colorClass = JuboBlockTypes.GetColorClass(block.BlockType);
+                    var emoji = JuboBlockTypes.GetEmoji(block.BlockType);
+                    var korName = JuboBlockTypes.GetKoreanName(block.BlockType);
+
+                    <div class="jubo-block-item @colorClass" data-block-type="@block.BlockType">
+                        <div class="jubo-block-header" onclick="toggleBlock(this, event)">
+                            <span class="jubo-block-emoji">@emoji</span>
+                            <span class="jubo-block-name">@korName</span>
+
+                            @if (block.IsRequired)
+                            {
+                                <span class="jubo-block-required-badge">필수</span>
+                            }
+                            else
+                            {
+                                <span class="jubo-block-optional-badge">선택</span>
+                            }
+
+                            @if (!string.IsNullOrEmpty(block.LastModifiedBy))
+                            {
+                                <span class="jubo-block-modified d-none d-sm-inline">
+                                    @block.LastModifiedBy ·
+                                    @(block.LastModifiedAt.HasValue ? block.LastModifiedAt.Value.ToString("MM/dd HH:mm") : "")
+                                </span>
+                            }
+
+                            <span class="jubo-block-modified">
+                                @(block.IsVisible ? "👁" : "🙈")
+                            </span>
+
+                            <button type="button" class="jubo-block-toggle-btn" aria-label="열기/닫기">▼</button>
+                        </div>
+
+                        <div class="jubo-block-body">
+                            <!-- Visibility -->
+                            <div class="jubo-visibility-toggle">
+                                <label class="jubo-toggle-switch">
+                                    <input type="checkbox"
+                                           class="jubo-visibility-input"
+                                           @(block.IsVisible ? "checked" : "")
+                                           onchange="toggleVisibility(this, '@block.BlockType')" />
+                                    <span class="jubo-toggle-slider"></span>
+                                </label>
+                                <span class="vis-label" style="font-size:0.85rem; font-weight:600; color:#4A5568;">
+                                    @(block.IsVisible ? "👁 표시됨" : "🙈 숨김")
+                                </span>
+                            </div>
+
+                            <!-- Title -->
+                            <div class="jubo-field-group">
+                                <label class="jubo-label" style="font-size:0.82rem;">섹션 제목</label>
+                                <input type="text"
+                                       class="jubo-input jubo-block-title-input"
+                                       value="@block.BlockTitle"
+                                       placeholder="섹션 제목 입력..." />
+                            </div>
+
+                            <!-- Content -->
+                            <div class="jubo-field-group">
+                                <label class="jubo-label" style="font-size:0.82rem;">내용</label>
+                                <textarea class="jubo-textarea jubo-block-content-input"
+                                          placeholder="내용을 입력하세요. 줄바꿈이 그대로 반영됩니다...">@block.BlockContent</textarea>
+                            </div>
+
+                            <!-- Last Modified Info -->
+                            @if (!string.IsNullOrEmpty(block.LastModifiedBy))
+                            {
+                                <div class="jubo-block-modified mb-2">
+                                    마지막 수정: @block.LastModifiedBy ·
+                                    @(block.LastModifiedAt.HasValue ? block.LastModifiedAt.Value.ToString("yyyy-MM-dd HH:mm") : "")
+                                </div>
+                            }
+
+                            <!-- Save Button -->
+                            <button type="button"
+                                    class="jubo-block-save-btn"
+                                    data-jubo-id="@Model.Id"
+                                    data-block-id="@block.Id"
+                                    data-block-type="@block.BlockType"
+                                    data-sort-order="@block.SortOrder"
+                                    onclick="saveBlock(this)">
+                                💾 저장
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right: Sidebar -->
+        <div class="jubo-meta-sidebar">
+            <!-- Jubo Info -->
+            <div class="jubo-meta-card">
+                <div class="jubo-meta-card-header">📊 주보 정보</div>
+                <div class="jubo-meta-card-body">
+                    <div class="jubo-meta-row">
+                        <span class="jubo-meta-key">날짜</span>
+                        <span class="jubo-meta-val">@Model.JuboDate.ToString("yyyy.MM.dd")</span>
+                    </div>
+                    <div class="jubo-meta-row">
+                        <span class="jubo-meta-key">템플릿</span>
+                        <span class="jubo-meta-val">
+                            @JuboTemplateTypes.GetEmoji(Model.TemplateType)
+                            @JuboTemplateTypes.GetKoreanName(Model.TemplateType)
+                        </span>
+                    </div>
+                    <div class="jubo-meta-row">
+                        <span class="jubo-meta-key">상태</span>
+                        <span class="jubo-meta-val">@(Model.IsPublished ? "✅ 발행" : "✏️ 작성중")</span>
+                    </div>
+                    <div class="jubo-meta-row">
+                        <span class="jubo-meta-key">블록</span>
+                        <span class="jubo-meta-val">@(Model.Blocks.Count)개</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(Model.LastModifiedBy))
+                    {
+                        <div class="jubo-meta-row">
+                            <span class="jubo-meta-key">마지막 수정</span>
+                            <span class="jubo-meta-val" style="font-size:0.78rem;">
+                                @Model.LastModifiedBy<br />
+                                @(Model.LastModifiedAt.HasValue ? Model.LastModifiedAt.Value.ToString("MM/dd HH:mm") : "")
+                            </span>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="jubo-meta-card">
+                <div class="jubo-meta-card-header">⚡ 빠른 실행</div>
+                <div class="jubo-meta-card-body">
+                    <div class="jubo-action-list">
+                        <a href="/Jubo/Preview/@Model.Id" target="_blank"
+                           class="btn-jubo btn-jubo-preview btn-jubo-full">👁 미리보기</a>
+                        <a href="/Jubo/Print/@Model.Id" target="_blank"
+                           class="btn-jubo btn-jubo-print btn-jubo-full">🖨 출력 페이지</a>
+                        <a href="/Jubo/Attendance/@Model.Id"
+                           class="btn-jubo btn-jubo-attend btn-jubo-full">📊 출석 관리</a>
+                        <button type="button"
+                                class="btn-jubo btn-jubo-save btn-jubo-full"
+                                onclick="createSnapshot(@Model.Id)">📸 스냅샷 저장</button>
+                        <a href="/Jubo" class="btn-jubo btn-jubo-edit btn-jubo-full">← 목록으로</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="jubo-meta-card">
+                <div class="jubo-meta-card-header">💡 사용 팁</div>
+                <div class="jubo-meta-card-body" style="font-size:0.8rem; color:#64748B; line-height:1.7;">
+                    <p>• 각 블록 헤더를 클릭하면 열립니다</p>
+                    <p>• 내용 수정 후 반드시 <strong>💾 저장</strong>을 눌러주세요</p>
+                    <p>• 👁/🙈 토글로 블록 표시 여부를 바꿀 수 있어요</p>
+                    <p>• 여러 선생님이 동시에 수정 가능해요</p>
+                    <p>• 출력 전 📸 스냅샷 저장을 권장해요</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/js/jubo.js"></script>
+<script>
+    function toggleBlock(header, event) {
+        if (!header) return;
+
+        const blockItem = header.closest('.jubo-block-item');
+        const body = blockItem ? blockItem.querySelector('.jubo-block-body') : null;
+        const btn = header.querySelector('.jubo-block-toggle-btn');
+
+        if (!blockItem || !body) return;
+
+        const isOpen = blockItem.classList.contains('is-open');
+
+        if (isOpen) {
+            blockItem.classList.remove('is-open');
+            body.style.display = 'none';
+            if (btn) {
+                btn.textContent = '▼';
+                btn.setAttribute('aria-expanded', 'false');
+            }
+        } else {
+            blockItem.classList.add('is-open');
+            body.style.display = 'block';
+            if (btn) {
+                btn.textContent = '▲';
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.jubo-block-item').forEach(function (item) {
+            item.classList.remove('is-open');
+
+            const body = item.querySelector('.jubo-block-body');
+            const btn = item.querySelector('.jubo-block-toggle-btn');
+
+            if (body) {
+                body.style.display = 'none';
+            }
+
+            if (btn) {
+                btn.textContent = '▼';
+                btn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    });
+</script>

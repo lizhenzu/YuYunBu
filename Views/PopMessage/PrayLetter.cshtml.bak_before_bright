@@ -1,0 +1,194 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.PopMessage.PopMessageComposeVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 이름이 없으면 "전도사님", 있으면 "홍길동 전도사님"
+    var toLabel = string.IsNullOrWhiteSpace(Model.ToFullName) ? "전도사님" : $"{Model.ToFullName} 전도사님";
+    var returnUrl = string.IsNullOrWhiteSpace(Model.ReturnUrl) ? "/Home/Index" : Model.ReturnUrl;
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>전도사님께 기도 편지</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+<link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+<style>
+/* 기도 유형 */
+.chip-row { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.chip { padding: 13px 8px; text-align: center; font-size: 14px; color: var(--dim2); background: var(--card); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: background .15s, color .15s; }
+.chip:hover { color: var(--acc); }
+.chip.sel { background: var(--tx); color: var(--bg); font-weight: 600; }
+@@media (max-width: 380px) { .chip-row { grid-template-columns: repeat(2, 1fr); } }
+
+textarea.fIn { min-height: 240px; }
+.cnt-txt { font-family: "Inter", sans-serif; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.cnt-txt.ov { color: var(--danger); }
+.fAct { align-items: center; }
+.fAct .cnt-txt { margin-right: auto; }
+.err-box { display: none; margin-top: 10px; }
+
+/* 보낸 뒤 */
+.done-wrap { display: none; padding: 56px 0 20px; text-align: center; }
+.done-k { font-size: 11.5px; font-weight: 600; letter-spacing: .22em; color: var(--acc); }
+.done-title { font-family: "Noto Serif KR", serif; font-size: 24px; margin-top: 10px; }
+.done-msg { margin: 14px auto 28px; max-width: 340px; font-family: "Noto Serif KR", serif; font-size: 15px; line-height: 1.9; color: var(--dim2); }
+.done-msg strong { font-weight: 500; color: var(--tx); }
+.done-rule { width: 40px; height: 1px; background: var(--acc); margin: 20px auto 0; }
+</style>
+</head>
+<body>
+
+<header class="hd">
+    <div class="sh">
+        <div class="hdTop">
+            <a href="@returnUrl">← 돌아가기</a>
+            <span>받는 분 · @toLabel</span>
+        </div>
+        <div class="hdK">PRAYER LETTER</div>
+        <h1 class="hdT">전도사님께 기도 편지</h1>
+        <div class="hdS">마음속 기도 제목을 편지로 전해 보세요.</div>
+    </div>
+</header>
+
+<main class="sh">
+
+    <!-- ─── 완료 화면 ─────────────────────── -->
+    <div class="done-wrap" id="doneWrap">
+        <div class="done-k">SENT</div>
+        <div class="done-title">기도 편지가 전달됐어요</div>
+        <div class="done-rule"></div>
+        <div class="done-msg">
+            <strong>@toLabel</strong>이 곧 편지를 확인하실 거예요.<br>
+            하나님이 여러분의 기도를 들으시고<br>
+            반드시 응답해 주실 거예요.
+        </div>
+        <a class="nbtn pri" href="@returnUrl">@ConstatsCommon.ToHome 돌아가기</a>
+    </div>
+
+    <!-- ─── 작성 폼 ────────────────────────── -->
+    <div id="composeWrap" class="fm">
+
+        <div class="fRow">
+            <span class="fLbl">기도 유형 · 누르면 내용이 채워져요</span>
+            <div class="chip-row" id="chipRow">
+                <div class="chip" data-tpl="감사">감사 기도</div>
+                <div class="chip" data-tpl="도움">도움 요청</div>
+                <div class="chip" data-tpl="중보">중보 기도</div>
+                <div class="chip" data-tpl="가족">가족을 위해</div>
+                <div class="chip" data-tpl="건강">건강 기도</div>
+                <div class="chip" data-tpl="직접">직접 작성</div>
+            </div>
+        </div>
+
+        <!-- 숨겨진 AntiForgery 폼 -->
+        <form id="afForm" method="post" action="javascript:void(0)" style="display:none;">
+            @Html.AntiForgeryToken()
+        </form>
+
+        <div class="fRow">
+            <label class="fLbl" for="msg">기도 내용</label>
+            <textarea id="msg" class="fIn" maxlength="500"
+                placeholder="전도사님께 전하고 싶은 기도 제목이나 마음을 자유롭게 써 주세요.&#10;&#10;예) 요즘 시험 준비로 많이 힘들어요. 기도 부탁드립니다."></textarea>
+            <div class="alert err-box" id="errBox"></div>
+        </div>
+
+        <div class="fAct">
+            <span class="cnt-txt" id="cntTxt"><span id="cnt">0</span> / 500</span>
+            <button type="button" class="nbtn pri" id="sendBtn" onclick="sendPray()">기도 편지 보내기</button>
+        </div>
+    </div>
+
+    <div class="ft"><span>© 유년부 · 기도 편지</span></div>
+</main>
+
+<script>
+(function () {
+    'use strict';
+
+    /* ── 템플릿 ─────────────────────────── */
+    const TPL = {
+        '감사': '전도사님, 안녕하세요 🙏\n\n요즘 이런 일들로 정말 감사한 마음이 들어서 편지를 씁니다.\n\n(감사한 내용을 적어주세요)\n\n항상 저희를 위해 기도해 주셔서 정말 감사합니다.',
+        '도움': '전도사님, 안녕하세요 🙏\n\n요즘 아래와 같은 어려움이 있어서 기도 부탁드립니다.\n\n(어려운 상황이나 기도 제목을 적어주세요)\n\n전도사님의 기도와 말씀이 큰 힘이 됩니다.',
+        '중보': '전도사님, 안녕하세요 🙏\n\n소중한 분을 위해 중보 기도를 부탁드리고 싶습니다.\n\n이름 또는 상황: (적어주세요)\n\n하나님의 은혜가 그 분께 가득하길 바랍니다.',
+        '가족': '전도사님, 안녕하세요 🙏\n\n저희 가족을 위해 기도해 주세요.\n\n(가족 상황이나 기도 제목을 적어주세요)\n\n우리 가족이 하나님 안에서 더욱 하나 되길 소망합니다.',
+        '건강': '전도사님, 안녕하세요 🙏\n\n건강 문제로 기도 부탁드립니다.\n\n(건강 상황을 적어주세요)\n\n하나님의 치유와 회복을 믿으며 기도합니다.',
+        '직접': ''
+    };
+
+    /* ── 칩 클릭 ────────────────────────── */
+    document.querySelectorAll('.chip').forEach(chip => {
+        chip.addEventListener('click', function () {
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('sel'));
+            this.classList.add('sel');
+            const t = TPL[this.dataset.tpl] ?? '';
+            document.getElementById('msg').value = t;
+            updateCnt();
+            if (t) document.getElementById('msg').focus();
+        });
+    });
+
+    /* ── 글자수 ─────────────────────────── */
+    function updateCnt() {
+        const len = (document.getElementById('msg').value || '').length;
+        document.getElementById('cnt').textContent = len;
+        document.getElementById('cntTxt').classList.toggle('ov', len >= 480);
+    }
+    document.getElementById('msg').addEventListener('input', updateCnt);
+    updateCnt();
+
+    /* ── 전송 ───────────────────────────── */
+    window.sendPray = async function () {
+        const btn    = document.getElementById('sendBtn');
+        const errBox = document.getElementById('errBox');
+        const msg    = (document.getElementById('msg').value || '').trim();
+        const token  = document.querySelector('#afForm [name="__RequestVerificationToken"]')?.value ?? '';
+
+        errBox.style.display = 'none';
+
+        if (!msg) { showErr('기도 내용을 입력해 주세요.'); return; }
+        if (msg.length > 500) { showErr('500자 이하로 작성해 주세요.'); return; }
+
+        btn.disabled = true;
+        btn.textContent = '전송 중…';
+
+        try {
+            const fd = new FormData();
+            fd.append('__RequestVerificationToken', token);
+            fd.append('ToUserName', 'onlylove224');
+            fd.append('MessageText', msg);
+
+            const res  = await fetch('/PopMessage/SendAjax', { method:'POST', body:fd });
+            const data = await res.json();
+
+            if (data.ok) {
+                document.getElementById('composeWrap').style.display = 'none';
+                document.getElementById('doneWrap').style.display    = 'block';
+                window.scrollTo({ top:0, behavior:'smooth' });
+            } else {
+                showErr(data.message || '전송에 실패했습니다. 다시 시도해 주세요.');
+                resetBtn();
+            }
+        } catch {
+            showErr('네트워크 오류가 발생했습니다. 다시 시도해 주세요.');
+            resetBtn();
+        }
+    };
+
+    function showErr(msg) {
+        const b = document.getElementById('errBox');
+        b.textContent = msg;
+        b.style.display = 'block';
+    }
+
+    function resetBtn() {
+        const btn = document.getElementById('sendBtn');
+        btn.disabled = false;
+        btn.textContent = '기도 편지 보내기';
+    }
+})();
+</script>
+</body>
+</html>

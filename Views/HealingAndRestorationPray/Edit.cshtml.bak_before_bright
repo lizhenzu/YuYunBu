@@ -1,0 +1,153 @@
+﻿@model BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray
+@*  ══════════════════════════════════════════════════════════════
+    치유와 회복 기도문 등록 · 수정 — Bone 스킨 (관리자 전용)
+    Create 와 Edit 가 함께 쓴다. 이전 화면은 Edit_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    bool isNew = Model == null || Model.PrayId <= 0;
+    var err = TempData["Error"] as string;
+    bool useN = Model != null && string.Equals(Model.UseYN, "N", StringComparison.OrdinalIgnoreCase);
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16181C" />
+    <title>@(isNew ? "기도문 등록" : "기도문 수정") · 치유와 회복을 위한 기도문</title>
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .edHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 28px var(--pad) 24px; }
+    .qz .edK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .edH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.4; margin: 10px 0 0; color: var(--bg); }
+    .qz .edS { font-size: 11.5px; color: #9A9690; margin-top: 8px; }
+
+    .qz .edFlash { margin-top: 16px; padding: 11px 14px; font-size: 12.5px; border: 1px solid #D8A39B; color: #A63A2C; }
+
+    .qz .edSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .edSecT { font-family: "Noto Serif KR", serif; font-size: 15px; }
+    .qz .edSecS { font-size: 10.5px; color: var(--dim); }
+
+    .qz .edField { margin-top: 16px; }
+    .qz .edLb { display: block; font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--dim2); margin-bottom: 7px; }
+    .qz .edIn, .qz .edTa {
+        width: 100%; box-sizing: border-box; font-family: inherit; font-size: 14px; color: var(--tx);
+        background: #FFFEFB; border: 1px solid var(--rule); border-radius: 1px; padding: 11px 12px; outline: none;
+    }
+    .qz .edTa { font-family: "Noto Serif KR", serif; font-size: 14.5px; line-height: 1.9; resize: vertical; min-height: 360px; }
+    .qz .edIn:focus, .qz .edTa:focus { border-color: var(--acc); box-shadow: 0 0 0 3px var(--mark); }
+    .qz .edHint { font-size: 10.5px; color: var(--dim); margin-top: 6px; }
+
+    .qz .edRow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .qz .edRadio { display: flex; border: 1px solid var(--rule); }
+    .qz .edRadio label { flex: 1; text-align: center; padding: 11px 0; font-size: 13px; color: var(--dim2); cursor: pointer; background: #FFFEFB; }
+    .qz .edRadio label + label { border-left: 1px solid var(--rule); }
+    .qz .edRadio input { position: absolute; opacity: 0; pointer-events: none; }
+    .qz .edRadio label:has(input:checked) { background: var(--tx); color: var(--bg); }
+    .qz .edRadio label:has(input:focus-visible) { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+    .qz .edActs { display: flex; gap: 8px; margin-top: 30px; }
+    .qz .edBtn {
+        flex: 1; text-align: center; font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: .08em;
+        padding: 14px 0; border: 1px solid var(--rule); background: transparent; color: var(--dim2);
+        text-decoration: none; cursor: pointer; border-radius: 1px;
+    }
+    .qz .edBtn.ink { flex: 2; background: var(--tx); border-color: var(--tx); color: var(--bg); }
+    .qz .edBtn.ink:hover { background: var(--acc); border-color: var(--acc); }
+    .qz .edBtn:hover { border-color: var(--acc); color: var(--acc); }
+    .qz .edBtn.ink:hover { color: var(--bg); }
+    .qz .edBtn.del { color: #A63A2C; }
+    .qz .edBtn.del:hover { border-color: #D8A39B; }
+
+    @@media (max-width: 420px) { .qz .edRow { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/HealingAndRestorationPray/List">목록</a><span class="qzHomeSep">·</span><a class="qzHome" href="/HealingAndRestorationPray/Index">오늘의 기도</a>
+            </div>
+            <div class="qzDate">관리자</div>
+        </div>
+
+        <header class="edHead">
+            <div class="edK">치유와 회복을 위한 기도 · 관리자</div>
+            <h1 class="edH1">@(isNew ? "새 기도문 등록" : "기도문 수정")</h1>
+            <div class="edS">@(isNew ? "순서 번호가 작을수록 순환에서 먼저 나와요" : "조회수는 수정해도 그대로 유지돼요")</div>
+        </header>
+
+        @if (!string.IsNullOrEmpty(err)) { <div class="edFlash">@err</div> }
+
+        <form method="post" action="/HealingAndRestorationPray/Save">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="PrayId" value="@(Model?.PrayId ?? 0)" />
+
+            <div class="edSec"><span class="edSecT">기도문 내용</span><span class="edSecS">필수</span></div>
+
+            <div class="edField">
+                <label class="edLb" for="Title">기도 제목</label>
+                <input class="edIn" id="Title" name="Title" maxlength="200" required
+                       value="@(Model?.Title ?? "")" placeholder="예) 수술을 앞둔 분을 위하여" />
+            </div>
+
+            <div class="edField">
+                <label class="edLb" for="PrayText">기도문</label>
+                <textarea class="edTa" id="PrayText" name="PrayText" required rows="20"
+                          placeholder="기도문을 입력해 주세요">@(Model?.PrayText ?? "")</textarea>
+                <div class="edHint">줄바꿈이 화면에 그대로 나타나요</div>
+            </div>
+
+            <div class="edSec"><span class="edSecT">성경 구절</span><span class="edSecS">선택</span></div>
+
+            <div class="edField">
+                <label class="edLb" for="BibleRef">구절 표기</label>
+                <input class="edIn" id="BibleRef" name="BibleRef" maxlength="100"
+                       value="@(Model?.BibleRef ?? "")" placeholder="예) 시편 23:4" />
+            </div>
+            <div class="edField">
+                <label class="edLb" for="BibleText">구절 본문</label>
+                <input class="edIn" id="BibleText" name="BibleText" maxlength="1000"
+                       value="@(Model?.BibleText ?? "")" placeholder="구절 내용을 입력해 주세요" />
+            </div>
+
+            <div class="edSec"><span class="edSecT">노출 설정</span><span class="edSecS"></span></div>
+
+            <div class="edRow">
+                <div class="edField">
+                    <label class="edLb" for="SortOrder">순서 번호</label>
+                    <input class="edIn" id="SortOrder" name="SortOrder" type="number" min="0" step="1"
+                           value="@(Model?.SortOrder ?? 0)" />
+                    <div class="edHint">작을수록 먼저 나와요</div>
+                </div>
+                <div class="edField">
+                    <span class="edLb">사용 여부</span>
+                    <div class="edRadio" role="radiogroup" aria-label="사용 여부">
+                        <label><input type="radio" name="UseYN" value="Y" checked="@(!useN)" />사용</label>
+                        <label><input type="radio" name="UseYN" value="N" checked="@useN" />숨김</label>
+                    </div>
+                    <div class="edHint">숨김은 순환에서 빠져요</div>
+                </div>
+            </div>
+
+            <div class="edActs">
+                <button type="submit" class="edBtn ink">@(isNew ? "등록하기" : "저장하기")</button>
+                <a class="edBtn" href="/HealingAndRestorationPray/List">취소</a>
+                @if (!isNew)
+                {
+                    <a class="edBtn del" href="/HealingAndRestorationPray/Delete?PrayId=@Model!.PrayId">삭제</a>
+                }
+            </div>
+        </form>
+
+    </div>
+</div>
+
+</body>
+</html>

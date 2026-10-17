@@ -1,0 +1,411 @@
+﻿@{
+    Layout = null;
+}
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@{
+
+    // ✅ 원하는 경로로 교체하세요
+    var urlChallengeMain = "/Home/MissionMainBoard";      // 도전 성경말씀(말씀읽기/퀴즈/암송/기도)
+    var urlBibleReading = "/bibleCenter/MyDashboard";         // 도전성경완독(성경 통독하기)
+    var urlHome = "/";                             // 홈
+}
+
+@{
+    // 권한 (기존 유지)
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>도전 성경 · 통독</title>
+
+    <style>
+        :root {
+            /* ✅ 완전 새 테마: 크림 베이지 + 잉크 + 라일락/민트 포인트 */
+            --bgTop: #fff7ed;
+            --bgMid: #f4f1ff;
+            --bgBot: #eafff6;
+            --card: rgba(255,255,255,.82);
+            --card2: rgba(255,255,255,.62);
+            --line: rgba(15,23,42,.10);
+            --ink: #0f172a;
+            --muted: rgba(15,23,42,.62);
+            --violet1: #6d28d9;
+            --violet2: #a78bfa;
+            --mint1: #0ea5a4;
+            --mint2: #99f6e4;
+            --amber1: #f59e0b;
+            --amber2: #fde68a;
+            --shadow: 0 18px 55px rgba(15,23,42,.12);
+            --radius: 22px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            color: var(--ink);
+            min-height: 100vh;
+            background: radial-gradient(900px 520px at 12% 10%, rgba(109,40,217,.16), transparent 60%), radial-gradient(760px 520px at 92% 18%, rgba(14,165,164,.14), transparent 60%), radial-gradient(760px 520px at 40% 110%, rgba(245,158,11,.14), transparent 60%), linear-gradient(180deg, var(--bgTop), var(--bgMid) 55%, var(--bgBot));
+        }
+
+        .wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 22px 16px;
+        }
+
+        .shell {
+            width: 100%;
+            max-width: 860px;
+        }
+
+        .hero {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .title {
+            font-size: 30px;
+            font-weight: 950;
+            letter-spacing: -.01em;
+            line-height: 1.12;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 750;
+        }
+
+        .pill {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.62);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 24px rgba(15,23,42,.10);
+            backdrop-filter: blur(10px);
+            font-size: 13px;
+            font-weight: 900;
+            color: rgba(15,23,42,.78);
+        }
+
+            .pill .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--violet1), var(--mint1));
+                box-shadow: 0 0 0 4px rgba(167,139,250,.22);
+            }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .card {
+            position: relative;
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, var(--card), var(--card2));
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transform: translateY(0);
+            transition: transform .16s ease, box-shadow .16s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 26px 70px rgba(15,23,42,.16);
+            }
+
+            .card::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                pointer-events: none;
+                opacity: .95;
+            }
+
+        .btn {
+            width: 100%;
+            border: 0;
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            padding: 18px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            position: relative;
+        }
+
+        .icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            flex: 0 0 auto;
+            box-shadow: 0 12px 24px rgba(15,23,42,.12);
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.70);
+        }
+
+        .text {
+            min-width: 0;
+        }
+
+        .label {
+            font-size: 20px;
+            font-weight: 950;
+            letter-spacing: -.01em;
+            line-height: 1.18;
+        }
+
+        .desc {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 750;
+            line-height: 1.35;
+        }
+
+        .chev {
+            margin-left: auto;
+            font-size: 20px;
+            opacity: .85;
+            font-weight: 900;
+        }
+
+        .btn:focus {
+            outline: 3px solid rgba(109,40,217,.28);
+            outline-offset: 4px;
+            border-radius: calc(var(--radius) - 2px);
+        }
+
+        /* ✅ 카드별 새로운 테마 */
+        .theme-challenge::before {
+            background: radial-gradient(340px 240px at 15% 20%, rgba(109,40,217,.22), transparent 60%), radial-gradient(320px 240px at 85% 20%, rgba(14,165,164,.18), transparent 60%);
+        }
+
+        .theme-challenge .icon {
+            background: linear-gradient(135deg, rgba(109,40,217,.16), rgba(153,246,228,.26));
+        }
+
+        .theme-challenge .btn:hover {
+            background: linear-gradient(135deg, rgba(109,40,217,.10), rgba(14,165,164,.08));
+        }
+
+        .theme-reading::before {
+            background: radial-gradient(360px 260px at 18% 18%, rgba(245,158,11,.22), transparent 60%), radial-gradient(320px 240px at 86% 24%, rgba(167,139,250,.18), transparent 60%);
+        }
+
+        .theme-reading .icon {
+            background: linear-gradient(135deg, rgba(245,158,11,.18), rgba(167,139,250,.18));
+        }
+
+        .theme-reading .btn:hover {
+            background: linear-gradient(135deg, rgba(245,158,11,.10), rgba(167,139,250,.08));
+        }
+
+        .theme-home {
+            grid-column: 1 / -1;
+        }
+
+            .theme-home::before {
+                background: radial-gradient(360px 260px at 20% 22%, rgba(14,165,164,.18), transparent 60%), radial-gradient(320px 240px at 88% 26%, rgba(15,23,42,.10), transparent 60%);
+            }
+
+            .theme-home .icon {
+                background: linear-gradient(135deg, rgba(14,165,164,.14), rgba(255,255,255,.70));
+            }
+
+            .theme-home .btn:hover {
+                background: linear-gradient(135deg, rgba(14,165,164,.08), rgba(15,23,42,.04));
+            }
+
+        .foot {
+            margin-top: 14px;
+            text-align: center;
+            color: rgba(15,23,42,.50);
+            font-size: 12.5px;
+            font-weight: 750;
+        }
+
+        @@media (max-width: 640px) {
+            .hero {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .title {
+                font-size: 27px;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .theme-home {
+                grid-column: auto;
+            }
+
+            .icon {
+                width: 62px;
+                height: 62px;
+            }
+        }
+
+
+        /* ✅ 테스트 안내 강조 문구 */
+.mi-root[data-state="shown"] .mi-notice {
+    margin: .6rem 0 .2rem;
+    padding: .55rem .75rem;
+    border-radius: 12px;
+    background: rgba(255, 210, 90, .16);
+    border: 1px solid rgba(255, 210, 90, .35);
+    font-size: .82rem;
+    font-weight: 800;
+    color: #fff6dc;
+    line-height: 1.35;
+    box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+
+.mi-root[data-state="shown"] .mi-notice strong {
+    color: #ffe08a;
+}
+
+
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="shell">
+
+            <div class="hero">
+                <div>
+                    <div class="title">성경미션속으로</div>
+                    <div class="subtitle">말씀으로 하루를 시작해요 🙂</div>
+                </div>
+
+                <div class="pill" aria-label="안내">
+                    <span class="dot" aria-hidden="true"></span>
+                    <span>오늘도 한 걸음!</span>
+                    <span style="opacity:.55;">·</span>
+                    <span>말씀 & 미션</span>
+                </div>
+            </div>
+
+           @*     @await Html.PartialAsync("_Banner_4Mission_Notice") *@
+            @await Html.PartialAsync("_Banner_MissionDashBoard")
+           
+            @await Html.PartialAsync("_Banner_ChallengeMissionBible")
+            @await Html.PartialAsync("_Banner_MissionReadBible")
+
+
+
+            <div class="grid">
+                <!-- ✅ 도전 성경/말씀: 말씀 읽고/퀴즈/암송/기도 -->
+                @*             <div class="card theme-challenge">
+                    <button class="btn" onclick="location.href='@urlChallengeMain'">
+                        <div class="icon">🔥</div>
+                        <div class="text">
+                            <div class="label">@ConstatsCommon.MainKeyTitle</div>
+                            <div class="desc">말씀 읽고 · 퀴즈 풀고 · 암송하고 · 기도하기</div>
+                        </div>
+                        <div class="chev">→</div>
+                    </button>
+                </div>
+
+                <!-- ✅ 도전성경완독: 성경 통독하기 -->
+                <div class="card theme-reading">
+                    <button class="btn" onclick="location.href='@urlBibleReading'">
+                        <div class="icon">📖</div>
+                        <div class="text">
+                            <div class="label">@ConstatsCommon.ReadBibleAllTitleButton</div>
+                            <div class="desc">성경 통독 진행상황 확인 & 오늘 분량 읽기</div>
+                        </div>
+                        <div class="chev">→</div>
+                    </button>
+                </div>
+ *@
+                <!-- ✅ 홈 -->
+                <div class="card theme-home">
+                    <button class="btn" onclick="location.href='@urlHome'">
+                        <div class="icon">🏠</div>
+                        <div class="text">
+                            <div class="label">홈으로 가기</div>
+                            <div class="desc">메인 화면으로 돌아가기</div>
+                        </div>
+                        <div class="chev">→</div>
+                    </button>
+                </div>
+
+                @if (isSuperAdmin)
+                {
+
+                    <div class="card theme-home">
+                        <button class="btn" onclick="location.href='/Home/MissionMainBoard'">
+                            <div class="icon">🏠</div>
+                            <div class="text">
+                                <div class="label">테스트</div>
+                                <div class="desc">미션 2025</div>
+                            </div>
+                            <div class="chev">→</div>
+                        </button>
+                    </div>     <div class="card theme-home">
+                        <button class="btn" onclick="location.href='/DailyMission2Award/Dashboard'">
+                            <div class="icon">🏠</div>
+                            <div class="text">
+                                <div class="label">테스트</div>
+                                <div class="desc">미션 2026 시상 들어가기</div>
+                            </div>
+                            <div class="chev">→</div>
+                        </button>
+                    </div>
+                }
+
+            </div>
+
+            <div class="foot">© Challenge Bible & Reading</div>
+        </div>
+    </div>
+
+     <script src="/js/GlobalCookie.js"></script>
+</body>
+</html>

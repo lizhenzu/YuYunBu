@@ -1,0 +1,239 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+<style>
+    /* ==========================================
+       RB66 – ONE CARD MERGED (LIGHT THEME)
+       - 카드 1개로 통합
+       - 버튼은 한 줄로 쭉 (모바일은 100% 스택)
+       - 텍스트 더 진하게(가독성 강화)
+       ========================================== */
+
+    .rb66-wrap {
+        margin: 1.2rem 0 2rem;
+        display: grid;
+        gap: 12px;
+    }
+
+    /* ✅ 통합 카드 */
+    .rb66-card {
+        position: relative;
+        border-radius: 22px;
+        padding: 16px 16px 14px;
+        background: rgba(255,255,255,.88);
+        border: 1px solid rgba(15,23,42,.12);
+        box-shadow: 0 18px 48px rgba(15,23,42,.10);
+        overflow: hidden;
+        backdrop-filter: blur(12px);
+    }
+
+        /* 상단 컬러 라인 */
+        .rb66-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            height: 7px;
+            pointer-events: none;
+            background: linear-gradient( 90deg, rgba(56,189,248,.70), rgba(34,197,94,.58), rgba(167,139,250,.58), rgba(56,189,248,.70) );
+        }
+
+        /* 은은한 글로우 */
+        .rb66-card::after {
+            content: "";
+            position: absolute;
+            inset: -45% -30% auto -30%;
+            height: 240px;
+            background: radial-gradient(circle at 30% 30%, rgba(56,189,248,.18), transparent 60% );
+            pointer-events: none;
+        }
+
+        .rb66-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 22px 60px rgba(15,23,42,.14);
+        }
+
+    /* ---------- Header ---------- */
+    .rb66-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .rb66-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        border: 1px solid rgba(15,23,42,.10);
+        box-shadow: 0 10px 22px rgba(15,23,42,.08);
+        flex: 0 0 auto;
+        color: rgba(11,18,32,.95);
+        background: linear-gradient(135deg, rgba(56,189,248,.22), rgba(34,197,94,.16), rgba(167,139,250,.14) );
+    }
+
+    /* ---------- Titles ---------- */
+    .rb66-title-main {
+        font-size: 18px;
+        font-weight: 1000;
+        letter-spacing: -0.2px;
+        line-height: 1.12;
+        color: #0b1220; /* ✅ 선명 */
+        text-shadow: 0 1px 0 rgba(255,255,255,.55);
+    }
+
+    /* ✅ 서브 타이틀: 뿌연 회색 -> 진한 색으로 */
+    .rb66-title-sub {
+        margin-top: 2px;
+        font-size: 14px;
+        font-weight: 900;
+        letter-spacing: -0.1px;
+        color: #1f2937; /* ✅ 선명 */
+    }
+
+    /* ---------- Body ---------- */
+    /* ✅ 본문도 더 진하게 */
+    .rb66-text {
+        margin: 6px 0 12px;
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.55;
+        color: #334155; /* ✅ 선명 */
+        position: relative;
+        z-index: 1;
+    }
+
+    /* ---------- Actions (buttons) ---------- */
+    .rb66-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .rb66-btn {
+        border: 1px solid rgba(15,23,42,.12);
+        border-radius: 999px;
+        padding: 10px 12px;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: -0.12px;
+        cursor: pointer;
+        background: rgba(255,255,255,.94);
+        color: rgba(11,18,32,.95);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform .12s ease, background .12s ease, box-shadow .12s ease, border-color .12s ease;
+        white-space: nowrap;
+        box-shadow: 0 10px 22px rgba(15,23,42,.06);
+    }
+
+        .rb66-btn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,1);
+            border-color: rgba(15,23,42,.16);
+            box-shadow: 0 14px 28px rgba(15,23,42,.10);
+        }
+
+        .rb66-btn .emoji {
+            font-size: 16px;
+        }
+
+        /* 버튼 타입 */
+        .rb66-btn.primary {
+            background: linear-gradient(135deg, rgba(56,189,248,.22), rgba(167,139,250,.14) );
+            border-color: rgba(56,189,248,.30);
+        }
+
+        .rb66-btn.secondary {
+            background: linear-gradient(135deg, rgba(167,139,250,.18), rgba(236,72,153,.10) );
+            border-color: rgba(167,139,250,.28);
+        }
+
+        .rb66-btn.success {
+            background: linear-gradient(135deg, rgba(34,197,94,.20), rgba(250,204,21,.12) );
+            border-color: rgba(34,197,94,.28);
+        }
+
+    /* ---------- Hint ---------- */
+    /* ✅ 힌트도 더 진하게 */
+    .rb66-hint {
+        margin-top: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        color: #475569; /* ✅ 선명 */
+        position: relative;
+        z-index: 1;
+    }
+
+    /* 모바일: 버튼 크게 */
+    @@media (max-width:520px) {
+        .rb66-card {
+            padding: 14px 14px 12px;
+        }
+
+        .rb66-icon {
+            width: 48px;
+            height: 48px;
+            font-size: 24px;
+        }
+
+        .rb66-btn {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="rb66-wrap">
+
+    <!-- ✅ 3개 카드를 1개 카드로 통합 -->
+    <div class="rb66-card merged">
+
+        <div class="rb66-header">
+            <div class="rb66-icon">📖</div>
+            <div>
+                <div class="rb66-title-main">
+                    @ConstatsCommon.ReadBibleAllTitleButton
+                </div>
+                <div class="rb66-title-sub">
+                    참여자 · 성경노트 · 완독자 안내
+                </div>
+            </div>
+        </div>
+
+        <p class="rb66-text">
+            66권 완독에 도전하는 친구들의 <b>참여 현황</b>을 확인하고,
+            읽으면서 남긴 <b>성경노트</b>도 모아볼 수 있어요.<br />
+            또한 끝까지 완주한 <b>완독자</b>를 함께 칭찬하고 축하해 주세요!
+        </p>
+
+        <!-- ✅ 버튼이 한 줄로 쭉 나열 -->
+        <div class="rb66-actions">
+
+            <button class="rb66-btn primary" onclick="location.href='/bibleCenter/MyDashboardList';">
+                <span class="emoji">🔎</span><span>참여자 보기</span>
+            </button>
+
+            <button class="rb66-btn secondary" onclick="location.href='/bibleCenter/bibleBookMark';">
+                <span class="emoji">✏️</span><span>성경노트</span>
+            </button>
+        </div>
+
+        <div class="rb66-hint">
+            * 참여/완독 목록은 최신 기준으로 정리됩니다. 성경노트는 언제든 다시 확인할 수 있어요 😊
+        </div>
+
+    </div>
+
+</div>

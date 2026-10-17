@@ -1,0 +1,183 @@
+﻿@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Services.Abstract;
+@using Microsoft.AspNetCore.Http;
+
+@model BulletinBoard.Models.FamilyPhoto.FamilyPhotoBannerVM
+@using BulletinBoard.Models.FamilyPhoto
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+
+@*  ══════════════════════════════════════════════════════════════
+    안내(Welcome) — 홈 배너를 누르면 오는 곳.  갤러리와 같은 Bone(호텔 인쇄물) 스킨.
+    초대 글 · 일정 띠 · 참여 방법 01–04 · 사진 올리기 / 갤러리 보기.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var now = DateHelper.GetKoreaNow();
+    var bg  = Model ?? new FamilyPhotoBannerVM();
+    bool isStaff = ViewBag.IsStaff == true;
+    string DM(DateTime d) => $"{d.Month}.{d.Day}";
+    string MD(DateTime d) => $"{d.Month}월 {d.Day}일";
+
+    // 지금 단계 · 주 버튼
+    int nowStep = bg.IsPublished ? 3 : bg.Phase switch
+    {
+        FamilyPhotoPhase.Like   => 2,
+        FamilyPhotoPhase.Closed => 3,
+        _                       => 1,
+    };
+    string btn, url;
+    if (bg.IsPublished)                                   { btn = "결과 보기 →";      url = "/FamilyPhoto/Result"; }
+    else if (bg.Phase == FamilyPhotoPhase.Like)           { btn = "좋아요 누르기 →";  url = "/FamilyPhoto"; }
+    else if (bg.Phase == FamilyPhotoPhase.Closed)         { btn = "갤러리 보기 →";    url = "/FamilyPhoto"; }
+    else if (!Cfg.CanUploadAt(now))                       { btn = "갤러리 미리 보기 →"; url = "/FamilyPhoto"; }
+    else                                                  { btn = "사진 올리기 →";    url = "/FamilyPhoto/Enter"; }
+
+    // ── 카카오톡 · 메신저 공유 미리보기 (Open Graph) ──
+    string ogDomain = (ViewBag.Domain as string ?? "https://www.jamsilkids.com").TrimEnd('/');
+    string ogUrl    = ViewBag.FullURL as string ?? $"{ogDomain}/FamilyPhoto/Welcome";
+    string ogImage  = $"{ogDomain}/images/og/family-photo-contest.png?v=2026092702";   // 9/27 일정 없는 "명절" 공용 이미지로 교체 — 카톡 캐시를 피하려고 v 를 올림
+    string ogTitle  = "명절 · 우리 가족 사진 콘테스트";   // 추석 · 설날 어느 명절에나 쓰는 제목
+    string ogDesc   = bg.IsPublished
+        ? $"함께 나눈 사진, 고마워요 · {bg.EntryCount}가족 · 사진 {bg.PhotoCount}장 · 결과를 확인해 보세요."
+        : bg.Phase switch
+        {
+            FamilyPhotoPhase.Like   => $"좋아요 투표 {MD(Cfg.LikeStart)}~ 언제든 · 사진마다 1번씩, 누구나 · 결과는 {MD(Cfg.AnnounceDay)} 주일 공개 · 지금 {bg.EntryCount}가족 참여 중",
+            FamilyPhotoPhase.Closed => $"좋아요 투표가 끝났어요 · {MD(Cfg.AnnounceDay)} 주일에 같이 사진을 봐요",
+            _ => $"사진 올리기 {MD(Cfg.UploadStart)}~ · 좋아요 투표 {MD(Cfg.LikeStart)}~ · 로그인 없이 가족명만 적고 사진 {Cfg.MaxPhotos}장까지",
+        };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@ogTitle</title>
+<meta name="description" content="@ogDesc" />
+
+@* ── 카카오톡 · 메신저 공유 미리보기 ── *@
+<meta property="og:type"        content="website" />
+<meta property="og:site_name"   content="@(string.IsNullOrWhiteSpace(ChurchName) ? "잠실새내교회 유년부" : $"{ChurchName}교회 {DepartmentName}")" />
+<meta property="og:title"       content="@ogTitle" />
+<meta property="og:description" content="@ogDesc" />
+<meta property="og:url"         content="@ogUrl" />
+<meta property="og:image"       content="@ogImage" />
+<meta property="og:image:secure_url" content="@ogImage" />
+<meta property="og:image:type"  content="image/png" />
+<meta property="og:image:width"  content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt"   content="@ogTitle" />
+<meta property="og:locale"      content="ko_KR" />
+<meta name="twitter:card"        content="summary_large_image" />
+<meta name="twitter:title"       content="@ogTitle" />
+<meta name="twitter:description" content="@ogDesc" />
+<meta name="twitter:image"       content="@ogImage" />
+<link rel="canonical" href="@ogUrl" />
+
+<partial name="_FamilyPhotoStyle" />
+<style>
+    .qz .brH1 { margin-top: 22px; font-size: 25px; line-height: 1.4; word-break: keep-all; }
+    .qz .brH1 .l1 { display: block; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif;
+                    font-size: 13px; font-weight: 600; letter-spacing: .14em; color: var(--acc); margin-bottom: 8px; }
+    .qz .brH1 b { display: inline; }
+    .qz .brP { font-size: 12.5px; color: var(--dim); margin-top: 8px; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+    .qz .lead { font-family: "Noto Serif KR", serif; font-weight: 300; font-size: 14.5px; line-height: 1.95; color: var(--dim2); margin-top: 14px; word-break: keep-all; }
+    .qz .lead b { font-weight: 400; color: var(--tx); background-image: linear-gradient(transparent 66%, var(--mark) 66%); }
+
+    .qz .tl i { font-size: 11px; }
+    .qz .tl div.on i { color: var(--dim2); }
+    .qz .stats { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--rule); border-top: 0; background: #fff; }
+    .qz .stats div { padding: 10px 13px; border-right: 1px solid var(--rule); display: flex; align-items: baseline; gap: 6px; }
+    .qz .stats div:last-child { border-right: 0; }
+    .qz .stats b { font-family: "Inter", sans-serif; font-weight: 300; font-size: 20px; color: var(--acc); }
+    .qz .stats span { font-size: 10.5px; letter-spacing: .12em; color: var(--dim); }
+
+    .qz .secH { font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: var(--dim); margin: 28px 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--tx); }
+    .qz ol.steps { list-style: none; margin: 0; padding: 0; }
+    .qz ol.steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 2px; border-bottom: 1px solid var(--rule); }
+    .qz ol.steps b { font-family: "Inter", sans-serif; font-weight: 300; font-size: 22px; color: var(--acc); width: 34px; flex: 0 0 auto; line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .qz ol.steps .t { font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.4; word-break: keep-all; }
+    .qz ol.steps .s { font-size: 11.5px; color: var(--dim); margin-top: 4px; line-height: 1.7; word-break: keep-all; }
+    .qz ol.steps .s em { font-style: normal; color: var(--tx); font-weight: 600; }
+
+    @@media (max-width: 480px) {
+        .qz .brH1 { font-size: 22px; }
+        .qz .lead { font-size: 14px; line-height: 1.9; }
+        .qz .tl { grid-template-columns: 1fr; }
+        .qz .tl div { border-right: 0; border-bottom: 1px solid var(--rule); }
+        .qz .tl div:last-child { border-bottom: 0; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>가족 사진</em></span>
+            </div>
+            @* 오른쪽 : 오늘 날짜 대신 글자 크기 −/＋ (DailyMission4 화면과 같은 것) *@
+            <partial name="~/Views/DailyMission4/Partials/_FontSizeCtl.cshtml" />
+        </div>
+
+        @* 제목은 줄을 일부러 나눠 둔다 — 좁은 화면에서 어중간하게 밀리지 않게 *@
+        <div class="brH1">
+            <span class="l1">🌕 추석맞이</span>
+            <b>우리 가족 사진 콘테스트</b>
+        </div>
+        <div class="brP">기간 : @MD(Cfg.UploadStart)부터 @MD(Cfg.AnnounceDay)</div>
+
+        <div class="lead">
+            추석 연휴, 휴가지에서의 순간도 가족과 함께한 한때도 좋아요.<br />
+            우리 가족의 <b>추석 한 장면</b>을 로그인 없이 가족명만으로<br />
+            유년부 친구들과 나누고 서로에게 마음을 전해 보세요.
+        </div>
+
+        <div class="tl">
+            <div class="@(nowStep == 1 ? "on" : "")"><u>UPLOAD</u><b>@DM(Cfg.UploadStart) –</b><i>사진 올리기 · 언제든 · 가족명만 적고 사진 @(Cfg.MaxPhotos)장까지</i></div>
+            <div class="@(nowStep == 2 ? "on" : "")"><u>LIKE</u><b>@DM(Cfg.LikeStart) –</b><i>좋아요 투표 · 언제든 · 사진마다 1번씩, 누구나 · 결과는 @DM(Cfg.AnnounceDay) 공개</i></div>
+            <div class="@(nowStep == 3 ? "on" : "")"><u>TOGETHER</u><b>@DM(Cfg.AnnounceDay) @Cfg.AnnounceDay.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpper()</b><i>같이 사진 보기 · 예배 시간에 함께 봐요</i></div>
+        </div>
+        <div class="stats">
+            <div><b>@bg.EntryCount</b><span>가족 참여</span></div>
+            <div><b>@bg.PhotoCount</b><span>장</span></div>
+        </div>
+
+        <div class="secH">참여 방법</div>
+        <ol class="steps">
+            <li><b>01</b><div><div class="t">가족명과 비밀번호 4자리를 정해요</div><div class="s">로그인 없이 누구나 · 예: <em>김하늘네</em> · 나중에 사진을 바꾸거나 지울 때 비밀번호를 써요</div></div></li>
+            <li><b>02</b><div><div class="t">우리 가족 추석 사진을 @(Cfg.MaxPhotos)장까지 올려요</div><div class="s">한 장에 @(Cfg.MaxFileBytes / 1024 / 1024)MB까지 · 사진마다 한 줄 설명 · 올리면 바로 갤러리에 보여요</div></div></li>
+            <li><b>03</b><div><div class="t">@MD(Cfg.LikeStart)부터 서로의 사진에 좋아요를 눌러요</div><div class="s">사진마다 1번씩, 다시 누르면 취소 · 가족 · 친구 · 친척에게도 갤러리를 알려 주세요</div></div></li>
+            <li><b>04</b><div><div class="t">@MD(Cfg.AnnounceDay) 주일에 같이 사진을 봐요</div><div class="s">예배 시간에 함께 보며 축하해요 · 사진은 그 뒤에도 갤러리에 남아요</div></div></li>
+        </ol>
+        <div class="hint">
+            @MD(Cfg.UploadStart)부터 올린 사진만 유효해요.
+        </div>
+
+        <div class="acts">
+            <a class="btn" href="@url">@btn</a>
+            <a class="btn line" href="/FamilyPhoto">갤러리 보기</a>
+            @if (isStaff) { <a class="btn line" href="/FamilyPhoto/Admin">관리 →</a> }
+        </div>
+
+        <div class="brFoot">
+                <span> © @DateHelper.GetKoreaNow().Year 잠실새내 · 유년부</span>
+            <span><a href="/">홈으로 →</a></span>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,406 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model UserInfo
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    사진 정보 변경 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 한 화면 네 상태)
+      ① 지금 사진 → ② 사진 고르기(시트) → ③ 자르기 / ④ 촬영 → 저장 → 정보 관리로
+    · 서버로 보내는 주소와 내용은 예전 그대로 : POST /HumanResource/UploadProfilePicture { ProfilePicture(base64), UserId }
+    · 사진 처리는 브라우저 안에서 새 방식으로 (서버는 그대로)
+        - 큰 사진은 먼저 작게 줄여서(긴 변 1600px) 자르기 화면이 가볍게 뜬다 — createImageBitmap + EXIF 방향 자동 보정
+        - 자른 결과는 512×512 JPEG 로 저장 → 예전 PNG 원본 크기(수 MB)보다 수십 배 가볍다
+        - 올리는 진행 정도를 XHR 로 받아 "대기 카드"에 보여 준다
+        - 카메라를 못 쓰는 환경(http · 일부 앱)은 기기 카메라 앱으로 대신 찍는다 (<input capture>)
+    · 이전 화면은 ModifyHRPhoto.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string backUrl = $"/HumanResource/ManageUserInfo?UserId={Model.UserId}&PersonId={Model.PersonId}";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>사진 정보 변경</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; --red: #D9534F; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        [hidden] { display: none !important; }
+        .pz { max-width: 520px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px)); position: relative; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { color: var(--dim); letter-spacing: .04em; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 5px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .hdS { margin-top: 3px; font-size: 12.5px; color: var(--dim2); }
+
+        /* ① 지금 사진 */
+        .pic { position: relative; width: 176px; height: 176px; margin: 26px auto 0; }
+        #image-circle { width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: var(--grey); box-shadow: 0 0 0 4px #fff, 0 0 0 5px #E1E6EE; }
+        #cropped-image { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .camera-icon { position: absolute; right: 2px; bottom: 2px; width: 46px; height: 46px; border: 0; border-radius: 50%; background: var(--blue); box-shadow: 0 2px 8px rgba(47,128,237,.35); cursor: pointer; display: grid; place-items: center; padding: 0; }
+        .camera-icon:hover { background: #1F6FDB; }
+        .camera-icon i { display: block; position: relative; width: 20px; height: 15px; border: 2px solid #fff; border-radius: 4px; }
+        .camera-icon i::after { content: ""; position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -4px 0 0 -4px; border: 2px solid #fff; border-radius: 50%; }
+        .nm { margin: 18px 0 0; text-align: center; font-size: 20px; font-weight: 800; color: var(--ink); }
+        .hint { margin-top: 6px; text-align: center; font-size: 12.5px; color: var(--dim); }
+        .hint.ok { color: var(--blue); font-weight: 700; }
+
+        /* 아래 버튼 줄 */
+        .act { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: linear-gradient(rgba(255,255,255,0), #fff 28%); padding: 22px 16px calc(14px + env(safe-area-inset-bottom, 0px)); }
+        .actIn { max-width: 488px; margin: 0 auto; display: flex; gap: 8px; }
+        .btn { height: 48px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; display: grid; place-items: center; }
+        .btn.p { flex: 1; background: var(--blue); color: #fff; }
+        .btn.p:hover:not(:disabled) { background: #1F6FDB; }
+        .btn.p:disabled { background: #BFD6F7; cursor: default; }
+        .btn.g { flex: none; width: 100px; background: var(--grey); color: var(--dim2); }
+        .btn.g:hover { color: var(--blue); }
+
+        /* ② 사진 고르기 시트 */
+        .toast-popup { position: fixed; inset: 0; z-index: 60; display: none; }
+        .toast-popup.active { display: block; }
+        .toast-popup .dim { position: absolute; inset: 0; background: rgba(17,24,39,.45); }
+        .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-width: 520px; margin: 0 auto; background: #fff; border-radius: 18px 18px 0 0; padding: 10px 16px calc(18px + env(safe-area-inset-bottom, 0px)); animation: up .18s ease-out; }
+        @@keyframes up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+        .sheet .grab { display: block; width: 36px; height: 4px; border-radius: 99px; background: #E1E6EE; margin: 0 auto 12px; }
+        .sheet button { width: 100%; display: flex; align-items: center; gap: 12px; height: 54px; margin-bottom: 8px; padding: 0 14px; border: 0; border-radius: 14px; background: var(--grey); font: inherit; font-size: 15px; font-weight: 800; color: var(--ink); cursor: pointer; text-align: left; }
+        .sheet button small { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--dim2); }
+        .sheet button .ico { flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--soft); color: var(--blue); display: grid; place-items: center; font-size: 11px; font-weight: 800; }
+        .sheet button.x { justify-content: center; background: #fff; color: var(--dim2); margin-bottom: 0; }
+
+        /* ③ 자르기 */
+        #cropper-container .cropWrap { margin-top: 14px; width: 100%; aspect-ratio: 1; max-height: 70vh; border-radius: 14px; overflow: hidden; background: #111827; }
+        #captured-image { display: block; max-width: 100%; }
+        .tip { margin-top: 12px; text-align: center; font-size: 12.5px; color: var(--dim2); }
+        .cropper-view-box, .cropper-face { border-radius: 50%; }
+        .cropper-view-box { outline: 0; box-shadow: 0 0 0 2px #fff; }
+        .cropper-line, .cropper-point { display: none; }
+        .cropper-modal { background: rgba(17,24,39,.55); }
+
+        /* ④ 촬영 */
+        #camera-panel .camBox { margin-top: 14px; width: 100%; aspect-ratio: 3 / 4; max-height: 66vh; border-radius: 14px; overflow: hidden; background: #1F2937; position: relative; }
+        #camera-stream { width: 100%; height: 100%; object-fit: cover; display: block; background: #1F2937; }
+        .camBtns { display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 16px; }
+        #capture-button { width: 66px; height: 66px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px var(--blue); cursor: pointer; padding: 0; }
+        #capture-button:active { transform: scale(.94); }
+        .flip { height: 40px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--grey); color: var(--dim2); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+
+        /* 대기 카드 — 사진 불러오기 · 줄이기 · 올리기 */
+        .wait { position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 20px; background: rgba(17,24,39,.5); }
+        .wait.on { display: grid; }
+        .waitCard { width: 100%; max-width: 320px; background: #fff; border-radius: 18px; padding: 22px 20px 20px; text-align: center; box-shadow: 0 20px 50px rgba(17,24,39,.3); }
+        .spin { width: 34px; height: 34px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid var(--soft); border-top-color: var(--blue); animation: spin .8s linear infinite; }
+        .wait.err .spin { animation: none; border-color: #FDEEEE; border-top-color: var(--red); }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        .wt { font-size: 16px; font-weight: 800; color: var(--ink); }
+        .ws { margin-top: 4px; font-size: 12.5px; color: var(--dim2); line-height: 1.6; }
+        .bar { height: 6px; margin-top: 14px; border-radius: 99px; background: var(--grey); overflow: hidden; }
+        .bar i { display: block; height: 100%; width: 0; background: var(--blue); border-radius: 99px; transition: width .15s; }
+        .steps { display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px; color: var(--dim); }
+        .steps span.on { color: var(--blue); font-weight: 800; }
+        .steps span.done { color: var(--dim2); }
+        .waitBtns { display: none; gap: 8px; margin-top: 16px; }
+        .wait.err .waitBtns { display: flex; }
+        .wait.err .bar, .wait.err .steps { display: none; }
+        .waitBtns button { flex: 1; height: 42px; border: 0; border-radius: 12px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; background: var(--grey); color: var(--dim2); }
+        .waitBtns button.p { background: var(--blue); color: #fff; }
+
+        @@media (prefers-reduced-motion: reduce) { .sheet, .spin { animation: none; } }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="hdTop">
+        <span><a href="@backUrl">정보 관리</a><span class="sep">›</span>사진</span>
+        <span>PHOTO</span>
+    </div>
+
+    @* ① 지금 사진 *@
+    <section id="main-panel">
+        <div class="hdK">MY PHOTO</div>
+        <h1 class="hdT">사진 정보 변경</h1>
+        <div class="hdS">프로필 사진을 바꿔요</div>
+
+        <div class="pic">
+            <div id="image-circle"><img id="cropped-image" src="@Model.ProfilePicturePath" alt="프로필 사진" onerror="this.removeAttribute('src')"></div>
+            <button type="button" class="camera-icon" onclick="toggleToastPopup()" aria-label="사진 바꾸기"><i></i></button>
+        </div>
+        <div class="nm">@Model.FullName</div>
+        <div class="hint" id="hint">카메라 버튼을 눌러 새 사진을 고르세요</div>
+    </section>
+
+    @* ③ 자르기 *@
+    <section id="cropper-container" hidden>
+        <div class="hdK">CROP</div>
+        <h1 class="hdT">보일 부분을 골라요</h1>
+        <div class="hdS">끌어서 움직이고, 두 손가락(휠)으로 크기를 바꿔요</div>
+        <div class="cropWrap"><img id="captured-image" src="" alt="고른 사진"></div>
+        <div class="tip">동그라미 안이 프로필 사진이 돼요</div>
+    </section>
+
+    @* ④ 촬영 *@
+    <section id="camera-panel" hidden>
+        <div class="hdK">CAMERA</div>
+        <h1 class="hdT">사진을 찍어요</h1>
+        <div class="camBox"><video id="camera-stream" autoplay playsinline muted></video></div>
+        <div class="camBtns">
+            <button type="button" class="flip" id="flip-button">앞·뒤 전환</button>
+            <button type="button" id="capture-button" aria-label="사진 찍기"></button>
+            <span style="width:84px"></span>
+        </div>
+        <div class="tip">가운데 버튼을 누르면 찍혀요</div>
+    </section>
+
+    <canvas id="capture-canvas" hidden></canvas>
+    <input type="file" id="photo-input" accept="image/*" hidden>
+    <input type="file" id="photo-capture" accept="image/*" capture="user" hidden>
+
+    @* 아래 버튼 줄 — 상태에 따라 바뀐다 *@
+    <div class="act">
+        <div class="actIn" id="act-main">
+            <button type="button" class="btn p" id="save-button" disabled>저장</button>
+            <button type="button" class="btn g" id="cancel-button">이전 화면</button>
+        </div>
+        <div class="actIn" id="act-crop" hidden>
+            <button type="button" class="btn p" id="crop-image">이 모양으로 자르기</button>
+            <button type="button" class="btn g" id="crop-cancel">취소</button>
+        </div>
+        <div class="actIn" id="act-camera" hidden>
+            <button type="button" class="btn g" id="camera-cancel" style="width:100%">취소</button>
+        </div>
+    </div>
+</div>
+
+@* ② 사진 고르기 시트 *@
+<div class="toast-popup no-select" id="sheet" aria-hidden="true">
+    <div class="dim" onclick="toggleToastPopup()"></div>
+    <div class="sheet" role="dialog" aria-label="사진 고르기">
+        <span class="grab"></span>
+        <button type="button" onclick="selectPhoto()"><span class="ico">앨범</span>사진 선택<small>앨범에서</small></button>
+        <button type="button" onclick="startCamera()"><span class="ico">촬영</span>사진 촬영<small>카메라로</small></button>
+        <button type="button" class="x" onclick="toggleToastPopup()">취소</button>
+    </div>
+</div>
+
+@* 대기 카드 *@
+<div class="wait" id="loadingOverlay" role="alertdialog" aria-live="polite">
+    <div class="waitCard">
+        <div class="spin"></div>
+        <div class="wt" id="waitTitle">처리 중이에요</div>
+        <div class="ws" id="waitSub">잠시만 기다려 주세요</div>
+        <div class="bar"><i id="waitBar"></i></div>
+        <div class="steps"><span id="st1">사진 준비</span><span id="st2">올리는 중</span><span id="st3">저장</span></div>
+        <div class="waitBtns"><button type="button" onclick="closeWait()">닫기</button><button type="button" class="p" id="retryBtn">다시 시도</button></div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<script>
+(function () {
+    var USER_ID = '@Model.UserId';
+    var BACK_URL = '@Html.Raw(backUrl)';
+    var MAX_SRC = 1600;     // 자르기 화면에 올리는 사진의 긴 변 (더 크면 줄인다)
+    var OUT = 512;          // 저장하는 정사각형 한 변
+    var QUALITY = 0.9;      // JPEG 품질
+
+    var $ = function (id) { return document.getElementById(id); };
+    var croppedImg = $('cropped-image'), capturedImg = $('captured-image'), video = $('camera-stream'), canvas = $('capture-canvas');
+    var cropper = null, stream = null, facing = 'environment';
+    var newBlob = null;            // 자른 새 사진 (JPEG)
+    var objUrls = [];              // 해제할 임시 주소
+
+    function keepUrl(u) { objUrls.push(u); return u; }
+    function freeUrls(except) { objUrls = objUrls.filter(function (u) { if (u === except) return true; try { URL.revokeObjectURL(u); } catch (e) { } return false; }); }
+
+    /* ── 화면 전환 ── */
+    function show(view) {
+        $('main-panel').hidden      = view !== 'main';
+        $('cropper-container').hidden = view !== 'crop';
+        $('camera-panel').hidden    = view !== 'camera';
+        $('act-main').hidden   = view !== 'main';
+        $('act-crop').hidden   = view !== 'crop';
+        $('act-camera').hidden = view !== 'camera';
+        window.scrollTo(0, 0);
+    }
+
+    /* ── 대기 카드 ── */
+    var wait = $('loadingOverlay'), onRetry = null;
+    function setSteps(n) { ['st1', 'st2', 'st3'].forEach(function (id, i) { var e = $(id); e.className = i + 1 < n ? 'done' : (i + 1 === n ? 'on' : ''); }); }
+    window.showLoading = function (title, sub, pct, step) {
+        wait.classList.remove('err'); wait.classList.add('on');
+        $('waitTitle').textContent = title || '처리 중이에요';
+        $('waitSub').textContent = sub || '잠시만 기다려 주세요';
+        $('waitBar').style.width = (pct == null ? 0 : pct) + '%';
+        setSteps(step || 1);
+    };
+    window.hideLoading = function () { wait.classList.remove('on', 'err'); };
+    window.closeWait = window.hideLoading;
+    function showError(msg, retry) {
+        wait.classList.add('on', 'err');
+        $('waitTitle').textContent = '저장하지 못했어요';
+        $('waitSub').textContent = msg || '잠시 후 다시 시도해 주세요';
+        onRetry = retry;
+    }
+    $('retryBtn').addEventListener('click', function () { var f = onRetry; hideLoading(); if (f) f(); });
+
+    /* ── ② 시트 ── */
+    window.toggleToastPopup = function () {
+        var s = $('sheet'); var on = s.classList.toggle('active'); s.setAttribute('aria-hidden', on ? 'false' : 'true');
+    };
+    window.selectPhoto = function () { toggleToastPopup(); $('photo-input').click(); };
+    window.cancelToast = window.toggleToastPopup;
+
+    /* ── 큰 사진은 먼저 작게 (EXIF 방향 자동 보정) ── */
+    async function prepareImage(fileOrBlob) {
+        var bmp = null;
+        if (window.createImageBitmap) {
+            try { bmp = await createImageBitmap(fileOrBlob, { imageOrientation: 'from-image' }); } catch (e) { bmp = null; }
+        }
+        var w, h, src;
+        if (bmp) { w = bmp.width; h = bmp.height; src = bmp; }
+        else {
+            // 구형 브라우저 — Image 로 읽는다 (요즘 브라우저는 EXIF 방향을 알아서 맞춘다)
+            var url = keepUrl(URL.createObjectURL(fileOrBlob));
+            src = await new Promise(function (ok, no) { var im = new Image(); im.onload = function () { ok(im); }; im.onerror = no; im.src = url; });
+            w = src.naturalWidth; h = src.naturalHeight;
+        }
+        var scale = Math.min(1, MAX_SRC / Math.max(w, h));
+        var cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+        canvas.width = cw; canvas.height = ch;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cw, ch);
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(src, 0, 0, cw, ch);
+        if (bmp && bmp.close) bmp.close();
+        var blob = await new Promise(function (ok) { canvas.toBlob(ok, 'image/jpeg', 0.92); });
+        return keepUrl(URL.createObjectURL(blob));
+    }
+
+    /* ── ③ 자르기 ── */
+    function startCrop(url) {
+        if (cropper) { cropper.destroy(); cropper = null; }
+        capturedImg.onload = function () {
+            show('crop');   // 자르기 상자는 화면에 보인 뒤에 만들어야 크기를 바로 잰다
+            cropper = new Cropper(capturedImg, { aspectRatio: 1, viewMode: 1, dragMode: 'move', autoCropArea: .9, guides: false, center: false, highlight: false, background: false, cropBoxMovable: true, cropBoxResizable: true, toggleDragModeOnDblclick: false, checkOrientation: false });
+            hideLoading();
+        };
+        capturedImg.src = url;
+    }
+    function leaveCrop() { if (cropper) { cropper.destroy(); cropper = null; } capturedImg.removeAttribute('src'); show('main'); }
+
+    async function handleFile(file) {
+        if (!file) return;
+        if (file.type && file.type.indexOf('image/') !== 0) { alert('사진 파일만 고를 수 있어요.'); return; }
+        showLoading('사진을 불러오는 중', '큰 사진은 잠깐 걸려요', 30, 1);
+        try { startCrop(await prepareImage(file)); }
+        catch (e) { hideLoading(); alert('이 사진은 열 수 없어요. 다른 사진을 골라 주세요.'); }
+    }
+    $('photo-input').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; handleFile(f); });
+    $('photo-capture').addEventListener('change', function (e) { var f = e.target.files[0]; e.target.value = ''; handleFile(f); });
+    $('crop-cancel').addEventListener('click', leaveCrop);
+
+    $('crop-image').addEventListener('click', function () {
+        if (!cropper) return;
+        showLoading('사진을 줄이는 중', '', 60, 1);
+        // 한 프레임 쉬어서 대기 카드가 먼저 그려지게
+        setTimeout(function () {
+            var c = cropper.getCroppedCanvas({ width: OUT, height: OUT, fillColor: '#fff', imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+            c.toBlob(function (blob) {
+                if (!blob) { hideLoading(); alert('사진을 만들지 못했어요. 다시 시도해 주세요.'); return; }
+                newBlob = blob;
+                var u = keepUrl(URL.createObjectURL(blob));
+                croppedImg.src = u; freeUrls(u);
+                leaveCrop();
+                $('save-button').disabled = false;
+                var h = $('hint'); h.textContent = '마음에 들면 저장을 눌러요'; h.classList.add('ok');
+                hideLoading();
+            }, 'image/jpeg', QUALITY);
+        }, 30);
+    });
+
+    /* ── ④ 촬영 ── */
+    function stopStream() { if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; } video.srcObject = null; }
+    async function openStream() {
+        stopStream();
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1440 } }, audio: false });
+        video.srcObject = stream;
+    }
+    window.startCamera = async function () {
+        toggleToastPopup();
+        // 카메라를 직접 못 쓰는 환경(http · 일부 앱)은 기기 카메라 앱으로
+        if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || !window.isSecureContext) { $('photo-capture').click(); return; }
+        try { await openStream(); show('camera'); }
+        catch (e) { $('photo-capture').click(); }
+    };
+    $('flip-button').addEventListener('click', async function () { facing = facing === 'environment' ? 'user' : 'environment'; try { await openStream(); } catch (e) { } });
+    $('camera-cancel').addEventListener('click', function () { stopStream(); show('main'); });
+    $('capture-button').addEventListener('click', function () {
+        if (!video.videoWidth) return;
+        var vw = video.videoWidth, vh = video.videoHeight, scale = Math.min(1, MAX_SRC / Math.max(vw, vh));
+        canvas.width = Math.round(vw * scale); canvas.height = Math.round(vh * scale);
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        stopStream();
+        canvas.toBlob(function (blob) { startCrop(keepUrl(URL.createObjectURL(blob))); }, 'image/jpeg', 0.92);
+    });
+
+    /* ── 저장 : 예전과 같은 주소 · 같은 내용(JSON + base64), 진행 정도는 XHR 로 ── */
+    function blobToBase64(blob) {
+        return new Promise(function (ok, no) { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(',')[1]); }; r.onerror = no; r.readAsDataURL(blob); });
+    }
+    async function save() {
+        if (!newBlob) return;
+        showLoading('사진을 올리는 중', '', 5, 2);
+        var b64;
+        try { b64 = await blobToBase64(newBlob); } catch (e) { showError('사진을 읽지 못했어요', save); return; }
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '/HumanResource/UploadProfilePicture');
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.upload.onprogress = function (ev) {
+            if (!ev.lengthComputable) return;
+            var p = Math.round(ev.loaded / ev.total * 90);
+            $('waitBar').style.width = Math.max(5, p) + '%';
+            $('waitSub').textContent = '올리는 중 ' + Math.round(ev.loaded / ev.total * 100) + '%';
+        };
+        xhr.onload = function () {
+            var ok = false, data = null;
+            try { data = JSON.parse(xhr.responseText); ok = !!(data && data.success); } catch (e) { }
+            if (xhr.status >= 200 && xhr.status < 300 && ok) {
+                setSteps(3); $('waitBar').style.width = '100%';
+                $('waitTitle').textContent = '저장했어요'; $('waitSub').textContent = '정보 관리로 돌아가요';
+                setTimeout(function () { window.location.href = BACK_URL; }, 350);
+            } else {
+                showError((data && data.message) ? data.message : '서버가 사진을 받지 못했어요', save);
+            }
+        };
+        xhr.onerror = function () { showError('인터넷 연결을 확인해 주세요', save); };
+        xhr.ontimeout = function () { showError('시간이 너무 오래 걸렸어요', save); };
+        xhr.timeout = 60000;
+        xhr.send(JSON.stringify({ ProfilePicture: b64, UserId: USER_ID }));
+    }
+    $('save-button').addEventListener('click', save);
+    $('cancel-button').addEventListener('click', function () { window.location.href = BACK_URL; });
+
+    /* 프로필 사진 캐시 무력화 (최신 이미지 반영) */
+    var base = '@Model.ProfilePicturePath';
+    if (base) croppedImg.src = base + '?' + new Date().getTime();
+
+    window.addEventListener('pagehide', function () { stopStream(); freeUrls(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+﻿@* Views/Shared/DailyMission2Partials/_Dm2Block_Quiz.cshtml *@
+@model dynamic
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+}
+
+@{
+    // 기대 입력:
+    // Model.Done, Model.Title
+    // Model.QuestionText
+    // Model.Options (IEnumerable<string>) or Model.OptionA..D
+    // Model.PostUrl, Model.QuestionId, Model.SelectedDate, Model.UserAnswer, Model.CorrectAnswer(optional)
+    var title = S(Model?.Title); if (string.IsNullOrWhiteSpace(title)) title = "🧠 오늘의 퀴즈";
+    var done = B(Model?.Done);
+    var qText = S(Model?.QuestionText);
+
+    var postUrl = S(Model?.PostUrl);
+    var questionId = S(Model?.QuestionId);
+    var selectedDate = S(Model?.SelectedDate);
+
+    // 옵션: Options가 있으면 사용, 없으면 A~D 조합
+    IEnumerable<string> opts = Model?.Options as IEnumerable<string>;
+    if (opts == null)
+    {
+        var tmp = new List<string>();
+        var a = S(Model?.OptionA); var b = S(Model?.OptionB); var c = S(Model?.OptionC); var d = S(Model?.OptionD);
+        if (!string.IsNullOrWhiteSpace(a)) tmp.Add(a);
+        if (!string.IsNullOrWhiteSpace(b)) tmp.Add(b);
+        if (!string.IsNullOrWhiteSpace(c)) tmp.Add(c);
+        if (!string.IsNullOrWhiteSpace(d)) tmp.Add(d);
+        opts = tmp;
+    }
+
+    var userAnswer = S(Model?.UserAnswer);
+    var correct = S(Model?.CorrectAnswer); // 있으면 하이라이트 가능
+}
+
+<div class="card">
+    @await Html.PartialAsync("DailyMission2Partials/_Dm2Block_Header", new { Title = title, BadgeOk = done })
+
+    <div class="cardBody">
+        @if (string.IsNullOrWhiteSpace(qText))
+        {
+            <div class="warnBox">오늘의 퀴즈가 없습니다.</div>
+        }
+        else
+        {
+            <div class="qText">@qText</div>
+
+            @if (!string.IsNullOrWhiteSpace(postUrl))
+            {
+                <form method="post" action="@postUrl" class="form">
+                    @Html.AntiForgeryToken()
+
+                    <input type="hidden" name="questionId" value="@questionId" />
+                    <input type="hidden" name="selectedDate" value="@selectedDate" />
+
+                    <div class="options">
+                        @{
+                            int idx = 0;
+                            foreach (var o in opts)
+                            {
+                                idx++;
+                                var value = o;
+                                var isMine = (!string.IsNullOrWhiteSpace(userAnswer) && userAnswer == value);
+                                var isCorrect = (!string.IsNullOrWhiteSpace(correct) && correct == value);
+
+                                var cls = "opt";
+                                if (isCorrect) cls += " correct";
+                                else if (isMine) cls += " mine";
+                            }
+                        }
+                        @foreach (var o in opts)
+                        {
+                            var value = o;
+                            var isMine = (!string.IsNullOrWhiteSpace(userAnswer) && userAnswer == value);
+                            var isCorrect = (!string.IsNullOrWhiteSpace(correct) && correct == value);
+
+                            var cls = "opt";
+                            if (isCorrect) cls += " correct";
+                            else if (isMine) cls += " mine";
+
+                            <label class="@cls">
+                                <input type="radio" name="answerQ" value="@value" @(isMine ? "checked" : "") />
+                                <span>@value</span>
+                            </label>
+                        }
+                    </div>
+
+                    <div class="btnRow">
+                        <button class="btn primary" type="submit">제출</button>
+                    </div>
+                </form>
+            }
+        }
+    </div>
+</div>

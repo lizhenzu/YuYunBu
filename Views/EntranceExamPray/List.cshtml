@@ -1,0 +1,320 @@
+﻿@model List<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray>
+@using BulletinBoard.Helpers
+@using BulletinBoard.Common
+@using Microsoft.AspNetCore.Html
+@*  ══════════════════════════════════════════════════════════════
+    수험생 기도문 목록 — Bone 스킨 (A안: 목차형 한 줄 목록)
+      · 일반 사용자 : 사용중인 기도문만, 읽기 링크만
+      · 슈퍼 유저   : 숨긴 것까지 전부, 수정·삭제 버튼과 운영 수치까지
+    이전 화면은 List_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    int total    = ViewBag.TotalCount is int _t ? _t : 0;          // 사용중 전체
+    int rotCnt   = ViewBag.RotationCount is int _rc ? _rc : total; // 매일 순환하는 것만
+    int rotNo    = ViewBag.RotationNo is int _r ? _r : 0;
+    int todayId  = ViewBag.TodayPrayId is int _tp ? _tp : 0;
+
+    var msg = TempData["Msg"] as string;
+    var err = TempData["Error"] as string;
+
+    // ── 카카오톡·메신저 공유 미리보기 (Open Graph) — 기존 그대로 ─────────────
+    string ogDomain = (ViewBag.Domain as string ?? "").TrimEnd('/');
+    string ogUrl    = ViewBag.FullURL as string ?? $"{ogDomain}/EntranceExamPray/List";
+    string ogImage  = $"{ogDomain}/images/og/entrance-exam-pray.png";
+    string ogTitle  = "수험생을 위한 기도문";
+    string ogDesc   = total > 0
+        ? $"기도문 {total}편 · 매일 한 편씩 함께 기도해요"
+        : "수험생을 위해 오늘도 함께 기도해요";
+
+    // 본문 미리보기 — 이름 자리를 감싼 별표(**○○(이)**)를 걷어내고 한 줄로 폅니다.
+    string Excerpt(string? raw, int len)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var t = System.Text.RegularExpressions.Regex.Replace(raw, @"\*{2,3}", "");
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"\s+", " ").Trim();
+        return t.Length > len ? t.Substring(0, len) + "…" : t;
+    }
+
+    var list      = Model ?? new List<BulletinBoard.Models.EntranceExamPrays.EntranceExamPray>();
+    var todayItem = list.Find(x => x.PrayId == todayId);
+    // 숨김(UseYN='N')은 관리자에게만 오고, 따로 "숨김" 묶음으로 모은다 (2026-10-03)
+    bool IsShown(BulletinBoard.Models.EntranceExamPrays.EntranceExamPray x) => !string.Equals(x.UseYN, "N", StringComparison.OrdinalIgnoreCase);
+    var daily     = list.FindAll(x => IsShown(x) && !x.IsOccasion);
+    var occasion  = list.FindAll(x => IsShown(x) &&  x.IsOccasion);
+    var hiddenAll = list.FindAll(x => !IsShown(x));
+    int unusedCnt = list.Count - total;
+}
+
+@* 기도문 한 줄 *@
+@{
+    void Row(BulletinBoard.Models.EntranceExamPrays.EntranceExamPray p)
+    {
+        bool isToday  = todayId > 0 && p.PrayId == todayId;
+        bool isActive = !string.Equals(p.UseYN, "N", StringComparison.OrdinalIgnoreCase);
+        string href   = $"/EntranceExamPray/Detail?PrayId={p.PrayId}";
+        DateTime? touched = p.UpdatedAt ?? (p.CreatedAt == DateTime.MinValue ? (DateTime?)null : p.CreatedAt);
+        bool everEdited   = p.UpdatedAt.HasValue;
+        var ex = Excerpt(p.PrayText, 96);
+
+        // 번호 = 순환 차례. 순환에서 빠진 것(그날)·숨긴 것(–)은 0 으로 온다.
+        string no = p.RotationNo > 0 ? p.RotationNo.ToString() : (p.IsOccasion ? "그날" : "–");
+
+        <div class="elRow @(isToday ? "on" : "") @(isSuper && !isActive ? "off" : "")">
+            <a class="elHit" href="@href" aria-label="@p.Title 기도문 읽기"></a>
+            <span class="elNo @(p.RotationNo > 0 ? "" : "sm")">@no</span>
+            <div class="elB">
+                <div class="elN">
+                    @p.Title
+                    @if (isToday)
+                    {
+                        <em>오늘</em>
+                    }
+                    @* 관리자에게만 — 보임 / 숨김 표시 *@
+                    @if (isSuper)
+                    {
+                        if (isActive) { <em class="vis">보임</em> }
+                        else          { <em class="off">숨김</em> }
+                    }
+                </div>
+                @if (ex.Length > 0)
+                {
+                    <div class="elEx">@ex</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(p.BibleRef) || isSuper)
+                {
+                    <div class="elM">
+                        @if (!string.IsNullOrWhiteSpace(p.BibleRef))
+                        {
+                            <span class="ref">@p.BibleRef</span>
+                        }
+                        @if (isSuper)
+                        {
+                            if (touched.HasValue)
+                            {
+                                <span title="@((everEdited ? "마지막 수정" : "등록") + ": " + touched.Value.ToString("yyyy-MM-dd HH:mm"))">@(everEdited ? "수정" : "등록") @touched.Value.ToString("MM-dd")</span>
+                            }
+                            <span>조회 @p.ClickCount.ToString("N0")</span>
+                            <span>기도 @p.LikeCount.ToString("N0")</span>
+                        }
+                    </div>
+                }
+                @if (isSuper)
+                {
+                    <div class="elAct">
+                        <a href="@href">보기</a>
+                        <a href="/EntranceExamPray/Edit?PrayId=@p.PrayId">수정</a>
+                        <a class="del" href="/EntranceExamPray/Delete?PrayId=@p.PrayId">삭제</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@ogTitle</title>
+    <meta name="description" content="@ogDesc" />
+
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="@ogTitle" />
+    <meta property="og:title"       content="@ogTitle" />
+    <meta property="og:description" content="@ogDesc" />
+    <meta property="og:url"         content="@ogUrl" />
+    <meta property="og:image"       content="@ogImage" />
+    <meta property="og:image:secure_url" content="@ogImage" />
+    <meta property="og:image:type"  content="image/png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="@ogTitle" />
+    <meta property="og:locale"      content="ko_KR" />
+
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="@ogTitle" />
+    <meta name="twitter:description" content="@ogDesc" />
+    <meta name="twitter:image"       content="@ogImage" />
+
+    <link rel="canonical" href="@ogUrl" />
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    /* 짙은 머리 */
+    .qz .elHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 28px var(--pad) 24px; }
+    .qz .elK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .elH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.4; margin: 10px 0 0; color: var(--bg); }
+    .qz .elCnt { font-family: "Inter", sans-serif; font-weight: 200; font-size: 40px; line-height: 1; margin-top: 14px; color: #D9C29B; font-variant-numeric: tabular-nums; }
+    .qz .elCnt small { font-size: 12px; font-weight: 400; color: #9A9690; margin-left: 8px; }
+    .qz .elAdm { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 10.5px; color: #B9B3A8; }
+    .qz .elAdm b { font-family: "Inter", sans-serif; font-weight: 400; color: #E9E2D6; margin-left: 3px; }
+
+    .qz .elFlash { margin-top: 16px; padding: 11px 14px; font-size: 12.5px; border: 1px solid var(--acc); color: var(--acc); }
+    .qz .elFlash.err { border-color: #D8A39B; color: #A63A2C; }
+
+    /* 오늘의 기도문 */
+    .qz .elToday { display: block; margin-top: 20px; padding: 16px; background: var(--mark); color: inherit; text-decoration: none; }
+    .qz .elTk { font-size: 9.5px; font-weight: 600; letter-spacing: .18em; color: var(--acc); }
+    .qz .elTt { font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.45; margin-top: 7px; }
+    .qz .elTx { font-size: 11.5px; color: var(--dim2); line-height: 1.7; margin-top: 6px; word-break: keep-all; }
+    .qz .elGo { font-size: 11px; color: var(--acc); margin-top: 9px; letter-spacing: .06em; }
+
+    /* 묶음 머리 */
+    .qz .elSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 30px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .elSecT { font-family: "Noto Serif KR", serif; font-size: 15px; }
+    .qz .elSecS { font-size: 10.5px; color: var(--dim); }
+    .qz .elHint { font-size: 11px; color: var(--dim); line-height: 1.7; padding: 10px 0; border-bottom: 1px solid var(--rule); word-break: keep-all; }
+
+    /* 한 줄 */
+    .qz .elRow { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px 2px; border-bottom: 1px solid var(--rule); }
+    .qz .elRow.on { background: var(--mark); }
+    .qz .elRow.off { opacity: .5; }
+    .qz .elHit { position: absolute; inset: 0; z-index: 1; }
+    .qz .elRow:hover .elN { color: var(--acc); }
+    .qz .elNo { font-family: "Inter", sans-serif; font-weight: 300; font-size: 17px; width: 30px; text-align: center; color: var(--dim2); flex: 0 0 auto; padding-top: 1px; font-variant-numeric: tabular-nums; }
+    .qz .elNo.sm { font-family: inherit; font-size: 11px; padding-top: 4px; color: var(--dim); }
+    .qz .elRow.on .elNo { color: var(--acc); }
+    .qz .elB { flex: 1 1 auto; min-width: 0; }
+    .qz .elN { font-family: "Noto Serif KR", serif; font-size: 14.5px; line-height: 1.45; word-break: keep-all; }
+    .qz .elN em {
+        font-style: normal; font-family: "Gothic A1", sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: .08em;
+        padding: 2px 6px; margin-left: 6px; vertical-align: 2px; border: 1px solid var(--acc); color: var(--acc); white-space: nowrap;
+    }
+    .qz .elN em.off { border-color: var(--rule); color: var(--dim); }
+    .qz .elEx { font-size: 11.5px; color: var(--dim); line-height: 1.6; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: keep-all; }
+    .qz .elM { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 7px; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .qz .elM .ref { font-family: "Gothic A1", sans-serif; color: var(--acc); }
+    .qz .elAct { position: relative; z-index: 2; display: flex; gap: 5px; margin-top: 9px; }
+    .qz .elAct a { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; border: 1px solid var(--rule); padding: 5px 10px; color: var(--dim2); text-decoration: none; }
+    .qz .elAct a:hover { border-color: var(--acc); color: var(--acc); }
+    .qz .elAct a.del { color: #A63A2C; }
+    .qz .elAct a.del:hover { border-color: #D8A39B; }
+
+    .qz .elEmpty { padding: 40px 0; text-align: center; }
+    .qz .elEmpty b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 16px; }
+    .qz .elEmpty span { display: block; font-size: 12px; color: var(--dim); margin-top: 6px; }
+
+    /* 아래 메뉴 */
+    .qz .elNav { display: flex; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 30px; }
+    .qz .elNav a { flex: 1; text-align: center; padding: 14px 0; font-size: 12.5px; color: var(--dim2); text-decoration: none; border-right: 1px solid var(--rule); }
+    .qz .elNav a:last-child { border-right: 0; }
+    .qz .elNav a:hover { color: var(--acc); }
+    .qz .elNew { display: block; text-align: center; background: var(--tx); color: var(--bg); padding: 14px; font-size: 12.5px; font-weight: 600; letter-spacing: .1em; margin-top: 16px; text-decoration: none; }
+    .qz .elNew:hover { background: var(--acc); }
+</style>
+    <link rel="stylesheet" href="/css/pray-bright.css" asp-append-version="true">
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                    <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/PrayHome/Index">기도홈</a>
+            </div>
+            @if (isSuper)
+            {
+                <div class="qzDate">관리자 · <a class="qzHome" href="/EntranceExamPray/Create">등록</a></div>
+            }
+        </div>
+
+        <header class="elHead">
+            <div class="elK">수험생을 위한 기도</div>
+            <h1 class="elH1">기도문 목록</h1>
+            @if (total > 0)
+            {
+                <div class="elCnt">@total<small>편@(rotNo > 0 ? $" · 오늘 {rotNo}번째" : "")</small></div>
+            }
+            else
+            {
+                <div class="elAdm" style="font-size:12px">곧 준비될 예정이에요</div>
+            }
+            @if (isSuper)
+            {
+                <div class="elAdm">
+                    <span>사용 중<b>@total</b></span>
+                    <span>매일 순환<b>@rotCnt</b></span>
+                    @if (total - rotCnt > 0) { <span>그날에만<b>@(total - rotCnt)</b></span> }
+                    @if (unusedCnt > 0) { <span>미사용<b>@unusedCnt</b></span> }
+                </div>
+            }
+        </header>
+
+        @if (!string.IsNullOrEmpty(msg)) { <div class="elFlash">@msg</div> }
+        @if (!string.IsNullOrEmpty(err)) { <div class="elFlash err">@err</div> }
+
+        @if (todayItem != null)
+        {
+            var tbEx = Excerpt(todayItem.PrayText, 120);
+            <a class="elToday" href="/EntranceExamPray/Index">
+                <div class="elTk">오늘의 기도문 · @rotNo / @rotCnt</div>
+                <div class="elTt">@todayItem.Title</div>
+                @if (!string.IsNullOrEmpty(tbEx))
+                {
+                    <div class="elTx">@tbEx</div>
+                }
+                <div class="elGo">읽으러 가기 ›</div>
+            </a>
+        }
+
+        @if (list.Count == 0)
+        {
+            <div class="elEmpty">
+                <b>아직 등록된 기도문이 없어요</b>
+                <span>@(isSuper ? "첫 기도문을 등록해 주세요" : "곧 준비될 예정이에요")</span>
+            </div>
+        }
+        else
+        {
+            @if (daily.Count > 0)
+            {
+                <div class="elSec">
+                    <span class="elSecT">매일 돌아가는 기도문</span>
+                    <span class="elSecS">순환 차례 순 · @(daily.Count)편</span>
+                </div>
+                @foreach (var p in daily) { Row(p); }
+            }
+
+            @if (occasion.Count > 0)
+            {
+                <div class="elSec">
+                    <span class="elSecT">그날에 읽는 기도문</span>
+                    <span class="elSecS">@(occasion.Count)편</span>
+                </div>
+                <div class="elHint">시험 날이나 발표를 기다리는 날처럼, 그때에 맞추어 골라 읽어요. 매일 순환에는 나오지 않아요.</div>
+                @foreach (var p in occasion) { Row(p); }
+            }
+
+            @if (isSuper && hiddenAll.Count > 0)
+            {
+                <div class="elSec">
+                    <span class="elSecT">숨김 · 관리자만 보임</span>
+                    <span class="elSecS">@(hiddenAll.Count)편</span>
+                </div>
+                <div class="elHint">일반 사용자에게는 보이지 않아요. 읽어 보고 괜찮으면 <b>수정</b>에서 사용 여부를 <b>사용</b>으로 바꾸세요. 매일 순환이 켜진 기도문은 그때부터 순환에 들어가요.</div>
+                @foreach (var p in hiddenAll) { Row(p); }
+            }
+        }
+
+        <nav class="elNav">
+            <a href="/EntranceExamPray/Index">오늘의 기도문</a>
+            <a href="/PrayHome/Index">기도홈</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </nav>
+
+        @if (isSuper)
+        {
+            <a class="elNew" href="/EntranceExamPray/Create">새 기도문 등록</a>
+        }
+
+    </div>
+</div>
+
+</body>
+</html>

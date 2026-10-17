@@ -1,0 +1,558 @@
+@model StockBulletinBoard.Models.DailyEnglish
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily English</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+        /* ── RESET & BASE ───────────────────────────────── */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:       #0a0a0f;
+            --surface:  #111118;
+            --card:     #16161f;
+            --border:   rgba(255,255,255,0.07);
+            --gold:     #c9a84c;
+            --gold-lt:  #f0d080;
+            --gold-dk:  #8a6a1e;
+            --text:     #e8e6e0;
+            --muted:    #7a7870;
+            --danger:   #c0392b;
+            --blue:     #3b82f6;
+            --radius:   24px;
+            --glow:     0 0 80px rgba(201,168,76,0.12);
+        }
+
+        html, body {
+            min-height: 100vh;
+            background: var(--bg);
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        /* ── ANIMATED BACKGROUND ─────────────────────────── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 20% 20%, rgba(201,168,76,0.06) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 60% at 80% 80%, rgba(59,130,246,0.04) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* noise texture overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.5;
+        }
+
+        /* ── LAYOUT ─────────────────────────────────────── */
+        .stage {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        /* ── HEADER BADGE ────────────────────────────────── */
+        .header-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+            animation: fadeDown 0.6s ease both;
+        }
+
+        .header-badge .line {
+            width: 40px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold));
+        }
+        .header-badge .line.right {
+            background: linear-gradient(90deg, var(--gold), transparent);
+        }
+
+        .header-badge span {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gold);
+            opacity: 0.8;
+        }
+
+        /* ── CARD ────────────────────────────────────────── */
+        .card {
+            width: 100%;
+            max-width: 560px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 48px 44px 40px;
+            box-shadow:
+                var(--glow),
+                0 40px 80px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.06);
+            animation: riseUp 0.7s cubic-bezier(0.22,1,0.36,1) both;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* corner accent */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 120px; height: 120px;
+            background: radial-gradient(circle at 0% 0%, rgba(201,168,76,0.1), transparent 70%);
+            pointer-events: none;
+        }
+
+        /* ── SENTENCE NUMBER ─────────────────────────────── */
+        .sentence-num {
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 0.2em;
+            color: var(--muted);
+            margin-bottom: 24px;
+            animation: fadeIn 0.8s ease 0.1s both;
+        }
+        .sentence-num strong {
+            color: var(--gold);
+        }
+
+        /* ── ENGLISH TEXT ────────────────────────────────── */
+        .english-wrap {
+            position: relative;
+            margin-bottom: 20px;
+            animation: fadeIn 0.8s ease 0.2s both;
+        }
+
+        .english-text {
+            font-family: 'Playfair Display', serif;
+            font-size: 30px;
+            font-weight: 700;
+            line-height: 1.35;
+            color: #fff;
+            letter-spacing: -0.01em;
+        }
+
+        /* gold underline decoration */
+        .english-text::after {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 2px;
+            background: linear-gradient(90deg, var(--gold), var(--gold-lt));
+            margin-top: 16px;
+            border-radius: 2px;
+        }
+
+        /* ── SPEAK BUTTON ────────────────────────────────── */
+        .btn-speak {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            margin: 16px 0 24px;
+            padding: 8px 18px;
+            background: transparent;
+            border: 1px solid rgba(201,168,76,0.35);
+            border-radius: 100px;
+            color: var(--gold);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            animation: fadeIn 0.8s ease 0.3s both;
+        }
+
+        .btn-speak:hover {
+            background: rgba(201,168,76,0.1);
+            border-color: var(--gold);
+            box-shadow: 0 0 20px rgba(201,168,76,0.15);
+            transform: translateY(-1px);
+        }
+        .btn-speak:active { transform: scale(0.97); }
+
+        .btn-speak .icon {
+            width: 20px; height: 20px;
+            background: var(--gold);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px;
+            flex-shrink: 0;
+        }
+
+        /* ── DIVIDER ─────────────────────────────────────── */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+            animation: fadeIn 0.8s ease 0.35s both;
+        }
+        .divider hr {
+            flex: 1;
+            border: none;
+            border-top: 1px solid var(--border);
+        }
+        .divider .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: var(--gold);
+            opacity: 0.5;
+        }
+
+        /* ── KOREAN TEXT ─────────────────────────────────── */
+        .korean-text {
+            font-size: 18px;
+            font-weight: 300;
+            color: var(--text);
+            letter-spacing: 0.02em;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            animation: fadeIn 0.8s ease 0.4s both;
+        }
+
+        /* ── INFO BLOCKS ─────────────────────────────────── */
+        .info-block {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 14px;
+            animation: fadeIn 0.8s ease 0.45s both;
+        }
+
+        .info-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gold);
+            opacity: 0.7;
+            margin-bottom: 8px;
+        }
+
+        .info-content {
+            font-size: 14px;
+            color: #b0aea8;
+            line-height: 1.65;
+            font-weight: 300;
+        }
+
+        /* ── EXAMPLE BLOCK ───────────────────────────────── */
+        .example-block {
+            background: rgba(201,168,76,0.05);
+            border-left: 2px solid var(--gold);
+            border-radius: 0 12px 12px 0;
+            padding: 14px 18px;
+            margin-bottom: 32px;
+            animation: fadeIn 0.8s ease 0.5s both;
+        }
+
+        .example-block .info-label { margin-bottom: 6px; }
+
+        .example-block .example-text {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+            font-size: 15px;
+            color: #d4c9a0;
+            line-height: 1.6;
+        }
+
+        /* ── ACTION BUTTONS ──────────────────────────────── */
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            animation: fadeIn 0.8s ease 0.55s both;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--gold-dk), var(--gold), var(--gold-lt));
+            background-size: 200% 200%;
+            color: #0a0a0f;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .btn-primary:hover::before { opacity: 1; }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(201,168,76,0.3);
+        }
+        .btn-primary:active { transform: scale(0.98); }
+
+        .btn-danger {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid rgba(192,57,43,0.3);
+            border-radius: 14px;
+            background: rgba(192,57,43,0.08);
+            color: #e07060;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.03em;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .btn-danger:hover {
+            background: rgba(192,57,43,0.15);
+            border-color: rgba(192,57,43,0.5);
+            transform: translateY(-1px);
+        }
+        .btn-danger:active { transform: scale(0.98); }
+
+        /* ── COMPLETE STATE ──────────────────────────────── */
+        .complete-wrap {
+            text-align: center;
+            padding: 20px 0 10px;
+        }
+
+        .complete-icon {
+            font-size: 56px;
+            margin-bottom: 20px;
+            display: block;
+            animation: pop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.3s both;
+        }
+
+        .complete-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .complete-sub {
+            font-size: 15px;
+            color: var(--muted);
+            font-weight: 300;
+            margin-bottom: 36px;
+        }
+
+        .btn-reset {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #1a6a3a, #28a745, #5dd87a);
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn-reset:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(40,167,69,0.3);
+        }
+        .btn-reset:active { transform: scale(0.98); }
+
+        /* ── ANIMATIONS ──────────────────────────────────── */
+        @@keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @@keyframes riseUp {
+            from { opacity: 0; transform: translateY(30px) scale(0.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @@keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @@keyframes pop {
+            from { opacity: 0; transform: scale(0.5); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+
+        /* speaking pulse */
+        @@keyframes speakPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(201,168,76,0.4); }
+            50%       { box-shadow: 0 0 0 8px rgba(201,168,76,0); }
+        }
+        .btn-speak.speaking .icon {
+            animation: speakPulse 1s ease infinite;
+        }
+
+        /* ── RESPONSIVE ──────────────────────────────────── */
+        @@media (max-width: 600px) {
+            .card { padding: 36px 28px 32px; }
+            .english-text { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="stage">
+
+    <!-- Header badge -->
+    <div class="header-badge">
+        <span class="line"></span>
+        <span>Daily English</span>
+        <span class="line right"></span>
+    </div>
+
+    <!-- Main card -->
+    <div class="card">
+
+        @if (Model != null)
+        {
+            <!-- Sentence number -->
+            <div class="sentence-num">
+                NO. &nbsp;<strong>#@Model.Id</strong>
+            </div>
+
+            <!-- English sentence -->
+            <div class="english-wrap">
+                <div class="english-text">@Model.EnglishText</div>
+            </div>
+
+            <!-- Speak button -->
+            <button class="btn-speak" onclick="speakText(this)" id="speakBtn">
+                <span class="icon">♪</span>
+                발음 듣기
+            </button>
+
+            <!-- Divider -->
+            <div class="divider">
+                <hr /><span class="dot"></span><hr />
+            </div>
+
+            <!-- Korean meaning -->
+            <div class="korean-text">@Model.KoreanText</div>
+
+            <!-- Description -->
+            <div class="info-block">
+                <div class="info-label">설명</div>
+                <div class="info-content">@Model.Description</div>
+            </div>
+
+            <!-- Example -->
+            <div class="example-block">
+                <div class="info-label">예문</div>
+                <div class="example-text">@Model.Example</div>
+            </div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <form method="post" action="/DailyEnglish/MarkAsRead">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn-primary">
+                        읽음 &nbsp;→&nbsp; 다음 문장
+                    </button>
+                </form>
+
+                <form method="post" action="/DailyEnglish/Delete"
+                      onsubmit="return confirm('현재 영어 문장을 삭제하시겠습니까?');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn-danger">
+                        현재 문장 삭제
+                    </button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <!-- All done state -->
+            <div class="complete-wrap">
+                <span class="complete-icon">🎉</span>
+                <div class="complete-title">오늘 완료!</div>
+                <div class="complete-sub">모든 문장을 학습했습니다</div>
+
+                <form method="post" action="/DailyEnglish/Reset">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn-reset">
+                        처음부터 다시 보기
+                    </button>
+                </form>
+            </div>
+        }
+
+    </div><!-- /card -->
+
+</div><!-- /stage -->
+
+<script>
+    function speakText(btn) {
+        var text = "@(Model?.EnglishText ?? "")";
+        if (!text) return;
+
+        var utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = 0.92;
+        utterance.pitch = 1;
+
+        if (btn) {
+            btn.classList.add('speaking');
+            btn.textContent = '';
+            // rebuild inner
+            var icon = document.createElement('span');
+            icon.className = 'icon';
+            icon.textContent = '♪';
+            var label = document.createTextNode(' 재생 중…');
+            btn.appendChild(icon);
+            btn.appendChild(label);
+
+            utterance.onend = function () {
+                btn.classList.remove('speaking');
+                btn.textContent = '';
+                var i2 = document.createElement('span');
+                i2.className = 'icon';
+                i2.textContent = '♪';
+                btn.appendChild(i2);
+                btn.appendChild(document.createTextNode(' 발음 듣기'));
+            };
+        }
+
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utterance);
+    }
+</script>
+
+</body>
+</html>

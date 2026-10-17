@@ -1,0 +1,132 @@
+@using BulletinBoard.ViewModels
+@model BandPost
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+
+    var boardTableName = ViewBag.BoardTableName as string ?? "BandPosts";
+    var boardName      = ViewBag.BoardName      as string ?? "게시판";
+
+    var myFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    bool canDelete = isAdmin || isSuperAdmin
+        || string.Equals(Model.WriterName, myFullName, StringComparison.OrdinalIgnoreCase);
+
+    var initials = (!string.IsNullOrWhiteSpace(Model.WriterName) ? Model.WriterName : "?").Substring(0, 1).ToUpper();
+    var images   = Model.Images ?? new List<BandPostImage>();
+    int imgCount = images.Count;
+    string gridClass = imgCount == 1 ? "count-1" : imgCount == 2 ? "count-2" : imgCount == 3 ? "count-3" : "count-many";
+    int maxVisible = 4;
+
+    string srcJson = "[" + string.Join(",", images.Select(img => "'" + img.ImagePath.Replace("'", "\\'").Replace("\\", "\\\\") + "'")) + "]";
+}
+
+<div class="post-card" id="post-@Model.Id">
+
+    <!-- 헤더 -->
+    <div class="post-head">
+        <div class="post-author">
+            <div class="post-avatar">@initials</div>
+            <div>
+                <div class="post-name">@(Model.WriterName ?? "익명")</div>
+                <div class="post-time">@Model.CreatedAt.ToString("yyyy.MM.dd HH:mm")</div>
+            </div>
+        </div>
+        @if (canDelete)
+        {
+            <form asp-action="Delete" asp-controller="BandBoard" method="post"
+                  onsubmit="return confirm('이 글을 삭제할까요?')">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="boardTableName" value="@boardTableName" />
+                <input type="hidden" name="boardName"      value="@boardName" />
+                <input type="hidden" name="id"             value="@Model.Id" />
+                <button type="submit" class="post-del-btn">삭제</button>
+            </form>
+        }
+    </div>
+
+    <!-- 본문 -->
+    @if (!string.IsNullOrWhiteSpace(Model.Content))
+    {
+        <div class="post-body">
+            <div class="post-text">@Model.Content</div>
+        </div>
+    }
+
+    <!-- 이미지 -->
+    @if (imgCount > 0)
+    {
+        <div class="post-imgs">
+            <div class="post-imgs-grid @gridClass">
+                @for (int i = 0; i < Math.Min(imgCount, maxVisible); i++)
+                {
+                    string src = images[i].ImagePath;
+                    bool isLast = i == maxVisible - 1 && imgCount > maxVisible;
+                    <div class="post-img-wrap" onclick="lbOpen(@srcJson, @i)">
+                        <img class="post-img" src="@src" alt="첨부 사진 @(i+1)" loading="lazy" />
+                        @if (isLast)
+                        {
+                            <div class="img-more-overlay">+@(imgCount - maxVisible)</div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- 액션 바 -->
+    <div class="post-actions">
+        <button type="button" class="like-btn" data-post-id="@Model.Id">
+            <span class="i">♡</span>좋아요
+            <span class="like-count">@Model.LikeCount</span>
+        </button>
+        <button type="button" class="comment-toggle-btn">
+            댓글 <span class="cmt-badge">@(Model.Comments?.Count ?? 0)</span>
+        </button>
+    </div>
+
+    <!-- 댓글 영역 -->
+    <div class="comment-zone hidden">
+        <div class="comment-list">
+            @if (Model.Comments != null && Model.Comments.Any())
+            {
+                foreach (var c in Model.Comments.OrderBy(c => c.Id))
+                {
+                    string cInit = (!string.IsNullOrWhiteSpace(c.WriterName) ? c.WriterName : "?").Substring(0, 1).ToUpper();
+                    <div class="comment-item">
+                        <div class="comment-dot">@cInit</div>
+                        <div class="comment-content">
+                            <div class="comment-name">@c.WriterName</div>
+                            <div class="comment-text">@c.Content</div>
+                            <div class="comment-ts">@c.CreatedAt.ToString("MM.dd HH:mm")</div>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="comment-empty">첫 번째 댓글을 남겨 보세요.</div>
+            }
+        </div>
+        <div class="comment-form-wrap">
+            <form class="comment-form" data-post-id="@Model.Id" style="display:contents;">
+                @Html.AntiForgeryToken()
+                <input class="cmt-name-input"
+                       value="@(myFullName ?? "")"
+                       placeholder="이름" />
+                <input class="cmt-content-input" placeholder="댓글을 남겨 주세요" />
+                <button type="submit" class="cmt-submit">등록</button>
+            </form>
+        </div>
+    </div>
+
+</div>

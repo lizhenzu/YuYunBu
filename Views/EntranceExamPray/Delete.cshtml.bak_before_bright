@@ -1,0 +1,81 @@
+@model BulletinBoard.Models.EntranceExamPrays.EntranceExamPray
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7F6FC" />
+    <title>기도문 삭제 · 수험생을 위한 기도문</title>
+    @await Html.PartialAsync("_Study")
+    <style>
+    .dhero{ padding:26px 0 16px; }
+    .dhero h1{ font-family:var(--f-read); margin:10px 0 0; font-size:clamp(20px,4.6vw,27px); font-weight:800; letter-spacing:-.02em; }
+    .warn{
+        background:#FDECEA; border:1px solid #F5C9C3; border-radius:14px;
+        padding:16px 18px; margin-bottom:16px;
+    }
+    .warn-tt{ font-size:14px; font-weight:700; color:#A63A2C; margin-bottom:6px; }
+    .warn-sub{ font-size:12.5px; color:#8A4034; line-height:1.65; }
+    .preview .ncard-bd{ opacity:.72; }
+    </style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        <a class="nb-btn" href="/EntranceExamPray/List">← 목록</a>
+        <div class="nb-mid">기도문 삭제</div>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="dhero">
+        <span class="chip chip-leaf">🔒 관리자 전용</span>
+        <h1>이 기도문을 삭제할까요?</h1>
+    </section>
+
+    <div class="warn">
+        <div class="warn-tt">⚠️ 되돌릴 수 없습니다</div>
+        <div class="warn-sub">
+            삭제하면 기도문과 함께 조회수 <strong>@Model.ClickCount.ToString("N0")회</strong>,
+            좋아요 <strong>@Model.LikeCount.ToString("N0")회</strong> 기록도 사라집니다.<br />
+            잠시 감추기만 원하신다면, 수정 화면에서 <strong>사용 여부를 “숨김”</strong>으로 바꿔 주세요.
+        </div>
+    </div>
+
+    <article class="ncard preview">
+        <div class="ncard-hd">
+            <div class="ncard-ico">🙏</div>
+            <span class="ncard-tt">@Model.Title</span>
+            <span class="ncard-sub">순서 @Model.SortOrder</span>
+        </div>
+        <div class="ncard-bd">
+            <p class="pray-body">@Model.PrayText</p>
+            @if (!string.IsNullOrWhiteSpace(Model.BibleRef) || !string.IsNullOrWhiteSpace(Model.BibleText))
+            {
+                <div class="verse-box">
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleRef)) { <div class="verse-ref">📖 @Model.BibleRef</div> }
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleText)) { <p class="verse-text">@Model.BibleText</p> }
+                </div>
+            }
+        </div>
+    </article>
+
+    <form method="post" action="/EntranceExamPray/DeleteConfirmed">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="PrayId" value="@Model.PrayId" />
+        <div class="btn-row">
+            <a class="btn" href="/EntranceExamPray/List">취소하고 목록으로</a>
+            <a class="btn" href="/EntranceExamPray/Edit?PrayId=@Model.PrayId">✏️ 숨김으로 바꾸기</a>
+            <button type="submit" class="btn btn-danger">🗑 삭제합니다</button>
+        </div>
+    </form>
+
+</div>
+
+</body>
+</html>

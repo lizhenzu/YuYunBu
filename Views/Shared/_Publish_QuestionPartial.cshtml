@@ -1,0 +1,68 @@
+﻿@model BulletinBoard.Models.TodayCollectQuestion
+
+
+@if (!string.IsNullOrEmpty(@Model.QuestionTypeDataObjectsData.QuestionQ))
+{
+    <form method="post" asp-action="AnswerQuestion">
+        <div class="card">
+            <div class="card-body">
+                <p><strong>질문</strong></p>
+                <p>@Model.QuestionTypeDataObjectsData.QuestionQ</p>
+                <div asp-validation-summary="All" class="text-danger"></div>
+                @if (@Model.QuestionTypeDataObjectsData.QuestionType.ToLower() == "o")
+                {
+                    <input type="radio" name="AnswerQ" id="Question1" value="1">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question1</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question2" value="2">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question2</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question3" value="3">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question3</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question4" value="4">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question4</label>
+                    <br>
+                    <span asp-validation-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="text-danger"></span>
+                }
+                else
+                {
+                    @if (@Model.TodayCheckCompositeData.QuestionCount == 0)
+                    {
+                        <div class="form-group">
+                            <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ"></label>
+                            <input asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="form-control" autofocus />
+                            <span asp-validation-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="text-danger"></span>
+                        </div>
+                    }
+                }
+                <input type="hidden" id="CorrectAnswer" name="CorrectAnswer" value="@Model.QuestionTypeDataObjectsData.CorrectAnswer" />
+                <input type="hidden" id="Id"            name="Id"            value="@Model.QuestionTypeDataObjectsData.Id" />
+            </div>
+        </div>
+
+        <div class="body-container">
+            @if (@Model.TodayCheckCompositeData.QuestionCount == 0)
+            {
+                <div class="button-click-division" onclick="sendPostRequest()">제출</div>
+            }
+            <div class="button-click-division" onclick="goHome()">Home</div>
+        </div>
+
+
+        <button type="submit" class="pretty-button" id="submitButton" style="display:none;">제출</button>
+    </form>
+}
+else
+{
+    @await Html.PartialAsync("_DisplayMessageBar" ,"오늘은 성경 퀴즈가 없습니다.")
+}
+
+<script>
+    function goHome() {
+        window.location.href = "/Home/IndexBranch";
+    }
+    function sendPostRequest() {
+        document.getElementById('submitButton').click(); // submit 버튼 클릭 효과
+    }
+</script>

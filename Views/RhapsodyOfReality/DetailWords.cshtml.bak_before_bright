@@ -1,0 +1,368 @@
+﻿@model BulletinBoard.Models.RhapsodyOfRealityComposite
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"preach_{todayDate}.webp";
+    string formattedModResultDataOG = $"{@ViewBag.Domain}/images/preach/{formattedModResultData}";
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    bool methodTEXT = false;
+    @if (@ViewBag.methodTEXT != null && @ViewBag.methodTEXT == "TEXT")
+    {
+        methodTEXT = true;
+    }
+}
+
+@{
+    int Year  = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(0, 4));
+    int Month = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(5, 2));
+    int Day   = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(8, 2));
+    string DateString  = $"{Year}년 {Month}월 {Day}일 {Model.RhapsodyOfRealitysData.WeekDayKor}요일";
+    string DateShort   = $"{Month}월 {Day}일 {Model.RhapsodyOfRealitysData.WeekDayKor}";
+
+    var videoId  = Model?.RhapsodyOfRealitysData?.YouTuBuURL ?? "";
+    var endMin   = Model?.RhapsodyOfRealitysData?.EndMinute ?? 0;
+    var endSec   = Model?.RhapsodyOfRealitysData?.EndSecond ?? 0;
+    var total    = endMin * 60 + endSec;
+    var hasRange = (endMin > 0 || endSec > 0);
+
+    var refCount = Model?.eBibleDatas?.Count ?? 0;
+}
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16181C" />
+    <title>@Model?.RhapsodyOfRealitysData?.WordTitle · @ChurchName</title>
+    <meta property="og:title"       content="@ChurchName · @DepartmentName" />
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다." />
+    <meta property="og:image"       content="@formattedModResultDataOG" />
+    <meta property="og:url"         content="@ViewBag.FullURL" />
+    <meta property="og:type"        content="website" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;800;900&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+    <script src="/js/bibleOneByOne.js"></script>
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    :root { --fs: 1; }
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .rrFs { display: flex; border: 1px solid var(--rule); }
+    .qz .rrFs button { font-family: "Noto Serif KR", serif; background: none; border: 0; color: var(--dim); padding: 3px 8px; cursor: pointer; line-height: 1.4; }
+    .qz .rrFs button:nth-child(1) { font-size: 11px; }
+    .qz .rrFs button:nth-child(2) { font-size: 13px; }
+    .qz .rrFs button:nth-child(3) { font-size: 15px; }
+    .qz .rrFs button.on { background: var(--tx); color: var(--bg); }
+
+    /* 짙은 머리 */
+    .qz .rrHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 30px var(--pad) 26px; }
+    .qz .rrK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .rrH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.45; margin: 10px 0 0; color: var(--bg); word-break: keep-all; text-wrap: balance; }
+    .qz .rrDate { font-family: "Inter", sans-serif; font-weight: 200; font-size: 44px; line-height: 1; margin-top: 18px; color: #D9C29B; font-variant-numeric: tabular-nums; }
+    .qz .rrDate small { font-size: 12px; font-weight: 400; color: #9A9690; margin-left: 8px; }
+
+    /* 영상 */
+    .qz .rrPlayer { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #2A2C30; margin-top: 22px; }
+    .qz .rrPlayer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .qz .rrCtl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+    .qz .rrBtn { font-family: inherit; font-size: 12px; font-weight: 600; letter-spacing: .04em; padding: 8px 12px; border: 1px solid var(--rule); background: transparent; color: var(--dim2); cursor: pointer; border-radius: 1px; }
+    .qz .rrBtn.play { background: var(--tx); border-color: var(--tx); color: var(--bg); }
+    .qz .rrBtn:hover { border-color: var(--acc); }
+    .qz .rrLoop { margin-left: auto; font-size: 11px; color: var(--acc); }
+    .qz .rrRange { font-family: "Inter", sans-serif; font-size: 11px; color: var(--dim); }
+
+    /* 묶음 머리 */
+    .qz .rrSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 30px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .rrSecT { font-family: "Noto Serif KR", serif; font-size: 16px; }
+    .qz .rrSecS { font-size: 11px; color: var(--dim); }
+
+    /* 오늘의 말씀 */
+    .qz .rrBody { margin-top: 14px; }
+    .qz .s-line, .qz .s-plain {
+        font-family: "Noto Serif KR", serif; font-size: calc(15.5px * var(--fs)); line-height: 1.95;
+        color: #2A2C30; margin: 0 0 12px; word-break: keep-all;
+    }
+    .qz .s-line:last-child, .qz .s-plain:last-child { margin-bottom: 0; }
+
+    /* 기도 */
+    .qz .rrPray { margin-top: 26px; padding: 18px 16px; background: var(--mark); }
+    .qz .rrPrayK { font-size: 10px; font-weight: 600; letter-spacing: .2em; color: var(--acc); }
+    .qz .rrPrayT { font-family: "Noto Serif KR", serif; font-size: calc(15px * var(--fs)); line-height: 1.9; margin: 8px 0 0; white-space: pre-line; word-break: keep-all; }
+
+    /* 참고 성경 */
+    .qz .rrRef { padding: 14px 0 12px; border-bottom: 1px solid var(--rule); }
+    .qz .rrRefT { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--acc); }
+    .qz .rrV { display: flex; gap: 10px; margin-top: 6px; }
+    .qz .rrVn { font-family: "Inter", sans-serif; font-size: 11px; color: var(--acc); width: 18px; text-align: right; flex: 0 0 auto; padding-top: 4px; }
+    .qz .rrVt { font-family: "Noto Serif KR", serif; font-size: calc(13.5px * var(--fs)); line-height: 1.85; color: var(--dim2); word-break: keep-all; }
+    .qz .rrEmpty { padding: 20px 0; text-align: center; font-size: 12.5px; color: var(--dim); }
+    .qz .rrAdmin { margin-top: 12px; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); word-break: break-all; }
+
+    /* 아래 메뉴 */
+    .qz .rrNav { display: flex; flex-wrap: wrap; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 30px; }
+    .qz .rrNav a { flex: 1 1 0; min-width: 64px; text-align: center; padding: 14px 0; font-size: 12.5px; color: var(--dim2); text-decoration: none; border-right: 1px solid var(--rule); }
+    .qz .rrNav a:last-child { border-right: 0; }
+    .qz .rrNav a:hover { color: var(--acc); }
+
+    /* 처리 중 박스 */
+    #processingBox { display: none; position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 200;
+        background: #16181C; color: #F7F6F3; padding: 14px 20px; font-size: 13px; }
+
+    .rv { opacity: 0; transform: translateY(12px); transition: opacity .5s ease, transform .5s ease; }
+    .rv.in { opacity: 1; transform: none; }
+    @@media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } }
+    @@media print { .qzBar, .rrNav, .rrCtl, .rrPlayer, #processingBox { display: none !important; } }
+</style>
+</head>
+<body>
+
+<div id="processingBox">처리 중이에요. 잠시만 기다려 주세요.</div>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">홈</a></div>
+            <div class="rrFs" role="group" aria-label="글자 크기">
+                <button type="button" onclick="setFs('s')" id="fsS" aria-label="작게">가</button>
+                <button type="button" onclick="setFs('m')" id="fsM" aria-label="보통">가</button>
+                <button type="button" onclick="setFs('l')" id="fsL" aria-label="크게">가</button>
+            </div>
+        </div>
+
+        <header class="rrHead">
+            <div class="rrK">오늘의 5분 말씀</div>
+            <h1 class="rrH1">@Model?.RhapsodyOfRealitysData?.WordTitle</h1>
+            <div class="rrDate">@Month.ToString("D2").@Day.ToString("D2")<small>@(Model?.RhapsodyOfRealitysData?.WeekDayKor)요일 @if (isSuperAdmin || isAdmin) {<text> · 조회 @Model?.RhapsodyOfRealitysData?.Visited</text>}</small></div>
+        </header>
+
+        @* ── 설교 영상 ── *@
+        @if (!methodTEXT && !string.IsNullOrEmpty(videoId))
+        {
+            <div class="rrPlayer rv">
+                <iframe id="ytplayer"
+                        src="https://www.youtube.com/embed/@videoId?start=0@(hasRange ? $"&end={total}" : "")&enablejsapi=1&rel=0"
+                        title="설교영상"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+            </div>
+            <div class="rrCtl">
+                <button type="button" class="rrBtn play" onclick="ytPlay()">재생</button>
+                <button type="button" class="rrBtn" onclick="ytPause()">일시정지</button>
+                <button type="button" class="rrBtn" onclick="ytReplay()">처음부터</button>
+                @if (isSuperAdmin && hasRange)
+                {
+                    <span class="rrRange">0:00 ~ @endMin:@endSec.ToString("D2")</span>
+                }
+                <span class="rrLoop">무한 반복 중</span>
+            </div>
+        }
+
+        @* ── 오늘의 말씀 ── *@
+        <div class="rrSec"><span class="rrSecT">오늘의 말씀</span><span class="rrSecS"></span></div>
+        <div class="rrBody rv">
+            @{
+                var phrase = Model?.RhapsodyOfRealitysData?.WordPhrase ?? "";
+                var lines  = phrase.Split(new[]{"\r\n","\n"}, StringSplitOptions.None);
+                foreach (var ln in lines)
+                {
+                    if (!string.IsNullOrWhiteSpace(ln))
+                    {
+                        if (methodTEXT)
+                        {
+                            <p class="s-plain">@ln</p>
+                        }
+                        else
+                        {
+                            <p class="s-line">@ln</p>
+                        }
+                    }
+                }
+            }
+        </div>
+
+        @* ── 기도 ── *@
+        <div class="rrPray rv">
+            <div class="rrPrayK">기도</div>
+            <p class="rrPrayT">@Model?.RhapsodyOfRealitysData?.WordPray</p>
+        </div>
+
+        @* ── 참고 성경 (전부 펼침) ── *@
+        <div class="rrSec"><span class="rrSecT">참고 성경</span><span class="rrSecS">@(refCount > 0 ? $"{refCount}곳" : "")</span></div>
+        @if (refCount == 0)
+        {
+            <div class="rrEmpty">참고 성경이 없어요</div>
+        }
+        else
+        {
+            foreach (var va in Model!.eBibleDatas)
+            {
+                <div class="rrRef">
+                    <div class="rrRefT">@va.JanZulString</div>
+                    @if (!string.IsNullOrEmpty(va.BibleText))
+                    {
+                        foreach (var v in va.eBibleDatas)
+                        {
+                            <div class="rrV"><span class="rrVn">@v.zul</span><span class="rrVt">@v.BibleData</span></div>
+                        }
+                    }
+                </div>
+            }
+        }
+        @if (isSuperAdmin)
+        {
+            <div class="rrAdmin">https://www.jamsilkids.com/RhapsodyOfReality/DetailWords</div>
+        }
+
+        @* ── 아래 메뉴 ── *@
+        @if (!methodTEXT)
+        {
+            <nav class="rrNav">
+                <a href="/">홈</a>
+                @if (isSuperAdmin)
+                {
+                    <a href="/RhapsodyOfReality/DetailList">QT 목록</a>
+                    <a href="/RhapsodyOfReality/ModifyView?Id=@Model?.RhapsodyOfRealitysData?.Id">수정</a>
+                }
+                @if (isSuperAdmin || isAdmin)
+                {
+                    <a href="/BibleBulk/BibleMissingList">성경</a>
+                    <a href="/RhapsodyOfReality/DetailWordsP?Id=@Model?.RhapsodyOfRealitysData?.Id&methodTEXT=TEXT">평문</a>
+                }
+            </nav>
+        }
+
+    </div>
+</div>
+
+<!-- ═══ 글자 크기 ═══ -->
+<script>
+(function(){
+    var MAP = { s:0.90, m:1, l:1.16 };
+    window.setFs = function(k, silent){
+        if (!MAP[k]) k = 'm';
+        document.documentElement.style.setProperty('--fs', MAP[k]);
+        ['S','M','L'].forEach(function(x){
+            var b = document.getElementById('fs'+x);
+            if (b) b.classList.toggle('on', x.toLowerCase() === k);
+        });
+        if (!silent) { try { localStorage.setItem('rorFs', k); } catch(e){} }
+    };
+    var saved = 'm';
+    try { saved = localStorage.getItem('rorFs') || 'm'; } catch(e){}
+    setFs(saved, true);
+})();
+</script>
+
+<!-- ═══ YouTube 구간 무한 반복 ═══ -->
+<script>
+    // Razor → JS 구간 변수
+    var ytStartSecs = 0;
+    var ytEndSecs   = @total;          // 0 이면 구간 미설정 (영상 끝까지)
+    var ytHasRange  = @(hasRange ? "true" : "false");
+
+    var player      = null;
+    var playerReady = false;
+    var actionQueue = [];
+    var ytLastEnded = 0;
+    var loopTimer   = null;
+
+    /* 구간 반복 재시작 공통 함수 */
+    function ytLoopRestart() {
+        if (!player) return;
+        try {
+            if (ytHasRange && ytEndSecs > 0) {
+                player.loadVideoById({
+                    videoId:      '@videoId',
+                    startSeconds: ytStartSecs,
+                    endSeconds:   ytEndSecs
+                });
+            } else {
+                player.seekTo(ytStartSecs, true);
+                player.playVideo();
+            }
+        } catch (e) { }
+    }
+
+    function createYTPlayer() {
+        var el = document.getElementById('ytplayer');
+        if (!el) return;
+        player = new YT.Player('ytplayer', {
+            events: {
+                'onReady': function () {
+                    playerReady = true;
+                    while (actionQueue.length) { (actionQueue.shift())(); }
+                },
+                'onStateChange': function (e) {
+                    if (e.data === YT.PlayerState.ENDED) {
+                        var now = Date.now();
+                        if (now - ytLastEnded < 600) return;   // 중복 ENDED 방지
+                        ytLastEnded = now;
+                        clearTimeout(loopTimer);
+                        loopTimer = setTimeout(ytLoopRestart, 120);
+                    }
+                }
+            }
+        });
+    }
+
+    (function init() {
+        if (window.YT && window.YT.Player) { createYTPlayer(); }
+        else { window.onYouTubeIframeAPIReady = function () { createYTPlayer(); }; }
+    })();
+
+    function doWhenReady(fn) { playerReady ? fn() : actionQueue.push(fn); }
+    function ytPlay()   { doWhenReady(function () { player.playVideo(); }); }
+    function ytPause()  { doWhenReady(function () { player.pauseVideo(); }); }
+    function ytReplay() { doWhenReady(ytLoopRestart); }
+</script>
+
+<!-- ═══ 스크롤 등장 ═══ -->
+<script>
+(function () {
+    var els = document.querySelectorAll('.rv');
+    if (!('IntersectionObserver' in window)) {
+        els.forEach(function (el) { el.classList.add('in'); });
+        return;
+    }
+    var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+            if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); }
+        });
+    }, { threshold: 0.06, rootMargin: '0px 0px -30px 0px' });
+    els.forEach(function (el, i) {
+        el.style.transitionDelay = Math.min(i * 70, 210) + 'ms';
+        obs.observe(el);
+    });
+})();
+</script>
+
+</body>
+</html>

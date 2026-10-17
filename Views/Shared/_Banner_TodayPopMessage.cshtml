@@ -1,0 +1,708 @@
+﻿@{
+    Layout = null; // 메인 화면에 붙일거면 필요에 따라 제거하세요.
+}
+
+<!-- ✅ PopMessage 알림(대시보드 + 최근 안읽은 팝업)
+     ✅ 변경사항(요청 반영)
+     1) 대시보드(pmDashWrap): 기본은 항상 숨김(hidden) + 사용자가 "대시보드 보기" 버튼으로만 열기
+        - unread 변화로 자동 표시/자동 숨김 ❌
+        - 공용 쿠키 스크립트 충돌 방지 위해 js-global-cookie-section / hide-btn 제거
+     2) 팝업(pmPopupWrap): unread>0일 때만 자동 표시(기존 로직 유지), X 누르면 임시 닫기(기존 유지)
+-->
+
+<style>
+    :root {
+        --pm-bg: #f6fbf8;
+        --pm-card: #ffffff;
+        --pm-ink: #123029;
+        --pm-muted: #5a6b66;
+        --pm-line: #dfeee8;
+        --pm-primary: #1F6F5B;
+        --pm-primary2: #2a8a72;
+        --pm-danger: #c62828;
+        --pm-shadow: 0 18px 60px rgba(18,48,41,.14);
+        --pm-radius: 20px;
+    }
+
+    .pmDash {
+        margin: 14px 0 22px;
+    }
+
+    /* ✅ 상단 “메일함 요약” 카드 */
+    .pmDashCard {
+        position: relative;
+        border-radius: 26px;
+        border: 1px solid var(--pm-line);
+        background: radial-gradient(1100px 380px at 10% 0%, rgba(31,111,91,.14) 0%, rgba(255,255,255,.92) 55%), radial-gradient(900px 360px at 90% 10%, rgba(42,138,114,.12) 0%, rgba(255,255,255,.0) 55%), #fff;
+        box-shadow: 0 14px 30px rgba(18,48,41,.10);
+        overflow: hidden;
+        padding: 16px 16px 14px;
+    }
+
+    .pmDashTop {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .pmDashTitleBox {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .pmDashLabel {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        width: fit-content;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 900;
+        color: var(--pm-primary);
+        background: rgba(31,111,91,.10);
+        border: 1px solid rgba(31,111,91,.22);
+    }
+
+    .pmDashTitle {
+        font-size: 18px;
+        font-weight: 1000;
+        color: var(--pm-ink);
+        letter-spacing: .02em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .pmDashSub {
+        font-size: 13px;
+        color: var(--pm-muted);
+        font-weight: 700;
+        line-height: 1.35;
+    }
+
+    .pmDashActions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .pmBtn {
+        border: 1px solid rgba(0,0,0,.08);
+        background: rgba(255,255,255,.9);
+        color: var(--pm-ink);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-weight: 900;
+        font-size: 12px;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(18,48,41,.06);
+        transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+        white-space: nowrap;
+    }
+
+        .pmBtn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 22px rgba(18,48,41,.10);
+            background: #fff;
+        }
+
+        .pmBtn.primary {
+            background: linear-gradient(135deg, rgba(31,111,91,.95), rgba(42,138,114,.95));
+            border-color: transparent;
+            color: #fff;
+        }
+
+    /* ✅ 카운트 3개 타일 */
+    .pmTiles {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .pmTile {
+        background: rgba(255,255,255,.92);
+        border: 1px solid var(--pm-line);
+        border-radius: 18px;
+        padding: 12px 12px;
+        box-shadow: 0 8px 20px rgba(18,48,41,.06);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-width: 0;
+    }
+
+    .pmTileL {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .pmTileK {
+        font-size: 12px;
+        font-weight: 900;
+        color: var(--pm-muted);
+    }
+
+    .pmTileV {
+        font-size: 20px;
+        font-weight: 1000;
+        color: var(--pm-ink);
+        letter-spacing: .02em;
+    }
+
+    .pmTileIcon {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        background: rgba(31,111,91,.10);
+        border: 1px solid rgba(31,111,91,.18);
+        flex: 0 0 auto;
+    }
+
+    .pmTile.unread .pmTileIcon {
+        background: rgba(198,40,40,.10);
+        border-color: rgba(198,40,40,.22);
+    }
+
+    .pmTile.unread .pmTileV {
+        color: var(--pm-danger);
+    }
+
+    @@media (max-width: 720px) {
+        .pmTiles {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ✅ “최근 안읽은” 팝업(우측 하단 토스트 스타일) */
+    .pmPopupWrap {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 9999;
+        width: min(420px, calc(100% - 32px));
+        display: none; /* JS에서 unread 있을 때만 show */
+    }
+
+        .pmPopupWrap.is-open {
+            display: block;
+        }
+
+    .pmPopup {
+        border-radius: 22px;
+        border: 1px solid rgba(0,0,0,.08);
+        background: rgba(255,255,255,.92);
+        box-shadow: var(--pm-shadow);
+        backdrop-filter: blur(10px);
+        overflow: hidden;
+        animation: pmPopIn .18s ease-out;
+    }
+
+    @@keyframes pmPopIn {
+        from {
+            transform: translateY(10px);
+            opacity: .0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .pmPopupHead {
+        padding: 12px 12px 10px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid rgba(0,0,0,.06);
+        background: radial-gradient(600px 240px at 0% 0%, rgba(31,111,91,.18) 0%, rgba(255,255,255,.0) 58%), rgba(255,255,255,.78);
+    }
+
+    .pmPopupTitle {
+        font-weight: 1000;
+        color: var(--pm-ink);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .pmPill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-weight: 1000;
+        font-size: 12px;
+        background: rgba(198,40,40,.10);
+        border: 1px solid rgba(198,40,40,.22);
+        color: var(--pm-danger);
+        white-space: nowrap;
+    }
+
+    .pmPopupSub {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 800;
+        color: var(--pm-muted);
+        line-height: 1.35;
+    }
+
+    .pmPopupCloseRow {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .pmCloseBtn {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,.08);
+        background: rgba(255,255,255,.9);
+        cursor: pointer;
+        font-weight: 1000;
+        box-shadow: 0 6px 16px rgba(18,48,41,.08);
+    }
+
+    .pmPopupBody {
+        padding: 10px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: min(52vh, 420px);
+        overflow: auto;
+    }
+
+    .pmMsg {
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,.07);
+        background: #fff;
+        padding: 10px 10px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        cursor: pointer;
+        box-shadow: 0 6px 16px rgba(18,48,41,.06);
+    }
+
+    .pmDot {
+        width: 10px;
+        height: 10px;
+        margin-top: 6px;
+        border-radius: 999px;
+        background: var(--pm-danger);
+        flex: 0 0 auto;
+    }
+
+    .pmMsgMain {
+        min-width: 0;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .pmMsgTop {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .pmMsgWho {
+        font-weight: 1000;
+        color: var(--pm-ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 72%;
+    }
+
+    .pmMsgTime {
+        font-size: 11px;
+        font-weight: 900;
+        color: var(--pm-muted);
+        white-space: nowrap;
+    }
+
+    .pmMsgPreview {
+        font-size: 13px;
+        font-weight: 800;
+        color: #24443c;
+        line-height: 1.35;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .pmPopupFoot {
+        padding: 10px 12px 12px;
+        border-top: 1px solid rgba(0,0,0,.06);
+        display: flex;
+        gap: 8px;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255,255,255,.8);
+    }
+
+    .pmLinkBtn {
+        flex: 1;
+        text-align: center;
+        border-radius: 14px;
+        padding: 10px 12px;
+        font-weight: 1000;
+        border: 1px solid rgba(0,0,0,.08);
+        background: #fff;
+        cursor: pointer;
+        text-decoration: none;
+        color: var(--pm-ink);
+    }
+
+        .pmLinkBtn.primary {
+            background: linear-gradient(135deg, rgba(31,111,91,.95), rgba(42,138,114,.95));
+            border-color: transparent;
+            color: #fff;
+        }
+</style>
+
+<!-- ✅ 대시보드: 기본 숨김 + 버튼으로만 표시 -->
+<div class="pmDash" id="pmDashWrap" hidden>
+    <section class="pmDashCard">
+        <div class="pmDashTop">
+            <div class="pmDashTitleBox">
+                <div class="pmDashLabel">📬 메시지함 대시보드</div>
+                <div class="pmDashTitle">
+                    최근 쪽지를 한눈에
+                    <span style="font-size:12px;font-weight:900;color:var(--pm-muted)"></span>
+                </div>
+                <div class="pmDashSub">
+                    받은/보낸/안읽은 개수를 보여주고, 안읽은 메시지가 있으면 우측 하단에 알림 팝업이 뜹니다.
+                </div>
+            </div>
+
+            <div class="pmDashActions">
+                <!-- ✅ 추가: 대시보드 토글(대시보드 내부에서도 숨기기 가능) -->
+                <button type="button" class="pmBtn" id="pmDashToggle">대시보드 보기</button>
+
+                <button type="button" class="pmBtn" id="pmDashRefresh">새로고침</button>
+                <a class="pmBtn primary" href="/PopMessage/Index">쪽지함 열기</a>
+            </div>
+        </div>
+
+        <div class="pmTiles">
+            <div class="pmTile" role="button" tabindex="0" id="pmTileInbox" title="받은함 열기">
+                <div class="pmTileL">
+                    <div class="pmTileK">내가 받은 메시지</div>
+                    <div class="pmTileV" id="pmInboxCount">0</div>
+                </div>
+                <div class="pmTileIcon">📥</div>
+            </div>
+
+            <div class="pmTile" role="button" tabindex="0" id="pmTileSent" title="보낸함 열기">
+                <div class="pmTileL">
+                    <div class="pmTileK">내가 보낸 메시지</div>
+                    <div class="pmTileV" id="pmSentCount">0</div>
+                </div>
+                <div class="pmTileIcon">📤</div>
+            </div>
+
+            <div class="pmTile unread" role="button" tabindex="0" id="pmTileUnread" title="안읽은 메시지 보기">
+                <div class="pmTileL">
+                    <div class="pmTileK">안읽은 메시지</div>
+                    <div class="pmTileV" id="pmUnreadCount">0</div>
+                </div>
+                <div class="pmTileIcon">🔔</div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- ✅ 최근 안읽은 메시지 알림 팝업: 안읽은 있을 때만 표시 -->
+<!-- (원하면 여기서 js-global-cookie-section 제거 가능. 현재는 충돌 대상이 pmDash가 아니라 팝업이므로 유지/제거 모두 OK) -->
+<div class="pmPopupWrap js-global-cookie-section" data-cookie-key="TodayPopMessage" id="pmPopupWrap" aria-live="polite">
+    <div class="pmPopup">
+        <div class="pmPopupHead">
+            <div style="min-width:0">
+                <div class="pmPopupTitle">
+                    🔔 최근 안읽은 메시지
+                    <span class="pmPill" id="pmPopupPill">0개</span>
+                </div>
+                <div class="pmPopupSub">메시지 카드를 누르면 쪽지함으로 이동합니다.</div>
+            </div>
+
+            <div class="pmPopupCloseRow">
+                <button type="button" class="pmCloseBtn" id="pmPopupClose" aria-label="닫기">✕</button>
+            </div>
+        </div>
+
+        <div class="pmPopupBody" id="pmPopupList">
+            <!-- JS가 안읽은 메시지 카드 채움 -->
+        </div>
+
+        <div class="pmPopupFoot">
+            <a class="pmLinkBtn" href="/PopMessage/Index">쪽지함</a>
+            <a class="pmLinkBtn primary" href="/PopMessage/Index#inbox">받은함 바로가기</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const POP_MESSAGE_PAGE = '/PopMessage/Index';
+        const POLL_MS = 5000; // 5초 폴링
+
+        const api = {
+            unreadCount: () => fetch('/PopMessage/UnreadCount', { cache: "no-store" }).then(r => r.json()),
+            inboxList: (page, pageSize) => fetch(`/PopMessage/InboxList?page=${page}&pageSize=${pageSize}`, { cache: "no-store" }).then(r => r.json()),
+            sentList:  (page, pageSize) => fetch(`/PopMessage/SentList?page=${page}&pageSize=${pageSize}`, { cache: "no-store" }).then(r => r.json()),
+        };
+
+        const el = {
+            dashWrap: document.getElementById('pmDashWrap'),
+
+            inboxCount: document.getElementById('pmInboxCount'),
+            sentCount: document.getElementById('pmSentCount'),
+            unreadCount: document.getElementById('pmUnreadCount'),
+
+            tileInbox: document.getElementById('pmTileInbox'),
+            tileSent: document.getElementById('pmTileSent'),
+            tileUnread: document.getElementById('pmTileUnread'),
+
+            refresh: document.getElementById('pmDashRefresh'),
+            dashToggle: document.getElementById('pmDashToggle'),
+
+            popupWrap: document.getElementById('pmPopupWrap'),
+            popupClose: document.getElementById('pmPopupClose'),
+            popupPill: document.getElementById('pmPopupPill'),
+            popupList: document.getElementById('pmPopupList'),
+        };
+
+        function esc(s) {
+            return (s ?? '').replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        function fmtTime(s) {
+            return (s ?? '').toString().replace('T', ' ').substring(0, 16);
+        }
+
+        function buildUnreadCard(item) {
+            const who = item.peerFullName ?? item.PeerFullName ?? item.peerUserName ?? item.PeerUserName ?? '알수없음';
+            const time = item.insertDT ?? item.InsertDT ?? '';
+            const preview = item.messagePreview ?? item.MessagePreview ?? item.messageText ?? item.MessageText ?? '';
+
+            const div = document.createElement('div');
+            div.className = 'pmMsg';
+            div.setAttribute('role', 'button');
+            div.tabIndex = 0;
+            div.innerHTML = `
+                <div class="pmDot"></div>
+                <div class="pmMsgMain">
+                    <div class="pmMsgTop">
+                        <div class="pmMsgWho">${esc(who)}</div>
+                        <div class="pmMsgTime">${esc(fmtTime(time))}</div>
+                    </div>
+                    <div class="pmMsgPreview">${esc(preview)}</div>
+                </div>
+            `;
+
+            const go = () => { window.location.href = POP_MESSAGE_PAGE; };
+            div.addEventListener('click', go);
+            div.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+
+            return div;
+        }
+
+        function setCounts({ inboxTotal, sentTotal, unreadTotal }) {
+            el.inboxCount.textContent = (inboxTotal ?? 0).toString();
+            el.sentCount.textContent  = (sentTotal ?? 0).toString();
+            el.unreadCount.textContent = (unreadTotal ?? 0).toString();
+        }
+
+        // ===========================
+        // ✅ 대시보드는 "기본 숨김" + 사용자가 토글 버튼으로만 표시
+        // ===========================
+        let dashOpened = false;
+
+        function renderDashVisibility(unreadTotalForLabel) {
+            if (!el.dashWrap) return;
+
+            el.dashWrap.hidden = !dashOpened;
+
+            // 버튼 라벨(선택): unread 표시하고 싶으면 아래 한 줄 사용
+            // const label = dashOpened ? '대시보드 숨기기' : `대시보드 보기 (${unreadTotalForLabel ?? 0} 안읽음)`;
+
+            const label = dashOpened ? '대시보드 숨기기' : '대시보드 보기';
+            if (el.dashToggle) el.dashToggle.textContent = label;
+        }
+
+        el.dashToggle?.addEventListener('click', () => {
+            dashOpened = !dashOpened;
+            renderDashVisibility(lastUnread ?? 0);
+        });
+
+        // ===========================
+        // ✅ 팝업 “임시 닫기” 로직
+        // - X 누르면 session 동안 suppress
+        // - unread가 증가(새 메시지 도착)하면 자동으로 해제하고 다시 표시
+        // ===========================
+        let popupSuppressed = false;
+
+        function closePopupTemporarily() {
+            popupSuppressed = true;
+            el.popupWrap?.classList.remove('is-open');
+        }
+
+        function showPopupIfUnread(unreadTotal, { force = false } = {}) {
+            if (!unreadTotal || unreadTotal <= 0) {
+                el.popupWrap?.classList.remove('is-open');
+                return;
+            }
+            if (popupSuppressed && !force) return;
+
+            if (el.popupPill) el.popupPill.textContent = `${unreadTotal}개`;
+            el.popupWrap?.classList.add('is-open');
+        }
+
+        async function fillPopupUnreadList() {
+            if (!el.popupList) return;
+            el.popupList.innerHTML = '';
+
+            const res = await api.inboxList(0, 12).catch(() => null);
+            const items = (res && res.ok) ? (res.items || []) : [];
+
+            const unreadItems = items
+                .filter(x => ((x.visited ?? x.Visited) ?? 0) === 0)
+                .slice(0, 5);
+
+            if (unreadItems.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.padding = '10px 2px';
+                empty.style.color = 'var(--pm-muted)';
+                empty.style.fontWeight = '900';
+                empty.style.fontSize = '13px';
+                empty.textContent = '안읽은 메시지가 있어요. (목록을 불러오지 못했으면 새로고침 해주세요)';
+                el.popupList.appendChild(empty);
+            } else {
+                unreadItems.forEach(it => el.popupList.appendChild(buildUnreadCard(it)));
+            }
+        }
+
+        async function loadTotalsAndRender(unreadTotal, { popupForce = false } = {}) {
+            const inbox = await api.inboxList(0, 1).catch(() => null);
+            const sent  = await api.sentList(0, 1).catch(() => null);
+
+            const inboxTotal = (inbox && inbox.ok) ? (inbox.totalCount ?? inbox.TotalCount ?? 0) : 0;
+            const sentTotal  = (sent  && sent.ok)  ? (sent.totalCount  ?? sent.TotalCount  ?? 0) : 0;
+
+            setCounts({ inboxTotal, sentTotal, unreadTotal });
+
+            // ✅ 대시보드는 자동 표시/숨김 없음. 버튼 라벨만 갱신(원하면)
+            renderDashVisibility(unreadTotal);
+
+            // ✅ 팝업 표시(필요시 강제)
+            showPopupIfUnread(unreadTotal, { force: popupForce });
+
+            if (unreadTotal > 0) {
+                await fillPopupUnreadList();
+            } else if (el.popupList) {
+                el.popupList.innerHTML = '';
+            }
+        }
+
+        // ===========================
+        // ✅ 폴링
+        // ===========================
+        let lastUnread = null;
+        let inFlight = false;
+
+        async function checkUnreadAndUpdate({ forceFull = false } = {}) {
+            if (document.visibilityState === 'hidden') return;
+            if (inFlight) return;
+
+            inFlight = true;
+            try {
+                const u = await api.unreadCount().catch(() => null);
+                const unreadTotal = (u && u.ok) ? (u.count ?? 0) : 0;
+
+                const first = (lastUnread === null);
+                const changed = (!first && unreadTotal !== lastUnread);
+                const increased = (!first && unreadTotal > lastUnread); // ✅ 새 메시지 도착(안읽은 증가)
+                const becamePositive = (!first && lastUnread === 0 && unreadTotal > 0);
+
+                // ✅ 숫자만 즉시 반영(대시보드 자동표시 X)
+                if (el.unreadCount) el.unreadCount.textContent = (unreadTotal ?? 0).toString();
+                if (el.popupPill) el.popupPill.textContent = `${unreadTotal}개`;
+
+                // ✅ unread가 증가하면: 사용자가 닫아놨더라도 다시 보여주기
+                if (increased || becamePositive) {
+                    popupSuppressed = false;
+                }
+
+                // ✅ 처음/강제/변경 시 전체 갱신
+                if (forceFull || first || changed) {
+                    await loadTotalsAndRender(unreadTotal, { popupForce: increased || becamePositive });
+                } else {
+                    showPopupIfUnread(unreadTotal);
+                    renderDashVisibility(unreadTotal);
+                }
+
+                lastUnread = unreadTotal;
+            } finally {
+                inFlight = false;
+            }
+        }
+
+        // ✅ 타일 클릭
+        el.tileInbox?.addEventListener('click', () => window.location.href = POP_MESSAGE_PAGE + '#inbox');
+        el.tileSent?.addEventListener('click', () => window.location.href = POP_MESSAGE_PAGE + '#sent');
+        el.tileUnread?.addEventListener('click', () => window.location.href = POP_MESSAGE_PAGE + '#inbox');
+
+        [el.tileInbox, el.tileSent, el.tileUnread].forEach(t => {
+            if (!t) return;
+            t.addEventListener('keydown', (e) => { if (e.key === 'Enter') t.click(); });
+        });
+
+        // ✅ 팝업 닫기: “임시 닫기”
+        el.popupClose?.addEventListener('click', closePopupTemporarily);
+
+        // ✅ 새로고침 버튼: 강제 전체 갱신 + 팝업 suppress 해제
+        el.refresh?.addEventListener('click', () => {
+            popupSuppressed = false;
+            checkUnreadAndUpdate({ forceFull: true });
+        });
+
+        // ✅ 초기: 대시보드 기본 숨김
+        dashOpened = false;
+        renderDashVisibility(0);
+
+        // ✅ 초기 로드
+        checkUnreadAndUpdate({ forceFull: true });
+
+        // ✅ 5초 폴링
+        setInterval(() => checkUnreadAndUpdate({ forceFull: false }), POLL_MS);
+
+    })();
+</script>

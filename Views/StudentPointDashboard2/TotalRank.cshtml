@@ -1,0 +1,1068 @@
+﻿@model BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+
+@{
+    Layout = null;
+
+    var year  = Model?.Year ?? DateHelper.GetKoreaNow().Year;
+    var rows  = Model?.Rows ?? new List<BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM>();
+
+    int maxTotal        = rows.Any() ? rows.Max(r => r.TotalPoint)        : 1;
+    int maxBible        = rows.Any() ? rows.Max(r => r.BiblePoint)        : 1;
+    int maxMission      = rows.Any() ? rows.Max(r => r.MissionBookPoint)  : 1;
+    int maxDevotion     = rows.Any() ? rows.Max(r => r.DevotionPoint)     : 1;
+    int maxAttendance   = rows.Any() ? rows.Max(r => r.AttendancePoint)   : 1;
+    int maxEvangelism   = rows.Any() ? rows.Max(r => r.EvangelismPoint)   : 1;
+    if (maxTotal        < 1) maxTotal        = 1;
+    if (maxBible        < 1) maxBible        = 1;
+    if (maxMission      < 1) maxMission      = 1;
+    if (maxDevotion     < 1) maxDevotion     = 1;
+    if (maxAttendance   < 1) maxAttendance   = 1;
+    if (maxEvangelism   < 1) maxEvangelism   = 1;
+
+    string Safe(string? s) => (s ?? "").Trim();
+    string FmtDate(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy.MM.dd") : "—";
+
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var phys = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+            if (System.IO.File.Exists(phys)) return $"/images/profile/{uid}.png";
+        }
+        return "/images/icon/people/people_01.webp";
+    }
+
+    string RoleCss(string? lbl) => lbl switch {
+        "학생" => "tag-student",
+        "교사" => "tag-teacher",
+        _     => "tag-etc"
+    };
+
+    string ClassLabel(BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM r)
+    {
+        if (r.ClassYear.HasValue && r.ClassBan.HasValue) return $"{r.ClassYear}학년 {r.ClassBan}반";
+        if (r.ClassYear.HasValue) return $"{r.ClassYear}학년";
+        return "";
+    }
+
+    var top3 = rows.Take(3).ToList();
+    var rest = rows.Skip(3).ToList();
+    string[] medals    = { "🥇", "🥈", "🥉" };
+    string[] rankCls   = { "rank-1", "rank-2", "rank-3" };
+    int[]    svgR      = { 44, 38, 36 };
+    double[] svgCirc   = { 2*Math.PI*44, 2*Math.PI*38, 2*Math.PI*36 };
+}
+
+<!doctype html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>통합 포인트 랭킹 — @ConstatsCommon.MainKeyTitle</title>
+<style>
+/* ── CSS 변수 ───────────────────────────────────────────── */
+:root{
+    --bg:      #f0f4ff;
+    --bg2:     #e4ecff;
+    --card:    rgba(255,255,255,.96);
+    --border:  rgba(30,41,98,.10);
+    --txt:     #1a1f3c;
+    --txt2:    #5a6382;
+    --txt3:    #94a3c0;
+    --primary: #4f6fff;
+    --pri2:    #6c8aff;
+    --bible:   #22c55e;
+    --mission: #0ea5e9;
+    --devotion:#f59e0b;
+    --attend:  #ef4444;
+    --ev:      #fb7185;
+    --total:   #8b5cf6;
+    --gold:    #f59e0b;
+    --silver:  #94a3b8;
+    --bronze:  #b45309;
+    --sh-sm:   0 2px 8px  rgba(30,41,98,.08);
+    --sh-md:   0 8px 24px rgba(30,41,98,.12);
+    --sh-lg:   0 16px 48px rgba(30,41,98,.16);
+    --rad-sm:  12px;
+    --rad-md:  18px;
+    --rad-lg:  24px;
+}
+[data-theme="dark"]{
+    --bg:      #0f1423;
+    --bg2:     #151c30;
+    --card:    rgba(21,30,52,.96);
+    --border:  rgba(255,255,255,.10);
+    --txt:     #e8edff;
+    --txt2:    #8b96b8;
+    --txt3:    #4a5578;
+    --primary: #6c8aff;
+    --pri2:    #8fa5ff;
+    --bible:   #4ade80;
+    --mission: #38bdf8;
+    --devotion:#fbbf24;
+    --attend:  #f87171;
+    --ev:      #fda4af;
+    --total:   #a78bfa;
+    --gold:    #fbbf24;
+    --silver:  #94a3b8;
+    --bronze:  #d97706;
+    --sh-sm:   0 2px 8px  rgba(0,0,0,.3);
+    --sh-md:   0 8px 24px rgba(0,0,0,.4);
+    --sh-lg:   0 16px 48px rgba(0,0,0,.5);
+}
+
+/* ── 리셋 ────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+    background:var(--bg); color:var(--txt); min-height:100vh;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 10% 0%, color-mix(in srgb,var(--primary) 12%,transparent),transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 10%,color-mix(in srgb,var(--bible) 8%,transparent),transparent 50%);
+    background-attachment:fixed;
+}
+
+/* ── 컨트롤 바 ───────────────────────────────────────────── */
+.ctrl-bar{
+    position:sticky;top:0;z-index:100;
+    background:color-mix(in srgb,var(--bg) 85%,transparent);
+    backdrop-filter:blur(20px) saturate(180%);
+    -webkit-backdrop-filter:blur(20px) saturate(180%);
+    border-bottom:1px solid var(--border);
+    box-shadow:var(--sh-sm);
+}
+.ctrl-inner{
+    max-width:1280px;margin:0 auto;
+    padding:10px 16px;
+    display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+}
+.pill-input{
+    display:flex;align-items:center;gap:8px;
+    background:var(--card);border:1px solid var(--border);
+    border-radius:999px;padding:8px 16px;box-shadow:var(--sh-sm);
+    transition:border-color .2s,box-shadow .2s;
+}
+.pill-input:focus-within{
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 20%,transparent);
+}
+.pill-input input,.pill-input select{
+    background:none;border:none;outline:none;
+    color:var(--txt);font-size:.875rem;font-weight:600;
+}
+.pill-input input{min-width:180px;}
+.pill-input select{cursor:pointer;min-width:130px;}
+.seg{
+    display:flex;background:var(--card);border:1px solid var(--border);
+    border-radius:999px;overflow:hidden;box-shadow:var(--sh-sm);
+}
+.seg button{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:7px 14px;font-size:.8rem;font-weight:800;
+    color:var(--txt2);border:none;background:none;cursor:pointer;white-space:nowrap;
+    transition:background .15s,color .15s;
+}
+.seg button.active,.seg button:hover{
+    background:color-mix(in srgb,var(--primary) 16%,transparent);color:var(--primary);
+}
+.theme-btn{
+    width:38px;height:38px;border-radius:999px;
+    background:var(--card);border:1px solid var(--border);
+    box-shadow:var(--sh-sm);cursor:pointer;font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .2s;margin-left:auto;
+}
+.theme-btn:hover{transform:rotate(20deg);}
+
+/* ── 래퍼 ────────────────────────────────────────────────── */
+.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 48px;}
+
+/* ── 페이지 헤더 ─────────────────────────────────────────── */
+.page-header{text-align:center;margin-bottom:32px;}
+.page-header h1{
+    font-size:clamp(1.5rem,4vw,2.2rem);font-weight:900;letter-spacing:-.5px;
+    background:linear-gradient(135deg,var(--primary),var(--pri2),var(--total));
+    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    margin-bottom:6px;
+}
+.page-header .sub{font-size:.875rem;color:var(--txt2);font-weight:600;}
+.badge-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;}
+.badge-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    background:color-mix(in srgb,var(--primary) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--primary) 30%,transparent);
+    color:var(--primary);font-size:.8rem;font-weight:800;
+    padding:4px 14px;border-radius:999px;
+}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0;}
+
+/* ── 시상대 (TOP 3) ──────────────────────────────────────── */
+.podium-section{margin-bottom:36px;}
+.podium-section>h2{
+    font-size:.8rem;font-weight:800;color:var(--txt3);
+    letter-spacing:1.5px;text-transform:uppercase;
+    text-align:center;margin-bottom:16px;
+}
+.podium-grid{
+    display:grid;grid-template-columns:1fr 1.18fr 1fr;
+    gap:12px;align-items:end;
+}
+@@media(max-width:640px){.podium-grid{grid-template-columns:1fr;align-items:start;}}
+
+.podium-card{
+    position:relative;border-radius:var(--rad-lg);
+    background:var(--card);border:1.5px solid var(--border);
+    box-shadow:var(--sh-lg);overflow:hidden;text-align:center;
+    padding:24px 16px 20px;
+    animation:cardIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+.podium-card::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;}
+.podium-card.rank-1{padding-top:32px;}
+.podium-card.rank-1::before{background:linear-gradient(160deg,rgba(245,158,11,.09),transparent 50%);}
+.podium-card.rank-2::before{background:linear-gradient(160deg,rgba(148,163,184,.07),transparent 50%);}
+.podium-card.rank-3::before{background:linear-gradient(160deg,rgba(180,83,9,.07),transparent 50%);}
+
+.podium-medal{
+    position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    font-size:1.6rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));
+}
+.rank-1 .podium-medal{font-size:2rem;top:8px;}
+
+/* 회전 그라디언트 링 */
+.avatar-ring{display:inline-block;position:relative;margin:8px auto 12px;border-radius:50%;}
+.avatar-ring::before{
+    content:'';position:absolute;inset:-3px;border-radius:50%;
+    background:conic-gradient(var(--ring-c1),var(--ring-c2),var(--ring-c1));
+    animation:ringRotate 4s linear infinite;
+}
+.rank-1{--ring-c1:#f59e0b;--ring-c2:#fde68a;}
+.rank-2{--ring-c1:#94a3b8;--ring-c2:#e2e8f0;}
+.rank-3{--ring-c1:#b45309;--ring-c2:#fcd34d;}
+@@keyframes ringRotate{to{transform:rotate(360deg);}}
+.avatar-ring img{
+    display:block;border-radius:50%;object-fit:cover;
+    position:relative;z-index:1;border:3px solid var(--bg);
+}
+.rank-1 .avatar-ring img{width:88px;height:88px;}
+.rank-2 .avatar-ring img{width:76px;height:76px;}
+.rank-3 .avatar-ring img{width:72px;height:72px;}
+
+.podium-name{font-size:1rem;font-weight:900;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-1 .podium-name{font-size:1.15rem;}
+
+.tag{
+    display:inline-block;font-size:.72rem;font-weight:800;
+    padding:2px 10px;border-radius:999px;margin-bottom:6px;
+    border:1px solid transparent;
+}
+.tag-student{background:color-mix(in srgb,var(--bible) 12%,transparent);color:var(--bible);border-color:color-mix(in srgb,var(--bible) 25%,transparent);}
+.tag-teacher{background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);border-color:color-mix(in srgb,var(--primary) 25%,transparent);}
+.tag-etc    {background:color-mix(in srgb,var(--txt3) 12%,transparent);color:var(--txt2);border-color:color-mix(in srgb,var(--txt3) 20%,transparent);}
+.tag-class  {background:color-mix(in srgb,var(--mission) 10%,transparent);color:var(--mission);border-color:color-mix(in srgb,var(--mission) 20%,transparent);}
+
+.podium-score{font-size:2.2rem;font-weight:900;line-height:1;margin-bottom:2px;}
+.rank-1 .podium-score{font-size:2.8rem;color:var(--gold);}
+.podium-score-label{font-size:.72rem;color:var(--txt3);font-weight:700;margin-bottom:10px;}
+
+/* SVG 링 */
+.ring-wrap{position:relative;margin:0 auto 10px;}
+.ring-wrap svg{display:block;}
+.ring-track{fill:none;stroke:var(--bg2);}
+.ring-fill {fill:none;stroke-linecap:round;transition:stroke-dashoffset 1.4s cubic-bezier(.22,1,.36,1);}
+.rank-1 .ring-fill{stroke:url(#grad1);}
+.rank-2 .ring-fill{stroke:url(#grad2);}
+.rank-3 .ring-fill{stroke:url(#grad3);}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ring-pct{font-size:1.1rem;font-weight:900;}
+.ring-lbl{font-size:.65rem;font-weight:700;color:var(--txt3);}
+
+/* 점수 미니 그리드 (시상대) */
+.p-scores{
+    display:grid;grid-template-columns:1fr 1fr;gap:6px;
+    margin-bottom:8px;text-align:left;
+}
+.p-mini{
+    background:var(--bg2);border-radius:var(--rad-sm);padding:7px 9px;
+}
+.p-mini .pm-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.p-mini .pm-label{font-size:.66rem;font-weight:800;color:var(--txt3);display:flex;align-items:center;gap:4px;}
+.p-mini .pm-val{font-size:.88rem;font-weight:900;}
+.p-bar{height:4px;border-radius:999px;background:color-mix(in srgb,var(--txt3) 18%,transparent);overflow:hidden;}
+.p-bar-fill{height:100%;border-radius:999px;width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1);}
+
+.podium-date{font-size:.72rem;color:var(--txt3);font-weight:700;margin-top:6px;}
+
+/* ── 섹션 레이블 ─────────────────────────────────────────── */
+.section-label{
+    font-size:.8rem;font-weight:800;color:var(--txt3);
+    letter-spacing:1.5px;text-transform:uppercase;
+    margin-bottom:12px;margin-top:4px;
+}
+
+/* ── 일반 카드 그리드 ─────────────────────────────────────── */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+@@media(max-width:1100px){.grid{grid-template-columns:repeat(2,1fr);}}
+@@media(max-width:640px) {.grid{grid-template-columns:1fr;}}
+
+.card{
+    background:var(--card);border:1px solid var(--border);
+    border-radius:var(--rad-md);box-shadow:var(--sh-sm);
+    overflow:hidden;display:flex;flex-direction:column;
+    transition:transform .2s,box-shadow .2s,border-color .2s;
+    animation:cardIn .5s cubic-bezier(.22,1,.36,1) both;opacity:0;
+}
+.card:hover{
+    transform:translateY(-3px);box-shadow:var(--sh-md);
+    border-color:color-mix(in srgb,var(--primary) 30%,transparent);
+}
+@@keyframes cardIn{
+    from{opacity:0;transform:translateY(20px) scale(.97);}
+    to  {opacity:1;transform:translateY(0)    scale(1);}
+}
+
+.card-header{display:flex;gap:12px;padding:14px 14px 10px;align-items:flex-start;}
+.c-avatar{position:relative;flex-shrink:0;width:62px;height:62px;}
+.c-avatar img{
+    width:50px;height:50px;border-radius:50%;object-fit:cover;
+    border:2.5px solid var(--bg);display:block;background:var(--bg2);
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1;
+}
+.ca-ring-svg{position:absolute;inset:0;display:block;overflow:visible;transform:rotate(-90deg);}
+.ca-ring-track{fill:none;stroke:color-mix(in srgb,var(--txt3) 20%,transparent);}
+.ca-ring-fill{fill:none;stroke-linecap:round;stroke:url(#grad-card);transition:stroke-dashoffset 1.2s cubic-bezier(.22,1,.36,1);}
+.c-rank-no{
+    position:absolute;bottom:-2px;right:-2px;
+    width:22px;height:22px;border-radius:50%;
+    background:var(--primary);color:#fff;font-size:.65rem;font-weight:900;
+    display:flex;align-items:center;justify-content:center;
+    border:2px solid var(--bg);z-index:2;
+}
+
+.c-info{flex:1;min-width:0;}
+.c-name{font-size:.95rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px;}
+.c-meta{display:flex;flex-wrap:wrap;gap:4px;}
+
+.card-body{padding:0 14px 14px;}
+.total-big{
+    display:flex;align-items:baseline;gap:4px;
+    margin-bottom:10px;
+    padding:8px 12px;border-radius:var(--rad-sm);
+    background:color-mix(in srgb,var(--total) 8%,transparent);
+    border:1px solid color-mix(in srgb,var(--total) 20%,transparent);
+}
+.total-big .tv{font-size:1.4rem;font-weight:900;color:var(--total);}
+.total-big .tl{font-size:.72rem;font-weight:800;color:var(--txt3);}
+
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
+.sm-box{background:var(--bg2);border-radius:var(--rad-sm);padding:7px 9px;}
+.sm-box .sk{font-size:.66rem;color:var(--txt3);font-weight:800;margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+.sm-box .sv{font-size:.95rem;font-weight:900;}
+.sm-bar{height:4px;border-radius:999px;background:color-mix(in srgb,var(--txt3) 18%,transparent);overflow:hidden;margin-top:4px;}
+.sm-bar-fill{height:100%;border-radius:999px;width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1);}
+
+.card-date{font-size:.7rem;color:var(--txt3);font-weight:700;margin-top:4px;text-align:right;}
+
+/* ── 리스트 뷰 ───────────────────────────────────────────── */
+.list-wrap{
+    border-radius:var(--rad-md);border:1px solid var(--border);
+    background:var(--card);box-shadow:var(--sh-sm);
+    overflow:hidden;overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.list-head,.list-row{
+    display:grid;
+    grid-template-columns:52px 1.8fr repeat(6,1fr) 1fr;
+    gap:8px;padding:11px 14px;align-items:center;
+    white-space:nowrap;min-width:780px;
+}
+.list-head{
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    font-size:.72rem;color:var(--txt3);font-weight:800;letter-spacing:.5px;text-transform:uppercase;
+}
+.list-head div{text-align:right;}
+.list-head div:first-child,.list-head div:nth-child(2){text-align:left;}
+.list-row{border-bottom:1px solid var(--border);transition:background .15s;}
+.list-row:last-child{border-bottom:none;}
+.list-row:hover{background:color-mix(in srgb,var(--primary) 4%,transparent);}
+
+.l-rank{
+    display:flex;align-items:center;justify-content:center;
+    width:32px;height:32px;border-radius:50%;
+    background:color-mix(in srgb,var(--primary) 10%,transparent);
+    border:1px solid color-mix(in srgb,var(--primary) 20%,transparent);
+    font-size:.8rem;font-weight:900;color:var(--primary);flex-shrink:0;
+}
+.l-rank.top1{background:color-mix(in srgb,var(--gold)   14%,transparent);color:var(--gold);  border-color:color-mix(in srgb,var(--gold) 30%,transparent);}
+.l-rank.top2{background:color-mix(in srgb,var(--silver) 14%,transparent);color:var(--silver);border-color:color-mix(in srgb,var(--silver) 30%,transparent);}
+.l-rank.top3{background:color-mix(in srgb,var(--bronze) 14%,transparent);color:var(--bronze);border-color:color-mix(in srgb,var(--bronze) 30%,transparent);}
+
+.l-who{display:flex;align-items:center;gap:10px;min-width:0;}
+
+/* 리스트 아바타 회전 링 */
+.l-avatar-wrap{
+    position:relative;flex-shrink:0;
+    width:48px;height:48px;
+}
+.l-avatar-wrap::before{
+    content:'';position:absolute;inset:-2px;border-radius:50%;
+    background:conic-gradient(var(--lrc1),var(--lrc2),var(--lrc3));
+    animation:lRingRotate 5s linear infinite;
+}
+@@keyframes lRingRotate{to{transform:rotate(360deg);}}
+.l-avatar{
+    width:46px;height:46px;border-radius:50%;object-fit:cover;
+    border:2.5px solid var(--bg);background:var(--bg2);
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    display:block;z-index:1;
+}
+/* 순위별 링 색상 */
+.l-ring-top1   {--lrc1:#f59e0b;--lrc2:#fde68a;--lrc3:#f59e0b;}
+.l-ring-top2   {--lrc1:#94a3b8;--lrc2:#e2e8f0;--lrc3:#94a3b8;}
+.l-ring-top3   {--lrc1:#cd7c2f;--lrc2:#fcd34d;--lrc3:#cd7c2f;}
+/* 역할별 링 색상 */
+.l-ring-student{--lrc1:#22c55e;--lrc2:#0ea5e9;--lrc3:#a78bfa;}
+.l-ring-teacher{--lrc1:#6c8aff;--lrc2:#ec4899;--lrc3:#f59e0b;}
+.l-ring-etc    {--lrc1:#94a3c0;--lrc2:#4f6fff;--lrc3:#22c55e;}
+.l-name-block{min-width:0;}
+.l-name{font-size:.88rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.l-sub {font-size:.7rem;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.l-num{
+    text-align:right;font-size:.88rem;font-weight:900;
+    display:flex;align-items:center;justify-content:flex-end;gap:5px;
+}
+.l-num.total-cell{color:var(--total);}
+.l-bar-line{
+    display:flex;align-items:center;gap:5px;justify-content:flex-end;
+}
+.l-bar-line .lb{
+    width:48px;height:5px;border-radius:999px;
+    background:color-mix(in srgb,var(--txt3) 18%,transparent);overflow:hidden;flex-shrink:0;
+}
+.l-bar-line .lbf{height:100%;border-radius:999px;width:0;transition:width 1.2s cubic-bezier(.22,1,.36,1);}
+
+/* 컬러 도트 */
+.cd{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;}
+.cd-bible   {background:var(--bible);}
+.cd-mission {background:var(--mission);}
+.cd-devotion{background:var(--devotion);}
+.cd-attend  {background:var(--attend);}
+.cd-ev      {background:var(--ev);}
+.cd-total   {background:var(--total);}
+
+/* 뷰 토글 */
+[data-view="card"] #listSection{display:none;}
+[data-view="list"] #cardSection{display:none;}
+
+/* 빈 상태 */
+.empty{text-align:center;padding:60px 20px;color:var(--txt3);font-size:.9rem;font-weight:700;}
+
+/* 네비 버튼 */
+.nav-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:32px;}
+.nav-btn{
+    flex:1 1 200px;display:flex;align-items:center;gap:12px;
+    padding:14px 18px;border-radius:var(--rad-md);
+    background:var(--card);border:1px solid var(--border);
+    box-shadow:var(--sh-sm);text-decoration:none;color:var(--txt);
+    transition:transform .15s,box-shadow .15s;
+}
+.nav-btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md);}
+.nav-btn .ni{font-size:1.3rem;width:42px;height:42px;border-radius:var(--rad-sm);flex-shrink:0;
+             background:color-mix(in srgb,var(--primary) 12%,transparent);display:flex;align-items:center;justify-content:center;}
+.nav-btn .nt b  {font-size:.9rem;font-weight:900;display:block;}
+.nav-btn .nt span{font-size:.75rem;color:var(--txt2);font-weight:700;}
+
+/* lazy img */
+img[data-src]{opacity:0;transition:opacity .4s;}
+img.loaded   {opacity:1;}
+</style>
+</head>
+<body data-view="list">
+
+<!-- 컨트롤 바 -->
+<nav class="ctrl-bar">
+    <div class="ctrl-inner">
+        <!-- 홈 버튼 -->
+        <a href="/" style="display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:999px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:700;color:var(--txt2);text-decoration:none;white-space:nowrap;touch-action:manipulation;-webkit-tap-highlight-color:transparent;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--txt2)'">
+            ← 홈
+        </a>
+        <!-- 역할 필터 -->
+        <div class="seg" id="roleSeg">
+            <button class="active" data-role="all">전체</button>
+            <button data-role="학생">학생</button>
+            <button data-role="교사">교사</button>
+            <button data-role="기타">기타</button>
+        </div>
+
+        <!-- 정렬 -->
+        <div class="pill-input" title="정렬">
+            <span>↕️</span>
+            <select id="sortSel">
+                <option value="rank"       selected>순위(기본)</option>
+                <option value="total"      >총점순</option>
+                <option value="bible"      >@ConstatsCommon.MainKeyTitle 순</option>
+                <option value="mission"    >미션북순</option>
+                <option value="devotion"   >말씀&amp;일기순</option>
+                <option value="attendance" >출석순</option>
+            </select>
+        </div>
+
+        <!-- 검색 -->
+        <div class="pill-input">
+            <span>🔎</span>
+            <input id="q" type="search" placeholder="이름 / 아이디 검색" autocomplete="off"/>
+        </div>
+
+        <!-- 보기 토글 -->
+        <div class="seg" id="viewSeg">
+            <button data-view-btn="card">⊞ 카드</button>
+            <button data-view-btn="list" class="active">☰ 리스트</button>
+        </div>
+
+        <!-- 다크모드 -->
+        <button class="theme-btn" id="themeBtn" title="테마 전환">🌙</button>
+    </div>
+</nav>
+
+<div class="wrap">
+
+    <!-- 페이지 헤더 -->
+    <div class="page-header">
+        <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:700;color:var(--txt2);text-decoration:none;margin-bottom:18px;touch-action:manipulation;-webkit-tap-highlight-color:transparent;">← 홈으로</a>
+        <h1>🏆 통합 포인트 랭킹</h1>
+        <div class="sub">@(@year)년 · @ConstatsCommon.myDoToRi 4영역 합산</div>
+        <div class="badge-row">
+            <span class="badge-pill"><span class="dot cd-bible"></span>@ConstatsCommon.MainKeyTitle</span>
+            <span class="badge-pill"><span class="dot cd-mission"></span>미션북</span>
+            <span class="badge-pill"><span class="dot cd-devotion"></span>말씀&amp;일기</span>
+            <span class="badge-pill"><span class="dot cd-attend"></span>출석</span>
+            <span class="badge-pill"><span class="dot cd-ev"></span>전도상</span>
+            <span class="badge-pill"><span class="dot cd-total"></span>총 <span id="countBadge">@rows.Count</span>명 참여</span>
+        </div>
+    </div>
+
+    @{
+        // SVG 그라디언트 (defs)
+    }
+    <!-- SVG defs -->
+    <svg width="0" height="0" style="position:absolute">
+        <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#f59e0b"/>
+                <stop offset="100%" stop-color="#22c55e"/>
+            </linearGradient>
+            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#94a3b8"/>
+                <stop offset="100%" stop-color="#6c8aff"/>
+            </linearGradient>
+            <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#b45309"/>
+                <stop offset="100%" stop-color="#f59e0b"/>
+            </linearGradient>
+            <linearGradient id="grad-card" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%"   stop-color="#8b5cf6"/>
+                <stop offset="100%" stop-color="#4f6fff"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    @if (!rows.Any())
+    {
+        <div class="empty">😔 표시할 랭킹 데이터가 없습니다.</div>
+    }
+    else
+    {
+        <!-- ── TOP 3 시상대 ── -->
+        @if (top3.Count > 0)
+        {
+            <section class="podium-section" id="podiumSection">
+                <h2>🏆 TOP RANKING</h2>
+                <div class="podium-grid">
+                    @{
+                        int[] order = top3.Count == 1 ? new[]{0} : top3.Count == 2 ? new[]{1,0} : new[]{1,0,2};
+                    }
+                    @foreach (var oi in order)
+                    {
+                        if (oi >= top3.Count) continue;
+                        var r      = top3[oi];
+                        var ri     = oi;
+                        var photo  = ProfileOrDefault(r.UserId);
+                        var pct    = maxTotal > 0 ? Math.Min(100, (int)Math.Round((double)r.TotalPoint * 100.0 / maxTotal)) : 0;
+                        var circ   = svgCirc[ri];
+                        var offset = circ - (circ * pct / 100.0);
+                        var svgSz  = ri == 0 ? 108 : ri == 1 ? 96 : 90;
+                        var strkW  = 7;
+                        var cx     = svgSz / 2;
+                        var classLbl = ClassLabel(r);
+
+                        var pbB = maxBible        > 0 ? Math.Min(100,(int)Math.Round((double)r.BiblePoint      *100.0/maxBible))        : 0;
+                        var pbM = maxMission      > 0 ? Math.Min(100,(int)Math.Round((double)r.MissionBookPoint*100.0/maxMission))      : 0;
+                        var pbD = maxDevotion     > 0 ? Math.Min(100,(int)Math.Round((double)r.DevotionPoint   *100.0/maxDevotion))     : 0;
+                        var pbA = maxAttendance   > 0 ? Math.Min(100,(int)Math.Round((double)r.AttendancePoint *100.0/maxAttendance))   : 0;
+                        var pbE = maxEvangelism   > 0 ? Math.Min(100,(int)Math.Round((double)r.EvangelismPoint *100.0/maxEvangelism))   : 0;
+
+                        <div class="podium-card @rankCls[ri]"
+                             data-role="@Safe(r.RoleLabel)"
+                             data-name="@($"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.RoleLabel)}".ToLowerInvariant())"
+                             data-rank="@r.Rank"
+                             data-total="@r.TotalPoint"
+                             data-bible="@r.BiblePoint"
+                             data-mission="@r.MissionBookPoint"
+                             data-devotion="@r.DevotionPoint"
+                             data-attendance="@r.AttendancePoint"
+                             style="animation-delay:@(oi*0.12)s">
+                            <div class="podium-medal">@medals[ri]</div>
+                            <div class="avatar-ring @rankCls[ri]">
+                                <img data-src="@photo" src="/images/icon/people/people_01.webp"
+                                     alt="@r.FullName" width="@(ri==0?88:ri==1?76:72)" height="@(ri==0?88:ri==1?76:72)"
+                                     onerror="this.src='/images/icon/people/people_01.webp'"/>
+                            </div>
+                            <div class="podium-name">@(!string.IsNullOrWhiteSpace(r.FullName)?r.FullName:r.UserName)</div>
+                            <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;margin-bottom:8px;">
+                                <span class="tag @RoleCss(r.RoleLabel)">@r.RoleLabel</span>
+                                @if (!string.IsNullOrWhiteSpace(classLbl))
+                                {
+                                    <span class="tag tag-class">@classLbl</span>
+                                }
+                            </div>
+                            <div class="podium-score" data-count="@r.TotalPoint">0</div>
+                            <div class="podium-score-label">통합 총점</div>
+                            <!-- SVG 링 -->
+                            <div class="ring-wrap" style="width:@(svgSz)px;height:@(svgSz)px;">
+                                <svg width="@svgSz" height="@svgSz" style="transform:rotate(-90deg)">
+                                    <circle class="ring-track" cx="@cx" cy="@cx" r="@svgR[ri]" stroke-width="@strkW"/>
+                                    <circle class="ring-fill"  cx="@cx" cy="@cx" r="@svgR[ri]" stroke-width="@strkW"
+                                            stroke-dasharray="@circ.ToString("F2")"
+                                            stroke-dashoffset="@circ.ToString("F2")"
+                                            data-target-offset="@offset.ToString("F2")"/>
+                                </svg>
+                                <div class="ring-center">
+                                    <span class="ring-pct" data-pct="@pct">0%</span>
+                                    <span class="ring-lbl">비율</span>
+                                </div>
+                            </div>
+                            <!-- 4개 카테고리 미니 점수 -->
+                            <div class="p-scores">
+                                <div class="p-mini">
+                                    <div class="pm-top">
+                                        <span class="pm-label"><span class="cd cd-bible"></span>@ConstatsCommon.MainKeyTitle</span>
+                                        <span class="pm-val" style="color:var(--bible)">@r.BiblePoint</span>
+                                    </div>
+                                    <div class="p-bar"><div class="p-bar-fill" style="background:var(--bible)" data-pct="@pbB"></div></div>
+                                </div>
+                                <div class="p-mini">
+                                    <div class="pm-top">
+                                        <span class="pm-label"><span class="cd cd-mission"></span>미션북</span>
+                                        <span class="pm-val" style="color:var(--mission)">@r.MissionBookPoint</span>
+                                    </div>
+                                    <div class="p-bar"><div class="p-bar-fill" style="background:var(--mission)" data-pct="@pbM"></div></div>
+                                </div>
+                                <div class="p-mini">
+                                    <div class="pm-top">
+                                        <span class="pm-label"><span class="cd cd-devotion"></span>말씀&amp;일기</span>
+                                        <span class="pm-val" style="color:var(--devotion)">@r.DevotionPoint</span>
+                                    </div>
+                                    <div class="p-bar"><div class="p-bar-fill" style="background:var(--devotion)" data-pct="@pbD"></div></div>
+                                </div>
+                                <div class="p-mini">
+                                    <div class="pm-top">
+                                        <span class="pm-label"><span class="cd cd-attend"></span>출석×@ConstatsCommon.attendancePoint</span>
+                                        <span class="pm-val" style="color:var(--attend)">@r.AttendancePoint</span>
+                                    </div>
+                                    <div class="p-bar"><div class="p-bar-fill" style="background:var(--attend)" data-pct="@pbA"></div></div>
+                                </div>
+                                <div class="p-mini">
+                                    <div class="pm-top">
+                                        <span class="pm-label"><span class="cd cd-ev"></span>전도상</span>
+                                        <span class="pm-val" style="color:var(--ev)">@r.EvangelismPoint</span>
+                                    </div>
+                                    <div class="p-bar"><div class="p-bar-fill" style="background:var(--ev)" data-pct="@pbE"></div></div>
+                                </div>
+                            </div>
+                            <div class="podium-date">마지막 활동: @FmtDate(r.LastActivityDate)</div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- ── 카드 뷰 (4위~) ── -->
+        <div id="cardSection">
+            @if (rest.Count > 0)
+            {
+                <div class="section-label">ALL PARTICIPANTS</div>
+                <div class="grid" id="cardGrid">
+                    @for (int i = 0; i < rest.Count; i++)
+                    {
+                        var r       = rest[i];
+                        var rankNum = i + 4;
+                        var photo   = ProfileOrDefault(r.UserId);
+                        var classLbl = ClassLabel(r);
+                        var sortName = (string.IsNullOrWhiteSpace(r.FullName) ? r.UserName : r.FullName).ToLowerInvariant();
+                        var dataName = $"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.RoleLabel)}".ToLowerInvariant();
+
+                        var totalPct = maxTotal > 0 ? Math.Min(100,(int)Math.Round((double)r.TotalPoint*100.0/maxTotal)):0;
+                        var _caCirc  = 2.0 * Math.PI * 26.0;
+                        var _caOff   = _caCirc * (1.0 - Math.Clamp(totalPct,0,100)/100.0);
+
+                        var pbB = maxBible        > 0 ? Math.Min(100,(int)Math.Round((double)r.BiblePoint      *100.0/maxBible))        : 0;
+                        var pbM = maxMission      > 0 ? Math.Min(100,(int)Math.Round((double)r.MissionBookPoint*100.0/maxMission))      : 0;
+                        var pbD = maxDevotion     > 0 ? Math.Min(100,(int)Math.Round((double)r.DevotionPoint   *100.0/maxDevotion))     : 0;
+                        var pbA = maxAttendance   > 0 ? Math.Min(100,(int)Math.Round((double)r.AttendancePoint *100.0/maxAttendance))   : 0;
+                        var pbE = maxEvangelism   > 0 ? Math.Min(100,(int)Math.Round((double)r.EvangelismPoint *100.0/maxEvangelism))   : 0;
+
+                        <div class="card item"
+                             data-role="@Safe(r.RoleLabel)"
+                             data-name="@dataName"
+                             data-rank="@r.Rank"
+                             data-total="@r.TotalPoint"
+                             data-bible="@r.BiblePoint"
+                             data-mission="@r.MissionBookPoint"
+                             data-devotion="@r.DevotionPoint"
+                             data-attendance="@r.AttendancePoint"
+                             style="animation-delay:@(Math.Min(i,15)*0.05)s">
+                            <div class="card-header">
+                                <div class="c-avatar">
+                                    <svg class="ca-ring-svg" width="62" height="62">
+                                        <circle class="ca-ring-track" cx="31" cy="31" r="26" stroke-width="4"/>
+                                        <circle class="ring-fill ca-ring-fill" cx="31" cy="31" r="26" stroke-width="4"
+                                                stroke-dasharray="@_caCirc.ToString("F2")"
+                                                stroke-dashoffset="@_caCirc.ToString("F2")"
+                                                data-target-offset="@_caOff.ToString("F2")"/>
+                                    </svg>
+                                    <img data-src="@photo" src="/images/icon/people/people_01.webp"
+                                         alt="@r.FullName" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                    <span class="c-rank-no">@rankNum</span>
+                                </div>
+                                <div class="c-info">
+                                    <div class="c-name">@(!string.IsNullOrWhiteSpace(r.FullName)?r.FullName:r.UserName)</div>
+                                    <div class="c-meta">
+                                        <span class="tag @RoleCss(r.RoleLabel)">@r.RoleLabel</span>
+                                        @if (!string.IsNullOrWhiteSpace(classLbl))
+                                        {
+                                            <span class="tag tag-class">@classLbl</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- 총점 강조 -->
+                                <div class="total-big">
+                                    <span class="tv" data-count="@r.TotalPoint">@r.TotalPoint</span>
+                                    <span class="tl">통합 총점</span>
+                                </div>
+                                <!-- 4개 카테고리 -->
+                                <div class="score-grid">
+                                    <div class="sm-box">
+                                        <div class="sk"><span class="cd cd-bible"></span>@ConstatsCommon.MainKeyTitle</div>
+                                        <div class="sv" style="color:var(--bible)">@r.BiblePoint</div>
+                                        <div class="sm-bar"><div class="sm-bar-fill" style="background:var(--bible)" data-pct="@pbB"></div></div>
+                                    </div>
+                                    <div class="sm-box">
+                                        <div class="sk"><span class="cd cd-mission"></span>미션북</div>
+                                        <div class="sv" style="color:var(--mission)">@r.MissionBookPoint</div>
+                                        <div class="sm-bar"><div class="sm-bar-fill" style="background:var(--mission)" data-pct="@pbM"></div></div>
+                                    </div>
+                                    <div class="sm-box">
+                                        <div class="sk"><span class="cd cd-devotion"></span>말씀&amp;일기</div>
+                                        <div class="sv" style="color:var(--devotion)">@r.DevotionPoint</div>
+                                        <div class="sm-bar"><div class="sm-bar-fill" style="background:var(--devotion)" data-pct="@pbD"></div></div>
+                                    </div>
+                                    <div class="sm-box">
+                                        <div class="sk"><span class="cd cd-attend"></span>출석×@ConstatsCommon.attendancePoint</div>
+                                        <div class="sv" style="color:var(--attend)">@r.AttendancePoint</div>
+                                        <div class="sm-bar"><div class="sm-bar-fill" style="background:var(--attend)" data-pct="@pbA"></div></div>
+                                    </div>
+                                    <div class="sm-box">
+                                        <div class="sk"><span class="cd cd-ev"></span>전도상</div>
+                                        <div class="sv" style="color:var(--ev)">@r.EvangelismPoint</div>
+                                        <div class="sm-bar"><div class="sm-bar-fill" style="background:var(--ev)" data-pct="@pbE"></div></div>
+                                    </div>
+                                </div>
+                                <div class="card-date">마지막 활동: @FmtDate(r.LastActivityDate)</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- ── 리스트 뷰 (전체) ── -->
+        <div id="listSection">
+            <div class="list-wrap">
+                <div class="list-head">
+                    <div>순위</div>
+                    <div>이름</div>
+                    <div><span class="cd cd-bible" style="display:inline-block;margin-right:3px;"></span>@ConstatsCommon.MainKeyTitle</div>
+                    <div><span class="cd cd-mission" style="display:inline-block;margin-right:3px;"></span>미션북</div>
+                    <div><span class="cd cd-devotion" style="display:inline-block;margin-right:3px;"></span>말씀&amp;일기</div>
+                    <div><span class="cd cd-attend" style="display:inline-block;margin-right:3px;"></span>출석</div>
+                    <div><span class="cd cd-ev" style="display:inline-block;margin-right:3px;"></span>전도상</div>
+                    <div><span class="cd cd-total" style="display:inline-block;margin-right:3px;"></span>총점</div>
+                    <div>최근활동</div>
+                </div>
+                @foreach (var r in rows)
+                {
+                    var photo    = ProfileOrDefault(r.UserId);
+                    var dispName = !string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName;
+                    var classLbl = ClassLabel(r);
+                    var subText  = Safe(r.RoleLabel) + (!string.IsNullOrWhiteSpace(classLbl) ? " · " + classLbl : "");
+                    var rankTop  = r.Rank == 1 ? "top1" : r.Rank == 2 ? "top2" : r.Rank == 3 ? "top3" : "";
+
+                    var pbB2 = maxBible        > 0 ? Math.Min(100,(int)Math.Round((double)r.BiblePoint      *100.0/maxBible))        : 0;
+                    var pbM2 = maxMission      > 0 ? Math.Min(100,(int)Math.Round((double)r.MissionBookPoint*100.0/maxMission))      : 0;
+                    var pbD2 = maxDevotion     > 0 ? Math.Min(100,(int)Math.Round((double)r.DevotionPoint   *100.0/maxDevotion))     : 0;
+                    var pbA2 = maxAttendance   > 0 ? Math.Min(100,(int)Math.Round((double)r.AttendancePoint *100.0/maxAttendance))   : 0;
+                    var pbE2 = maxEvangelism   > 0 ? Math.Min(100,(int)Math.Round((double)r.EvangelismPoint *100.0/maxEvangelism))   : 0;
+                    var ringClass = r.Rank switch {
+                        1 => "l-ring-top1",
+                        2 => "l-ring-top2",
+                        3 => "l-ring-top3",
+                        _ => r.RoleLabel == "학생" ? "l-ring-student" :
+                             r.RoleLabel == "교사" ? "l-ring-teacher" : "l-ring-etc"
+                    };
+
+                    <div class="list-row item"
+                         data-role="@Safe(r.RoleLabel)"
+                         data-name="@($"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.RoleLabel)}".ToLowerInvariant())"
+                         data-rank="@r.Rank"
+                         data-total="@r.TotalPoint"
+                         data-bible="@r.BiblePoint"
+                         data-mission="@r.MissionBookPoint"
+                         data-devotion="@r.DevotionPoint"
+                         data-attendance="@r.AttendancePoint">
+                        <div><span class="l-rank @rankTop">@r.Rank</span></div>
+                        <div class="l-who">
+                            <div class="l-avatar-wrap @ringClass">
+                                <img class="l-avatar" data-src="@photo" src="/images/icon/people/people_01.webp"
+                                     alt="@dispName" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                            </div>
+                            <div class="l-name-block">
+                                <div class="l-name">@dispName</div>
+                                <div class="l-sub">@subText</div>
+                            </div>
+                        </div>
+                        <div class="l-num">
+                            <div class="l-bar-line">
+                                <div class="lb"><div class="lbf" style="background:var(--bible)" data-pct="@pbB2"></div></div>
+                                <span style="color:var(--bible)">@r.BiblePoint</span>
+                            </div>
+                        </div>
+                        <div class="l-num">
+                            <div class="l-bar-line">
+                                <div class="lb"><div class="lbf" style="background:var(--mission)" data-pct="@pbM2"></div></div>
+                                <span style="color:var(--mission)">@r.MissionBookPoint</span>
+                            </div>
+                        </div>
+                        <div class="l-num">
+                            <div class="l-bar-line">
+                                <div class="lb"><div class="lbf" style="background:var(--devotion)" data-pct="@pbD2"></div></div>
+                                <span style="color:var(--devotion)">@r.DevotionPoint</span>
+                            </div>
+                        </div>
+                        <div class="l-num">
+                            <div class="l-bar-line">
+                                <div class="lb"><div class="lbf" style="background:var(--attend)" data-pct="@pbA2"></div></div>
+                                <span style="color:var(--attend)">@r.AttendancePoint</span>
+                            </div>
+                        </div>
+                        <div class="l-num">
+                            <div class="l-bar-line">
+                                <div class="lb"><div class="lbf" style="background:var(--ev)" data-pct="@pbE2"></div></div>
+                                <span style="color:var(--ev)">@r.EvangelismPoint</span>
+                            </div>
+                        </div>
+                        <div class="l-num total-cell">
+                            @r.TotalPoint
+                        </div>
+                        <div class="l-num" style="font-size:.72rem;color:var(--txt3);font-weight:700;justify-content:flex-end;">
+                            @FmtDate(r.LastActivityDate)
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- 네비 버튼 -->
+    <div class="nav-btns">
+        <a class="nav-btn" href="/">
+            <div class="ni">🏠</div>
+            <div class="nt"><b>홈으로</b><span>메인 화면으로 이동</span></div>
+        </a>
+        <a class="nav-btn" href="/StudentPointDashboard4/Index">
+            <div class="ni">🌰</div>
+            <div class="nt"><b>@ConstatsCommon.myDoToRi Home</b><span>대시보드로 이동</span></div>
+        </a>
+        <a class="nav-btn" href="/DailyMission2/ParticipantPersons">
+            <div class="ni">📖</div>
+            <div class="nt"><b>도전성경 참여자</b><span>개인 달성 현황</span></div>
+        </a>
+    </div>
+</div>
+
+<script>
+(function(){
+    'use strict';
+
+    /* ── 다크모드 ─────────────────────────────── */
+    const html  = document.documentElement;
+    const saved = localStorage.getItem('tr-theme');
+    if (saved) html.dataset.theme = saved;
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) html.dataset.theme = 'dark';
+
+    const themeBtn = document.getElementById('themeBtn');
+    themeBtn.textContent = html.dataset.theme === 'dark' ? '☀️' : '🌙';
+    themeBtn.addEventListener('click', () => {
+        const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+        html.dataset.theme = next;
+        localStorage.setItem('tr-theme', next);
+        themeBtn.textContent = next === 'dark' ? '☀️' : '🌙';
+    });
+
+    /* ── 이미지 Lazy Load ─────────────────────── */
+    const imgIO = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            const img = e.target, src = img.dataset.src;
+            if (src) {
+                img.src = src;
+                img.addEventListener('load',  () => img.classList.add('loaded'), {once:true});
+                img.addEventListener('error', () => { img.src='/images/icon/people/people_01.webp'; img.classList.add('loaded'); }, {once:true});
+                delete img.dataset.src;
+            }
+            imgIO.unobserve(img);
+        });
+    }, {rootMargin:'300px'});
+    document.querySelectorAll('img[data-src]').forEach(img => imgIO.observe(img));
+
+    /* ── 카운트업 ─────────────────────────────── */
+    function countUp(el, target, dur, suffix) {
+        let startTime = null;
+        const step = ts => {
+            if (!startTime) startTime = ts;
+            const p = Math.min((ts - startTime) / dur, 1);
+            const v = Math.round((1 - Math.pow(1 - p, 3)) * target);
+            el.textContent = v.toLocaleString() + (suffix || '');
+            if (p < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    }
+
+    /* ── 진입 시 애니메이션 ───────────────────── */
+    const animIO = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+            if (!e.isIntersecting) return;
+            animIO.unobserve(e.target);
+
+            // 바 (카드/시상대/리스트 공통)
+            e.target.querySelectorAll('[data-pct]').forEach(el => {
+                if (el.classList.contains('sm-bar-fill') ||
+                    el.classList.contains('p-bar-fill')  ||
+                    el.classList.contains('lbf')) {
+                    el.style.width = el.dataset.pct + '%';
+                }
+            });
+            e.target.querySelectorAll('.ring-fill[data-target-offset]').forEach(c => {
+                c.style.strokeDashoffset = c.dataset.targetOffset;
+            });
+            e.target.querySelectorAll('.ring-pct[data-pct]').forEach(el => {
+                countUp(el, parseInt(el.dataset.pct, 10), 1400, '%');
+            });
+            e.target.querySelectorAll('[data-count]').forEach(el => {
+                const t = parseInt(el.dataset.count, 10);
+                if (!isNaN(t)) countUp(el, t, 1200, '');
+            });
+            // 리스트 바
+            e.target.querySelectorAll('.lbf[data-pct]').forEach(el => {
+                el.style.width = el.dataset.pct + '%';
+            });
+        });
+    }, {threshold:0.08});
+
+    document.querySelectorAll('.podium-card, .card, .list-row').forEach(c => animIO.observe(c));
+
+    /* ── 필터 · 정렬 ──────────────────────────── */
+    const body      = document.body;
+    const qInput    = document.getElementById('q');
+    const sortSel   = document.getElementById('sortSel');
+    const roleSeg   = document.getElementById('roleSeg');
+    const viewSeg   = document.getElementById('viewSeg');
+    const countEl   = document.getElementById('countBadge');
+
+    let activeRole = 'all';
+
+    function allItems() {
+        return Array.from(document.querySelectorAll('.podium-card, .card.item, .list-row.item'));
+    }
+    function toNum(v) { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+
+    function applyFilter() {
+        const q    = (qInput.value || '').trim().toLowerCase();
+        const role = activeRole;
+        let vis = 0;
+        allItems().forEach(el => {
+            const nameMatch = !q || (el.dataset.name || '').includes(q);
+            const roleMatch = role === 'all' || (el.dataset.role || '') === role;
+            const show = nameMatch && roleMatch;
+            el.style.display = show ? '' : 'none';
+            if (show) vis++;
+        });
+        if (countEl) countEl.textContent = vis;
+    }
+
+    function applySort(key) {
+        const dir = key === 'rank' ? 'asc' : 'desc';
+        const sort = (container, selector) => {
+            const items = Array.from(container.querySelectorAll(selector));
+            items.sort((a, b) => {
+                const av = toNum(a.dataset[key] || a.dataset[key === 'total' ? 'total' : key]);
+                const bv = toNum(b.dataset[key] || b.dataset[key === 'total' ? 'total' : key]);
+                return dir === 'asc' ? av - bv : bv - av;
+            });
+            const frag = document.createDocumentFragment();
+            items.forEach(el => frag.appendChild(el));
+            container.appendChild(frag);
+        };
+        const cg = document.getElementById('cardGrid');
+        const lw = document.querySelector('.list-wrap');
+        if (cg) sort(cg, '.card.item');
+        if (lw) sort(lw, '.list-row.item');
+    }
+
+    // 역할 필터
+    roleSeg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            roleSeg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeRole = btn.dataset.role;
+            applyFilter();
+        });
+    });
+
+    // 정렬
+    sortSel.addEventListener('change', () => applySort(sortSel.value));
+
+    // 검색
+    qInput.addEventListener('input', applyFilter);
+
+    // 보기 토글
+    viewSeg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            viewSeg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            body.dataset.view = btn.dataset.viewBtn;
+        });
+    });
+
+    // 초기
+    applySort('rank');
+    applyFilter();
+})();
+</script>
+</body>
+</html>

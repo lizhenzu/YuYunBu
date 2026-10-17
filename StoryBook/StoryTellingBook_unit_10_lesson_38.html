@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>마법과 미신이 나를 도와줄 수 있나요?</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+  :root{
+    --bg:#faf3e2; --surface:#ffffff; --surface-2:#fef8ec;
+    --ink:#3a2e22; --ink-soft:#8a7a63; --ink-faint:#b6a888; --line:#ecdfc4;
+    --sky:#2f8fd1; --sky-soft:#e4f1fb;
+    --leaf:#3d9a5c; --leaf-soft:#e7f5ea;
+    --sun:#d99a1e; --sun-soft:#fdf1d7;
+    --coral:#df6248; --coral-soft:#fbe7e1;
+    --shadow: 0 2px 0 rgba(58,46,34,.05), 0 14px 30px -18px rgba(58,46,34,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c1710; --surface:#272016; --surface-2:#221c13;
+      --ink:#f3ecdc; --ink-soft:#c3b499; --ink-faint:#8b7c62; --line:#3c3221;
+      --sky:#6cbbef; --sky-soft:#182838;
+      --leaf:#6ecb90; --leaf-soft:#182a1e;
+      --sun:#eec168; --sun-soft:#2c250f;
+      --coral:#ef8a72; --coral-soft:#2e1e17;
+      --shadow: 0 2px 0 rgba(0,0,0,.2), 0 14px 30px -18px rgba(0,0,0,.6);
+    }
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; color-scheme:light dark; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Gowun Dodum','Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;
+    line-height:1.75; -webkit-font-smoothing:antialiased; }
+  .page{ max-width:600px; margin:0 auto; padding:32px 18px 60px; }
+  @media (min-width:600px){ .page{ padding:52px 28px 80px; } }
+  h1,h2{ margin:0; font-family:'Jua','Noto Sans KR','Malgun Gothic',sans-serif; font-weight:400; text-wrap:balance; }
+  p{ margin:0; }
+  em{ font-style:normal; font-weight:700; }
+
+  .cover{ text-align:center; padding-bottom:10px; }
+  .kicker{ display:inline-block; font-size:.82rem; font-weight:700; color:var(--sky); background:var(--sky-soft); border-radius:999px; padding:6px 16px; }
+  .cover h1{ margin-top:16px; font-size:clamp(1.6rem,6.8vw,2.2rem); line-height:1.42; }
+  .cover .sub{ margin-top:10px; color:var(--ink-soft); font-size:.98rem; }
+  .cover-art{ margin:22px auto 0; width:120px; height:120px; }
+
+  .scene{ margin-top:44px; }
+  .scene-tag{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .icon{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:0 0 auto; font-size:1.1rem; }
+  .no{ font-family:'Jua'; font-size:.78rem; color:var(--ink-faint); }
+  .ti{ font-family:'Jua'; font-size:1.15rem; }
+  .scene-card{ background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:22px; box-shadow:var(--shadow); }
+  .scene-card p{ font-size:1.03rem; }
+  .scene-card p + p{ margin-top:10px; }
+  .scene.sky .icon{ background:var(--sky-soft); }
+  .scene.leaf .icon{ background:var(--leaf-soft); }
+  .scene.sun .icon{ background:var(--sun-soft); }
+  .scene.coral .icon{ background:var(--coral-soft); }
+
+  .chips{ margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:5px 14px; font-size:.95rem; }
+
+  .quote-big{ margin-top:18px; font-family:'Jua'; font-size:clamp(1.2rem,4.8vw,1.5rem); line-height:1.55; color:var(--leaf); text-align:center; padding:8px 4px; }
+  .reveal{ margin-top:16px; background:var(--surface-2); border:1.5px dashed var(--line); border-radius:14px; padding:14px 16px; }
+  .reveal .q{ font-size:.88rem; color:var(--ink-soft); }
+  .reveal .a{ margin-top:6px; font-family:'Jua'; font-size:1.1rem; color:var(--coral); }
+  .reveal .a small{ display:block; font-family:'Gowun Dodum'; font-size:.85rem; color:var(--ink-soft); margin-top:3px; }
+
+  .verse-block{ margin-top:16px; background:var(--sun-soft); border-radius:14px; padding:16px 18px; }
+  .verse-block .ref{ font-size:.78rem; font-weight:700; color:var(--sun); }
+  .verse-block .txt{ margin-top:6px; font-size:.95rem; }
+
+  .compare-head{ margin-top:16px; font-family:'Jua'; font-size:.95rem; color:var(--ink-soft); }
+  .actions{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+  .action{ display:flex; align-items:flex-start; gap:12px; background:var(--surface-2); border-radius:12px; padding:11px 14px; }
+  .action .num{ flex:0 0 auto; width:26px; height:26px; margin-top:2px; border-radius:50%; color:#fff; font-family:'Jua'; font-size:.85rem; display:flex; align-items:center; justify-content:center; background:var(--leaf); }
+  .action.step .num{ background:var(--sky); }
+  .action.no .num{ background:var(--coral); }
+  .action .txt{ font-size:.96rem; }
+
+  .erase{ margin-top:14px; background:var(--surface-2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; font-family:'Jua'; font-size:1.05rem; line-height:2; text-align:center; letter-spacing:.04em; }
+  .erase s{ color:var(--ink-faint); text-decoration-thickness:2px; text-decoration-color:var(--coral); }
+  .erase b{ color:var(--leaf); font-weight:400; }
+
+  .puzzle{ margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .piece{ border-radius:14px; padding:12px 14px; font-size:.92rem; line-height:1.55; }
+  .piece:nth-child(1){ background:var(--sky-soft); }
+  .piece:nth-child(2){ background:var(--leaf-soft); }
+  .piece:nth-child(3){ background:var(--sun-soft); }
+  .piece:nth-child(4){ background:var(--coral-soft); }
+  .piece b{ display:block; font-family:'Jua'; font-weight:400; font-size:.78rem; color:var(--ink-soft); }
+  .pledge{ margin-top:12px; background:var(--surface-2); border:2px solid var(--leaf); border-radius:16px; padding:16px 18px; text-align:center; }
+  .pledge .h{ font-family:'Jua'; color:var(--leaf); }
+  @media (max-width:420px){ .puzzle{ grid-template-columns:1fr; } }
+
+  .tip{ margin-top:16px; background:var(--sky-soft); border-radius:14px; padding:14px 16px; font-size:.95rem; }
+  .tip b{ font-family:'Jua'; font-weight:400; color:var(--sky); }
+  .prayer{ margin-top:16px; background:var(--coral-soft); border-radius:14px; padding:20px; }
+  .prayer .amen{ display:block; margin-top:10px; font-family:'Jua'; color:var(--coral); }
+
+  footer{ margin-top:56px; padding-top:18px; border-top:1px solid var(--line); font-size:.78rem; color:var(--ink-faint); display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:space-between; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="cover">
+    <span class="kicker">10단원 38과 · 이야기로 만나요</span>
+    <h1>마법과 미신이 나를<br>도와줄 수 있나요?</h1>
+    <p class="sub">문화 속에 숨은 미신을 알아보고 하나님만 의지하기로 결단하는 이야기</p>
+    <svg class="cover-art" viewBox="0 0 120 120" fill="none">
+      <circle cx="60" cy="60" r="52" fill="var(--sun-soft)"></circle>
+      <circle cx="56" cy="62" r="24" fill="var(--surface)" stroke="var(--sun)" stroke-width="2.5"></circle>
+      <path d="M56 50l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z" fill="var(--sun)" stroke="var(--sun)" stroke-width="1.5" stroke-linejoin="round"></path>
+      <path d="M88 26l3 7 7 1-5 5 1 7-6-4-6 4 1-7-5-5 7-1z" fill="var(--sky-soft)" stroke="var(--sky)" stroke-width="2" stroke-linejoin="round"></path>
+    </svg>
+  </div>
+
+  <!-- 장면 1 -->
+  <section class="scene sky">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🔮</span>
+      <span class="no">장면 1</span>
+      <span class="ti">관상, 타로, 별자리 운세</span>
+    </div>
+    <div class="scene-card">
+      <p>관상, 타로, 별자리 운세… 들어 보거나 직접 해 본 적 있나요? 왜 사람들은 이런 것들을 찾아갈까요?</p>
+      <p>사람들은 <em>두려움이나 욕심</em>으로 마음이 흐려져(미혹되어) 잘못된 것을 붙잡고, 믿고, 따라가요. 이것을 <em>미신</em>이라고 해요.</p>
+      <div class="reveal">
+        <p class="q">🧭 미신이란?</p>
+        <p class="a">길을 잃은 믿음<br><small>엉뚱한 곳에서 도움을 찾으려 헤매는 마음이에요</small></p>
+      </div>
+      <p style="margin-top:12px;">그렇다면 미신이 정말 나를 도와줄 수 있을까요? 말씀 속에서 배워 봐요.</p>
+    </div>
+  </section>
+
+  <!-- 장면 2 -->
+  <section class="scene leaf">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🧽</span>
+      <span class="no">장면 2</span>
+      <span class="ti">가나안 땅의 미신 지우기</span>
+    </div>
+    <div class="scene-card">
+      <p>이스라엘 백성이 들어갈 가나안 땅에는 하나님이 <em>가증하게</em> 여기시는 미신이 많았어요. 하나님은 그 민족들의 행동을 본받지 말라고 하셨어요.</p>
+      <div class="compare-head">🚫 가나안의 미신들</div>
+      <div class="actions">
+        <div class="action no"><span class="num">✕</span><span class="txt">자기 아들이나 딸을 불 가운데로 지나가게 하는 것</span></div>
+        <div class="action no"><span class="num">✕</span><span class="txt">점치는 것, 요술하는 것</span></div>
+        <div class="action no"><span class="num">✕</span><span class="txt">무당</span></div>
+      </div>
+
+      <p style="margin-top:14px;">미신과 관련된 말을 연필로 쓱쓱 지우면 어떤 글자가 남을까요?</p>
+      <div class="erase">
+        신 은 <s>불 가 운 데 로 지 나 가 는 것</s> 하 나 <s>점 치 는 것</s> 님 <s>요 술 하 는 것</s> 뿐 <s>무 당</s> 이 에 요
+      </div>
+      <div class="reveal">
+        <p class="q">✏️ 남은 글자는?</p>
+        <p class="a">“신은 하나님뿐이에요.”</p>
+      </div>
+
+      <p style="margin-top:12px;">가나안 사람들은 도움을 얻고 불안한 미래를 스스로 다스리려고 점술과 주술, 무속 신앙에 깊이 빠져 있었어요. 하나님은 그것을 아주 싫어하셨고, 우리가 <em>하나님 앞에서 완전하기를</em> 원하세요(신 18:13).</p>
+    </div>
+  </section>
+
+  <!-- 장면 3 -->
+  <section class="scene sun">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">👓</span>
+      <span class="no">장면 3</span>
+      <span class="ti">말씀 안경을 써 볼까요?</span>
+    </div>
+    <div class="scene-card">
+      <p>마법과 미신은 우리를 도와줄 수 없어요. 우리를 도와줄 수 있는 능력 있는 신은 <em>하나님 한 분뿐</em>이에요. 그래서 문화 속에 숨은 미신을 따르지 않고 하나님의 말씀을 따라야 해요.</p>
+      <p class="quote-big">“문화에 숨겨진<br>미신을 조심해요.”</p>
+      <div class="verse-block">
+        <p class="ref">외울 말씀 · 이사야 45:5 상반절</p>
+        <p class="txt">“나는 여호와라 나 외에 다른 이가 없나니 나 밖에 신이 없느니라”</p>
+      </div>
+      <p style="margin-top:12px;font-size:.92rem;color:var(--ink-soft);">함께 보는 말씀 · 신명기 18:9–14, 골로새서 2:8 (헛된 속임수에 사로잡히지 않도록 주의해요)</p>
+    </div>
+  </section>
+
+  <!-- 장면 4 -->
+  <section class="scene coral">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🕵️</span>
+      <span class="no">장면 4</span>
+      <span class="ti">우리 주변에 숨은 미신 찾기</span>
+    </div>
+    <div class="scene-card">
+      <p>미신은 무서운 모습으로만 오지 않아요. <em>‘문화’라는 이름</em>으로 우리 가까이에 있어요.</p>
+      <div class="chips">
+        <span class="chip">📺 애니메이션</span><span class="chip">📱 웹툰</span><span class="chip">🎮 게임</span><span class="chip">🔑 부적 키링</span><span class="chip">🌟 오늘의 운세</span>
+      </div>
+      <div class="reveal">
+        <p class="q">🤔 여러분은 이런 모습을 보거나 경험한 적 있나요?</p>
+        <p class="a">미신인 줄 모르고 지나쳤을 수도 있어요<br><small>그래서 말씀 안경으로 살펴보고 ‘조심’해야 해요</small></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 장면 5 -->
+  <section class="scene sky">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">👩‍🏫</span>
+      <span class="no">장면 5</span>
+      <span class="ti">교사가 알아둘 뉴에이지</span>
+    </div>
+    <div class="scene-card">
+      <p>뉴에이지는 <em>“우리가 곧 신이다”, “신은 내 안에 있다”</em>고 말해요. 사람이 스스로를 신처럼 여기고 자기 힘으로 구원과 치유에 이를 수 있다고 믿게 하는 거예요.</p>
+      <div class="actions">
+        <div class="action no"><span class="num">!</span><span class="txt">점성술, 영매술, 무속 신앙, 신접 행위에 대한 관심과 의존이 자연스러워져요</span></div>
+        <div class="action no"><span class="num">!</span><span class="txt">음악과 예술로 “하나님 없이도 스스로 치유·구원”이라는 메시지가 은근히 퍼져요</span></div>
+        <div class="action"><span class="num">✓</span><span class="txt">가장 큰 위험은 하나님의 유일성과 주권을 부정하는 것이에요</span></div>
+      </div>
+      <p style="margin-top:12px;">성경은 점, 신접, 초월적 지식 추구를 일관되게 경고해요(신 18:10–12, 사 8:19). 예술은 하나님의 영광을 드러내는 도구여야 하고, 사람의 자아를 절대화하는 수단이 되면 안 돼요.</p>
+      <div class="tip"><b>💡 아이들에게는</b><br>겁주지 말고 쉽게! “우리를 도와주실 수 있는 분은 하나님뿐이에요.” 이 한마디면 충분해요.</div>
+    </div>
+  </section>
+
+  <!-- 장면 6 -->
+  <section class="scene leaf">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🧩</span>
+      <span class="no">장면 6</span>
+      <span class="ti">퍼즐을 맞추고 결단문 완성하기</span>
+    </div>
+    <div class="scene-card">
+      <p>퍼즐 조각 5개 중 가운데는 결단문, 나머지 네 조각에는 우리가 지킬 약속이 있어요. 조각을 하나씩 읽어 볼까요?</p>
+      <div class="puzzle">
+        <div class="piece"><b>조각 ①</b>내 마음이 어떤지 <em>타로카드에게 물어보지</em> 않아요.</div>
+        <div class="piece"><b>조각 ②</b><em>하나님께 기도</em>로 내 마음과 상황을 말씀드려요.</div>
+        <div class="piece"><b>조각 ③</b>점을 보거나 마법을 통해 <em>미래를 알려고</em> 하지 않아요.</div>
+        <div class="piece"><b>조각 ④</b>우리를 이끌어 주시는 분은 <em>하나님</em>이세요.</div>
+      </div>
+      <div class="pledge">
+        <p class="h">✍️ 결단문</p>
+        <p style="margin-top:6px;">나 <em>○○○</em>은(는) 미신을 믿지 않아요.<br>악한 문화를 따라가지 않겠습니다.<br>하나님만 의지할래요.</p>
+      </div>
+      <p style="margin-top:12px;">세상의 많은 사람은 이런 문화를 통해 마음의 안정을 찾거나 미래를 판단해 결정해요. 하지만 우리는 말씀 안경을 쓰고 <em>악한 문화가 아닌 하나님을 따라가요.</em></p>
+      <div class="tip"><b>👩‍🏫 교사 꿀팁</b><br>4개의 조각을 읽는 순서는 정해져 있지 않아요. 아이들이 집중하도록 한 명씩 돌아가며 읽게 해 주세요.</div>
+    </div>
+  </section>
+
+  <!-- 장면 7 -->
+  <section class="scene coral">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🙏</span>
+      <span class="no">장면 7</span>
+      <span class="ti">함께 기도해요</span>
+    </div>
+    <div class="scene-card">
+      <div class="prayer">
+        <p>“하나님 아버지! 하나님의 자리를 그 어떤 것도 대신할 수 없어요. 제가 하나님만을 의지하게 도와주세요. 예수님의 이름으로 기도합니다.”</p>
+        <span class="amen">아멘 🤍</span>
+      </div>
+      <p style="margin-top:14px;font-size:.92rem;color:var(--ink-soft);">이번 주 미션: 말씀 안경 완성하기 · 가족과 이야기 나누기 · 소금과 빛으로 살기 · 소리 내어 기도하기 · 완료 후 선생님께 사진 보내기 📸</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>10단원 38과 · 마법과 미신이 나를 도와줄 수 있나요?</span>
+    <span>본문 · 신명기 18:9–14, 골로새서 2:8</span>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,360 @@
+﻿@model IEnumerable<BulletinBoard.Models.EventMater>
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>행사 목록</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #e8f5e9;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            color: #37474f;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #558b2f;
+            font-size: 2.2em;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .event-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .event-card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease-in-out;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #c8e6c9;
+        }
+
+            .event-card:hover {
+                transform: scale(1.03);
+            }
+
+        .event-title {
+            font-size: 1.6em;
+            font-weight: bold;
+            color: #33691e;
+            margin-bottom: 10px;
+        }
+
+        .event-info {
+            font-size: 1em;
+            color: #546e7a;
+            margin-bottom: 10px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            margin: 5px;
+            padding: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .apply-btn {
+            background-color: #81c784;
+        }
+
+        .view-btn {
+            background-color: #64b5f6;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+
+        .event-icon {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #ffd600;
+            padding: 10px 15px;
+            border-radius: 50%;
+            font-size: 1.2em;
+            font-weight: bold;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .home-button {
+            margin-top: 30px;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            background-color: #ff7043;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+            .home-button:hover {
+                background-color: #e64a19;
+            }
+    </style>
+
+    <style>
+        /* Overlay for dark background */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Dark background */
+            display: none;
+            z-index: 9999;
+        }
+
+        /* Centered horizontal message box with animation */
+        .loading-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px 70px; /* Padding adjusted for horizontal layout */
+            font-size: 18px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            animation: fadeIn 0.5s forwards, pulse 1.5s infinite ease-in-out; /* Fade in and pulse animation */
+            white-space: nowrap; /* Ensure text stays in a single line */
+        }
+
+        /* Pulse effect */
+        @@keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        /* Fade in effect */
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+    </style>
+
+    <style>
+
+        .styled-link {
+            color: #1e88e5;
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px dashed #90caf9;
+            transition: color 0.3s, border-color 0.3s;
+        }
+
+            .styled-link:hover {
+                color: #0d47a1;
+                border-bottom: 1px solid #0d47a1;
+                text-decoration: underline;
+            }
+
+    </style>
+
+
+    <script>
+        function ManageUserInfo(UserId) {
+
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+        }
+
+        async function EnrollEventApplyInfo(EventId) {
+            let result = await confirmMessage(true, ['신청하시겠습니까?']); // 취소 버튼 표시
+            if (result === 'y') {
+
+                showLoading();
+                //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                // 여기에 다음 작업을 넣습니다
+                window.location.href = "/ApplyEvent/EnrollEventApplyInfo?&EventId=" + EventId;
+            } else if (result === 'c') {
+                //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                // 작업 취소 로직
+            }
+        }
+    </script>
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+        function goBack() {
+            window.history.back();
+        }
+    </script>
+    <script src="/js/common2.js"></script>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+    <div class="container">
+        <h1>🌿 행사 목록 🌿</h1>
+        <div class="event-grid">
+
+            @foreach (var item in Model)
+            {
+                <div class="event-card">
+                    @*                    <div class="event-icon">🌸</div>
+                *@
+                    <div class="event-title">📖 @item.EventTitle</div>
+                    <hr>
+                    @if (!string.IsNullOrEmpty(@item.EventPlace))
+                    {
+                        <div class="event-info">📚 @item.EventPlace</div>
+                    }
+                    @if (SharedComm.GetDateDifferenceInDays(@item.EventDayFrom, @item.EventDayTo) == 0)
+                    {
+                        <div class="event-info">📅 @SharedComm.GetTodayToStringKor(@item.EventDayFrom)</div>
+                    }
+                    else
+                    {
+                        if ((@item.EventDayFrom.Year == @item.EventDayTo.Year) && (@item.EventDayFrom.Month == @item.EventDayTo.Month))
+                        {
+                            <div class="event-info">📅 @SharedComm.GetTodayToStringKor(@item.EventDayFrom) ~ @SharedComm.GetTodayToStringKor_dd(@item.EventDayTo)</div>
+                        }
+                        else
+                        {
+                            <div class="event-info">📅 @SharedComm.GetTodayToStringKor(@item.EventDayFrom) ~ @SharedComm.GetTodayToStringKor(@item.EventDayTo)</div>
+                        }
+                    }
+
+
+
+                    @{
+                        var timeFrom = item.EventTimeFrom;
+                        var timeTo = item.EventTimeTo;
+
+                        string FormatTime(TimeSpan time)
+                        {
+                            var hour = time.Hours;
+                            var minute = time.Minutes;
+                            var isPM = hour >= 12;
+                            var displayHour = hour % 12 == 0 ? 12 : hour % 12;
+
+                            string period = isPM ? "오후" : "오전";
+
+                            return minute > 0
+                            ? $"{period} {displayHour}시 {minute}분"
+                            : $"{period} {displayHour}시";
+                        }
+                    }
+
+                    @if (timeFrom.HasValue && timeFrom.Value != TimeSpan.Zero)
+                    {
+                        string display = "";
+
+                        if (timeTo.HasValue && timeTo.Value != TimeSpan.Zero && timeFrom != timeTo)
+                        {
+                            display = $"{FormatTime(timeFrom.Value)} ~ {FormatTime(timeTo.Value)}";
+                        }
+                        else
+                        {
+                            display = FormatTime(timeFrom.Value);
+                        }
+
+                        <div class="event-info">🕒 @display</div>
+                    }
+
+                    @if (!string.IsNullOrEmpty(@item.ForWhom))
+                    {
+                        <div class="event-info">🧑‍🤝‍🧑 @item.ForWhom</div>
+                    }
+
+
+                    @if (!string.IsNullOrEmpty(item.URLDesc))
+                    {
+                        <div class="event-info">
+                            📝 <a href="@item.URL" class="styled-link" target="_blank">@item.URLDesc</a>
+                        </div>
+                    }
+
+
+                    @if (@item.applyYN == "y")
+                    {
+                        <div class="button-container">
+
+                            @if (@item.processStatus == "c")
+                            {
+                                <button class="btn apply-btn" style="background-color :gray ; color :black;">신청마감</button>
+                            }
+                            else
+                            {
+                                <button class="btn apply-btn" onclick="EnrollEventApplyInfo('@item.EventId')">신청하기</button>
+                            }
+
+                            <button class="btn view-btn" onclick="window.location.href='/ApplyEvent/ApplyList?EventId=@item.EventId'">참가자 보기</button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <button class="home-button" onclick="window.location.href='/'">🏠 Home으로 가기</button>
+    </div>
+</body>
+</html>

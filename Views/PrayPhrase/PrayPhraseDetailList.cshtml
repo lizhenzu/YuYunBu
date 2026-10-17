@@ -1,0 +1,110 @@
+@model PrayPhrasesDetails
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    기도문 작성 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 예전 _Layout_Mission 대신 단독 화면.  수정 · 복구 주소는 그대로
+    · 이전 화면은 PrayPhraseDetailList.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    bool isSuper = await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    var list = Model.PrayPhrasesDetailList;
+    DateTime baseDate = list.Count > 0 ? list[0].PrayPhrasesData.ExposeDate : DateHelper.GetKoreaToday();
+    DateTime prevMonth = baseDate.AddMonths(-1);
+    DateTime nextMonth = baseDate.AddMonths(1);
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>기도문 작성</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pp-ref { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 999px; background: var(--soft); color: var(--blue); font-size: 12px; font-weight: 800; }
+        .pp-verse { margin: 8px 0 0; font-size: 13.5px; line-height: 1.75; color: var(--tx); word-break: keep-all; }
+        .pp-verse b { margin-right: 5px; font-size: 11px; font-weight: 800; color: #7FA3DB; }
+        .pp-lbl { margin-top: 12px; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--dim); }
+        .pp-pray { margin: 3px 0 0; font-size: 14.5px; line-height: 1.85; color: var(--ink); white-space: pre-wrap; word-break: keep-all; }
+        .pp-act { margin-top: 12px; }
+        .pp-act a { display: inline-block; padding: 6px 16px; border-radius: 999px; background: var(--blue); color: #fff !important; font-size: 12.5px; font-weight: 800; }
+        .qb-row.pp-item { align-items: flex-start; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span>기도문 작성</span>
+        <span>PRAY</span>
+    </div>
+
+    <div class="qb-k">PRAYER PHRASES · @(baseDate.Month)월</div>
+    <h1 class="qb-h1">기도문 작성</h1>
+    <div class="qb-sub">날짜별로 공개되는 기도문을 확인하고 고쳐요.</div>
+
+    <div class="qb-chips">
+        <a class="on" href="@Url.Action("EnrollPrayPhrase", "PrayPhrase")">+ 기도문 등록</a>
+        @if (isSuper)
+        {
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@(prevMonth.Year)&MMonth=@(prevMonth.Month)">@(prevMonth.Month)월 복구</a>
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@(baseDate.Year)&MMonth=@(baseDate.Month)">@(baseDate.Month)월 복구</a>
+            <a href="/PrayPhrase/RestorPrayPhrase?YYear=@(nextMonth.Year)&MMonth=@(nextMonth.Month)">@(nextMonth.Month)월 복구</a>
+        }
+    </div>
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">등록된 기도문이 없어요.</div>
+    }
+
+    @{ int no = 0; }
+    @foreach (var item in list)
+    {
+        no++;
+        var p = item.PrayPhrasesData;
+        var bible = item.eBiblesData;
+        <div class="qb-row pp-item">
+            <span class="n">@no.ToString("00")</span>
+            <div class="t">
+                <small>@p.ExposeDate.ToString("yyyy-MM-dd") (@dayKor[(int)p.ExposeDate.DayOfWeek])</small>
+                <b>@p.PrayTitle</b>
+                @if (bible != null && !string.IsNullOrEmpty(bible.BibleText))
+                {
+                    <span class="pp-ref">@(string.IsNullOrEmpty(bible.JanZulString) ? bible.BibleText : bible.JanZulString)</span>
+                    @if (bible.eBibleDatas != null && bible.eBibleDatas.Count > 0)
+                    {
+                        <p class="pp-verse">
+                            @foreach (var v in bible.eBibleDatas)
+                            {
+                                <b>@(v.zul)절</b>@v.BibleData<br />
+                            }
+                        </p>
+                    }
+                }
+                <div class="pp-lbl">기도내용</div>
+                <p class="pp-pray">@BulletinBoard.Helpers.PrayTextHelper.MarkNamesInline(p.PrayContent1)</p>
+                <div class="pp-act"><a href="@Url.Action("ModifyPrayPhrase", "PrayPhrase", new { Id = p.Id })">수정</a></div>
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>총 @(list.Count)편</span>
+        <span>
+            @if (isSuper) { <a href="/Home/MissionMainBoard">Mission</a> }
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </span>
+    </div>
+</div>
+</body>
+</html>

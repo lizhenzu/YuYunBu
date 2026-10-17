@@ -1,0 +1,169 @@
+﻿@model List<BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray>
+@*  ══════════════════════════════════════════════════════════════
+    치유와 회복 기도문 관리 — Bone 스킨 (수험생 기도문 목록과 같은 한 줄 목록)
+    관리자 전용. 이전 화면은 List_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    int total = ViewBag.TotalCount is int _t ? _t : 0;
+    int rotNo = ViewBag.RotationNo is int _r ? _r : 0;
+    var msg   = TempData["Msg"] as string;
+    var err   = TempData["Error"] as string;
+
+    // 오늘 노출되는 기도문 — 줄 순서가 아니라 PrayId 로 찾습니다.
+    int todayId = ViewBag.TodayPrayId is int _tp ? _tp : 0;
+
+    var list      = Model ?? new List<BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray>();
+    int unusedCnt = list.Count - total;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16181C" />
+    <title>기도문 관리 · 치유와 회복을 위한 기도문</title>
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .elHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 28px var(--pad) 24px; }
+    .qz .elK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .elH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.4; margin: 10px 0 0; color: var(--bg); }
+    .qz .elCnt { font-family: "Inter", sans-serif; font-weight: 200; font-size: 40px; line-height: 1; margin-top: 14px; color: #D9C29B; font-variant-numeric: tabular-nums; }
+    .qz .elCnt small { font-size: 12px; font-weight: 400; color: #9A9690; margin-left: 8px; }
+    .qz .elAdm { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 14px; font-size: 10.5px; color: #B9B3A8; }
+    .qz .elAdm b { font-family: "Inter", sans-serif; font-weight: 400; color: #E9E2D6; margin-left: 3px; }
+
+    .qz .elFlash { margin-top: 16px; padding: 11px 14px; font-size: 12.5px; border: 1px solid var(--acc); color: var(--acc); }
+    .qz .elFlash.err { border-color: #D8A39B; color: #A63A2C; }
+
+    .qz .elSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 26px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .elSecT { font-family: "Noto Serif KR", serif; font-size: 15px; }
+    .qz .elSecS { font-size: 10.5px; color: var(--dim); }
+    .qz .elHint { font-size: 11px; color: var(--dim); padding: 9px 0; border-bottom: 1px solid var(--rule); }
+
+    .qz .elRow { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 14px 2px; border-bottom: 1px solid var(--rule); }
+    .qz .elRow.on { background: var(--mark); }
+    .qz .elRow.off { opacity: .5; }
+    .qz .elHit { position: absolute; inset: 0; z-index: 1; }
+    .qz .elRow:hover .elN { color: var(--acc); }
+    .qz .elNo { font-family: "Inter", sans-serif; font-weight: 300; font-size: 17px; width: 30px; text-align: center; color: var(--dim2); flex: 0 0 auto; padding-top: 1px; font-variant-numeric: tabular-nums; }
+    .qz .elRow.on .elNo { color: var(--acc); }
+    .qz .elB { flex: 1 1 auto; min-width: 0; }
+    .qz .elN { font-family: "Noto Serif KR", serif; font-size: 14.5px; line-height: 1.45; word-break: keep-all; }
+    .qz .elN em {
+        font-style: normal; font-family: "Gothic A1", sans-serif; font-size: 9.5px; font-weight: 600; letter-spacing: .08em;
+        padding: 2px 6px; margin-left: 6px; vertical-align: 2px; border: 1px solid var(--acc); color: var(--acc); white-space: nowrap;
+    }
+    .qz .elN em.off { border-color: var(--rule); color: var(--dim); }
+    .qz .elM { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 7px; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .qz .elM .ref { font-family: "Gothic A1", sans-serif; color: var(--acc); }
+    .qz .elAct { position: relative; z-index: 2; display: flex; gap: 5px; margin-top: 9px; }
+    .qz .elAct a { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; border: 1px solid var(--rule); padding: 5px 10px; color: var(--dim2); text-decoration: none; }
+    .qz .elAct a:hover { border-color: var(--acc); color: var(--acc); }
+    .qz .elAct a.del { color: #A63A2C; }
+    .qz .elAct a.del:hover { border-color: #D8A39B; }
+
+    .qz .elEmpty { padding: 40px 0; text-align: center; }
+    .qz .elEmpty b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 16px; }
+    .qz .elEmpty span { display: block; font-size: 12px; color: var(--dim); margin-top: 6px; }
+
+    .qz .elNav { display: flex; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 30px; }
+    .qz .elNav a { flex: 1; text-align: center; padding: 14px 0; font-size: 12.5px; color: var(--dim2); text-decoration: none; border-right: 1px solid var(--rule); }
+    .qz .elNav a:last-child { border-right: 0; }
+    .qz .elNav a:hover { color: var(--acc); }
+    .qz .elNew { display: block; text-align: center; background: var(--tx); color: var(--bg); padding: 14px; font-size: 12.5px; font-weight: 600; letter-spacing: .1em; margin-top: 16px; text-decoration: none; }
+    .qz .elNew:hover { background: var(--acc); }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/HealingAndRestorationPray/Index">오늘의 기도</a><span class="qzHomeSep">·</span><a class="qzHome" href="/">홈</a>
+            </div>
+            <div class="qzDate">관리자 · <a class="qzHome" href="/HealingAndRestorationPray/Create">등록</a></div>
+        </div>
+
+        <header class="elHead">
+            <div class="elK">치유와 회복을 위한 기도 · 관리자</div>
+            <h1 class="elH1">기도문 관리</h1>
+            <div class="elCnt">@list.Count<small>편 등록@(rotNo > 0 ? $" · 오늘 {rotNo}번째" : "")</small></div>
+            <div class="elAdm">
+                <span>사용 중<b>@total</b></span>
+                @if (unusedCnt > 0) { <span>미사용<b>@unusedCnt</b></span> }
+            </div>
+        </header>
+
+        @if (!string.IsNullOrEmpty(msg)) { <div class="elFlash">@msg</div> }
+        @if (!string.IsNullOrEmpty(err)) { <div class="elFlash err">@err</div> }
+
+        <div class="elSec">
+            <span class="elSecT">기도문 목록</span>
+            <span class="elSecS">최근 수정 순</span>
+        </div>
+
+        @if (list.Count == 0)
+        {
+            <div class="elEmpty">
+                <b>등록된 기도문이 없어요</b>
+                <span>첫 기도문을 등록해 주세요</span>
+            </div>
+        }
+        else
+        {
+            <div class="elHint">왼쪽 숫자는 기도문 순서예요</div>
+            @foreach (var p in list)
+            {
+                bool isActive = string.Equals(p.UseYN, "Y", StringComparison.OrdinalIgnoreCase);
+                bool isToday  = isActive && todayId > 0 && p.PrayId == todayId;
+                DateTime? touched = p.UpdatedAt ?? (p.CreatedAt == DateTime.MinValue ? (DateTime?)null : p.CreatedAt);
+                bool everEdited   = p.UpdatedAt.HasValue;
+                string href = $"/HealingAndRestorationPray/Detail?PrayId={p.PrayId}";
+
+                <div class="elRow @(isToday ? "on" : "") @(!isActive ? "off" : "")">
+                    <a class="elHit" href="@href" aria-label="@p.Title 기도문 보기"></a>
+                    <span class="elNo">@p.SortOrder</span>
+                    <div class="elB">
+                        <div class="elN">
+                            @p.Title
+                            @if (isToday) { <em>오늘</em> }
+                            @if (!isActive) { <em class="off">미사용</em> }
+                        </div>
+                        <div class="elM">
+                            @if (!string.IsNullOrWhiteSpace(p.BibleRef))
+                            {
+                                <span class="ref">@p.BibleRef</span>
+                            }
+                            @if (touched.HasValue)
+                            {
+                                <span title="@((everEdited ? "마지막 수정" : "등록") + ": " + touched.Value.ToString("yyyy-MM-dd HH:mm"))">@(everEdited ? "수정" : "등록") @touched.Value.ToString("yyyy-MM-dd")</span>
+                            }
+                            <span>조회 @p.ClickCount.ToString("N0")</span>
+                            <span>기도 @p.LikeCount.ToString("N0")</span>
+                        </div>
+                        <div class="elAct">
+                            <a href="@href">보기</a>
+                            <a href="/HealingAndRestorationPray/Edit?PrayId=@p.PrayId">수정</a>
+                            <a class="del" href="/HealingAndRestorationPray/Delete?PrayId=@p.PrayId">삭제</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        <nav class="elNav">
+            <a href="/HealingAndRestorationPray/Index">오늘의 기도</a>
+            <a href="/">홈</a>
+        </nav>
+        <a class="elNew" href="/HealingAndRestorationPray/Create">새 기도문 등록</a>
+
+    </div>
+</div>
+
+</body>
+</html>

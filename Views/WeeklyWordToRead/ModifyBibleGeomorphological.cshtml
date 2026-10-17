@@ -1,0 +1,66 @@
+@model BibleGeomorphologicalWithID
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // ⚠ 컨트롤러의 SaveBibleGeomorphological 액션은 현재 주석 처리되어 있음 (저장 시 404)
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경 인물 · 지명</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .ud { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+        .ud label { display: flex; align-items: center; gap: 10px; padding: 11px 12px; background: var(--card); border: 1px solid var(--rule); cursor: pointer; font-size: 14.5px; }
+        .ud input[type=checkbox] { flex: none; width: 16px; height: 16px; accent-color: var(--acc); margin: 0; }
+        .ud label:has(input:checked) { border-color: var(--acc); background: var(--mark); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="/WeeklyWordToRead/WeeklyWordToReadDetailList">공과 목록</a></span>
+                <span>No. @Model.WeeklyWordToReadID</span>
+            </div>
+            <div class="hdK">BIBLE PEOPLE</div>
+            <h1 class="hdT">성경 인물 · 지명</h1>
+            <div class="hdS">이 공과에 연결할 인물 · 지명을 골라 주세요.</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <form asp-action="SaveBibleGeomorphological" method="post" class="fm">
+            <ul class="ud">
+                @for (int i = 0; i < Model.BibleGeomorphologicals.Count; i++)
+                {
+                    <li>
+                        <input type="hidden" asp-for="@Model.BibleGeomorphologicals[i].BibleGeomorphologicalID" />
+                        <input type="hidden" asp-for="@Model.BibleGeomorphologicals[i].BibleGeomorphologicalText" />
+                        <label>
+                            <input type="checkbox" asp-for="@Model.BibleGeomorphologicals[i].checkData" />
+                            @Model.BibleGeomorphologicals[i].BibleGeomorphologicalText
+                        </label>
+                    </li>
+                }
+            </ul>
+            <input type="hidden" id="WeeklyWordToReadID" name="WeeklyWordToReadID" value="@Model.WeeklyWordToReadID" />
+
+            <div class="fAct" style="margin-top:22px">
+                <a class="nbtn" href="/FileUpload/Upload">＋ 추가</a>
+                <button type="submit" class="nbtn pri">저장</button>
+            </div>
+        </form>
+        <div class="ft"><span>© 유년부 · 공과</span></div>
+    </main>
+</body>
+</html>

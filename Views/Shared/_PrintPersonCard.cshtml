@@ -1,0 +1,121 @@
+﻿@model BulletinBoard.Models.UserInfo
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+
+    int ClassYear = (int)ViewData["ClassYear"];
+    int ClassBan = (int)ViewData["ClassBan"];
+    string YearBanString = string.Empty;
+
+}
+@if (ClassYear > 0 && ClassBan > 0)
+{
+    YearBanString = $"{@Model.sequenceNo}. 학생 교적 카드 ({ClassYear}학년{ClassBan}반)";
+}
+
+<div class="container">
+    <div class="title">@YearBanString</div>
+    <table>
+        <tr>
+            <td class="label">이름</td>
+            @if (!string.IsNullOrEmpty(@Model.FullName))
+            {
+                <td> <a onclick="ManageUserInfo('@Model.UserId')">@Model.FullName</a> </td>
+            }
+            else
+            {
+                <td>______</td>
+            }
+            <td class="label">남/여</td>
+            @if (string.IsNullOrEmpty(@Model.sex))
+            {
+                <td>남, 여</td>
+            }
+            else
+            {
+                @if (@Model.sex == "m")
+                {
+                    <td>남</td>
+                }
+                else
+                {
+                    <td>여</td>
+                }
+            }
+        </tr>
+        <tr>
+            <td class="label">생년월일</td>
+            @if (@Model.bMonth > 0)
+            {
+                <td>@Model.bMonth 월 @Model.bDay 일</td>
+            }
+            else
+            {
+                <td>__월 __일</td>
+            }
+            <td class="label">교회/소속</td>
+            <td>@Model.DeptNM</td>
+        </tr>
+        <tr>
+            <td class="label">본인 HP</td>
+            <td colspan="3">010-___-___</td>
+        </tr>
+        <tr>
+            <td class="label">부모 HP(#1)</td>
+            @if (string.IsNullOrEmpty(@Model.PhoneNumber))
+            {
+                <td>010-___-___(부,모)</td>
+            }
+            else
+            {
+                <td>@Model.PhoneNumber</td>
+            }
+            <td class="label">부모 HP(#2)</td>
+            @if (string.IsNullOrEmpty(@Model.PhoneNumber))
+            {
+                <td>010-___-___(부,모)</td>
+            }
+            else
+            {
+                <td>@Model.PhoneNumber2</td>
+            }
+        </tr>
+        <tr>
+            <td class="label">학교</td>
+            @if (string.IsNullOrEmpty(@Model.school))
+            {
+                <td>____초등학교</td>
+            }
+            else
+            {
+                <td>@Model.school</td>
+            }
+            <td class="label">교회학교</td>
+            @if (@Model.ClassYear > 0)
+            {
+                <td>@Model.ClassYear 학년 @Model.ClassBan 반</td>
+            }
+            else
+            {
+                <td> __학년 __반</td>
+
+            }
+        </tr>
+        <tr>
+            <td class="label">주소</td>
+            @if (string.IsNullOrEmpty(@Model.HomeAaddress))
+            {
+                <td></td>
+            }
+            else
+            {
+                <td colspan="3">@Model.HomeAaddress</td>
+            }
+        </tr>
+    </table>
+</div>

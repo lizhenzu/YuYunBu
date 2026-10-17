@@ -1,0 +1,237 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.TodayPray
+@{
+    Layout = null;
+
+}
+@{
+    var isSuperAdmin = await AuthService.IsSignedIn(User) &&
+    await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+}
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="2025 여름성경캠프 준비 기도">
+    <meta property="og:description" content="매일매일 함께 기도해요">
+    <meta property="og:image" content="@ViewBag.FullURL/images/home/welcome/welcome_01.webp">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <title>오늘의 기도문</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: white;
+            padding: 5px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+
+        .title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+            .title h1 {
+                font-size: 1.8em;
+                color: #2e7d32;
+            }
+
+            .title h2 {
+                font-size: 1.2em;
+                color: #4caf50;
+                margin-top: 5px;
+            }
+
+            .title h3 {
+                font-size: 1.0em;
+                color: #66bb6a;
+                margin-top: 5px;
+            }
+
+            .title h4 {
+                font-size: 0.8em;
+                color: #66bb6a;
+                margin-top: 5px;
+            }
+
+            .title h5 {
+                font-size: 0.7em;
+                color: #66bb6a;
+                margin-top: 5px;
+            }
+
+        .prayer {
+            margin-top: 20px;
+            line-height: 1.8;
+            font-size: 1.25em;
+        }
+
+            .prayer p {
+                margin-bottom: 10px;
+            }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.95em;
+            color: #999;
+        }
+
+        @@media (max-width: 600px) {
+            .container {
+                padding: 5px;
+            }
+
+            .title h1 {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+
+    <style>
+        .preserve-text {
+            white-space: pre-wrap;
+            overflow: auto;
+        }
+    </style>
+
+
+    <script>
+        function openPopup() {
+            document.getElementById("popupImage").style.display = "block";
+        }
+
+        function closePopup() {
+            document.getElementById("popupImage").style.display = "none";
+        }
+    </script>
+
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+</head>
+<body>
+    <br />
+    <div class="container">
+        <div class="title">
+            <h1>2025년 여름성경캠프</h1>
+            <br />
+            <h3>일일 온라인 기도회</h3>
+            <h4>오늘은 @SharedComm.GetTodayToStringKor(@Model.ExposeDate) 입니다.</h4>
+@*            <h4>@SharedComm.DDay()</h4>*@
+            @*<h5>기도 : @($"{@SharedComm.HowManyDaysElapse()}일차")</h5>*@
+
+        </div>
+        <div id="popupImage" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background-color:rgba(0,0,0,0.7); z-index:9999;">
+            <div style="position:relative; max-width:90%; max-height:90%; margin:50px auto; background:white; padding:20px; border-radius:20px; text-align:center;">
+                <span onclick="closePopup()" style="position:absolute; top:10px; right:20px; font-size:25px; color:#A50034; cursor:pointer;">&times;</span>
+                <img src='/summerCamp2025/VictoryChallenge/@($"{@SharedComm.GetTodayAsString()}.jpg")' style="max-width:100%; max-height:80vh;" />
+            </div>
+        </div>
+
+
+@*        @if (SharedComm.showVictoryChallenge())
+        {
+            <div class="prayer" style="color: #004d40; text-align:center;">
+                <div class="buttonCommon colorBaseForestGreen" onclick="openPopup()"
+                     style="margin-top:10px; padding:10px 20px; cursor:pointer; font-weight:bold;">
+                    <h4>
+                        365 승리해 챌린지<br>
+                        @($"{@SharedComm.GetDayNumber()}일차")
+                    </h4>
+
+                    <h5>📸 오늘의 [기도 승리 챌린지] 보기</h5>
+                </div>
+            </div>
+        }*@
+
+        @{
+            // Subject 예시: "성령의 인도하심 (성령으로 채워지는 성경학교)"
+            var subject = @Model.Subject;
+            var openParenIndex = subject.IndexOf('(');
+            var closeParenIndex = subject.IndexOf(')');
+
+            string mainText = subject;
+            string subText = "";
+
+            if (openParenIndex >= 0 && closeParenIndex > openParenIndex)
+            {
+                mainText = subject.Substring(0, openParenIndex).Trim();
+                subText = subject.Substring(openParenIndex + 1, closeParenIndex - openParenIndex - 1).Trim();
+            }
+        }
+        <div class="prayer" style="color: #006633;text-align:center;">
+            <h4>오늘 기도 주제</h4>
+            <h3 style="color :#A50034">
+                @mainText <br />
+                <small>@subText</small>
+            </h3>
+        </div>
+
+@*        <div class="prayer" style="color: #006633;text-align:center;">
+            <h4>오늘 기도 주제</h4>
+            <h3 style="color :#A50034">@Model.Subject</h3>
+        </div>
+
+*@        @if (!string.IsNullOrEmpty(@Model.BibleText))
+        { 
+            <div class="prayer" style="color: #006633;">
+                @Model.BibleText <br />
+                @Model.BibleTextData
+            </div>
+        }
+        
+        <div class="prayer preserve-text ">@Model.PrayTEXTData<br /><br />예수님의 이름으로 기도드립니다. <br />아멘.
+        </div>
+        <div class="footer">
+           © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+        </div>
+    </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <a href="/" style="display: inline-block; background-color: #66bb6a; color: white; text-decoration: none; padding: 10px 20px; border-radius: 30px; margin: 5px; font-size: 1em;">
+            홈으로 이동
+        </a>
+
+        @if (isSuperAdmin)
+        {
+            <a href="/PrayHome/TodayPrayList" style="display: inline-block; background-color: #388e3c; color: white; text-decoration: none; padding: 10px 20px; border-radius: 30px; margin: 5px; font-size: 1em;">
+                기도목록 보기
+            </a>
+            <a href="/PrayHome/ModifyPray?PrayID=@Model.PrayID" style="display: inline-block; background-color: #388e3c; color: white; text-decoration: none; padding: 10px 20px; border-radius: 30px; margin: 5px; font-size: 1em;">
+                기도수정 보기
+            </a>
+        }
+    </div>
+
+</body>
+</html>

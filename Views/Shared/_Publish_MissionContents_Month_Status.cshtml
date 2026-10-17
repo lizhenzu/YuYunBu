@@ -1,0 +1,127 @@
+﻿<style>
+
+    .controls {
+        margin-bottom: 20px;
+    }
+
+    .calendar-container {
+        max-width: 1200px;
+        background: white;
+        box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+        /*padding: 5px;*/
+        text-align: center;
+        justify-content: center;
+        align-items: center;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        table th, td {
+        border: 1px solid #ddd;
+        text-align: center;
+        padding: 15px;
+        font-size: 15px;
+    }
+
+    th {
+        background-color: #ffcccb;
+        color: black;
+        font-size: 20px;
+    }
+
+    td {
+        height: 80px;
+        position: relative;
+        background-color: #fff;
+    }
+
+    .homework {
+        width: 30px;
+        height: 30px;
+        background: #ff6f61;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+    }
+
+    @@media (max-width: 768px) {
+         table th, td {
+            font-size: 14px;
+            padding: 10px;
+        }
+
+        .homework {
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+        }
+    }
+</style>
+@{
+    DateTime todayDT = BulletinBoard.Common.SharedComm.GetToday();
+}
+<div class="calendar-container">
+    <table id="calendar"></table>
+</div>
+
+<script>
+    function generateCalendar() {
+        const year = @todayDT.Year;
+        const month = @todayDT.Month;
+        const homeworkInput = "3,4,5,6";
+        const homeworkDays = homeworkInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const daysInMonth = new Date(year, month, 0).getDate();
+
+        let calendarHTML = `
+                        <thead>
+                            <tr><th colspan="7">` + year + `년 ` + month + `월</th></tr>
+                            <tr>
+                                <th>일</th>
+                                <th>월</th>
+                                <th>화</th>
+                                <th>수</th>
+                                <th>목</th>
+                                <th>금</th>
+                                <th>토</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                    `;
+
+        let dayCount = 1;
+        for (let i = 0; i < 6; i++) {
+            calendarHTML += "<tr>";
+            for (let j = 0; j < 7; j++) {
+                if (i === 0 && j < firstDay) {
+                    calendarHTML += "<td></td>";
+                } else if (dayCount > daysInMonth) {
+                    calendarHTML += "<td></td>";
+                } else {
+                    let homeworkMark = homeworkDays.includes(dayCount) ? "<div class='homework'>✔</div>" : "";
+                    calendarHTML += "<td>" + dayCount + homeworkMark + "</td>";
+                    dayCount++;
+                }
+            }
+            calendarHTML += "</tr>";
+            if (dayCount > daysInMonth) break;
+        }
+
+        calendarHTML += "</tbody>";
+        document.getElementById('calendar').innerHTML = calendarHTML;
+    }
+
+    window.onload = generateCalendar;
+</script>

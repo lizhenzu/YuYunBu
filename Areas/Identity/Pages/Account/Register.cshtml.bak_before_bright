@@ -1,0 +1,409 @@
+﻿@page
+@model RegisterModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입</title>
+
+    <style>
+        :root {
+            --bg0: #0b1220;
+            --bg1: #0f1b33;
+            --stroke: rgba(255,255,255,.14);
+            --text: #eaf0ff;
+            --muted: rgba(234,240,255,.72);
+            --cardA: rgba(255,255,255,.10);
+            --cardB: rgba(255,255,255,.06);
+            --shadowBig: 0 24px 70px rgba(0,0,0,.35);
+            --shadow: 0 10px 22px rgba(0,0,0,.16);
+            --radius: 24px;
+            --radiusSm: 14px;
+            /* ✅ 버튼 톤(로그인 페이지와 동일 계열) */
+            --btnPrimaryA: #2563eb;
+            --btnPrimaryB: #1d4ed8;
+            /* ✅ guest 계열은 #008000 라인 */
+            --btnGreenA: #16a34a;
+            --btnGreenB: #008000;
+            --btnGlassA: rgba(255,255,255,.12);
+            --btnGlassB: rgba(255,255,255,.08);
+            --btnGlassBorder: rgba(255,255,255,.18);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        }
+
+        /* ✅ 배경 이미지 삭제 + 동일 테마 */
+        body {
+            min-height: 100%;
+            color: var(--text);
+            background: radial-gradient(900px 600px at 20% 15%, rgba(124,58,237,.25), transparent 60%), radial-gradient(900px 600px at 80% 20%, rgba(34,197,94,.18), transparent 55%), radial-gradient(1200px 900px at 50% 110%, rgba(59,130,246,.14), transparent 60%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 22px;
+        }
+
+        .wrap {
+            width: min(980px, 100%);
+            display: grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        /* 왼쪽 안내 패널 */
+        .hero {
+            border: 1px solid var(--stroke);
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+            border-radius: var(--radius);
+            padding: 26px;
+            box-shadow: var(--shadowBig);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -80px -120px auto auto;
+                width: 260px;
+                height: 260px;
+                background: radial-gradient(circle at 30% 30%, rgba(124,58,237,.45), rgba(124,58,237,0) 60%);
+                filter: blur(2px);
+                transform: rotate(20deg);
+            }
+
+            .hero::after {
+                content: "";
+                position: absolute;
+                inset: auto auto -120px -140px;
+                width: 320px;
+                height: 320px;
+                background: radial-gradient(circle at 45% 45%, rgba(34,197,94,.28), rgba(34,197,94,0) 60%);
+                transform: rotate(-10deg);
+            }
+
+        .brandRow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(99,102,241,.95), rgba(59,130,246,.90));
+            box-shadow: 0 10px 24px rgba(0,0,0,.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .brandText b {
+            font-size: 18px;
+            letter-spacing: -.2px;
+        }
+
+        .brandText div {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 2px;
+        }
+
+        .hero h1 {
+            margin: 18px 0 10px;
+            font-size: 30px;
+            letter-spacing: -.6px;
+            line-height: 1.15;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.65;
+            position: relative;
+            z-index: 1;
+        }
+
+        .chips {
+            margin-top: 18px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .chip {
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            color: rgba(234,240,255,.86);
+            font-size: 12.5px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+            .chip span {
+                width: 18px;
+                height: 18px;
+                border-radius: 6px;
+                background: rgba(255,255,255,.10);
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 12px;
+            }
+
+        /* 오른쪽 등록 카드 */
+        .card {
+            border: 1px solid var(--stroke);
+            background: linear-gradient(180deg, var(--cardA), var(--cardB));
+            border-radius: var(--radius);
+            padding: 22px;
+            box-shadow: var(--shadowBig);
+            backdrop-filter: blur(10px);
+        }
+
+        .cardHead {
+            margin-bottom: 14px;
+        }
+
+            .cardHead h2 {
+                margin: 0;
+                font-size: 18px;
+                letter-spacing: -.2px;
+            }
+
+            .cardHead small {
+                display: block;
+                margin-top: 6px;
+                color: var(--muted);
+                font-size: 12.5px;
+                line-height: 1.4;
+            }
+
+        .hint {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            color: rgba(234,240,255,.86);
+            font-size: 12.5px;
+            line-height: 1.55;
+        }
+
+        .form-group {
+            margin: 12px 0;
+        }
+
+        .text-danger {
+            color: #fecaca;
+            font-size: 12.5px;
+        }
+
+        input.form-control {
+            width: 100%;
+            padding: 12px 12px;
+            border-radius: var(--radiusSm);
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(10,14,25,.35);
+            color: var(--text);
+            outline: none;
+            font-size: 15px;
+            transition: .15s ease;
+        }
+
+            input.form-control::placeholder {
+                color: rgba(234,240,255,.45);
+            }
+
+            input.form-control:focus {
+                border-color: rgba(59,130,246,.55);
+                box-shadow: 0 0 0 4px rgba(59,130,246,.18);
+                background: rgba(10,14,25,.42);
+            }
+
+        hr {
+            border: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+            margin: 14px 0;
+        }
+
+        /* 버튼 영역 */
+        .btnRow {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .subRow {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        button {
+            width: 100%;
+            border: none;
+            border-radius: 18px;
+            padding: 13px 14px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 900;
+            transition: transform .08s ease, box-shadow .15s ease, filter .15s ease;
+            box-shadow: var(--shadow);
+            letter-spacing: -.2px;
+        }
+
+            button:active {
+                transform: translateY(1px);
+            }
+
+            button:hover {
+                filter: brightness(1.03);
+            }
+
+        /* 등록(Primary) */
+        .btn-primary {
+            background: linear-gradient(180deg, var(--btnPrimaryA), var(--btnPrimaryB));
+            color: #fff;
+            box-shadow: 0 14px 30px rgba(37,99,235,.28);
+        }
+
+        /* 돌아가기/Home (Green 계열) */
+        .btn-green {
+            background: linear-gradient(180deg, var(--btnGreenA), var(--btnGreenB));
+            border: 1px solid rgba(0, 128, 0, .45);
+            color: #f0fdf4;
+            box-shadow: 0 12px 26px rgba(0,128,0,.22);
+        }
+
+        /* 모바일 */
+        @@media (max-width: 860px) {
+            .wrap {
+                grid-template-columns: 1fr;
+            }
+
+            .hero {
+                display: none;
+            }
+
+            body {
+                padding: 16px;
+            }
+
+            .subRow {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="wrap">
+
+        <section class="hero" aria-hidden="true">
+            <div class="brandRow">
+                <div class="logo">📝</div>
+                <div class="brandText">
+                    <b>Sign up</b>
+                    <div>회원가입 · 동일한 테마로 깔끔하게</div>
+                </div>
+            </div>
+
+            <h1>간단히 가입하고<br />바로 시작해요.</h1>
+            <p>
+                이름/이메일/비밀번호만 입력하면 됩니다.<br />
+                포인트 산정을 위해 영문 전체이름을 부탁드려요.
+            </p>
+
+            <div class="chips">
+                <div class="chip"><span>🔐</span> 안전한 가입</div>
+                <div class="chip"><span>⚡</span> 빠른 시작</div>
+                <div class="chip"><span>🎁</span> 포인트 적립</div>
+            </div>
+        </section>
+
+        <main class="card">
+            <div class="cardHead">
+                <h2>회원가입</h2>
+                <small>필수 정보를 입력해 주세요.</small>
+              @*   <div class="hint">포인트 산정을 위해서 필요하니 <b>영문 전체이름</b>을 적어 주세요.</div> *@
+            </div>
+
+            <form asp-route-returnUrl="@Model.ReturnUrl" method="post">
+                <div asp-validation-summary="All" class="text-danger"></div>
+                <hr />
+
+                <div class="form-group">
+                    <input asp-for="Input.FirstName" placeholder=@Html.DisplayNameFor(model => model.Input.FirstName) class="form-control" />
+                    <span asp-validation-for="Input.FirstName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <input asp-for="Input.LastName" placeholder=@Html.DisplayNameFor(model => model.Input.LastName) class="form-control" />
+                    <span asp-validation-for="Input.LastName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <input asp-for="Input.Email" placeholder=@Html.DisplayNameFor(model => model.Input.Email) class="form-control" />
+                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <input asp-for="Input.Password" placeholder=@Html.DisplayNameFor(model => model.Input.Password) class="form-control" />
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+
+                <div class="form-group">
+                    <input asp-for="Input.ConfirmPassword" placeholder=@Html.DisplayNameFor(model => model.Input.ConfirmPassword) class="form-control" />
+                    <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                </div>
+
+                <div class="btnRow">
+                    <button type="submit" class="btn btn-primary">등록</button>
+                </div>
+            </form>
+
+            <div class="subRow">
+                <button type="button" class="btn-green" onclick="history.back()">돌아가기</button>
+                <button type="button" class="btn-green" onclick="window.location.href='/'">Home</button>
+            </div>
+        </main>
+
+    </div>
+
+</body>
+</html>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

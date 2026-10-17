@@ -1,0 +1,577 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model IEnumerable<BulletinBoard.Models.Photo>
+
+@{
+    Layout = "~/Views/Shared/_AlbumLayout.cshtml";
+    var album = (BulletinBoard.Models.Album)ViewBag.Album;
+    ViewData["Title"] = album?.Name ?? "Album";
+
+    // ?mode=view | ?mode=manage
+    var mode = Context.Request.Query["mode"].ToString();
+    var isManageMode = string.Equals(mode, "manage", System.StringComparison.OrdinalIgnoreCase);
+    if (string.IsNullOrEmpty(mode))
+    {
+        isManageMode = false; // 기본은 보기 모드
+    }
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+@section PageHeader {
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+        <div>
+            <h1 class="h4 fw-bold mb-1">📸 @album.Name</h1>
+            @if (!string.IsNullOrWhiteSpace(album.Description))
+            {
+                <div class="text-secondary">@album.Description</div>
+            }
+            <div class="mt-2">
+                <span class="badge badge-soft rounded-pill">사진 @Model.Count().ToString("N0") 장</span>
+            </div>
+        </div>
+
+        <div class="d-flex flex-column align-items-end gap-2">
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+                <a class="btn btn-outline-secondary rounded-4" href="@Url.Action("Index", "Home")">🏠 홈으로</a>
+                <a class="btn btn-outline-light rounded-4" href="@Url.Action("Index")">목록</a>
+                <a class="btn btn-brand rounded-4" href="@Url.Action("DownloadAlbum", new { id = album.Id })">앨범 ZIP</a>
+
+                @if (isManageMode)
+                {
+                    <form asp-action="Delete"
+                          method="post"
+                          class="mb-0"
+                          onsubmit="return confirm('정말로 이 앨범을 삭제할까요? (내부 모든 사진 파일도 함께 삭제됩니다)');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@album.Id" />
+                        <button class="btn btn-outline-danger rounded-4" type="submit">앨범 삭제</button>
+                    </form>
+                }
+            </div>
+
+            <!-- 보기/관리 모드 전환 버튼 -->
+            <div class="mode-toggle d-flex align-items-center gap-2">
+                <a href="@Url.Action("Details", "Albums", new { id = album.Id, mode = "view" })"
+                   class="btn btn-sm @(isManageMode ? "btn-outline-light" : "btn-primary")">
+                    👀 보기 모드
+                </a>
+                <a href="@Url.Action("Details", "Albums", new { id = album.Id, mode = "manage" })"
+                   class="btn btn-sm @(isManageMode ? "btn-primary" : "btn-outline-warning")">
+                    🛠 관리 모드
+                </a>
+            </div>
+            <small class="text-muted small mt-1 text-end">
+                보기 모드: 사진만 보기 · 관리 모드: 업로드, 삭제, 커버 설정 가능
+            </small>
+        </div>
+    </div>
+}
+
+@if (TempData["msg"] != null)
+{
+    <div class="alert alert-info glass border-0">@TempData["msg"]</div>
+}
+
+@* =====================
+   업로드 카드 (관리 모드에서만)
+   ===================== *@
+@if (isManageMode)
+{
+    <div class="glass p-4 p-md-4 mb-4">
+        <h5 class="fw-bold mb-3">이미지 업로드</h5>
+        <form id="uploadForm" asp-action="Upload" method="post" enctype="multipart/form-data">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@album.Id" />
+            <div id="dropzone" class="dz">
+                <div class="mb-2">파일을 여기로 끌어다 놓거나 클릭하여 선택</div>
+                <button type="button" id="browseBtn" class="btn btn-ghost btn-sm rounded-4">파일 선택</button>
+                <input id="fileInput" type="file" name="files" multiple accept="image/*" class="d-none" />
+            </div>
+            <div id="preview" class="preview d-flex flex-wrap mt-3"></div>
+
+            <button class="btn btn-brand rounded-4 mt-3">업로드</button>
+        </form>
+    </div>
+
+    <!-- 선택 다운로드/삭제 + 전체 선택 -->
+    <div class="mb-3">
+        <div class="text-secondary small mb-2">
+            체크박스로 여러 사진을 선택 후 ZIP 다운로드하거나, 선택 사진만 삭제할 수 있어요.
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <!-- 전체 선택 -->
+            <div class="form-check small mb-0">
+                <input class="form-check-input" type="checkbox" id="selectAllPhotos" />
+                <label class="form-check-label" for="selectAllPhotos">
+                    사진 전체 선택
+                </label>
+            </div>
+
+            <!-- 버튼 그룹 -->
+            <div class="d-flex flex-wrap gap-2">
+                <button id="deleteSelectedBtn" type="button"
+                        class="btn btn-outline-danger rounded-4 btn-sm d-none">
+                    선택 사진 삭제
+                </button>
+
+                <button id="downloadSelectedBtn" type="button"
+                        class="btn btn-outline-light rounded-4 btn-sm">
+                    선택 ZIP 다운로드
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- 갤러리 -->
+<div class="grid">
+    @foreach (var p in Model)
+    {
+        <div class="photo">
+            <div class="top-actions">
+                @* 선택 체크박스: 관리 모드에서만 렌더링 *@
+                @if (isManageMode)
+                {
+                    <label class="checkbox d-flex align-items-center gap-2 mb-0">
+                        <input type="checkbox" name="photoIds" form="selectedForm" value="@p.Id" />
+                        <span class="small">선택</span>
+                    </label>
+                }
+                @if (album.CoverPhotoId == p.Id)
+                {
+                    <span class="cover-tag">커버</span>
+                }
+            </div>
+
+            <a href="@p.StoragePath" target="_blank" title="@p.OriginalName">
+                <img src="@(string.IsNullOrEmpty(p.ThumbnailStoragePath) ? p.StoragePath : p.ThumbnailStoragePath)"
+                     alt="@p.OriginalName"
+                     loading="lazy" />
+            </a>
+
+            @* ✅ bottom 영역: 관리 모드에서만 렌더링
+               → 보기 모드에서는 카드가 "사진만" 차지하고, 밑에 빈 공간 없음 *@
+            @if (isManageMode)
+            {
+                <div class="bottom d-flex flex-column align-items-center text-center">
+                    <div class="d-flex justify-content-center gap-2">
+                        <form asp-action="SetCover" method="post" class="mb-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="albumId" value="@album.Id" />
+                            <input type="hidden" name="photoId" value="@p.Id" />
+                            <button class="btn btn-ghost btn-sm rounded-4" title="커버로 지정">커버로 지정</button>
+                        </form>
+
+                        @if (isSignedIn)
+                        {
+                            <form asp-action="DeletePhoto" method="post" class="mb-0 delete-photo-form"
+                                  onsubmit="return confirm('이 사진을 삭제할까요?');">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="photoId" value="@p.Id" />
+                                <input type="hidden" name="albumId" value="@album.Id" />
+                                <button class="btn btn-sm btn-outline-danger rounded-4" title="삭제">삭제</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<!-- 업로드/삭제 공용 오버레이 -->
+<div id="uploadOverlay" class="upload-overlay" style="display:none;">
+    <div class="upload-overlay-box">
+        <div class="spinner-border" role="status" aria-hidden="true"></div>
+        <div id="overlayMessage" class="mt-3 fw-bold">처리 중입니다...</div>
+        <div class="text-muted small mt-1">잠시만 기다려 주세요.</div>
+    </div>
+</div>
+
+@* ZIP 다운로드용 숨김 폼: 관리 모드에서만 렌더링 *@
+@if (isManageMode)
+{
+    <form id="selectedForm" method="post" class="d-none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="albumId" value="@album.Id" />
+    </form>
+}
+
+@section Head {
+    <style>
+        .photo img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .upload-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .upload-overlay-box {
+            background: #ffffff;
+            padding: 24px 32px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            min-width: 260px;
+        }
+
+        body.uploading {
+            overflow: hidden;
+        }
+
+            body.uploading * {
+                pointer-events: none !important;
+            }
+
+            body.uploading #uploadOverlay,
+            body.uploading #uploadOverlay * {
+                pointer-events: auto !important;
+            }
+
+        #overlayMessage {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #222222;
+            letter-spacing: -0.02em;
+        }
+
+        .upload-overlay-box > .text-muted.small {
+            font-size: 0.8rem;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        // 현재 페이지가 관리 모드인지 서버에서 렌더링된 값으로 확인
+        var isManageMode = @((isManageMode ? "true" : "false").ToLower());
+
+        // 관리 모드가 아닐 때는 업로드 관련 스크립트/선택 기능을 아예 건너뛰도록 방어
+        if (isManageMode) {
+            const dz = document.getElementById('dropzone');
+            const input = document.getElementById('fileInput');
+            const browse = document.getElementById('browseBtn');
+            const uploadForm = document.getElementById('uploadForm');
+            const preview = document.getElementById('preview');
+
+            const uploadOverlay = document.getElementById('uploadOverlay');
+            const overlayMessage = document.getElementById('overlayMessage');
+            const selectedForm = document.getElementById('selectedForm');
+            const downloadBtn = document.getElementById('downloadSelectedBtn');
+            const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+            const selectAllCheckbox = document.getElementById('selectAllPhotos');
+            const selectCheckboxes = document.querySelectorAll('input[name="photoIds"][form="selectedForm"]');
+
+            // ================================
+            // Drag & Drop
+            // ================================
+            if (dz) {
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e =>
+                    dz.addEventListener(e, prevent, false)
+                );
+            }
+
+            function prevent(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            let picking = false;
+            function openPickerOnce() {
+                if (picking) return;
+                picking = true;
+                if (input) input.click();
+            }
+
+            if (input) {
+                input.addEventListener('change', () => {
+                    picking = false;
+
+                    const files = Array.from(input.files || []);
+                    if (!files.length || !uploadForm) return;
+
+                    const ok = confirm(`선택하신 ${files.length}개의 파일을 업로드할까요?`);
+                    if (!ok) {
+                        input.value = '';
+                        return;
+                    }
+
+                    uploadForm.requestSubmit();
+                });
+
+                input.addEventListener('blur', () => { picking = false; });
+                setInterval(() => { picking = false; }, 1500);
+            }
+
+            if (dz) {
+                dz.addEventListener('click', (e) => {
+                    if (e.target === browse || (browse && browse.contains(e.target))) return;
+                    openPickerOnce();
+                });
+            }
+
+            if (browse) {
+                browse.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openPickerOnce();
+                });
+            }
+
+            if (dz && input) {
+                dz.addEventListener('drop', (e) => {
+                    input.files = e.dataTransfer.files;
+
+                    const files = Array.from(input.files || []);
+                    if (!files.length || !uploadForm) return;
+
+                    const ok = confirm(`드롭하신 ${files.length}개의 파일을 업로드할까요?`);
+                    if (!ok) {
+                        input.value = '';
+                        return;
+                    }
+
+                    uploadForm.requestSubmit();
+                });
+            }
+
+            // ================================
+            // 선택 체크박스 UI
+            // ================================
+            function getSelectedCheckboxes() {
+                return document.querySelectorAll('input[name="photoIds"][form="selectedForm"]:checked');
+            }
+
+            function updateSelectionUI() {
+                const selected = getSelectedCheckboxes();
+                const all = document.querySelectorAll('input[name="photoIds"][form="selectedForm"]');
+
+                if (deleteSelectedBtn) {
+                    if (selected.length >= 2) {
+                        deleteSelectedBtn.classList.remove('d-none');
+                    } else {
+                        deleteSelectedBtn.classList.add('d-none');
+                    }
+                }
+
+                if (selectAllCheckbox) {
+                    if (all.length === 0) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = false;
+                    } else if (selected.length === all.length) {
+                        selectAllCheckbox.checked = true;
+                        selectAllCheckbox.indeterminate = false;
+                    } else if (selected.length === 0) {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = false;
+                    } else {
+                        selectAllCheckbox.checked = false;
+                        selectAllCheckbox.indeterminate = true;
+                    }
+                }
+            }
+
+            selectCheckboxes.forEach(cb => {
+                cb.addEventListener('change', updateSelectionUI);
+            });
+            updateSelectionUI();
+
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', () => {
+                    const all = document.querySelectorAll('input[name="photoIds"][form="selectedForm"]');
+                    all.forEach(cb => {
+                        cb.checked = selectAllCheckbox.checked;
+                    });
+                    updateSelectionUI();
+                });
+            }
+
+            // ================================
+            // ZIP 다운로드 (selectedForm 사용)
+            // ================================
+            if (downloadBtn && selectedForm) {
+                downloadBtn.addEventListener('click', () => {
+                    const selected = getSelectedCheckboxes();
+                    if (selected.length === 0) {
+                        alert('선택된 사진이 없습니다.');
+                        return;
+                    }
+
+                    selectedForm.action = '@Url.Action("DownloadSelected", "Albums")';
+                    selectedForm.submit();
+                });
+            }
+
+            // ================================
+            // 업로드: 순차 UploadAjax + 오버레이
+            // ================================
+            if (uploadForm && uploadOverlay && overlayMessage) {
+                uploadForm.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+
+                    const files = Array.from(input?.files || []);
+                    if (files.length === 0) {
+                        alert('업로드할 파일이 없습니다.');
+                        return;
+                    }
+
+                    const albumIdInput = uploadForm.querySelector('input[name="id"]');
+                    const tokenInput = uploadForm.querySelector('input[name="__RequestVerificationToken"]');
+                    const albumId = albumIdInput ? albumIdInput.value : null;
+                    const token = tokenInput ? tokenInput.value : null;
+
+                    if (!albumId || !token) {
+                        alert('필수 정보(id, 토큰)를 찾을 수 없습니다.');
+                        return;
+                    }
+
+                    document.body.classList.add('uploading');
+                    uploadOverlay.style.display = 'flex';
+
+                    let successCount = 0;
+                    const total = files.length;
+
+                    try {
+                        for (let i = 0; i < total; i++) {
+                            const file = files[i];
+
+                            overlayMessage.textContent = `(${total}개 중 ${i + 1}번째) "${file.name}" 업로드 중...`;
+
+                            const formData = new FormData();
+                            formData.append('__RequestVerificationToken', token);
+                            formData.append('id', albumId);
+                            formData.append('file', file);
+
+                            const response = await fetch('@Url.Action("UploadAjax", "Albums")', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            if (!response.ok) {
+                                throw new Error(`서버 응답 오류 (HTTP ${response.status})`);
+                            }
+
+                            const result = await response.json();
+                            if (!result.ok) {
+                                throw new Error(result.message || '업로드 실패');
+                            }
+
+                            successCount += (result.saved || 0);
+                        }
+
+                        overlayMessage.textContent = `업로드 완료! (${successCount}개 저장됨)`;
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 800);
+                    } catch (err) {
+                        console.error(err);
+                        alert(`업로드 중 오류가 발생했습니다.\n\n${err.message}`);
+                        document.body.classList.remove('uploading');
+                        uploadOverlay.style.display = 'none';
+                    }
+                });
+            }
+
+            // ================================
+            // 개별 이미지 삭제 시 오버레이
+            // ================================
+            const deleteForms = document.querySelectorAll('form.delete-photo-form');
+            deleteForms.forEach(form => {
+                form.addEventListener('submit', function () {
+                    if (document.body.classList.contains('uploading')) {
+                        return;
+                    }
+
+                    if (overlayMessage && uploadOverlay) {
+                        overlayMessage.textContent = '이미지 삭제 중입니다... 잠시만 기다려 주세요.';
+                        document.body.classList.add('uploading');
+                        uploadOverlay.style.display = 'flex';
+                    }
+                });
+            });
+
+            // ================================
+            // 선택 사진 삭제 (DeleteSelected)
+            // ================================
+            if (deleteSelectedBtn) {
+                deleteSelectedBtn.addEventListener('click', () => {
+                    const selected = getSelectedCheckboxes();
+
+                    if (selected.length < 2) {
+                        alert('사진을 2개 이상 선택해 주세요.');
+                        return;
+                    }
+
+                    if (!confirm(`선택한 ${selected.length}장의 사진을 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) {
+                        return;
+                    }
+
+                    if (document.body.classList.contains('uploading')) {
+                        return;
+                    }
+
+                    if (overlayMessage && uploadOverlay) {
+                        overlayMessage.textContent = '이미지 삭제 중입니다... 잠시만 기다려 주세요.';
+                        document.body.classList.add('uploading');
+                        uploadOverlay.style.display = 'flex';
+                    }
+
+                    const tempForm = document.createElement('form');
+                    tempForm.method = 'post';
+                    tempForm.action = '@Url.Action("DeleteSelected", "Albums")';
+
+                    const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+                    if (tokenInput) {
+                        const hiddenToken = document.createElement('input');
+                        hiddenToken.type = 'hidden';
+                        hiddenToken.name = '__RequestVerificationToken';
+                        hiddenToken.value = tokenInput.value;
+                        tempForm.appendChild(hiddenToken);
+                    }
+
+                    const albumIdInput = document.createElement('input');
+                    albumIdInput.type = 'hidden';
+                    albumIdInput.name = 'albumId';
+                    albumIdInput.value = '@album.Id';
+                    tempForm.appendChild(albumIdInput);
+
+                    selected.forEach(cb => {
+                        const h = document.createElement('input');
+                        h.type = 'hidden';
+                        h.name = 'photoIds';
+                        h.value = cb.value;
+                        tempForm.appendChild(h);
+                    });
+
+                    document.body.appendChild(tempForm);
+                    tempForm.submit();
+                });
+            }
+        }
+    </script>
+}

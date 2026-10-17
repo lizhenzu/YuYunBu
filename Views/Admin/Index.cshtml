@@ -1,0 +1,715 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = "_Layout_Mission";
+    string keyWordTitle = "관리";
+
+    bool isSuper =
+        (await AuthService.IsSignedIn(User))
+        && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)));
+}
+
+<link rel="stylesheet" href="/css/missionCommon.css">
+<link rel="stylesheet" href="/css/missionC.css">
+<link rel="stylesheet" href="/css/common.layer.css">
+
+<style>
+    :root {
+        --bg0: #070A12;
+        --bg1: #0B1220;
+        --card: rgba(255,255,255,.08);
+        --card2: rgba(255,255,255,.06);
+        --line: rgba(255,255,255,.12);
+        --text: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.70);
+        --muted2: rgba(255,255,255,.55);
+        --accent: #7FE7C4;
+        --accent2: #9AD7FF;
+        --pink: #FF5C7A;
+        --amber: #FBBF24;
+        --shadow: 0 26px 80px rgba(0,0,0,.45);
+        --radius: 22px;
+        --radius2: 16px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+    }
+
+    body {
+        margin: 0;
+        font-family: var(--sans);
+        color: var(--text);
+        background: radial-gradient(1200px 700px at 10% 10%, rgba(127,231,196,.18), transparent 55%), radial-gradient(900px 600px at 90% 20%, rgba(154,215,255,.16), transparent 55%), radial-gradient(900px 700px at 60% 90%, rgba(255,92,122,.10), transparent 55%), linear-gradient(180deg, var(--bg0), var(--bg1));
+    }
+
+    .adminWrap {
+        max-width: 1020px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+    }
+
+    /* ===== Header ===== */
+    .hero {
+        border-radius: 26px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(135deg, rgba(127,231,196,.14), rgba(154,215,255,.10));
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        position: relative;
+        padding: 16px 16px 14px;
+        margin-top: 10px;
+    }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            background: radial-gradient(800px 260px at 20% 0%, rgba(127,231,196,.22), transparent 60%), radial-gradient(800px 260px at 90% 10%, rgba(154,215,255,.18), transparent 60%);
+            pointer-events: none;
+        }
+
+    .heroRow {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .heroLeft {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 240px;
+    }
+
+    .heroBadge {
+        width: 46px;
+        height: 46px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, rgba(127,231,196,.95), rgba(154,215,255,.95));
+        color: #06101a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 1000;
+        letter-spacing: .6px;
+        box-shadow: 0 18px 40px rgba(0,0,0,.25);
+        user-select: none;
+    }
+
+    .heroTitle {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+        .heroTitle h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+        }
+
+        .heroTitle p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+    .heroRight {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .pill {
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        color: var(--muted);
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+        backdrop-filter: blur(10px);
+    }
+
+        .pill strong {
+            color: var(--text);
+            font-weight: 900;
+        }
+
+    .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 3px rgba(127,231,196,.14);
+    }
+
+    /* ===== Banner ===== */
+    .banner {
+        margin-top: 14px;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.12);
+        box-shadow: 0 18px 55px rgba(0,0,0,.35);
+        background: rgba(255,255,255,.04);
+    }
+
+        .banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: saturate(1.08) contrast(1.06);
+        }
+
+    /* ===== Section ===== */
+    .section {
+        margin-top: 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.05);
+        box-shadow: 0 18px 55px rgba(0,0,0,.30);
+        overflow: hidden;
+    }
+
+    .sectionHead {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(255,255,255,.10);
+        background: rgba(255,255,255,.03);
+    }
+
+        .sectionHead h2 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+        }
+
+        .sectionHead .hint {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+    .grid {
+        padding: 14px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    @@media (max-width: 820px) {
+        .grid
+
+    {
+        grid-template-columns: 1fr;
+    }
+
+    }
+
+    /* ===== Menu Card ===== */
+    .admCard {
+        position: relative;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+        box-shadow: 0 18px 55px rgba(0,0,0,.30);
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform .12s ease, border-color .12s ease, background .12s ease;
+        user-select: none;
+    }
+
+        .admCard:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255,255,255,.20);
+            background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07));
+        }
+
+        .admCard::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(620px 220px at 20% 0%, rgba(127,231,196,.18), transparent 60%), radial-gradient(620px 220px at 90% 10%, rgba(154,215,255,.14), transparent 60%);
+            pointer-events: none;
+        }
+
+    .admInner {
+        position: relative;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 14px;
+    }
+
+    .admIcon {
+        width: 52px;
+        height: 52px;
+        border-radius: 18px;
+        overflow: hidden;
+        flex: 0 0 auto;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 16px 40px rgba(0,0,0,.22);
+    }
+
+        .admIcon img {
+            width: 70%;
+            height: 70%;
+            object-fit: contain;
+            display: block;
+            filter: saturate(1.08) contrast(1.06);
+        }
+
+    .admText {
+        min-width: 0;
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+        .admText h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+            color: rgba(255,255,255,.94);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .admText p {
+            margin: 0;
+            font-size: 12px;
+            color: rgba(255,255,255,.70);
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+    .admGo {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .admBtn {
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.07);
+        color: rgba(255,255,255,.92);
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-size: 12px;
+        font-weight: 900;
+        cursor: pointer;
+        transition: transform .12s ease, background .12s ease, border-color .12s ease;
+        backdrop-filter: blur(10px);
+        white-space: nowrap;
+    }
+
+        .admBtn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,.10);
+            border-color: rgba(255,255,255,.20);
+        }
+
+    .admArrow {
+        width: 38px;
+        height: 38px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(255,255,255,.14);
+        background: linear-gradient(135deg, rgba(127,231,196,.88), rgba(154,215,255,.88));
+        color: #06101a;
+        font-weight: 1000;
+        box-shadow: 0 16px 40px rgba(0,0,0,.22);
+    }
+    @@media (max-width: 420px) {
+        .admBtn
+
+    {
+        display: none;
+    }
+
+    }
+
+    /* ===== Home Bar ===== */
+    .homeBar {
+        margin-top: 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(135deg, rgba(154,215,255,.14), rgba(127,231,196,.10));
+        box-shadow: 0 18px 55px rgba(0,0,0,.30);
+        overflow: hidden;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+
+        .homeBar::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(700px 260px at 20% 0%, rgba(154,215,255,.20), transparent 60%), radial-gradient(700px 260px at 90% 10%, rgba(127,231,196,.16), transparent 60%);
+            pointer-events: none;
+        }
+
+    .homeInner {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+    }
+
+    .homeIcon {
+        width: 54px;
+        height: 54px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 16px 40px rgba(0,0,0,.22);
+        overflow: hidden;
+    }
+
+        .homeIcon img {
+            width: 70%;
+            height: 70%;
+            object-fit: contain;
+            display: block;
+        }
+
+    .homeText {
+        flex: 1;
+        min-width: 0;
+    }
+
+        .homeText h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 950;
+            color: rgba(255,255,255,.94);
+            letter-spacing: -.2px;
+        }
+
+        .homeText p {
+            margin: 4px 0 0;
+            color: rgba(255,255,255,.72);
+            font-size: 12px;
+        }
+
+    .homeGo {
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(127,231,196,.92), rgba(154,215,255,.92));
+        color: #06101a;
+        font-weight: 1000;
+        box-shadow: 0 16px 40px rgba(0,0,0,.22);
+        border: 1px solid rgba(255,255,255,.10);
+    }
+</style>
+
+<div class="adminWrap">
+
+    <header class="hero">
+        <div class="heroRow">
+            <div class="heroLeft">
+                <div class="heroBadge">ADM</div>
+                <div class="heroTitle">
+                    <h1>@keyWordTitle 패널</h1>
+                    <p>퀴즈 · 포인트 · 공과 · 권한 · 모니터링을 한 화면에서 관리해요.</p>
+                </div>
+            </div>
+
+            <div class="heroRight">
+                <div class="pill"><span class="dot"></span>상태 <strong>Online</strong></div>
+                <div class="pill">업데이트 <strong>@DateHelper.GetKoreaNow().ToString("yyyy-MM-dd HH:mm")</strong></div>
+                @if (isSuper)
+                {
+                    <div class="pill">권한 <strong>SuperAdmin</strong></div>
+                }
+            </div>
+        </div>
+    </header>
+
+    <div class="banner">
+        <img src="/images/admin/admin002.webp" alt="Admin Banner">
+    </div>
+
+    <section class="section">
+        <div class="sectionHead">
+            <h2>기본 메뉴</h2>
+            <div class="hint">자주 쓰는 기능</div>
+        </div>
+
+        <div class="grid">
+            @* 퀴즈 *@
+            <div class="admCard" onclick="redirectToPage('/Question/QuestionDetailList')">
+                <div class="admInner">
+                    <div class="admIcon"><img src="/images/ICON/doGuide/goGuide06.webp" alt="퀴즈"></div>
+                    <div class="admText">
+                        <h3>퀴즈</h3>
+                        <p>퀴즈 작성하러 가기</p>
+                    </div>
+                    <div class="admGo">
+                        <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/Question/QuestionDetailList')">이동</button>
+                        <div class="admArrow">➜</div>
+                    </div>
+                </div>
+            </div>
+
+            @* 포인트 *@
+            <div class="admCard" onclick="redirectToPage('/Admin/IndexPoint')">
+                <div class="admInner">
+                    <div class="admIcon"><img src="/images/award/awardVertical.webp" alt="포인트"></div>
+                    <div class="admText">
+                        <h3>포인트메뉴</h3>
+                        <p>포인트 관리 하기</p>
+                    </div>
+                    <div class="admGo">
+                        <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/Admin/IndexPoint')">이동</button>
+                        <div class="admArrow">➜</div>
+                    </div>
+                </div>
+            </div>
+
+            @* 기도문 *@
+            <div class="admCard" onclick="redirectToPage('/PrayPhrase/PrayPhraseDetailList')">
+                <div class="admInner">
+                    <div class="admIcon"><img src="/images/ICON/pray/toGoPary002.webp" alt="기도문"></div>
+                    <div class="admText">
+                        <h3>MIP</h3>
+                        <p>기도문 작성하러 가기</p>
+                    </div>
+                    <div class="admGo">
+                        <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/PrayPhrase/PrayPhraseDetailList')">이동</button>
+                        <div class="admArrow">➜</div>
+                    </div>
+                </div>
+            </div>
+
+            @* 설문 *@
+            <div class="admCard" onclick="redirectToPage('/Survey/Index')">
+                <div class="admInner">
+                    <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="설문"></div>
+                    <div class="admText">
+                        <h3>설문</h3>
+                        <p>설문내용보기</p>
+                    </div>
+                    <div class="admGo">
+                        <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/Survey/Index')">이동</button>
+                        <div class="admArrow">➜</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    @if (isSuper)
+    {
+        <section class="section">
+            <div class="sectionHead">
+                <h2>슈퍼 관리자</h2>
+                <div class="hint">민감/관리 기능</div>
+            </div>
+
+            <div class="grid">
+                <div class="admCard" onclick="redirectToPage('/CheckPoint/MismatchClickHistoryForQuestion')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/doGuide/goGuide096.webp" alt="정정"></div>
+                        <div class="admText">
+                            <h3>퀴즈답변정정</h3>
+                            <p>퀴즈 답변 정정</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/CheckPoint/MismatchClickHistoryForQuestion')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/WeeklyWordToRead/WeeklyWordToReadDetailList')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/doGuide/goGuide096.webp" alt="공과"></div>
+                        <div class="admText">
+                            <h3>공과</h3>
+                            <p>공과 작성하러 가기</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/WeeklyWordToRead/WeeklyWordToReadDetailList')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/RoleManager/Index')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="Role"></div>
+                        <div class="admText">
+                            <h3>Role</h3>
+                            <p>Role관리</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/RoleManager/Index')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/UserRoles/Index')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="UserRole"></div>
+                        <div class="admText">
+                            <h3>UserRole</h3>
+                            <p>사용자별 Role 설정</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/UserRoles/Index')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/BibleBulk/BibleMissingList')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="성경"></div>
+                        <div class="admText">
+                            <h3>성경</h3>
+                            <p>성경입력</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/BibleBulk/BibleMissingList')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/BibleBulk/EnrollBulkQuiz')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="SQL"></div>
+                        <div class="admText">
+                            <h3>SQL</h3>
+                            <p>SQL입력</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/BibleBulk/EnrollBulkQuiz')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/HelpDesk/HelpDeskDetailList')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="VoC"></div>
+                        <div class="admText">
+                            <h3>VoC</h3>
+                            <p>수정요구사항</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/HelpDesk/HelpDeskDetailList')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/Monitoring/Index')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="Monitor"></div>
+                        <div class="admText">
+                            <h3>Monitor</h3>
+                            <p>관찰</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/Monitoring/Index')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/OneLineFamousWord/Index')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="명구"></div>
+                        <div class="admText">
+                            <h3>명구</h3>
+                            <p>명구등록</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/OneLineFamousWord/Index')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admCard" onclick="redirectToPage('/LoginHistMgmt/Index')">
+                    <div class="admInner">
+                        <div class="admIcon"><img src="/images/ICON/smile/toGoSmile001.webp" alt="로그"></div>
+                        <div class="admText">
+                            <h3>로그</h3>
+                            <p>로그관리</p>
+                        </div>
+                        <div class="admGo">
+                            <button type="button" class="admBtn" onclick="event.stopPropagation(); redirectToPage('/LoginHistMgmt/Index')">이동</button>
+                            <div class="admArrow">➜</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+    }
+
+    @* "출력"(사람 정보 출력 · 부서별) 카드 2개는 2026-10-04 삭제 — 연결된 /HumanResource/viewPersonInfo 화면이 없어 눌러도 깨졌다 *@
+
+    @* 메인으로 이동 *@
+    <div class="homeBar" onclick="redirectToPage('/')">
+        <div class="homeInner">
+            <div class="homeIcon">
+                <img src="/images/ICON/home/toGoHome001.webp" alt="home">
+            </div>
+            <div class="homeText">
+                <h3>메인으로 이동</h3>
+                <p>홈페이지 메인 화면으로 돌아갑니다.</p>
+            </div>
+            <div class="homeGo">➜</div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+</script>

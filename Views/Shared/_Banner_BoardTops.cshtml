@@ -1,0 +1,257 @@
+﻿@using BulletinBoard.ViewModels
+@using System.Linq
+
+@{
+    // ✅ ViewBag.BandBoardMessage = BandPost (최신 1건) 으로 들어온다고 가정
+    var latestPost = ViewBag.BandBoardMessage as BandPost;
+
+    // 안전 처리
+    var writer = latestPost?.WriterName ?? "익명";
+    DateTime? created = latestPost?.CreatedAt;
+    var likeCnt = latestPost?.LikeCount ?? 0;
+    var commentCnt = latestPost?.Comments?.Count ?? 0;
+
+    // 본문 미리보기
+    var preview = (latestPost?.Content ?? "").Trim();
+}
+ 
+@if (latestPost != null)
+{ 
+    <style>
+        /* ✅ 최신 게시글 배너 (Paper Coral Theme) - 공지와 완전 다르게 */
+        .latest-board-post-wrap {
+            margin: 1.2rem 0 2rem;
+        }
+
+        .latest-post {
+            position: relative;
+            border-radius: 26px;
+            padding: 1.15rem 1.25rem;
+            overflow: hidden;
+            color: #2b1b14;
+            background: radial-gradient(900px 420px at 15% 0%, rgba(255,170,120,.35) 0%, rgba(255,170,120,0) 60%), radial-gradient(700px 380px at 95% 15%, rgba(255,220,140,.32) 0%, rgba(255,220,140,0) 62%), linear-gradient(180deg, #fff7ef 0%, #fff1e4 40%, #fffaf5 100%);
+            border: 1px solid rgba(43,27,20,.10);
+            box-shadow: 0 18px 44px rgba(43,27,20,.12);
+        }
+
+            .latest-post::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                pointer-events: none;
+                background: radial-gradient(circle at 20% 30%, rgba(43,27,20,.06) 0 1px, transparent 2px), radial-gradient(circle at 65% 60%, rgba(43,27,20,.05) 0 1px, transparent 2px), radial-gradient(circle at 85% 30%, rgba(43,27,20,.04) 0 1px, transparent 2px);
+                opacity: .55;
+                mix-blend-mode: multiply;
+            }
+
+        .latest-post-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: .9rem;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .post-badges {
+            display: inline-flex;
+            gap: .45rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .post-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .28rem .75rem;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: .82rem;
+            background: rgba(255,255,255,.65);
+            border: 1px solid rgba(43,27,20,.10);
+            color: rgba(43,27,20,.85);
+            backdrop-filter: blur(6px);
+            white-space: nowrap;
+        }
+
+            .post-pill.new {
+                background: rgba(255,120,90,.16);
+                border-color: rgba(255,120,90,.26);
+                color: #a2321f;
+            }
+
+        .latest-post-title {
+            margin-top: .55rem;
+            font-weight: 1000;
+            line-height: 1.25;
+            font-size: 1.25rem;
+            letter-spacing: -.2px;
+        }
+
+        .latest-post-meta {
+            margin-top: .28rem;
+            font-size: .92rem;
+            color: rgba(43,27,20,.70);
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+        .latest-post-body {
+            margin-top: .85rem;
+            padding: .95rem 1rem;
+            border-radius: 18px;
+            background: rgba(255,255,255,.58);
+            border: 1px dashed rgba(43,27,20,.14);
+            line-height: 1.65;
+            font-size: .98rem;
+            position: relative;
+            z-index: 1;
+        }
+
+            .latest-post-body .clamp {
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                word-break: break-word;
+                white-space: pre-line;
+            }
+
+        .latest-post-actions {
+            margin-top: .9rem;
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn-paper {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .55rem .95rem;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: .92rem;
+            text-decoration: none;
+            color: #ffffff;
+            background: linear-gradient(90deg, #ff6b4a, #ff9a4a);
+            box-shadow: 0 12px 26px rgba(255,107,74,.22);
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+            .btn-paper:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 16px 32px rgba(255,107,74,.28);
+            }
+
+        .btn-outline-paper {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .55rem .95rem;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: .92rem;
+            text-decoration: none;
+            background: rgba(255,255,255,.72);
+            border: 1px solid rgba(43,27,20,.14);
+            color: rgba(43,27,20,.86);
+        }
+
+        /* ✅ 공지와 동일한 "숨기기 버튼" 규격(클래스 재사용) */
+        .latest-hide-controls {
+            display: flex;
+            gap: .35rem;
+            flex-wrap: wrap;
+        }
+
+        .birthday-hide-btn {
+            border-radius: 999px;
+            border: 1px solid rgba(43,27,20,.18);
+            padding: .3rem .75rem;
+            font-size: .78rem;
+            font-weight: 800;
+            cursor: pointer;
+            background: rgba(255,255,255,.72);
+            color: rgba(43,27,20,.86);
+            box-shadow: 0 2px 7px rgba(0,0,0,.05);
+        }
+
+            .birthday-hide-btn:hover {
+                background: rgba(255,255,255,.92);
+            }
+
+        @@media (min-width: 768px) {
+            .latest-post {
+                padding: 1.35rem 1.6rem;
+            }
+
+            .latest-post-title {
+                font-size: 1.55rem;
+            }
+        }
+    </style>
+
+    <!-- ✅ 공통 쿠키 숨김 처리: "선언만" (공통 스크립트가 show/hide 담당) -->
+    <div class="latest-board-post-wrap js-global-cookie-section"
+         data-cookie-key="LatestBandPostBanner_2025"
+         style="display:none;">
+
+        <div class="latest-post"
+             onclick="location.href='@Url.Action("Index", "BandBoard")';"
+             style="cursor:pointer;">
+
+            <div class="latest-post-head">
+                <div>
+                    <div class="post-badges">
+                        <span class="post-pill new">📰 최신 게시글</span>
+                        <span class="post-pill">💬 댓글 @commentCnt</span>
+                        <span class="post-pill">❤️ 좋아요 @likeCnt</span>
+                    </div>
+
+                    <div class="latest-post-title">
+                        @writer 님의 글
+                    </div>
+
+                    <div class="latest-post-meta">
+                        <span>🗓 @(created.HasValue? created.Value.ToString("yyyy.MM.dd HH:mm") : "-")</span>
+                        <span>·</span>
+                        <span>📌 게시판: Band</span>
+                    </div>
+                </div>
+
+                <!-- ✅ 버튼 클릭 시 카드 이동 막기 -->
+                <div class="latest-post-actions" onclick="event.stopPropagation();">
+                    <!-- ✅ 공지와 동일한 숨기기 버튼 3종 -->
+                    <div class="latest-hide-controls">
+                        <button class="birthday-hide-btn js-global-cookie-hide-btn" data-hide="today">
+                            오늘만 안보기
+                        </button>
+                        <button class="birthday-hide-btn js-global-cookie-hide-btn" data-hide="1week">
+                            1주일 숨기기
+                        </button>
+                        <button class="birthday-hide-btn js-global-cookie-hide-btn" data-hide="3week">
+                            3주 숨기기
+                        </button>
+                    </div>
+
+                    <a class="btn-outline-paper"
+                       href="@Url.Action("Index", "BandBoard")">
+                        📚 게시판
+                    </a>
+                </div>
+            </div>
+
+            <div class="latest-post-body">
+                <div class="clamp">@preview</div>
+            </div>
+        </div>
+    </div>
+}

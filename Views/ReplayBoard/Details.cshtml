@@ -1,0 +1,254 @@
+﻿@model BulletinBoard.Models.PostDetailVM
+@using System
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    // 댓글 수정 · 삭제 — Admin · SuperAdmin 역할, 예외로 "Basic" 계정 (컨트롤러 CanManageRepliesAsync 와 같은 기준)
+    bool canManageReplies = isSuperAdmin || isAdmin
+                            || (isSignedIn && string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));
+}
+
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    var board = Model.Board;
+    ViewBag.Title = $"{board.BoardName} - 상세";
+
+    var files = ViewBag.Files as List<BoardFile> ?? new();
+
+    bool IsImage(string name)
+    {
+        var ext = (System.IO.Path.GetExtension(name) ?? "").ToLowerInvariant();
+        return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp";
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@ViewBag.Title</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/board-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "Home")">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="@Url.Action("Index", "ReplayBoard", new { tableName = board.PostTable })">@board.BoardName</a></span>
+            <span>No. @Model.Post.Id</span>
+        </div>
+        <div class="hdK">@Model.Post.CreatedAt.ToString("yyyy.MM.dd HH:mm")</div>
+        <h1 class="hdT">@Model.Post.Title</h1>
+        <div class="hdS">
+            <b>@Model.Post.Writer</b><span class="sep"> · </span>조회 @Model.Post.ViewCount<span class="sep"> · </span>댓글 @Model.Replies.Count
+            @if (Model.Post.LikeCount > 0)
+            {
+                <span class="sep"> · </span><text>좋아요 @Model.Post.LikeCount</text>
+            }
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="tb">
+            <a class="nbtn" href="@Url.Action("Index", "ReplayBoard", new { tableName = board.PostTable })">목록</a>
+            @if (Model.Post.IsNotice) { <span class="tag">공지</span> }
+            @if (board?.PostTable == "NoticeBoard" && Model.Post.IsPinned) { <span class="tag line">상단고정</span> }
+            <span class="grow"></span>
+            <a class="nbtn" href="@Url.Action("Edit", "ReplayBoard", new { tableName = board.PostTable, id = Model.Post.Id })">수정</a>
+            <form method="post" action="@Url.Action("Delete","ReplayBoard")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tableName" value="@board.PostTable" />
+                <input type="hidden" name="id" value="@Model.Post.Id" />
+                <button class="nbtn dan" type="submit" onclick="return confirm('삭제할까요?');">삭제</button>
+            </form>
+        </div>
+
+        @if (board?.PostTable == "NoticeBoard" && Model.Post.IsPinned && Model.Post.PopupUntil.HasValue)
+        {
+            <div class="pop">팝업 표시 기간 · <b>@Model.Post.PopupUntil.Value.ToString("yyyy.MM.dd HH:mm")</b> 까지</div>
+        }
+
+        <article class="art">
+            <div class="ct pre content">@Model.Post.Content</div>
+        </article>
+
+        @if (files.Count > 0)
+        {
+            <section class="sec">
+                <div class="secH">
+                    <span class="secT">첨부파일</span>
+                    <span class="secN">@files.Count 개</span>
+                </div>
+                <ul class="fl">
+                    @foreach (var f in files)
+                    {
+                        var dl = Url.Action("DownloadFile", "ReplayBoard", new { tableName = board.PostTable, fileId = f.Id });
+                        <li>
+                            <span class="l">
+                                @if (IsImage(f.OriginalFileName))
+                                {
+                                    <a href="@dl" title="이미지 다운로드"><img class="th" src="@f.RelativePath" alt="@f.OriginalFileName" /></a>
+                                }
+                                else
+                                {
+                                    <span class="th">↓</span>
+                                }
+                                <a class="n" href="@dl" title="@f.OriginalFileName">@f.OriginalFileName</a>
+                            </span>
+                            <span class="r">
+                                <span class="s">@(Math.Round(f.FileSize / 1024.0)) KB</span>
+                                <form method="post" action="@Url.Action("DeleteFile","ReplayBoard")" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tableName" value="@board.PostTable" />
+                                    <input type="hidden" name="postId" value="@Model.Post.Id" />
+                                    <input type="hidden" name="fileId" value="@f.Id" />
+                                    <button class="nbtn sm dan" type="submit" onclick="return confirm('첨부파일을 삭제할까요?');">삭제</button>
+                                </form>
+                            </span>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        <!-- Replies -->
+        <section class="sec">
+            <div class="secH">
+                <span class="secT">댓글</span>
+                <span class="secN">@Model.Replies.Count 개</span>
+            </div>
+
+            <form method="post" action="@Url.Action("AddReply","ReplayBoard")" class="rpF"
+                  onsubmit="document.getElementById('clientTime').value=new Date().toISOString();">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tableName" value="@board.PostTable" />
+                <input type="hidden" name="postId" value="@Model.Post.Id" />
+                <input type="hidden" id="clientTime" name="clientTime" />
+
+                <input class="fIn w" name="replyWriter" placeholder="작성자" required />
+                <input class="fIn" name="replyContent" placeholder="댓글을 남겨 주세요" required />
+                <button class="nbtn pri" type="submit">등록</button>
+            </form>
+
+            @if (Model.Replies.Count == 0)
+            {
+                <div class="empty">첫 댓글을 남겨 주세요.</div>
+            }
+            @{ var replyNo = 0; }
+            @foreach (var r in Model.Replies)
+            {
+                replyNo++; @* 화면에 보이는 순서대로 1,2,3… (삭제해도 다시 이어서 매김) *@
+                <div class="rp" id="reply-@r.Id">
+                    <div class="rpH">
+                        <span><span class="rpNo">@replyNo</span><b>@r.Writer</b>@r.CreatedAt.ToString("yyyy.MM.dd HH:mm")</span>
+                        @if (canManageReplies)
+                        {
+                            @* 관리자만 — 수정 · 삭제 *@
+                            <span class="rpAct">
+                                <button class="nbtn sm" type="button" data-rp-edit="@r.Id">수정</button>
+                                <form method="post" action="@Url.Action("DeleteReply","ReplayBoard")">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="tableName" value="@board.PostTable" />
+                                    <input type="hidden" name="postId" value="@Model.Post.Id" />
+                                    <input type="hidden" name="replyId" value="@r.Id" />
+                                    <button class="nbtn sm dan" type="submit" onclick="return confirm('댓글을 삭제할까요?');">삭제</button>
+                                </form>
+                            </span>
+                        }
+                    </div>
+                    <div class="rpB replyBody">@r.Content</div>
+
+                    @if (canManageReplies)
+                    {
+                        <form method="post" action="@Url.Action("EditReply","ReplayBoard")" class="rpEdit" id="rpEdit-@r.Id" hidden>
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="tableName" value="@board.PostTable" />
+                            <input type="hidden" name="postId" value="@Model.Post.Id" />
+                            <input type="hidden" name="replyId" value="@r.Id" />
+                            <input class="fIn" name="replyWriter" value="@r.Writer" maxlength="60" placeholder="작성자" required />
+                            <textarea class="fIn" name="replyContent" maxlength="1000" placeholder="댓글 내용" required>@r.Content</textarea>
+                            <div class="rpEditB">
+                                <button class="nbtn sm" type="button" data-rp-cancel="@r.Id">취소</button>
+                                <button class="nbtn sm pri" type="submit">저장</button>
+                            </div>
+                        </form>
+                    }
+                </div>
+            }
+        </section>
+
+        <div class="ft">
+            <a href="@Url.Action("Index", "ReplayBoard", new { tableName = board.PostTable })">@board.BoardName</a>
+            <a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a>
+        </div>
+    </main>
+
+    <script>
+        // URL 자동 링크 변환 (본문 + 댓글)
+        (function () {
+            function htmlEsc(s) {
+                return s
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            function linkify(el) {
+                if (!el) return;
+                var raw = el.textContent || '';
+                var esc = htmlEsc(raw);
+                // URL 패턴 매칭 후 <a> 태그로 변환 (말미 구두점 제외)
+                var linked = esc.replace(
+                    /(https?:\/\/[^\s<>"']+?)([.,;:!?)\]'"]*(?:\s|$))/g,
+                    '<a class="content-link" href="$1" target="_blank" rel="noopener noreferrer">$1</a>$2'
+                );
+                el.innerHTML = linked;
+            }
+
+            // 본문
+            linkify(document.querySelector('.content'));
+
+            // 댓글 본문 전체
+            document.querySelectorAll('.replyBody').forEach(function (el) {
+                linkify(el);
+            });
+        })();
+
+        // 댓글 수정 (관리자) — 수정을 누르면 그 댓글 자리에 입력칸, 취소하면 원래대로
+        (function () {
+            function toggle(id, on) {
+                var f = document.getElementById('rpEdit-' + id);
+                var rp = document.getElementById('reply-' + id);
+                if (!f || !rp) return;
+                f.hidden = !on;
+                rp.classList.toggle('editing', on);
+                if (on) { var t = f.querySelector('textarea'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+            }
+            document.addEventListener('click', function (e) {
+                var ed = e.target.closest('[data-rp-edit]');
+                if (ed) { toggle(ed.getAttribute('data-rp-edit'), true); return; }
+                var cc = e.target.closest('[data-rp-cancel]');
+                if (cc) { var id = cc.getAttribute('data-rp-cancel'); var f = document.getElementById('rpEdit-' + id); f.reset(); toggle(id, false); }
+            });
+        })();
+    </script>
+</body>
+</html>

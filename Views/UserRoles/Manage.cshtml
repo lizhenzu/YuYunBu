@@ -1,0 +1,147 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+
+@model List<ManageUserRolesViewModel>
+
+@*  ══════════════════════════════════════════════════════════════
+    권한 관리 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 대상 사람 이름 · 이메일을 위에 보이고, Role 은 켜고 끄는 스위치.  바뀐 것을 아래에 바로 알려 준다
+    · 저장은 예전처럼 같은 주소(POST /UserRoles/Manage?userId=…)로.  필드 이름(Model[i].RoleId · RoleName · Selected) 그대로
+    · 예전 Cancel 은 없는 EditUser 로 가서 목록(/UserRoles/Index)으로 고침
+    · 이전 화면은 Manage.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string fullName = ViewBag.FullName as string ?? "";
+    string email = ViewBag.Email as string ?? ViewBag.UserName as string ?? "";
+    if (string.IsNullOrWhiteSpace(fullName)) { fullName = email; }
+    string initial = string.IsNullOrEmpty(fullName) ? "?" : fullName.Substring(0, 1);
+
+    string RoleDesc(string? r) => r switch
+    {
+        "SuperAdmin" => "모든 관리 화면 · 메뉴 표시 S",
+        "Admin"      => "관리자 화면 · 메뉴 표시 A",
+        "Moderator"  => "게시물 정리",
+        "Basic"      => "기본 권한",
+        _            => ""
+    };
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>권한 관리</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+
+        .ur-who { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 14px; border-radius: 14px; background: var(--soft); }
+        .ur-who .av { flex: 0 0 44px; height: 44px; border-radius: 50%; background: #fff; display: grid; place-items: center; font-size: 17px; font-weight: 800; color: var(--blue); }
+        .ur-who .t { min-width: 0; }
+        .ur-who b { display: block; font-size: 16px; font-weight: 800; color: var(--ink); }
+        .ur-who small { display: block; font-size: 12px; color: var(--dim2); word-break: break-all; }
+
+        .ur-rr { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
+        .ur-rr .n { flex: 0 0 28px; font-size: 13px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+        .ur-rr .t { flex: 1; min-width: 0; }
+        .ur-rr .t b { font-size: 15px; font-weight: 800; color: var(--ink); }
+        .ur-rr .t small { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); }
+        .ur-sw { position: relative; flex: 0 0 46px; height: 28px; }
+        .ur-sw input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+        .ur-sw i { position: absolute; inset: 0; border-radius: 999px; background: #E5E7EB; transition: background .15s; pointer-events: none; }
+        .ur-sw i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: left .15s; }
+        .ur-sw input:checked + i { background: var(--blue); }
+        .ur-sw input:checked + i::after { left: 21px; }
+        .ur-sw input:focus-visible + i { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+        .ur-note { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: var(--warnbg); color: var(--warn); font-size: 12.5px; line-height: 1.65; }
+        .ur-chg { margin-top: 12px; min-height: 20px; font-size: 12.5px; color: var(--dim2); }
+        .ur-chg b { color: var(--blue); }
+        .ur-err { margin-top: 12px; color: var(--red); font-size: 13px; }
+        .ur-err ul { margin: 0; padding-left: 18px; }
+        .ur-err:empty, .ur-err.validation-summary-valid { display: none; }
+
+        .ur-bar { display: flex; gap: 8px; margin-top: 16px; }
+        .ur-bar a, .ur-bar button { flex: 1; display: grid; place-items: center; height: 48px; border: 0; border-radius: 999px; font: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer; background: var(--grey); color: var(--tx); }
+        .ur-bar button { flex: 2; background: var(--blue); color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>저장하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/UserRoles/Index">사용자 권한</a><span class="sep">›</span>권한 관리</span>
+        <span>ROLE</span>
+    </div>
+
+    <div class="qb-k">MANAGE ROLES</div>
+    <h1 class="qb-h1">권한 관리</h1>
+
+    @if (!string.IsNullOrEmpty(fullName))
+    {
+        <div class="ur-who">
+            <span class="av">@initial</span>
+            <span class="t"><b>@fullName</b>@if (!string.IsNullOrEmpty(email) && email != fullName) {<small>@email</small>}</span>
+        </div>
+    }
+
+    <form method="post" onsubmit="document.getElementById('loadingOverlay').classList.add('on');">
+
+        <div class="qb-sec">Role<small>켜면 그 권한이 생겨요</small></div>
+
+        @for (int i = 0; i < Model.Count; i++)
+        {
+            <label class="ur-rr">
+                <span class="n">@((i + 1).ToString("00"))</span>
+                <span class="t"><b>@Model[i].RoleName</b>@if (!string.IsNullOrEmpty(RoleDesc(Model[i].RoleName))) {<small>@RoleDesc(Model[i].RoleName)</small>}</span>
+                <span class="ur-sw">
+                    <input type="hidden" asp-for="@Model[i].RoleId" />
+                    <input type="hidden" asp-for="@Model[i].RoleName" />
+                    <input asp-for="@Model[i].Selected" class="ur-role" data-role="@Model[i].RoleName" data-orig="@(Model[i].Selected ? "1" : "0")" />
+                    <i></i>
+                </span>
+            </label>
+        }
+
+        <div asp-validation-summary="All" class="ur-err"></div>
+
+        <div class="ur-note">SuperAdmin은 모든 관리 화면에 들어갈 수 있어요. 꼭 필요한 사람에게만 켜 주세요.</div>
+        <div class="ur-chg" id="urChg">바뀐 것이 없어요</div>
+
+        <div class="ur-bar">
+            <a href="/UserRoles/Index">취소</a>
+            <button type="submit">저장하기</button>
+        </div>
+    </form>
+
+    <div class="qb-ft">
+        <span>권한 관리</span>
+        <span><a href="/UserRoles/Index">사용자 권한</a><a href="/HumanResource/ManageUserInfo#g5">정보 관리</a></span>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const boxes = Array.from(document.querySelectorAll('.ur-role'));
+        const out = document.getElementById('urChg');
+        function show() {
+            const ch = boxes.filter(b => (b.checked ? '1' : '0') !== b.dataset.orig)
+                            .map(b => (b.checked ? '켜기 ' : '끄기 ') + b.dataset.role);
+            out.innerHTML = '';
+            if (!ch.length) { out.textContent = '바뀐 것이 없어요'; return; }
+            out.append('바뀐 것: ');
+            const b = document.createElement('b'); b.textContent = ch.join(' · '); out.append(b);
+        }
+        boxes.forEach(b => b.addEventListener('change', show));
+        window.addEventListener('pageshow', () => document.getElementById('loadingOverlay').classList.remove('on'));
+    })();
+</script>
+</body>
+</html>

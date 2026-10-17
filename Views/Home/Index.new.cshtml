@@ -1,0 +1,1424 @@
+﻿@{
+    Layout = null;
+}
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+}
+
+@{
+    bool showVBSParticipationSurveyGuide = false;
+
+    var bagVal = ViewBag.ShowVBSParticipationSurveyGuide;
+    if (bagVal is bool b)
+    {
+        showVBSParticipationSurveyGuide = b;
+    }
+    else if (bagVal != null)
+    {
+        bool parsed;
+        showVBSParticipationSurveyGuide = bool.TryParse(bagVal.ToString(), out parsed) ? parsed : false;
+    }
+}
+
+@{
+    var ChurchName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var userFullName =
+        (ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string)
+        ?? (HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) ?? "");
+
+    var userId = (ViewData["UserId"] as string)
+        ?? (HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString()) ?? "");
+
+    var profilePicturePath = (ViewData["ProfilePicturePath"] as string) ?? "";
+
+    var urlMissionToday  = "/DailyMission2/Branch";
+    var urlNotice        = "/Notice/Branch";
+    var urlAlbum         = "/Albums/Branch";
+    var urlAttendance    = "/Attendance/Index";
+    var urlAddressBook   = "/AddressBook/Branch";
+    var urlApplyEvent    = "/ApplyEvent/Branch";
+    var urlIndexComplex  = "/Home/IndexComplex";
+    var urlPickUserType  = "/Home/PickUserType";
+    var urlLogout        = "/Account/Logout";
+    var urlWorldview     = "/Worldview/Intro";
+    var urlWorldView2025 = "/ResourceBox/worldView2025";
+    var urlWeeklyWordToRead  = "/WeeklyWordToRead/Branch";
+    var urlVBSParticipationSurvey     = "/VBSParticipationSurvey/ViewAll?view=All";
+    var urlAdminTeacherOnly  = "/Admin/TeacherOnly";
+    var urlPraiseHub         = "/PrayHome/Branch";
+
+    var profileClickUrl = string.IsNullOrWhiteSpace(userFullName)
+        ? "/HumanResource/ManageUserInfo"
+        : $"/HumanResource/ManageUserInfo?UserId={Uri.EscapeDataString(userId ?? "")}";
+
+    var profileImgSrc = string.IsNullOrWhiteSpace(userFullName)
+        ? ConstatsCommon.representFaceImage
+        : profilePicturePath;
+
+    var pageTitle = (string.IsNullOrWhiteSpace(ChurchName) && string.IsNullOrWhiteSpace(DepartmentName))
+        ? "메인"
+        : $"{ChurchName} {DepartmentName}";
+
+    var topTitle = (string.IsNullOrWhiteSpace(ChurchName) && string.IsNullOrWhiteSpace(DepartmentName))
+        ? "교회 포털"
+        : $"{ChurchName} · {DepartmentName}";
+
+    var userTypeObj = ViewBag.UserType;
+    var userTypeStr = userTypeObj == null ? "" : userTypeObj.ToString();
+    var userType = string.IsNullOrWhiteSpace(userTypeStr) ? 'C' : userTypeStr.ToUpperInvariant()[0];
+
+    var menuMap = ViewBag.MenuPolicyMap as Dictionary<string, string>;
+
+    bool MenuAllowed(string url)
+    {
+        if (menuMap == null) return true;
+        return PrefSvc.IsMenuAllowed(menuMap, userType, url);
+    }
+
+    string typeLabel = userType switch
+    {
+        'A' => "전체보기",
+        'T' => "교사",
+        'P' => "학부모",
+        _ => "학생"
+    };
+
+    string typeEmoji = userType switch
+    {
+        'A' => "🛠️",
+        'T' => "🧑‍🏫",
+        'P' => "👨‍👩‍👧",
+        _ => "👧🧒"
+    };
+
+    string typeClass = userType switch
+    {
+        'A' => "ut-a",
+        'T' => "ut-t",
+        'P' => "ut-p",
+        _ => "ut-c"
+    };
+}
+
+@{
+    int integratedTotal = 0;
+
+    if (ViewBag.IntegratedTotal is int vi)
+    {
+        integratedTotal = vi;
+    }
+    else
+    {
+        int vParsed = 0;
+        var s = (ViewBag.IntegratedTotal ?? "").ToString();
+        if (!string.IsNullOrWhiteSpace(s) && int.TryParse(s, out vParsed))
+            integratedTotal = vParsed;
+    }
+
+    bool giftAvailable = false;
+    if (ViewBag.GiftAvailable is bool gb)
+    {
+        giftAvailable = gb;
+    }
+    else
+    {
+        bool gbParsed = false;
+        var s = (ViewBag.GiftAvailable ?? "").ToString();
+        if (!string.IsNullOrWhiteSpace(s) && bool.TryParse(s, out gbParsed))
+            giftAvailable = gbParsed;
+    }
+
+    bool milestoneJustReached = false;
+    if (ViewBag.MilestoneJustReached is bool mj)
+    {
+        milestoneJustReached = mj;
+    }
+    else
+    {
+        bool mjParsed = false;
+        var s = (ViewBag.MilestoneJustReached ?? "").ToString();
+        if (!string.IsNullOrWhiteSpace(s) && bool.TryParse(s, out mjParsed))
+            milestoneJustReached = mjParsed;
+    }
+
+    bool reached100 = integratedTotal >= 100;
+    int currentMilestone = integratedTotal > 0 ? (integratedTotal / 100) * 100 : 0;
+    bool isMilestone = (integratedTotal >= 100 && integratedTotal % 100 == 0);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+
+    <link rel="manifest" href="/manifest.json?v=1">
+    <meta name="theme-color" content="#FF6B35">
+    <link rel="apple-touch-icon" href="/images/ICON/church/pwa-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ═══════════════════════════════════════════════
+           DESIGN TOKENS — KIDS FRIENDLY THEME
+        ═══════════════════════════════════════════════ */
+        :root {
+            --bg:        #FFFDF5;
+            --surface:   #FFFFFF;
+            --surface2:  #F8F9FF;
+
+            --orange:    #FF6B35;
+            --orange-lt: rgba(255,107,53,.11);
+            --teal:      #0CC0B0;
+            --teal-lt:   rgba(12,192,176,.11);
+            --yellow:    #F59E0B;
+            --yellow-lt: rgba(245,158,11,.13);
+            --green:     #22C55E;
+            --green-lt:  rgba(34,197,94,.11);
+            --blue:      #3B82F6;
+            --blue-lt:   rgba(59,130,246,.11);
+            --purple:    #A855F7;
+            --purple-lt: rgba(168,85,247,.11);
+            --pink:      #EC4899;
+            --pink-lt:   rgba(236,72,153,.11);
+            --rose:      #F43F5E;
+            --rose-lt:   rgba(244,63,94,.11);
+
+            --ink:   #1A1A2E;
+            --ink2:  #4B5563;
+            --ink3:  #9CA3AF;
+            --border: rgba(0,0,0,.07);
+
+            --sh-sm: 0 2px 10px rgba(0,0,0,.07);
+            --sh:    0 4px 20px rgba(0,0,0,.09);
+            --sh-lg: 0 8px 36px rgba(0,0,0,.13);
+
+            --r:    18px;
+            --r-lg: 24px;
+            --r-xl: 32px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { -webkit-font-smoothing: antialiased; }
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Noto Sans KR', system-ui, sans-serif;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; }
+
+        .container {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 16px 14px 48px;
+        }
+
+        /* ═══════════════════════════════════════════════
+           HERO CARD
+        ═══════════════════════════════════════════════ */
+        .hero {
+            background: linear-gradient(135deg, #FFF4E6 0%, #EEF2FF 100%);
+            border-radius: var(--r-xl);
+            padding: 22px 20px 18px;
+            border: 1.5px solid rgba(255,107,53,.18);
+            box-shadow: var(--sh-lg);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -60px; right: -50px;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, rgba(255,107,53,.18), transparent 65%);
+            pointer-events: none;
+        }
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -50px; left: -40px;
+            width: 180px; height: 180px;
+            background: radial-gradient(circle, rgba(168,85,247,.14), transparent 65%);
+            pointer-events: none;
+        }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .rightPack { flex-shrink: 0; }
+        .rightStack { display: flex; flex-direction: column; align-items: flex-start; }
+
+        .avatarWrap {
+            width: 68px; height: 68px;
+            border-radius: 50%;
+            overflow: hidden;
+            cursor: pointer;
+            background: var(--surface);
+            border: 3px solid rgba(255,107,53,.35);
+            box-shadow: 0 4px 18px rgba(255,107,53,.25);
+            display: flex; align-items: center; justify-content: center;
+            animation: avatarPop .5s cubic-bezier(.34,1.56,.64,1) both;
+        }
+        @@keyframes avatarPop {
+            from { transform: scale(.7); opacity: 0; }
+            to   { transform: scale(1);  opacity: 1; }
+        }
+        .avatarWrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .brandBlock { min-width: 0; flex: 1; position: relative; }
+
+        .brandTitle {
+            font-size: 13px; font-weight: 700; color: var(--ink2);
+        }
+        .heroName {
+            font-size: 22px; font-weight: 900; color: var(--orange);
+            margin-top: 2px; letter-spacing: -.3px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .hello {
+            font-size: 17px; font-weight: 800; color: var(--ink);
+            margin-top: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .subline {
+            margin-top: 6px;
+            font-size: 13px; font-weight: 600; color: var(--ink2);
+        }
+        .subline a { color: var(--blue); }
+
+        /* hero bottom row — type pill + buttons */
+        .heroInner1 {
+            position: relative;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .typePill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            box-shadow: var(--sh-sm);
+            font-weight: 800; font-size: 13px;
+            white-space: nowrap;
+        }
+        .typePill small { font-size: 11px; font-weight: 600; color: var(--ink3); }
+        .typePill.ut-c { border-color: rgba(34,197,94,.30);  color: #15803D; }
+        .typePill.ut-p { border-color: rgba(59,130,246,.30); color: #1D4ED8; }
+        .typePill.ut-t { border-color: rgba(168,85,247,.30); color: #7E22CE; }
+        .typePill.ut-a { border-color: rgba(249,115,22,.30); color: #C2410C; }
+
+        .chipBtn {
+            padding: 9px 16px;
+            border-radius: 999px;
+            font-weight: 800; font-size: 13px;
+            cursor: pointer;
+            transition: transform .12s, filter .12s;
+            box-shadow: var(--sh-sm);
+        }
+        .chipBtn:focus { outline: 3px solid rgba(59,130,246,.30); outline-offset: 3px; }
+        .chipBtn:hover  { transform: translateY(-1px); filter: brightness(1.06); }
+        .chipBtn:active { transform: translateY(0);    filter: brightness(.97);  }
+
+        .chipBtn.changeTypeBtn {
+            background: linear-gradient(135deg, #22C55E, #16A34A);
+            color: #fff;
+        }
+        #pwaInstallBtn.chipBtn.changeTypeBtn {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            color: #fff;
+        }
+
+        /* ═══════════════════════════════════════════════
+           BIBLE SEARCH ZONE
+        ═══════════════════════════════════════════════ */
+        .bible-search-zone {
+            margin: 14px 0 0;
+            padding: 16px 18px 14px;
+            border-radius: var(--r-lg);
+            background: var(--surface);
+            border: 1.5px solid rgba(59,130,246,.15);
+            box-shadow: var(--sh-sm);
+        }
+        .bs-label-row {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 10px; flex-wrap: wrap;
+        }
+        .bs-chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            background: var(--blue-lt);
+            border: 1px solid rgba(59,130,246,.20);
+            font-size: 12.5px; font-weight: 800; color: var(--blue);
+        }
+        .bs-desc { font-size: 13px; font-weight: 600; color: var(--ink2); }
+        .bs-bar {
+            width: 100%;
+            display: flex; align-items: center; gap: 10px;
+            padding: 13px 14px;
+            border-radius: 14px;
+            border: 1.5px solid rgba(59,130,246,.18);
+            background: var(--surface2);
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .bs-bar:hover { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-lt); }
+        .bs-icon { font-size: 18px; flex-shrink: 0; }
+        .bs-placeholder {
+            flex: 1; text-align: left;
+            font-size: 14px; font-weight: 600; color: var(--ink3);
+        }
+        .bs-btn-text {
+            flex-shrink: 0; padding: 6px 18px;
+            border-radius: 10px;
+            background: var(--blue); color: #fff;
+            font-size: 13.5px; font-weight: 800;
+        }
+        .bs-hint-row {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .bs-hint-item {
+            font-size: 12px; font-weight: 700; color: var(--blue);
+            cursor: pointer; padding: 2px 0; transition: color .14s;
+        }
+        .bs-hint-item:hover { text-decoration: underline; }
+        .bs-hint-sep { color: #D1D5DB; font-size: 11px; }
+        @@media (max-width: 480px) {
+            .bs-desc { display: none; }
+            .bs-placeholder { font-size: 13px; }
+        }
+
+        /* ═══════════════════════════════════════════════
+           BANNER ZONE
+        ═══════════════════════════════════════════════ */
+        .bannerZone { margin-top: 14px; }
+
+        /* ═══════════════════════════════════════════════
+           GOLDEN BELL CTA — gold theme
+        ═══════════════════════════════════════════════ */
+        .mainCta {
+            display: block;
+            border-radius: var(--r-lg);
+            border: 2px solid rgba(255,215,0,.45);
+            overflow: hidden;
+            position: relative;
+            transform: translateZ(0);
+            background: linear-gradient(145deg, #f7d774 0%, #e6b800 25%, #c69214 50%, #f4d03f 75%, #fff2a8 100%);
+            box-shadow: 0 8px 28px rgba(198,146,20,.35);
+        }
+        .mainCta::before {
+            content: "";
+            position: absolute; inset: -2px; pointer-events: none;
+            background:
+                radial-gradient(420px 200px at 20% 0%, rgba(255,255,255,.65), transparent 65%),
+                radial-gradient(420px 220px at 80% 0%, rgba(255,255,255,.45), transparent 65%),
+                radial-gradient(420px 260px at 50% 140%, rgba(0,0,0,.20), transparent 70%);
+        }
+        .mainCta::after {
+            content: "";
+            position: absolute; inset: 0;
+            background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,.65) 50%, transparent 65%);
+            opacity: .35; pointer-events: none;
+            transform: translateX(-30%);
+        }
+        .mainCtaInner {
+            position: relative;
+            display: flex; align-items: center; gap: 16px;
+            padding: 18px 18px 14px;
+            backdrop-filter: blur(6px);
+        }
+        .mainCtaIcon {
+            width: 60px; height: 60px; border-radius: 20px;
+            display: flex; align-items: center; justify-content: center; font-size: 28px;
+            background: linear-gradient(180deg, #ffd84a, #d4a017); color: #5c4300;
+            border: 2px solid rgba(255,255,255,.45);
+            box-shadow: 0 20px 36px rgba(0,0,0,.35), 0 10px 18px rgba(198,146,20,.65), inset 0 2px 0 rgba(255,255,255,.65);
+            flex: 0 0 auto;
+        }
+        .mainCtaText { min-width: 0; flex: 1; }
+        .mainCtaTitle {
+            font-weight: 900; letter-spacing: -.2px; font-size: 18px;
+            color: #3a2a00; text-shadow: 0 1px 0 rgba(255,255,255,.55); word-break: keep-all;
+        }
+        .mainCtaDesc {
+            margin-top: 6px; font-size: 13.5px; font-weight: 800;
+            color: rgba(58,42,0,.85); word-break: keep-all;
+        }
+        .mainCtaMeta { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+        .mainCtaPill {
+            padding: 7px 10px; border-radius: 999px;
+            background: rgba(255,255,255,.75); border: 1px solid rgba(198,146,20,.45);
+            font-size: 12.5px; font-weight: 900; color: #4a3700;
+            box-shadow: 0 8px 16px rgba(0,0,0,.12);
+        }
+        .mainCta:hover  { transform: translateY(-3px) scale(1.01); filter: brightness(1.05); }
+        .mainCta:active { transform: translateY(0) scale(.99); }
+        .mainCtaBadges {
+            position: absolute; top: 12px; right: 12px;
+            display: flex; gap: 8px; flex-wrap: wrap; z-index: 5;
+            justify-content: flex-end; max-width: calc(100% - 24px);
+        }
+        .gbBadge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 7px 10px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 950; letter-spacing: -.2px;
+            border: 1px solid rgba(255,255,255,.45);
+            background: rgba(255,255,255,.28); color: #2a1c00;
+            box-shadow: 0 10px 18px rgba(0,0,0,.18); backdrop-filter: blur(6px);
+            white-space: nowrap;
+        }
+        .gbBadge .num { font-variant-numeric: tabular-nums; }
+        .gbBadge.points { background: rgba(255,255,255,.36); border-color: rgba(255,255,255,.55); }
+        .mainCta.gb-ready    { border-color: rgba(255,255,255,.78); filter: saturate(1.08) brightness(1.02); }
+        .mainCta.gb-milestone { border-color: rgba(255,255,255,.88); filter: brightness(1.04) saturate(1.10); }
+        .mainCta.gb-shimmer::after { animation: gbShimmer 1.8s linear infinite; opacity: .48; }
+        @@keyframes gbShimmer { 0% { transform: translateX(-30%); } 100% { transform: translateX(30%); } }
+        .gbConfetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+        .gbConfetti i {
+            position: absolute; top: -12px; width: 10px; height: 14px;
+            border-radius: 3px; opacity: .95;
+            transform: translateY(-20px) rotate(0deg);
+            animation: gbConfettiFall 1.25s ease-in forwards;
+        }
+        .gbConfetti i:nth-child(4n+1) { background: rgba(255,255,255,.95); }
+        .gbConfetti i:nth-child(4n+2) { background: rgba(37,99,235,.95); }
+        .gbConfetti i:nth-child(4n+3) { background: rgba(34,197,94,.95); }
+        .gbConfetti i:nth-child(4n)   { background: rgba(168,85,247,.95); }
+        @@keyframes gbConfettiFall {
+            0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+            10%  { opacity: 1; }
+            100% { transform: translateY(320px) rotate(420deg); opacity: 0; }
+        }
+        .mainCta.gb-just { border-color: rgba(255,255,255,.92); filter: brightness(1.06) saturate(1.14); }
+        .gbRewardWrap { position: relative; z-index: 7; padding: 0 14px 16px; }
+        .gbRewardBanner {
+            width: 100%; border-radius: var(--r);
+            border: 2px solid rgba(255,255,255,.78);
+            background: linear-gradient(135deg, rgba(255,255,255,.62), rgba(255,255,255,.34));
+            overflow: hidden; position: relative;
+        }
+        .gbRewardBanner::before {
+            content: ""; position: absolute; inset: -2px; pointer-events: none;
+            background:
+                radial-gradient(320px 160px at 0% 0%, rgba(37,99,235,.20), transparent 60%),
+                radial-gradient(320px 160px at 100% 0%, rgba(34,197,94,.16), transparent 62%);
+            opacity: .85;
+        }
+        .gbRewardRow {
+            position: relative; display: flex;
+            align-items: center; justify-content: space-between;
+            gap: 12px; padding: 14px;
+        }
+        .gbRewardLeft { min-width: 0; }
+        .gbRewardTitle { font-weight: 900; font-size: 15px; color: #2a1c00; word-break: keep-all; }
+        .gbRewardDesc  {
+            margin-top: 5px; font-size: 13px; font-weight: 800;
+            color: rgba(42,28,0,.85); line-height: 1.3; word-break: keep-all;
+        }
+        .gbRewardCTA {
+            flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 11px 14px; border-radius: 999px;
+            font-weight: 900; font-size: 13px; color: #1f1300;
+            border: 2px solid rgba(255,255,255,.82);
+            background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.48));
+            white-space: nowrap;
+        }
+        .gbRewardCTA .arr { font-size: 16px; opacity: .9; }
+        .mainCta.gb-just .gbRewardBanner { animation: gbPulse 1.25s ease-in-out infinite; }
+        @@keyframes gbPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.01); } }
+        @@media (max-width: 520px) {
+            .mainCtaBadges { position: relative; top: auto; right: auto; padding: 10px 14px 0; gap: 6px; max-width: 100%; justify-content: flex-end; }
+            .gbBadge { font-size: 12px; padding: 6px 9px; }
+            .mainCtaInner { align-items: flex-start; padding: 12px 14px 10px; gap: 10px; }
+            .mainCtaIcon { width: 52px; height: 52px; border-radius: 16px; font-size: 24px; }
+            .mainCtaTitle { font-size: 16px; }
+            .mobileDislayNone { display: none; }
+            .gbRewardWrap { padding: 0 12px 14px; }
+            .gbRewardRow { flex-direction: column; align-items: stretch; padding: 13px 12px; }
+            .gbRewardCTA { width: 100%; justify-content: center; }
+        }
+
+        /* ═══════════════════════════════════════════════
+           QUICK BUTTONS — vertical icon card style
+        ═══════════════════════════════════════════════ */
+        .quickGroup {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        @@media (max-width: 360px) { .quickGroup { grid-template-columns: repeat(3, 1fr); gap: 8px; } }
+
+        .quickBtn {
+            border-radius: var(--r);
+            padding: 14px 6px 12px;
+            font-size: 12px; font-weight: 800;
+            text-align: center; cursor: pointer;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 7px; min-height: 76px;
+            transition: transform .13s cubic-bezier(.34,1.56,.64,1), box-shadow .13s;
+            box-shadow: var(--sh-sm);
+            border: 1.5px solid transparent;
+        }
+        .quickBtn:focus { outline: 3px solid rgba(59,130,246,.30); outline-offset: 3px; }
+        .quickBtn:hover  { transform: translateY(-3px) scale(1.04); box-shadow: var(--sh); }
+        .quickBtn:active { transform: translateY(0) scale(.95); }
+
+        .qIcon  { font-size: 26px; line-height: 1; display: block; }
+        .qLabel { font-size: 11.5px; font-weight: 800; line-height: 1.2; word-break: keep-all; display: block; }
+
+        .quick-a { background: #FFF3ED; color: #C2410C; border-color: rgba(194,65,12,.12); }
+        .quick-b { background: #E0F2FE; color: #0369A1; border-color: rgba(3,105,161,.12); }
+        .quick-c { background: #FFF1F2; color: #BE123C; border-color: rgba(190,18,60,.12); }
+        .quick-d { background: #F0FDF4; color: #15803D; border-color: rgba(21,128,61,.12); }
+        .quick-e { background: #FAF5FF; color: #7E22CE; border-color: rgba(126,34,206,.12); }
+        .quick-f { background: #FFFBEB; color: #B45309; border-color: rgba(180,83,9,.12); }
+        .quick-g { background: #F0FDFA; color: #0F766E; border-color: rgba(15,118,110,.12); }
+
+        /* ═══════════════════════════════════════════════
+           CARD GRID — MAIN FEATURE CARDS
+        ═══════════════════════════════════════════════ */
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        @@media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+
+        .cardBtn {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-top: 4px solid #E5E7EB;
+            border-radius: var(--r-lg);
+            padding: 18px 16px 16px;
+            box-shadow: var(--sh-sm);
+            cursor: pointer; text-align: left;
+            position: relative; overflow: hidden;
+            transition: transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s;
+            width: 100%;
+        }
+        .cardBtn:focus { outline: 3px solid rgba(59,130,246,.30); outline-offset: 3px; }
+        .cardBtn:hover  { transform: translateY(-4px); box-shadow: var(--sh); }
+        .cardBtn:active { transform: translateY(0) scale(.98); }
+
+        .card-blue   { border-top-color: var(--blue);   }
+        .card-green  { border-top-color: var(--green);  }
+        .card-purple { border-top-color: var(--purple); }
+        .card-orange { border-top-color: var(--orange); }
+
+        /* full-width for obsolete cards on desktop */
+        .obsolete {
+            background: #FAFAFA;
+            border-style: dashed;
+            border-top-style: dashed;
+            opacity: .92;
+        }
+        @@media (min-width: 481px) { .cardBtn.obsolete { grid-column: span 2; } }
+
+        .cardInner { display: flex; gap: 14px; align-items: flex-start; }
+
+        .pict {
+            width: 56px; height: 56px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px;
+            background: var(--surface2);
+            border: 1.5px solid var(--border);
+            box-shadow: var(--sh-sm);
+            flex-shrink: 0;
+        }
+        .card-blue   .pict { background: var(--blue-lt);   border-color: rgba(59,130,246,.22); }
+        .card-green  .pict { background: var(--green-lt);  border-color: rgba(34,197,94,.22);  }
+        .card-purple .pict { background: var(--purple-lt); border-color: rgba(168,85,247,.22); }
+        .card-orange .pict { background: var(--orange-lt); border-color: rgba(255,107,53,.22); }
+
+        .title { font-weight: 900; font-size: 16px; letter-spacing: -.2px; color: var(--ink); }
+        .desc  { margin-top: 5px; font-size: 13px; font-weight: 600; color: var(--ink2); line-height: 1.45; }
+
+        .meta { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .pill {
+            padding: 5px 10px; border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            font-size: 12px; font-weight: 800; color: var(--ink);
+        }
+        .card-blue   .pill { background: var(--blue-lt);   border-color: rgba(59,130,246,.18); color: #1D4ED8; }
+        .card-green  .pill { background: var(--green-lt);  border-color: rgba(34,197,94,.18);  color: #15803D; }
+        .card-purple .pill { background: var(--purple-lt); border-color: rgba(168,85,247,.18); color: #7E22CE; }
+        .card-orange .pill { background: var(--orange-lt); border-color: rgba(255,107,53,.18); color: #C2410C; }
+
+        /* ═══════════════════════════════════════════════
+           FEEDBACK BUTTONS
+        ═══════════════════════════════════════════════ */
+        .feedbackBtn {
+            display: flex;
+            align-items: center; justify-content: space-between;
+            gap: 14px;
+            margin-top: 12px;
+            width: 100%;
+            padding: 16px 18px;
+            border-radius: var(--r-lg);
+            border: 1.5px solid var(--border);
+            background: var(--surface);
+            box-shadow: var(--sh-sm);
+            cursor: pointer;
+            transition: transform .14s, box-shadow .14s;
+            text-decoration: none;
+            color: var(--ink);
+            font-family: 'Noto Sans KR', system-ui, sans-serif;
+            /* override quickBtn column direction */
+            flex-direction: row !important;
+            min-height: auto;
+        }
+        .feedbackBtn:hover  { transform: translateY(-2px); box-shadow: var(--sh); }
+        .feedbackBtn:active { transform: translateY(0); }
+
+        .feedbackBtn .left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .feedbackBtn .qIcon {
+            width: 46px; height: 46px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            background: var(--blue-lt); border: 1px solid rgba(59,130,246,.18);
+            flex-shrink: 0;
+        }
+        .feedbackBtn .qText { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .feedbackBtn .qText b {
+            font-size: 14.5px; font-weight: 900; letter-spacing: -.2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .feedbackBtn .qText span {
+            font-size: 12.5px; font-weight: 700; color: var(--ink2);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .feedbackBtn .arrow { flex-shrink: 0; font-size: 20px; color: var(--ink3); }
+
+        /* ═══════════════════════════════════════════════
+           FOOTER
+        ═══════════════════════════════════════════════ */
+        .foot {
+            margin-top: 28px;
+            text-align: center; color: var(--ink3);
+            font-size: 12.5px; font-weight: 700;
+        }
+
+        /* ═══════════════════════════════════════════════
+           LOAD ANIMATION — stagger
+        ═══════════════════════════════════════════════ */
+        .k-fade { opacity: 0; transform: translateY(10px); animation: kFade .4s ease forwards; }
+        .k-fade:nth-child(1)  { animation-delay: .04s; }
+        .k-fade:nth-child(2)  { animation-delay: .09s; }
+        .k-fade:nth-child(3)  { animation-delay: .14s; }
+        .k-fade:nth-child(4)  { animation-delay: .19s; }
+        .k-fade:nth-child(5)  { animation-delay: .24s; }
+        .k-fade:nth-child(6)  { animation-delay: .29s; }
+        .k-fade:nth-child(7)  { animation-delay: .34s; }
+        .k-fade:nth-child(8)  { animation-delay: .39s; }
+        .k-fade:nth-child(9)  { animation-delay: .44s; }
+        .k-fade:nth-child(10) { animation-delay: .49s; }
+        @@keyframes kFade { to { opacity: 1; transform: translateY(0); } }
+
+        /* ═══════════════════════════════════════════════
+           RESPONSIVE
+        ═══════════════════════════════════════════════ */
+        @@media (max-width: 640px) {
+            .container { padding: 12px 12px 40px; }
+            .hero { border-radius: var(--r-lg); padding: 18px 16px 16px; }
+            .cardBtn { padding: 16px 14px 14px; }
+            .title { font-size: 15px; }
+            .desc { font-size: 12.5px; }
+        }
+        @@media (max-width: 420px) {
+            .heroName { font-size: 20px; }
+            .hello    { font-size: 15px; }
+            .avatarWrap { width: 60px; height: 60px; }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <!-- ══════════════════════════════
+         HERO HEADER
+    ══════════════════════════════ -->
+    <header class="hero">
+        <div class="heroInner">
+            <div class="rightPack">
+                <div class="rightStack">
+                    <div class="avatarWrap" onclick="location.href='@profileClickUrl'" title="내 정보 / 사진 변경">
+                        <img id="myProfileImg"
+                             src="@ConstatsCommon.representFaceImage"
+                             data-src="@profileImgSrc"
+                             alt="대표 프로필"
+                             width="68" height="68"
+                             decoding="async" fetchpriority="low" />
+                    </div>
+                </div>
+            </div>
+            <div class="brandBlock">
+                <div class="brandTitle">안녕하세요 👋</div>
+                @if (!string.IsNullOrWhiteSpace(userFullName))
+                {
+                    <div class="heroName">@(@userFullName)님!</div>
+                }
+                <div class="hello">@topTitle 입니다.</div>
+                @if (isSuperAdmin)
+                {
+                    <div class="subline"><a href="/OneLineFamousWord">@ViewData["OneLineText"]</a></div>
+                }
+                else
+                {
+                    <div class="subline">@ViewData["OneLineText"]</div>
+                }
+            </div>
+        </div>
+
+        <div class="heroInner1">
+            <div class="typePill @typeClass" title="현재 화면 유형">
+                <span>@typeEmoji</span>
+                <span class="label"><small>현재</small> @(@typeLabel)형 메뉴</span>
+            </div>
+
+            <form method="post" action="@Url.Action("ChangeUserType","Home")" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <button class="chipBtn changeTypeBtn" type="submit">🔁 메뉴 유형 변경</button>
+            </form>
+
+            <button id="pwaInstallBtn" class="chipBtn changeTypeBtn" type="button" style="display:none;">
+                📲 바로가기 설치
+            </button>
+
+            <a id="pwaHowToBtn" class="chipBtn changeTypeBtn" href="/Home/HowToInstall"
+               style="display:none; text-align:center;">
+                📌 바로가기 추가 방법
+            </a>
+        </div>
+    </header>
+
+    <!-- ══════════════════════════════
+         🔍 말씀 찾기 검색창
+    ══════════════════════════════ -->
+    <div class="bible-search-zone">
+        <div class="bs-label-row">
+            <span class="bs-chip">📖 말씀 찾기</span>
+            <span class="bs-desc">궁금한 단어 하나로 성경 전체를 탐색해보세요 ✨</span>
+        </div>
+        <button class="bs-bar" type="button" onclick="location.href='/Bible/Search'" aria-label="성경 구절 검색">
+            <span class="bs-icon">🔍</span>
+            <span class="bs-placeholder">예) 사랑, 믿음, 소망, 예수… 어떤 말씀이 궁금하세요?</span>
+            <span class="bs-btn-text">검색</span>
+        </button>
+        <div class="bs-hint-row">
+            <span class="bs-hint-item">💡 "두려워하지 말라"</span>
+            <span class="bs-hint-sep">·</span>
+            <span class="bs-hint-item">✝ "은혜"</span>
+            <span class="bs-hint-sep">·</span>
+            <span class="bs-hint-item">🕊 "평안"</span>
+            <span class="bs-hint-sep">·</span>
+            <span class="bs-hint-item">🌟 "기도"</span>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════
+         BANNER ZONE
+    ══════════════════════════════ -->
+    <section class="bannerZone">
+
+        <!-- 🌰 GOLDEN BELL CTA (도토리 포인트) -->
+        <a class="mainCta @(reached100 ? "gb-ready gb-shimmer" : "") @(isMilestone ? "gb-milestone" : "") @(milestoneJustReached ? "gb-just" : "")"
+           href="/StudentPointDashboard4/Index"
+           aria-label="내 도토리(포인트)로 이동"
+           data-points="@integratedTotal"
+           data-milestone="@currentMilestone"
+           data-justreached="@(milestoneJustReached ? "1" : "0")"
+           data-gift="@(giftAvailable ? "1" : "0")">
+
+            <div class="mainCtaBadges">
+                <span class="gbBadge points" title="현재 통합 포인트">
+                    💰 <span class="num">@integratedTotal</span>점
+                </span>
+            </div>
+
+            <div class="gbConfetti" aria-hidden="true"></div>
+
+            <div class="mainCtaInner">
+                <div class="mainCtaIcon" aria-hidden="true">🌰</div>
+                <div class="mainCtaText">
+                    <div class="mainCtaTitle">
+                        @ConstatsCommon.myDoToRi
+                        @if (milestoneJustReached)
+                        {
+                            <span style="font-weight:1000;"> · 🎉 마일스톤 달성!</span>
+                        }
+                        else
+                        {
+                            <span style="opacity:.75;"> </span>
+                        }
+                    </div>
+                    @if (milestoneJustReached)
+                    {
+                        <div class="mainCtaDesc" style="font-size:14.5px; font-weight:1000;">
+                            지금 바로 선물을 고를 수 있어요! 아래에서 "선물 고르기"를 눌러 주세요 👇
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mainCtaDesc">통합 포인트 · 선물함 · 마일스톤 진행 상황을 한 번에 확인해요</div>
+                    }
+                    <div class="mainCtaMeta mobileDislayNone">
+                        <span class="mainCtaPill">🎁 내 선물함</span>
+                        <span class="mainCtaPill">📈 포인트 현황</span>
+                        <span class="mainCtaPill">🔔 마일스톤</span>
+                    </div>
+                </div>
+            </div>
+
+            @if (milestoneJustReached)
+            {
+                <div class="gbRewardWrap" aria-label="선물 선택 안내">
+                    <div class="gbRewardBanner">
+                        <div class="gbRewardRow">
+                            <div class="gbRewardLeft">
+                                <div class="gbRewardTitle">🎁 선물 받을 시간이에요! 지금 선물 고르기</div>
+                                <div class="gbRewardDesc">
+                                    마일스톤(@currentMilestone 점)을 달성했어요.<br />
+                                    아래 버튼을 눌러 <b>내 선물함</b>에서 선물을 선택해 주세요!
+                                </div>
+                            </div>
+                            <div class="gbRewardCTA" aria-hidden="true">
+                                🎁 선물 고르기 <span class="arr">›</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </a>
+
+        <!-- ⚡ QUICK BUTTONS -->
+        <section class="quickGroup">
+            <button class="quickBtn quick-a" type="button" onclick="location.href='/DailyMission2/Index'">
+                <span class="qIcon">🎯</span>
+                <span class="qLabel">@ConstatsCommon.MainKeyTitle</span>
+            </button>
+
+            <button class="quickBtn quick-b" type="button"
+                    onclick="location.href='/BandBoard/Index?boardTableName=BandJuboPosts&boardName=주보게시판'">
+                <span class="qIcon">📰</span>
+                <span class="qLabel">금주의 주보</span>
+            </button>
+
+            <button class="quickBtn quick-c" type="button" onclick="location.href='/Notice'">
+                <span class="qIcon">📢</span>
+                <span class="qLabel">공지사항</span>
+            </button>
+
+            <button class="quickBtn quick-d" type="button" onclick="location.href='/Bible/Welcome'">
+                <span class="qIcon">📖</span>
+                <span class="qLabel">@ConstatsCommon.ReadBibleAllTitleButton</span>
+            </button>
+
+            <button class="quickBtn quick-e" type="button" onclick="location.href='/RhapsodyOfReality/DetailWords'">
+                <span class="qIcon">🎤</span>
+                <span class="qLabel">오늘의 설교</span>
+            </button>
+
+     
+      
+        </section>
+
+        <!-- 배너 파셜 -->
+        @await Html.PartialAsync("_Banner_NoticeTops")
+        @await Html.PartialAsync("_Banner_NoticeBoardTops")
+        @await Html.PartialAsync("_Banner_TodayPopMessage")
+        @await Html.PartialAsync("_Banner_NotifyPersonelHappyComingBirthday")
+        @await Html.PartialAsync("_Banner_TodayBirth")
+        @await Html.PartialAsync("_Banner_NoBirthdayInfo")
+    </section>
+
+    <!-- ══════════════════════════════
+         MAIN FEATURE CARDS
+    ══════════════════════════════ -->
+    <section class="grid">
+        @if (MenuAllowed(urlWorldview))
+        {
+            <button class="cardBtn card-orange k-fade" onclick="location.href='@urlWorldview'" type="button">
+                <div class="cardInner">
+                    <div class="pict">🧭</div>
+                    <div>
+                        <div class="title">@ConstatsCommon.MissionBibleWithparent</div>
+                        <div class="desc">한 주 공과를 집에서 더 깊게 나누도록 돕는 미션지예요.</div>
+                        <div class="meta">
+                            <span class="pill">🏡 가정예배</span>
+                            <span class="pill">💬 대화 질문</span>
+                            <span class="pill">✅ 한 주 실천</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlMissionToday))
+        {
+            <button class="cardBtn card-green k-fade" onclick="location.href='@urlMissionToday'" type="button">
+                <div class="cardInner">
+                    <div class="pict">📜</div>
+                    <div>
+                        <div class="title">성경미션</div>
+                        <div class="desc">말씀 읽기와 오늘 미션을 한 번에 시작해요.</div>
+                        <div class="meta">
+                            <span class="pill">🔥 @ConstatsCommon.MainKeyTitle</span>
+                            <span class="pill">📚 @ConstatsCommon.ReadBibleAllTitleButton</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlNotice))
+        {
+            <button class="cardBtn card-blue k-fade" onclick="location.href='@urlNotice'" type="button">
+                <div class="cardInner">
+                    <div class="pict">💬</div>
+                    <div>
+                        <div class="title">소통공간</div>
+                        <div class="desc">공지/게시판/주보/쪽지를 한 곳에서 확인해요.</div>
+                        <div class="meta">
+                            <span class="pill">📌 공지사항</span>
+                            <span class="pill">📝 게시판</span>
+                            <span class="pill">📰 주보</span>
+                            <span class="pill">✉️ 쪽지함</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlPraiseHub))
+        {
+            <button class="cardBtn card-purple k-fade" onclick="location.href='@urlPraiseHub'" type="button">
+                <div class="cardInner">
+                    <div class="pict">🎶</div>
+                    <div>
+                        <div class="title">예배 콘텐츠</div>
+                        <div class="desc">찬양으로 마음을 열고, 기도로 연결되고, 설교로 믿음이 자라요.</div>
+                        <div class="meta">
+                            <span class="pill">🎵 찬양</span>
+                            <span class="pill">🙏 기도</span>
+                            <span class="pill">🎙️ 설교</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlAdminTeacherOnly))
+        {
+            <button class="cardBtn k-fade" onclick="location.href='@urlAdminTeacherOnly'" type="button">
+                <div class="cardInner">
+                    <div class="pict">🚀</div>
+                    <div>
+                        <div class="title">교사전용메뉴</div>
+                        <div class="desc">출석부, 새친구, 포인트 관리 한 번에!</div>
+                        <div class="meta">
+                            <span class="pill">📋 출석부</span>
+                            <span class="pill">🪙 포인트</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlAlbum))
+        {
+            <button class="cardBtn card-purple k-fade" onclick="location.href='@urlAlbum'" type="button">
+                <div class="cardInner">
+                    <div class="pict">🖼️</div>
+                    <div>
+                        <div class="title">사진·영상</div>
+                        <div class="desc">사진 공유·다운로드, 영상 바로보기</div>
+                        <div class="meta">
+                            <span class="pill">🎬 사진/영상 보기</span>
+                            <span class="pill">💾 다운로드</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (false)
+        {
+            <button class="cardBtn card-blue" onclick="location.href='@urlAddressBook'" type="button">
+                <div class="cardInner">
+                    <div class="pict">📇</div>
+                    <div>
+                        <div class="title">주소록</div>
+                        <div class="desc">인명검색과 교적부를 편하게 찾아볼 수 있어요.</div>
+                        <div class="meta">
+                            <span class="pill">🔍 인명검색</span>
+                            <span class="pill">📘 교적부</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlApplyEvent))
+        {
+            <button class="cardBtn card-orange k-fade" onclick="location.href='@urlApplyEvent'" type="button">
+                <div class="cardInner">
+                    <div class="pict">📅</div>
+                    <div>
+                        <div class="title">이벤트</div>
+                        <div class="desc">생일자와 예정된 행사를 한눈에 확인해요.</div>
+                        <div class="meta">
+                            <span class="pill">🎂 생일자</span>
+                            <span class="pill">🔔 예정된 행사</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        @if (MenuAllowed(urlWeeklyWordToRead))
+        {
+            <button class="cardBtn obsolete k-fade" onclick="location.href='@urlWeeklyWordToRead'" type="button">
+                <div class="cardInner">
+                    <div class="pict">📘</div>
+                    <div>
+                        <div class="title">주일공과</div>
+                        <div class="desc">이번 주 공과를 미리 읽고 예습하는 방이에요. 공과 자료를 한곳에서 확인하고, 예배 전에 차근차근 준비해 보세요.</div>
+                        <div class="meta">
+                            <span class="pill">📖 공과 예습</span>
+                            <span class="pill">🗂️ 공과 자료</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+
+        <button class="cardBtn obsolete k-fade" onclick="location.href='/ResourceBox/index'" type="button">
+            <div class="cardInner">
+                <div class="pict">📦</div>
+                <div>
+                    <div class="title">유년부 자료실</div>
+                    <div class="desc">교육 자료를 한 곳에 모아둔 보관함이에요.</div>
+                    <div class="meta">
+                        <span class="pill">자료 아카이브</span>
+                        <span class="pill">영상 자료</span>
+                    </div>
+                </div>
+            </div>
+        </button>
+
+        @if (MenuAllowed(urlIndexComplex) && isSuperAdmin)
+        {
+            <button class="cardBtn obsolete" onclick="location.href='@urlIndexComplex'" type="button">
+                <div class="cardInner">
+                    <div class="pict">🕰️</div>
+                    <div>
+                        <div class="title">예전 화면 (Obsolete)</div>
+                        <div class="desc">새 화면이 불편하거나 오류가 있으면 예전 화면으로 이동할 수 있어요.</div>
+                        <div class="meta">
+                            <span class="pill">안정화용</span>
+                            <span class="pill">문제 발생 시 대체</span>
+                        </div>
+                    </div>
+                </div>
+            </button>
+        }
+    </section>
+
+    <!-- ══════════════════════════════
+         FEEDBACK BUTTONS
+    ══════════════════════════════ -->
+    <a class="feedbackBtn"
+       href="/Board/Create2?boardName=Anonymous"
+       aria-label="개선사항 및 불편사항 접수">
+        <div class="left">
+            <div class="qIcon">📝</div>
+            <div class="qText">
+                <b>개선사항 · 불편사항 접수</b>
+                <span>불편했던 점이나 개선 아이디어를 남겨주세요</span>
+            </div>
+        </div>
+        <div class="arrow">›</div>
+    </a>
+
+    @if (isSuperAdmin)
+    {
+        <a class="feedbackBtn"
+           href="/Board/IndexByBoard?boardName=Anonymous"
+           aria-label="개선사항 및 불편사항 접수 보기">
+            <div class="left">
+                <div class="qIcon">📝</div>
+                <div class="qText">
+                    <b>개선사항 · 불편사항 접수 보기</b>
+                    <span>불편했던 점이나 개선 아이디어를 남겨주세요</span>
+                </div>
+            </div>
+            <div class="arrow">›</div>
+        </a>
+
+        <a class="feedbackBtn"
+           href="/HelpDesk/Index"
+           aria-label="Help Desk">
+            <div class="left">
+                <div class="qIcon">📝</div>
+                <div class="qText">
+                    <b>Help Desk</b>
+                    <span>문제점 이야기해 주세요.</span>
+                </div>
+            </div>
+            <div class="arrow">›</div>
+        </a>
+    }
+
+    <div class="foot">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+</div>
+
+<!-- AntiForgery (wrDefer용) -->
+<form id="wrAntiForm" method="post" action="javascript:void(0)" style="display:none;">
+    @Html.AntiForgeryToken()
+</form>
+
+@if (false)
+{
+    <div id="wrGuideBack" style="
+    position:fixed; inset:0; background:rgba(0,0,0,.45);
+    display:@(showVBSParticipationSurveyGuide ? "flex" : "none"); align-items:center; justify-content:center;
+    padding:18px; z-index:9999;">
+    <div style="
+        width:min(520px, 100%);
+        background:#fff; border-radius:18px;
+        border:1px solid rgba(2,6,23,.12);
+        box-shadow:0 20px 60px rgba(0,0,0,.22);
+        overflow:hidden;">
+        <div style="padding:16px 16px 10px; font-weight:950; font-size:16px;">
+            🏕️ 겨울 성경학교 참석 여부 조사
+        </div>
+        <div style="padding:0 16px 14px; color:rgba(11,18,32,.75); font-weight:700; line-height:1.5;">
+            2/27 · 2/28 · 3/1<br />
+            오전/오후 참석 여부를 "밀기 버튼"으로 체크해 주세요.<br />
+            <span style="color:#2563eb; font-weight:900;">전일 참석 / 전일 미참석</span> 버튼도 있어요.
+        </div>
+        <div style="display:flex; gap:10px; padding:0 16px 16px; flex-wrap:wrap;">
+            <button type="button"
+                    onclick="location.href='@urlVBSParticipationSurvey'"
+                    style="flex:1; min-width:140px; padding:12px 12px; border-radius:14px;
+                           border:1px solid rgba(37,99,235,.35); background:#2563eb;
+                           color:#fff; font-weight:950; cursor:pointer;">
+                지금 참여하기
+            </button>
+            <button type="button"
+                    onclick="wrDefer(3)"
+                    style="flex:1; min-width:140px; padding:12px 12px; border-radius:14px;
+                           border:1px solid rgba(2,6,23,.12); background:#fff;
+                           color:rgba(11,18,32,.85); font-weight:900; cursor:pointer;">
+                3일 후 다시
+            </button>
+            <button type="button"
+                    onclick="wrDefer(7)"
+                    style="flex:1; min-width:140px; padding:12px 12px; border-radius:14px;
+                           border:1px solid rgba(2,6,23,.12); background:#fff;
+                           color:rgba(11,18,32,.85); font-weight:900; cursor:pointer;">
+                7일 후 다시
+            </button>
+            <button type="button"
+                    onclick="wrDefer(0)"
+                    style="width:100%; padding:12px 12px; border-radius:14px;
+                           border:1px solid rgba(2,6,23,.10); background:rgba(2,6,23,.06);
+                           color:rgba(11,18,32,.80); font-weight:900; cursor:pointer;">
+                닫기
+            </button>
+        </div>
+    </div>
+    </div>
+}
+
+<script>
+    (function () {
+        var img = document.getElementById('myProfileImg');
+        if (!img) return;
+
+        var isSignedIn = @((isSignedIn) ? "true" : "false");
+        if (!isSignedIn) return;
+
+        var realSrc = img.getAttribute('data-src') || img.getAttribute('src') || '';
+        if (!realSrc) return;
+
+        var load = function () { img.src = realSrc; };
+
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(load, { timeout: 1200 });
+        } else {
+            setTimeout(load, 0);
+        }
+    })();
+</script>
+
+<script src="/js/GlobalCookie.js"></script>
+
+<script>
+    (function () {
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("/service-worker.js").catch(function () { });
+            });
+        }
+
+        var ua = navigator.userAgent || "";
+        var isIOS = /iphone|ipad|ipod/i.test(ua);
+        var isStandaloneIOS = (window.navigator.standalone === true);
+
+        var installBtn = document.getElementById("pwaInstallBtn");
+        var howToBtn = document.getElementById("pwaHowToBtn");
+
+        var isStandalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+        if (isStandalone || isStandaloneIOS) {
+            if (installBtn) installBtn.style.display = "none";
+            if (howToBtn) howToBtn.style.display = "none";
+            return;
+        }
+
+        if (isIOS) {
+            if (howToBtn) howToBtn.style.display = "inline-flex";
+            return;
+        }
+
+        var deferredPrompt = null;
+
+        window.addEventListener("beforeinstallprompt", function (e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installBtn) installBtn.style.display = "inline-flex";
+        });
+
+        if (installBtn) {
+            installBtn.addEventListener("click", async function () {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                try { await deferredPrompt.userChoice; } catch (e) { }
+                deferredPrompt = null;
+                installBtn.style.display = "none";
+            });
+        }
+    })();
+</script>
+
+<script>
+    function wrGetAntiToken() {
+        var form = document.getElementById('wrAntiForm');
+        if (!form) return '';
+        var input = form.querySelector('input[name="__RequestVerificationToken"]');
+        return input ? input.value : '';
+    }
+
+    async function wrDefer(days) {
+        try {
+            if (days === 3 || days === 7) {
+                var token = wrGetAntiToken();
+                await fetch('/Home/DeferVBSParticipationSurveyGuide?days=' + encodeURIComponent(days), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'RequestVerificationToken': token
+                    },
+                    body: ''
+                });
+            }
+        } catch (e) { }
+
+        var back = document.getElementById('wrGuideBack');
+        if (back) back.style.display = 'none';
+    }
+</script>
+
+<script>
+    (function () {
+        var cta = document.querySelector('.mainCta');
+        if (!cta) return;
+
+        var milestone = parseInt(cta.getAttribute('data-milestone') || '0', 10) || 0;
+        var justReached = (cta.getAttribute('data-justreached') === '1');
+
+        var key = 'BB_GB_LAST_MILESTONE';
+        var last = parseInt(localStorage.getItem(key) || '0', 10) || 0;
+
+        var shouldFire = false;
+
+        if (justReached && milestone >= 100) {
+            shouldFire = true;
+        } else if (milestone >= 100 && milestone > last) {
+            shouldFire = true;
+        }
+
+        if (milestone >= 100) localStorage.setItem(key, String(milestone));
+        if (!shouldFire) return;
+
+        var layer = cta.querySelector('.gbConfetti');
+        if (!layer) return;
+
+        var count = 28;
+        for (var i = 0; i < count; i++) {
+            var p = document.createElement('i');
+            var left = Math.random() * 100;
+            var delay = Math.random() * 0.18;
+            var dur = 0.95 + Math.random() * 0.55;
+            var w = 8 + Math.random() * 8;
+            var h = 10 + Math.random() * 12;
+
+            p.style.left = left + '%';
+            p.style.animationDelay = delay + 's';
+            p.style.animationDuration = dur + 's';
+            p.style.width = w + 'px';
+            p.style.height = h + 'px';
+
+            layer.appendChild(p);
+        }
+
+        setTimeout(function () {
+            layer.innerHTML = '';
+        }, 1800);
+    })();
+</script>
+
+</body>
+</html>

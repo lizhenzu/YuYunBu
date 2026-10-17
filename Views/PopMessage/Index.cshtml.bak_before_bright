@@ -1,0 +1,764 @@
+﻿@{
+    Layout = null;
+}
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>쪽지함</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        /* ── 쪽지함 — Bone 톤 (공통: wwwroot/css/board-bone.css) ── */
+        .hdRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+        .unreadBox { flex: none; text-align: right; font-size: 11px; font-weight: 600; letter-spacing: .16em; color: var(--headdim); }
+        .unreadBox b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 34px; letter-spacing: 0; color: var(--headk); font-variant-numeric: tabular-nums; line-height: 1.1; }
+
+        /* 탭 — 머리 아래 붙는 세 칸 */
+        .tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 22px; border: 1px solid #3A3C40; }
+        .tab { font-family: inherit; font-size: 14px; padding: 11px 0; background: none; border: 0; border-left: 1px solid #3A3C40; color: var(--headdim); cursor: pointer; }
+        .tab:first-child { border-left: 0; }
+        .tab:hover { color: var(--headk); }
+        .tab.active { background: var(--headk); color: #16181C; font-weight: 600; }
+
+        /* 구역 머리 */
+        .panelHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 28px; padding-bottom: 10px; border-bottom: 1px solid var(--tx); }
+        .panelTitle { font-family: "Noto Serif KR", serif; font-size: 18px; font-weight: 500; }
+        .hint { font-size: 12.5px; color: var(--dim); line-height: 1.6; margin-top: 3px; }
+        .headBtns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        /* 버튼 (스크립트가 .btn 클래스를 쓴다) */
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; font-size: 13px; padding: 7px 13px; cursor: pointer; white-space: nowrap;
+            border: 1px solid var(--rule); background: var(--card); color: var(--tx); border-radius: 0; transition: border-color .15s, color .15s, background .15s; }
+        .btn:hover { border-color: var(--acc); color: var(--acc); }
+        .btn:disabled { opacity: .45; cursor: default; }
+        .btn.primary { background: var(--tx); color: var(--bg); border-color: var(--tx); }
+        .btn.primary:hover:not(:disabled) { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .btn.danger, .btn.adminDanger { color: var(--danger); }
+        .btn.danger:hover, .btn.adminDanger:hover { border-color: var(--danger); color: var(--danger); }
+        .btn.admin { color: var(--acc); border-color: var(--acc); }
+
+        /* 쪽지 목록 */
+        .list { display: block; }
+        .card { border-bottom: 1px solid var(--line); }
+        .cardRow { display: flex; gap: 12px; align-items: flex-start; padding: 15px 2px; cursor: pointer; transition: background .15s; }
+        .cardRow:hover { background: var(--card); }
+        .dot { flex: none; width: 7px; height: 7px; margin-top: 8px; border-radius: 50%; background: transparent; }
+        .dot.unread { background: var(--acc); }
+        .meta { flex: 1; min-width: 0; }
+        .who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14.5px; color: var(--tx); }
+        .plabel { font-size: 10.5px; font-weight: 600; letter-spacing: .1em; color: var(--dim); border: 1px solid var(--rule); padding: 1px 6px; }
+        .time { font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .badge { display: inline-block; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; padding: 2px 7px; background: var(--acc); color: var(--bg); }
+        .badge.read { background: none; border: 1px solid var(--rule); color: var(--dim); }
+        .badge.unread { background: none; border: 1px solid var(--acc); color: var(--acc); }
+        .preview { margin-top: 5px; font-family: "Noto Serif KR", serif; font-size: 14.5px; line-height: 1.6; color: var(--dim2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+        .unreadText .who { font-weight: 600; }
+        .unreadText .preview { color: var(--tx); }
+
+        .expand { display: none; padding: 0 2px 16px 21px; }
+        .expandInner { display: flex; flex-direction: column; gap: 10px; }
+        .body { white-space: pre-wrap; font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.9; color: var(--tx); background: var(--card); border: 1px solid var(--rule); border-left: 2px solid var(--acc); padding: 14px 16px; word-break: keep-all; overflow-wrap: anywhere; }
+        .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+        /* 새 쪽지 */
+        .composer { display: grid; grid-template-columns: 1fr; gap: 26px; margin-top: 18px; }
+        @@media (min-width: 760px) { .composer { grid-template-columns: 1fr 1fr; } }
+        .subT { font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--dim2); margin-bottom: 8px; }
+        .searchBox { display: flex; gap: 0; }
+        .searchBox .input { border-right: 0; }
+        .input { width: 100%; min-width: 0; font-family: inherit; font-size: 15px; color: var(--tx); background: var(--card); border: 1px solid var(--rule); border-radius: 0; padding: 11px 13px; outline: none; }
+        .input:focus { border-color: var(--acc); }
+        textarea.input { min-height: 180px; resize: vertical; line-height: 1.8; font-family: "Noto Serif KR", serif; }
+        .results { margin-top: 10px; border-top: 1px solid var(--line); }
+        .results .hint { padding: 12px 2px; }
+        .person { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+        .person.selected { background: var(--mark); padding-left: 10px; border-left: 2px solid var(--acc); }
+        .pname { font-size: 14.5px; font-weight: 600; }
+        .psub { font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); }
+        .sendArea { display: flex; flex-direction: column; gap: 8px; }
+        .sendHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+        #toInfo { font-size: 14px; color: var(--tx); }
+
+        .loadBar { padding: 20px 0 44px; text-align: center; }
+
+        /* 알림 */
+        .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 99999; display: none; padding: 11px 16px; background: var(--head); color: var(--headtx); font-size: 13px; box-shadow: 0 10px 24px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+
+        /* 관리자 메세지 창 */
+        .modalBack { position: fixed; inset: 0; z-index: 99998; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(12,13,15,.55); }
+        .modal { width: min(560px, 100%); background: var(--bg); border: 1px solid var(--rule); box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+        .modalHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; background: var(--head); color: var(--headtx); }
+        .modalTitle { font-family: "Noto Serif KR", serif; font-size: 17px; }
+        .modalHead .btn { background: none; border-color: #3A3C40; color: var(--headtx); }
+        .modalBody { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+        .modalHint { font-size: 13px; color: var(--dim2); line-height: 1.6; }
+        .modalActions { display: flex; justify-content: flex-end; gap: 6px; padding: 12px 18px 16px; border-top: 1px solid var(--rule); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="/Notice/Branch">소통공간</a></span>
+            </div>
+            <div class="hdRow">
+                <div>
+                    <div class="hdK">MESSAGE</div>
+                    <h1 class="hdT">쪽지함</h1>
+                </div>
+                <div class="unreadBox">안 읽음<b id="unreadBadge" title="안읽은 메세지">0</b></div>
+            </div>
+            <div class="tabs" role="tablist">
+                <button class="tab active" id="tabInbox" data-tab="inbox" type="button">받은함</button>
+                <button class="tab" id="tabSent" data-tab="sent" type="button">보낸함</button>
+                <button class="tab" id="tabNew" data-tab="new" type="button">새 쪽지</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="panelHead">
+            <div>
+                <div class="panelTitle" id="panelTitle">받은 메세지함</div>
+                <div class="hint" id="panelHint">안읽음은 굵게 표시됩니다. 스크롤로 화면에 보이면 읽음 처리됩니다.</div>
+            </div>
+
+            <div class="headBtns">
+                @* ✅ SuperAdmin 전용: "관리자메세지 보내기" 버튼 *@
+                @if (isSuperAdmin)
+                {
+                    <button class="btn admin" id="btnAdminBroadcast" type="button" title="모든 사용자에게 관리자 메세지 전송">관리자 메세지 보내기</button>
+
+                    @* ✅ 추가: SuperAdmin이 보낸 모든 메세지 삭제 *@
+                    <button class="btn adminDanger" id="btnDeleteSuperAdminMsgs" type="button" title="FromWhom='SuperAdmin' 전체 삭제">SuperAdmin 메세지 전체 삭제</button>
+                }
+                <button class="btn" id="btnRefresh" type="button">↻ 새로고침</button>
+            </div>
+        </div>
+
+        <div id="panelInbox" class="list"></div>
+        <div id="panelSent" class="list" style="display:none"></div>
+
+        <div id="panelNew" style="display:none">
+            <div class="composer">
+                <div>
+                    <div class="subT">받는 사람 찾기</div>
+                    <div class="searchBox">
+                        <input class="input" id="qPerson" placeholder="이름 · 아이디 · 전화번호" />
+                        <button class="btn primary" id="btnSearch" type="button">검색</button>
+                    </div>
+                    <div class="hint">이름 / UserName / 전화번호로 찾을 수 있어요.</div>
+                    <div class="results" id="personResults"></div>
+                </div>
+
+                <div class="sendArea">
+                    <div class="sendHead">
+                        <div>
+                            <div class="subT" style="margin-bottom:2px">쪽지 쓰기</div>
+                            <div id="toInfo">받는 사람을 선택해 주세요.</div>
+                        </div>
+                        <button class="btn primary" id="btnSend" type="button" disabled>전송</button>
+                    </div>
+                    <textarea class="input" id="msgText" placeholder="쪽지를 입력하세요 (최대 500자)"></textarea>
+                    <div class="hint" id="lenInfo" style="text-align:right">0 / 500</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="loadBar">
+            <div class="hint" id="loadHint">아래로 스크롤하면 더 불러옵니다.</div>
+        </div>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    @* ✅ SuperAdmin 관리자 메세지 모달 *@
+    <div class="modalBack" id="adminModalBack" aria-hidden="true">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="adminModalTitle">
+            <div class="modalHead">
+                <div class="modalTitle" id="adminModalTitle">관리자 메세지 보내기</div>
+                <button class="btn" id="btnAdminClose" type="button">닫기</button>
+            </div>
+            <div class="modalBody">
+                <div class="modalHint">
+                    SuperAdmin 전용 기능입니다. 전송 시 보내는 사람은 <b>SuperAdmin</b>으로 저장됩니다.
+                </div>
+                <textarea class="input" id="adminMsgText" placeholder="모든 사용자에게 보낼 메세지를 입력하세요 (최대 500자)"></textarea>
+                <div class="hint" id="adminLenInfo">0 / 500</div>
+            </div>
+            <div class="modalActions">
+                <button class="btn" id="btnAdminCancel" type="button">취소</button>
+                <button class="btn primary" id="btnAdminSend" type="button">전송</button>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" style="display:none">
+        @Html.AntiForgeryToken()
+    </form>
+
+    <script>
+        // ✅ 서버에서 내려주는 SuperAdmin 여부
+        const IS_SUPERADMIN = @((isSuperAdmin ? "true" : "false"));
+
+        // Anti-forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+        const api = {
+            unread: () => fetch('/PopMessage/UnreadCount').then(r => r.json()),
+            inbox: (page, pageSize) => fetch(`/PopMessage/InboxList?page=${page}&pageSize=${pageSize}`).then(r => r.json()),
+            sent: (page, pageSize) => fetch(`/PopMessage/SentList?page=${page}&pageSize=${pageSize}`).then(r => r.json()),
+            markRead: (idsCsv) => fetch('/PopMessage/MarkRead', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&ids=${encodeURIComponent(idsCsv)}`
+            }).then(r => r.json()),
+            del: (id) => fetch('/PopMessage/Delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&id=${encodeURIComponent(id)}`
+            }).then(r => r.json()),
+            searchPeople: (q) => fetch(`/PopMessage/SearchPeople?q=${encodeURIComponent(q)}&take=25`).then(r => r.json()),
+            send: (toUserName, messageText) => fetch('/PopMessage/SendAjax', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&ToUserName=${encodeURIComponent(toUserName)}&MessageText=${encodeURIComponent(messageText)}`
+            }).then(r => r.json()),
+
+            // ✅ SuperAdmin 전용: 전체 사용자에게 관리자 메세지 전송
+            adminBroadcast: (messageText) => fetch('/PopMessage/AdminBroadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&MessageText=${encodeURIComponent(messageText)}`
+            }).then(r => r.json()),
+
+            // ✅ SuperAdmin 전용: SuperAdmin이 보낸 메시지 전체 삭제
+            // (서버에서: DELETE FROM PopMessage WHERE FromWhom='SuperAdmin')
+            adminDeleteSuperAdminMessages: () => fetch('/PopMessage/AdminDeleteSuperAdminMessages', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}`
+            }).then(r => r.json())
+        };
+
+        const state = {
+            tab: 'inbox',
+            pageInbox: 0,
+            pageSent: 0,
+            pageSize: 20,
+            loading: false,
+            done: false,
+            pendingRead: new Set(),
+            readTimer: null,
+            selectedToUserName: '',
+            selectedToFullName: ''
+        };
+
+        const el = {
+            badge: document.getElementById('unreadBadge'),
+            title: document.getElementById('panelTitle'),
+            hint: document.getElementById('panelHint'),
+            loadHint: document.getElementById('loadHint'),
+
+            tabInbox: document.getElementById('tabInbox'),
+            tabSent: document.getElementById('tabSent'),
+            tabNew: document.getElementById('tabNew'),
+
+            pnlInbox: document.getElementById('panelInbox'),
+            pnlSent: document.getElementById('panelSent'),
+            pnlNew: document.getElementById('panelNew'),
+
+            btnRefresh: document.getElementById('btnRefresh'),
+
+            qPerson: document.getElementById('qPerson'),
+            btnSearch: document.getElementById('btnSearch'),
+            personResults: document.getElementById('personResults'),
+            toInfo: document.getElementById('toInfo'),
+            btnSend: document.getElementById('btnSend'),
+            msgText: document.getElementById('msgText'),
+            lenInfo: document.getElementById('lenInfo'),
+
+            toast: document.getElementById('toast'),
+
+            // ✅ SuperAdmin Modal
+            btnAdminBroadcast: document.getElementById('btnAdminBroadcast'),
+            btnDeleteSuperAdminMsgs: document.getElementById('btnDeleteSuperAdminMsgs'),
+
+            adminBack: document.getElementById('adminModalBack'),
+            btnAdminClose: document.getElementById('btnAdminClose'),
+            btnAdminCancel: document.getElementById('btnAdminCancel'),
+            btnAdminSend: document.getElementById('btnAdminSend'),
+            adminMsgText: document.getElementById('adminMsgText'),
+            adminLenInfo: document.getElementById('adminLenInfo'),
+        };
+
+        function toast(msg, ms = 1600) {
+            el.toast.textContent = msg;
+            el.toast.style.display = 'block';
+            clearTimeout(el.toast._t);
+            el.toast._t = setTimeout(() => el.toast.style.display = 'none', ms);
+        }
+
+        function setTab(tab) {
+            state.tab = tab;
+            state.loading = false;
+            state.done = false;
+
+            el.tabInbox.classList.toggle('active', tab === 'inbox');
+            el.tabSent.classList.toggle('active', tab === 'sent');
+            el.tabNew.classList.toggle('active', tab === 'new');
+
+            el.pnlInbox.style.display = tab === 'inbox' ? '' : 'none';
+            el.pnlSent.style.display = tab === 'sent' ? '' : 'none';
+            el.pnlNew.style.display = tab === 'new' ? '' : 'none';
+
+            if (tab === 'inbox') {
+                el.title.textContent = '받은 메세지함';
+                el.hint.textContent = '안읽음은 굵게 표시됩니다. 스크롤로 화면에 보이면 읽음 처리됩니다.';
+                el.loadHint.textContent = '아래로 스크롤하면 더 불러옵니다.';
+            } else if (tab === 'sent') {
+                el.title.textContent = '내가 보낸 메세지함';
+                el.hint.textContent = '카드를 누르면 본문 전체가 펼쳐집니다. (읽음/안읽음 표시)';
+                el.loadHint.textContent = '아래로 스크롤하면 더 불러옵니다.';
+            } else {
+                el.title.textContent = '새 메세지';
+                el.hint.textContent = '받는 사람을 찾고, 문자처럼 빠르게 전송하세요.';
+                el.loadHint.textContent = '검색 후 대상 선택 → 메세지 입력 → 전송';
+            }
+        }
+
+        function escapeHtml(s) {
+            return (s ?? '').replace(/[&<>"']/g, m => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[m]));
+        }
+
+        function buildCard(item, mode) {
+            const visited = (item.visited ?? item.Visited) ?? 0;
+
+            const inboxUnread = (mode === 'inbox' && visited === 0);
+            const sentUnread = (mode === 'sent' && visited === 0);
+
+            const id = item.id ?? item.Id;
+            const peerFullName = item.peerFullName ?? item.PeerFullName ?? '';
+            const peerUserName = item.peerUserName ?? item.PeerUserName ?? '';
+            const time = item.insertDT ?? item.InsertDT ?? '';
+            const preview = item.messagePreview ?? item.MessagePreview ?? '';
+            const body = item.messageText ?? item.MessageText ?? '';
+
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.id = id;
+            card.dataset.mode = mode;
+            card.dataset.peerUserName = peerUserName;
+
+            const row = document.createElement('div');
+            row.className = 'cardRow' + (inboxUnread ? ' unreadText' : '');
+
+            const dot = document.createElement('div');
+            dot.className = 'dot' + (inboxUnread ? ' unread' : '');
+
+            const meta = document.createElement('div');
+            meta.className = 'meta';
+
+            const who = document.createElement('div');
+            who.className = 'who';
+
+            let badgeHtml = '';
+            if (mode === 'inbox' && inboxUnread) badgeHtml = `<span class="badge">NEW</span>`;
+            if (mode === 'sent') {
+                badgeHtml = sentUnread
+                    ? `<span class="badge unread">안읽음</span>`
+                    : `<span class="badge read">읽음</span>`;
+            }
+
+            const peerLabel = mode === 'inbox'
+                ? `<span class="plabel">보낸이</span>`
+                : `<span class="plabel">받는이</span>`;
+            who.innerHTML = `${peerLabel} ${escapeHtml(peerFullName || peerUserName)} <span class="time">${escapeHtml(time)}</span> ${badgeHtml}`;
+
+            const pv = document.createElement('div');
+            pv.className = 'preview';
+            pv.textContent = preview;
+
+            meta.appendChild(who);
+            meta.appendChild(pv);
+
+            row.appendChild(dot);
+            row.appendChild(meta);
+
+            const exp = document.createElement('div');
+            exp.className = 'expand';
+            exp.innerHTML = `
+                <div class="expandInner">
+                    <div class="body">${escapeHtml(body)}</div>
+                    <div class="actions">
+                        ${mode === 'inbox' ? `<button class="btn" data-act="reply" type="button">답장</button>` : ''}
+                        <button class="btn danger" data-act="delete" type="button">삭제</button>
+                    </div>
+                </div>
+            `;
+
+            row.addEventListener('click', (e) => {
+                const btn = e.target?.closest('button[data-act]');
+                if (btn) return;
+                exp.style.display = (exp.style.display === 'block' ? 'none' : 'block');
+            });
+
+            exp.addEventListener('click', async (e) => {
+                const btn = e.target.closest('button[data-act]');
+                if (!btn) return;
+
+                const act = btn.getAttribute('data-act');
+                if (act === 'delete') {
+                    if (!confirm('이 메세지를 삭제할까요? (복구 불가)')) return;
+                    const res = await api.del(id);
+                    if (res.ok) {
+                        toast('삭제했습니다.');
+                        card.remove();
+                        refreshUnread();
+                    } else {
+                        toast('삭제 실패');
+                    }
+                }
+                if (act === 'reply') {
+                    const toUserName = peerUserName || '';
+                    if (!toUserName) { toast('상대 정보가 없습니다.'); return; }
+                    setSelectedPerson(toUserName, peerFullName || peerUserName);
+                    setTab('new');
+                    setTabUIOnly('new');
+                    toast('답장 대상이 선택됐어요.');
+                }
+            });
+
+            card.appendChild(row);
+            card.appendChild(exp);
+
+            if (inboxUnread) observeForRead(card);
+            return card;
+        }
+
+        let io = null;
+        function ensureIO() {
+            if (io) return;
+            io = new IntersectionObserver((entries) => {
+                for (const en of entries) {
+                    if (en.isIntersecting) {
+                        const card = en.target;
+                        const id = parseInt(card.dataset.id, 10);
+                        if (id > 0) {
+                            queueRead(id);
+                            io.unobserve(card);
+                        }
+                    }
+                }
+            }, { root: null, threshold: 0.35 });
+        }
+        function observeForRead(card) { ensureIO(); io.observe(card); }
+
+        function queueRead(id) {
+            state.pendingRead.add(id);
+            if (state.readTimer) clearTimeout(state.readTimer);
+            state.readTimer = setTimeout(flushRead, 500);
+        }
+
+        async function flushRead() {
+            if (state.pendingRead.size === 0) return;
+            const ids = Array.from(state.pendingRead);
+            state.pendingRead.clear();
+
+            const res = await api.markRead(ids.join(','));
+            if (res.ok) {
+                for (const id of ids) {
+                    const card = document.querySelector(`.card[data-id="${id}"]`);
+                    if (!card) continue;
+                    const row = card.querySelector('.cardRow');
+                    const dot = card.querySelector('.dot');
+                    if (row) row.classList.remove('unreadText');
+                    if (dot) dot.classList.remove('unread');
+                    const badge = card.querySelector('.who .badge');
+                    if (badge && badge.textContent === 'NEW') badge.remove();
+                }
+                refreshUnread();
+            }
+        }
+
+        function setTabUIOnly(tab) {
+            el.tabInbox.classList.toggle('active', tab === 'inbox');
+            el.tabSent.classList.toggle('active', tab === 'sent');
+            el.tabNew.classList.toggle('active', tab === 'new');
+
+            el.pnlInbox.style.display = tab === 'inbox' ? '' : 'none';
+            el.pnlSent.style.display = tab === 'sent' ? '' : 'none';
+            el.pnlNew.style.display = tab === 'new' ? '' : 'none';
+
+            if (tab === 'new') {
+                el.title.textContent = '새 메세지';
+                el.hint.textContent = '받는 사람을 찾고, 문자처럼 빠르게 전송하세요.';
+                el.loadHint.textContent = '검색 후 대상 선택 → 메세지 입력 → 전송';
+            }
+        }
+
+        async function refreshUnread() {
+            const u = await api.unread();
+            if (u.ok) el.badge.textContent = u.count;
+        }
+
+        async function loadMore() {
+            if (state.loading || state.done) return;
+            if (state.tab === 'new') return;
+
+            state.loading = true;
+            try {
+                if (state.tab === 'inbox') {
+                    const res = await api.inbox(state.pageInbox, state.pageSize);
+                    if (!res.ok) { toast(res.message || '로드 실패'); state.loading = false; return; }
+                    const items = res.items || [];
+                    if (items.length === 0) { state.done = true; el.loadHint.textContent = '더 이상 메세지가 없습니다.'; }
+                    for (const it of items) el.pnlInbox.appendChild(buildCard(it, 'inbox'));
+                    state.pageInbox++;
+                } else {
+                    const res = await api.sent(state.pageSent, state.pageSize);
+                    if (!res.ok) { toast(res.message || '로드 실패'); state.loading = false; return; }
+                    const items = res.items || [];
+                    if (items.length === 0) { state.done = true; el.loadHint.textContent = '더 이상 메세지가 없습니다.'; }
+                    for (const it of items) el.pnlSent.appendChild(buildCard(it, 'sent'));
+                    state.pageSent++;
+                }
+            } finally {
+                state.loading = false;
+            }
+        }
+
+        function resetList() {
+            state.done = false;
+            state.loading = false;
+            el.loadHint.textContent = '아래로 스크롤하면 더 불러옵니다.';
+
+            if (state.tab === 'inbox') {
+                state.pageInbox = 0;
+                el.pnlInbox.innerHTML = '';
+            }
+            if (state.tab === 'sent') {
+                state.pageSent = 0;
+                el.pnlSent.innerHTML = '';
+            }
+        }
+
+        function setSelectedPerson(userName, fullName) {
+            state.selectedToUserName = userName || '';
+            state.selectedToFullName = fullName || userName || '';
+
+            el.toInfo.textContent = state.selectedToUserName
+                ? `받는 사람: ${state.selectedToFullName}`
+                : '받는 사람을 선택해 주세요.';
+            el.btnSend.disabled = !state.selectedToUserName;
+        }
+
+        async function doSearch() {
+            const q = (el.qPerson.value || '').trim();
+            if (!q) { toast('검색어를 입력해 주세요'); return; }
+
+            const res = await api.searchPeople(q);
+            if (!res.ok) { toast('검색 실패'); return; }
+
+            const items = res.items || [];
+            el.personResults.innerHTML = '';
+            if (items.length === 0) {
+                el.personResults.innerHTML = `<div class="hint">검색 결과가 없습니다.</div>`;
+                return;
+            }
+
+            for (const p of items) {
+                const userName = p.userName ?? p.UserName ?? '';
+                const fullName = p.fullName ?? p.FullName ?? userName;
+
+                const div = document.createElement('div');
+                div.className = 'person' + (state.selectedToUserName === userName ? ' selected' : '');
+                div.innerHTML = `
+                    <div style="min-width:0">
+                        <div class="pname">${escapeHtml(fullName)}</div>
+                        <div class="psub">${escapeHtml(userName)}</div>
+                    </div>
+                    <button class="btn" type="button">선택</button>
+                `;
+                div.querySelector('button').addEventListener('click', () => {
+                    document.querySelectorAll('.person').forEach(x => x.classList.remove('selected'));
+                    div.classList.add('selected');
+                    setSelectedPerson(userName, fullName);
+                });
+                el.personResults.appendChild(div);
+            }
+        }
+
+        async function doSend() {
+            const to = state.selectedToUserName;
+            const msg = (el.msgText.value || '').trim();
+
+            if (!to) { toast('받는 사람을 선택해 주세요'); return; }
+            if (!msg) { toast('메세지를 입력해 주세요'); return; }
+            if (msg.length > 500) { toast('메세지는 최대 500자입니다.'); return; }
+
+            const res = await api.send(to, msg);
+            if (res.ok) {
+                toast('전송했습니다.');
+                el.msgText.value = '';
+                updateLen();
+                refreshUnread();
+            } else {
+                toast(res.message || '전송 실패');
+            }
+        }
+
+        function updateLen() {
+            const len = (el.msgText.value || '').length;
+            el.lenInfo.textContent = `${len} / 500`;
+        }
+
+        // =========================
+        // ✅ SuperAdmin 관리자메세지 모달/전송
+        // =========================
+        function openAdminModal() {
+            if (!IS_SUPERADMIN) return;
+            el.adminBack.style.display = 'flex';
+            el.adminBack.setAttribute('aria-hidden', 'false');
+            el.adminMsgText.value = '';
+            updateAdminLen();
+            setTimeout(() => el.adminMsgText.focus(), 0);
+        }
+        function closeAdminModal() {
+            el.adminBack.style.display = 'none';
+            el.adminBack.setAttribute('aria-hidden', 'true');
+        }
+        function updateAdminLen() {
+            const len = (el.adminMsgText.value || '').length;
+            el.adminLenInfo.textContent = `${len} / 500`;
+        }
+        async function doAdminBroadcast() {
+            if (!IS_SUPERADMIN) return;
+
+            const msg = (el.adminMsgText.value || '').trim();
+            if (!msg) { toast('메세지를 입력해 주세요'); return; }
+            if (msg.length > 500) { toast('메세지는 최대 500자입니다.'); return; }
+
+            el.btnAdminSend.disabled = true;
+            try {
+                const res = await api.adminBroadcast(msg);
+                if (res.ok) {
+                    closeAdminModal();
+                    toast('관리자 메세지를 전송했습니다.', 3000);
+                } else {
+                    toast(res.message || '전송 실패');
+                }
+            } finally {
+                el.btnAdminSend.disabled = false;
+            }
+        }
+
+        // =========================
+        // ✅ SuperAdmin: SuperAdmin 발신 메세지 전체 삭제
+        // =========================
+        async function doDeleteSuperAdminMessages() {
+            if (!IS_SUPERADMIN) return;
+
+            const warn =
+                "정말 삭제할까요?\n\n" +
+                "• FromWhom='SuperAdmin' 로 보낸 모든 메세지가 DB에서 삭제됩니다.\n" +
+                "• 복구 불가입니다.\n\n" +
+                "계속 진행하려면 '확인'을 눌러주세요.";
+            if (!confirm(warn)) return;
+
+            el.btnDeleteSuperAdminMsgs.disabled = true;
+            try {
+                const res = await api.adminDeleteSuperAdminMessages();
+                if (res.ok) {
+                    toast('SuperAdmin 메세지를 모두 삭제했습니다.', 3000);
+
+                    // ✅ 현재 탭 리스트 갱신
+                    if (state.tab === 'inbox' || state.tab === 'sent') {
+                        resetList();
+                        await loadMore();
+                    }
+                    await refreshUnread();
+                } else {
+                    toast(res.message || '삭제 실패');
+                }
+            } finally {
+                el.btnDeleteSuperAdminMsgs.disabled = false;
+            }
+        }
+
+        window.addEventListener('scroll', () => {
+            const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
+            if (nearBottom) loadMore();
+        });
+
+        el.tabInbox.addEventListener('click', () => { setTab('inbox'); resetList(); loadMore(); });
+        el.tabSent.addEventListener('click', () => { setTab('sent'); resetList(); loadMore(); });
+        el.tabNew.addEventListener('click', () => { setTab('new'); });
+
+        el.btnRefresh.addEventListener('click', () => {
+            if (state.tab === 'new') return toast('새 메세지 탭입니다.');
+            resetList();
+            loadMore();
+            refreshUnread();
+            toast('새로고침');
+        });
+
+        el.btnSearch.addEventListener('click', doSearch);
+        el.qPerson.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+        });
+
+        el.btnSend.addEventListener('click', doSend);
+        el.msgText.addEventListener('input', updateLen);
+
+        // ✅ SuperAdmin 버튼/모달 이벤트
+        if (el.btnAdminBroadcast) el.btnAdminBroadcast.addEventListener('click', openAdminModal);
+        if (el.btnAdminClose) el.btnAdminClose.addEventListener('click', closeAdminModal);
+        if (el.btnAdminCancel) el.btnAdminCancel.addEventListener('click', closeAdminModal);
+        if (el.btnAdminSend) el.btnAdminSend.addEventListener('click', doAdminBroadcast);
+        if (el.adminMsgText) el.adminMsgText.addEventListener('input', updateAdminLen);
+
+        // ✅ SuperAdmin 전체삭제 버튼 이벤트
+        if (el.btnDeleteSuperAdminMsgs) el.btnDeleteSuperAdminMsgs.addEventListener('click', doDeleteSuperAdminMessages);
+
+        // 모달 바깥 클릭 닫기 + ESC 닫기
+        if (el.adminBack) {
+            el.adminBack.addEventListener('click', (e) => {
+                if (e.target === el.adminBack) closeAdminModal();
+            });
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && el.adminBack.style.display === 'flex') closeAdminModal();
+            });
+        }
+
+        (async function init() {
+            updateLen();
+            await refreshUnread();
+            resetList();
+            await loadMore();
+        })();
+    </script>
+</body>
+</html>

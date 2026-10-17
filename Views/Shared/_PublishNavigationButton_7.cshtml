@@ -1,0 +1,53 @@
+﻿@model BulletinBoard.Models.eBibles
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+
+    int? currentJang = null;
+
+    //    string LangCDMethod = ViewBag.LangCDMethod as string;
+
+    string LangCDMethod = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.LangCD.ToString()) as String;
+
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+
+    string queryStringA = string.Empty;
+    string queryStringPrev = string.Empty;
+    string queryStringNow = string.Empty;
+    string queryStringNext = string.Empty;
+    queryStringA = $"/DailyMission/BibleSheetJangByJang?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+    queryStringNow = queryStringA + SharedComm.MakeBibleQueryString(Model.BibleText, Model.FromJang, 0, Model.ToJang, 0);
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+    if (Model.FromJang > 1)
+    {
+        queryStringPrev = queryStringA + SharedComm.MakeBibleQueryString(Model.BibleText, Model.FromJang - 1, 0, Model.FromJang - 1, 0);
+    }
+
+    if (ViewBag.BibleJang > Model.FromJang)
+    {
+        queryStringNext = queryStringA + SharedComm.MakeBibleQueryString(Model.BibleText, Model.FromJang + 1, 0, Model.FromJang + 1, 0);
+    }
+}
+<div class="button-bar  no-select">
+    @if (Model.FromJang > 1)
+    {
+        int Jang = @Model.FromJang - 1;
+
+        <div class="buttonCommon  colorBaseMossGreen" id="closeDiv" onclick="redirectToPage('@queryStringPrev')">이전 @($"{@Jang}장")</div>
+    }
+
+    <div class="buttonCommon  colorBasePinkBlush" id="closeDiv" onclick="redirectToPage('@($"/bibleCenter/IndexByMap?Id=0&BibleText={Model.BibleText}")')">바로가기</div>
+
+    @if (ViewBag.BibleJang > Model.FromJang)
+    {
+        int Jang = @Model.FromJang + 1;
+        <div class="buttonCommon  colorBaseMintGreen" id="closeDiv" onclick="redirectToPage('@queryStringNext')">다음 @($"{@Jang}장")</div>
+    }
+</div>

@@ -1,0 +1,130 @@
+@using BulletinBoard.Helpers
+@using BulletinBoard.Models
+@using BulletinBoard.Common
+@model PrayerArrow
+
+@*  ══════════════════════════════════════════════════════════════
+    다짐 기도(화살 기도) — 수정 (관리자)
+    · 2026-10-05 시안 확정 — 다른 기도 편집 화면과 같은 밝은 흰색 틀
+    · 저장하면 그 날 기도 화면(Index?day=)으로 돌아간다
+    · 이전 화면(초록 · 어두운 모드)은 Edit.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null; /* 레이아웃 미사용 */
+    ViewData["Title"] = "다짐 기도 수정";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --tx:#111827; --body:#374151; --dim:#9CA3AF; --dim2:#6B7280; --rule:#EEF0F3; --mark:#F4F6F9;
+                --acc:#2F80ED; --acc-dk:#1F6FDB; --soft:#EAF2FD; --num:#7FA3DB; --warn:#B4531F; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #FFFFFF; color: var(--body); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; }
+        :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+        .pz { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+
+        .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; font-size: 13px; color: var(--dim); }
+        .bar > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar a { color: var(--body); font-weight: 700; }
+        .bar a:hover { color: var(--acc); }
+        .bar .sep { margin: 0 6px; color: #D1D5DB; }
+        .prog { height: 3px; border-radius: 99px; background: var(--mark); }
+        .kk { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--acc); }
+        .h1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--tx); }
+
+        .nb { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--mark); color: var(--dim2); cursor: pointer; white-space: nowrap; }
+        .nb:hover { color: var(--acc); }
+        .nb.pri { background: var(--acc); color: #fff; }
+        .nb.pri:hover { background: var(--acc-dk); color: #fff; }
+
+        .toast { margin-top: 14px; padding: 10px 14px; border-radius: 12px; background: var(--soft); color: var(--acc); font-size: 13px; }
+        .fm { display: grid; gap: 14px; margin-top: 16px; }
+        .row2 { display: grid; grid-template-columns: 150px 1fr; gap: 10px; }
+        @@media (max-width: 560px) { .row2 { grid-template-columns: 1fr; gap: 14px; } }
+        label.l { display: block; font-size: 12px; color: var(--dim2); margin-bottom: 4px; }
+        .in { width: 100%; font: inherit; font-size: 14px; padding: 12px 13px; border: 0; border-radius: 12px; background: var(--mark); color: var(--tx); }
+        .in:focus { outline: none; background: #fff; box-shadow: inset 0 0 0 2px var(--acc); }
+        textarea.in { min-height: 84px; line-height: 1.8; resize: vertical; }
+        .lnum { display: flex; gap: 10px; align-items: flex-start; }
+        .lnum .n { flex: none; width: 22px; padding-top: 30px; font-size: 15px; font-weight: 800; color: var(--num); text-align: center; }
+        .lnum > div { flex: 1; min-width: 0; }
+        .hint { margin-top: 5px; font-size: 11.5px; color: var(--dim); line-height: 1.7; }
+        .err { display: block; margin-top: 4px; font-size: 12px; color: var(--warn); }
+        .err:empty { display: none; }
+        .acts { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; padding-top: 4px; }
+        .chk { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--body); cursor: pointer; }
+        .chk input { width: 18px; height: 18px; accent-color: var(--acc); }
+        .acts .grp { display: flex; gap: 6px; }
+        .acts .nb { height: 46px; padding: 0 18px; border-radius: 14px; font-size: 14px; }
+        .acts .nb.pri { min-width: 120px; font-weight: 800; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="@Url.Action("Index", new { day = Model.DayIndex })">다짐 기도</a><span class="sep">›</span>@(Model.DayIndex)일차 수정</span>
+        <a class="nb" href="@Url.Action("Index", new { day = Model.DayIndex })">보기 →</a>
+    </div>
+    <div class="prog"></div>
+
+    <div class="kk" style="margin-top:20px">다짐 기도 · 수정</div>
+    <h1 class="h1">@(Model.DayIndex)일차 기도문</h1>
+
+    @if (TempData["msg"] != null) { <div class="toast">@TempData["msg"]</div> }
+
+    <form asp-action="Edit" method="post" class="fm" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" asp-for="PrayerId" />
+
+        <div class="row2">
+            <div>
+                <label class="l" asp-for="DayIndex">일자 (1~31)</label>
+                <input class="in" asp-for="DayIndex" type="number" min="1" max="31" />
+                <span asp-validation-for="DayIndex" class="err"></span>
+            </div>
+            <div>
+                <label class="l" asp-for="Title">제목</label>
+                <input class="in" asp-for="Title" type="text" placeholder="예) 전심의 사랑" />
+                <span asp-validation-for="Title" class="err"></span>
+            </div>
+        </div>
+
+        <div class="lnum"><span class="n" aria-hidden="true">1</span><div>
+            <label class="l" asp-for="Line1">첫째 줄</label>
+            <textarea class="in" asp-for="Line1" placeholder="첫째 줄 기도문"></textarea>
+            <span asp-validation-for="Line1" class="err"></span>
+        </div></div>
+        <div class="lnum"><span class="n" aria-hidden="true">2</span><div>
+            <label class="l" asp-for="Line2">둘째 줄</label>
+            <textarea class="in" asp-for="Line2" placeholder="둘째 줄 기도문"></textarea>
+            <span asp-validation-for="Line2" class="err"></span>
+        </div></div>
+        <div class="lnum"><span class="n" aria-hidden="true">3</span><div>
+            <label class="l" asp-for="Line3">셋째 줄</label>
+            <textarea class="in" asp-for="Line3" placeholder="셋째 줄 기도문"></textarea>
+            <span asp-validation-for="Line3" class="err"></span>
+        </div></div>
+        <div class="hint">첫째 줄이 "주님 · 하나님 · 아버지 · 예수님"으로 시작하지 않으면 화면 맨 위에 "주님,"이 붙어요. 끝맺음("예수님의 이름으로…아멘.")은 자동으로 붙어요.</div>
+
+        <div class="acts">
+            <label class="chk"><input asp-for="IsActive" type="checkbox" /> 이 날 보이기</label>
+            <div class="grp">
+                <a class="nb" href="@Url.Action("Index", new { day = Model.DayIndex })">돌아가기</a>
+                <button type="submit" class="nb pri">저장</button>
+            </div>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>

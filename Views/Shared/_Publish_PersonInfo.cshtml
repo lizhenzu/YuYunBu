@@ -1,0 +1,68 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.UserInfo
+@{
+
+    string YearBan = string.Empty;
+    string roleString = string.Empty;
+    string birthDay = string.Empty;
+    string nameString = string.Empty;
+
+    string DisplayMode = ViewData["DisplayMode"] as string;
+
+    if (@Model.RoleCode == "T1001" && @Model.ClassYear > 0)
+    {
+        YearBan = $"반명 : {@Model.ClassYear}학년{@Model.ClassBan}반";
+        roleString = "학생";
+    }
+    else if (@Model.RoleCode == "T1002" || @Model.RoleCode == "T1003" || @Model.RoleCode == "T1004" || @Model.RoleCode == "T1005" ||
+             @Model.RoleCode == "T1006" || @Model.RoleCode == "T1007" || @Model.RoleCode == "T1008" || @Model.RoleCode == "T1009")
+    {
+        roleString = $"교사";
+    }
+    else
+    {
+        roleString = $"기타";
+    }
+
+    if (@Model.bMonth > 0 && @Model.bDay > 0)
+    {
+        birthDay = $"생일 : {@Model.bMonth}월{@Model.bDay}일";
+    }
+    {
+        nameString = $"{Model.sequenceNo}. {Model.FullName}[{roleString}]";
+    }
+}
+
+<div class="card">
+    <img src="@Model.ProfilePicturePath" alt="Profile Picture"  >
+    <div class="info">
+        <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@nameString</span></div>
+        <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@Model.UserName</span></div>
+
+        @if (!string.IsNullOrEmpty(@Model.PhoneNumber))
+        {
+            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@Model.PhoneNumber</span></div>
+        }
+        @if (!string.IsNullOrEmpty(@Model.PhoneNumber2))
+        {
+            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@Model.PhoneNumber2</span></div>
+        }
+
+        @if (!string.IsNullOrEmpty(YearBan))
+        {
+            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@YearBan</span></div>
+        }
+        @if (@Model.bMonth > 0 && @Model.bDay > 0)
+        {
+            <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@birthDay</span></div>
+        }
+         
+    </div>
+</div>
+ 

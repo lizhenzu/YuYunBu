@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>일과 쉼을 지킨 사람들</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap">
+<style>
+  :root{
+    --bg:#faf3e2; --surface:#ffffff; --surface-2:#fef8ec;
+    --ink:#3a2e22; --ink-soft:#8a7a63; --ink-faint:#b6a888; --line:#ecdfc4;
+    --sky:#2f8fd1; --sky-soft:#e4f1fb;
+    --leaf:#3d9a5c; --leaf-soft:#e7f5ea;
+    --sun:#d99a1e; --sun-soft:#fdf1d7;
+    --coral:#df6248; --coral-soft:#fbe7e1;
+    --shadow: 0 2px 0 rgba(58,46,34,.05), 0 14px 30px -18px rgba(58,46,34,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#1c1710; --surface:#272016; --surface-2:#221c13;
+      --ink:#f3ecdc; --ink-soft:#c3b499; --ink-faint:#8b7c62; --line:#3c3221;
+      --sky:#6cbbef; --sky-soft:#182838;
+      --leaf:#6ecb90; --leaf-soft:#182a1e;
+      --sun:#eec168; --sun-soft:#2c250f;
+      --coral:#ef8a72; --coral-soft:#2e1e17;
+      --shadow: 0 2px 0 rgba(0,0,0,.2), 0 14px 30px -18px rgba(0,0,0,.6);
+    }
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; color-scheme:light dark; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Gowun Dodum','Noto Sans KR','Malgun Gothic',-apple-system,sans-serif;
+    line-height:1.75; -webkit-font-smoothing:antialiased; }
+  .page{ max-width:600px; margin:0 auto; padding:32px 18px 60px; }
+  @media (min-width:600px){ .page{ padding:52px 28px 80px; } }
+  h1,h2{ margin:0; font-family:'Jua','Noto Sans KR','Malgun Gothic',sans-serif; font-weight:400; text-wrap:balance; }
+  p{ margin:0; }
+
+  .cover{ text-align:center; padding-bottom:10px; }
+  .kicker{ display:inline-block; font-size:.82rem; font-weight:700; color:var(--sky); background:var(--sky-soft); border-radius:999px; padding:6px 16px; }
+  .cover h1{ margin-top:16px; font-size:clamp(1.6rem,6.8vw,2.2rem); line-height:1.42; }
+  .cover .sub{ margin-top:10px; color:var(--ink-soft); font-size:.98rem; }
+  .cover-art{ margin:22px auto 0; width:120px; height:120px; }
+
+  .scene{ margin-top:44px; }
+  .scene-tag{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .icon{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex:0 0 auto; font-size:1.1rem; }
+  .no{ font-family:'Jua'; font-size:.78rem; color:var(--ink-faint); }
+  .ti{ font-family:'Jua'; font-size:1.15rem; }
+  .scene-card{ background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:22px; box-shadow:var(--shadow); }
+  .scene-card p{ font-size:1.03rem; }
+  .scene-card p + p{ margin-top:10px; }
+  em{ font-style:normal; font-weight:700; }
+  .scene.sky .icon{ background:var(--sky-soft); color:var(--sky); }
+  .scene.leaf .icon{ background:var(--leaf-soft); color:var(--leaf); }
+  .scene.sun .icon{ background:var(--sun-soft); color:var(--sun); }
+  .scene.coral .icon{ background:var(--coral-soft); color:var(--coral); }
+
+  .quote-big{ margin-top:18px; font-family:'Jua'; font-size:clamp(1.2rem,4.8vw,1.5rem); line-height:1.55; color:var(--leaf); text-align:center; padding:8px 4px; }
+  .reveal{ margin-top:16px; background:var(--surface-2); border:1.5px dashed var(--line); border-radius:14px; padding:14px 16px; }
+  .reveal .q{ font-size:.88rem; color:var(--ink-soft); }
+  .reveal .a{ margin-top:6px; font-family:'Jua'; font-size:1.1rem; color:var(--coral); }
+  .reveal .a small{ display:block; font-family:'Gowun Dodum'; font-size:.85rem; color:var(--ink-soft); margin-top:3px; }
+
+  .verse-block{ margin-top:16px; background:var(--sun-soft); border-radius:14px; padding:16px 18px; }
+  .verse-block .ref{ font-size:.78rem; font-weight:700; color:var(--sun); }
+  .verse-block .txt{ margin-top:6px; font-size:.95rem; }
+
+  .compare-head{ margin-top:16px; font-family:'Jua'; font-size:.95rem; color:var(--ink-soft); }
+  .actions{ margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+  .action{ display:flex; align-items:center; gap:12px; background:var(--surface-2); border-radius:12px; padding:11px 14px; }
+  .action .num{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; color:#fff; font-family:'Jua'; font-size:.85rem; display:flex; align-items:center; justify-content:center; background:var(--leaf); }
+  .action.step .num{ background:var(--sky); }
+  .action .txt{ font-size:.96rem; }
+
+  .timeline{ margin-top:14px; border-left:3px solid var(--line); padding-left:16px; display:flex; flex-direction:column; gap:12px; }
+  .tl{ position:relative; }
+  .tl:before{ content:""; position:absolute; left:-23px; top:8px; width:11px; height:11px; border-radius:50%; background:var(--sky); }
+  .tl b{ font-family:'Jua'; font-weight:400; color:var(--sky); margin-right:6px; }
+
+  .tip{ margin-top:16px; background:var(--sky-soft); border-radius:14px; padding:14px 16px; font-size:.95rem; }
+  .tip b{ font-family:'Jua'; font-weight:400; color:var(--sky); }
+  .prayer{ margin-top:16px; background:var(--coral-soft); border-radius:14px; padding:20px; }
+  .prayer .amen{ display:block; margin-top:10px; font-family:'Jua'; color:var(--coral); }
+
+  footer{ margin-top:56px; padding-top:18px; border-top:1px solid var(--line); font-size:.78rem; color:var(--ink-faint); display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:space-between; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="cover">
+    <span class="kicker">10단원 35과 · 본받을 사람 이야기</span>
+    <h1>일과 쉼을<br>지킨 사람들</h1>
+    <p class="sub">금메달보다 주일을 택한 선수, 일요일엔 문을 닫는 사장님</p>
+    <svg class="cover-art" viewBox="0 0 120 120" fill="none">
+      <circle cx="60" cy="60" r="52" fill="var(--sun-soft)"></circle>
+      <path d="M44 34h32v18a16 16 0 0 1-32 0z" fill="var(--surface)" stroke="var(--sun)" stroke-width="2.5"></path>
+      <path d="M44 40H34c0 12 4 16 10 16M76 40h10c0 12-4 16-10 16" stroke="var(--sun)" stroke-width="2.5" stroke-linecap="round"></path>
+      <path d="M60 68v14M48 86h24" stroke="var(--sun)" stroke-width="2.5" stroke-linecap="round"></path>
+    </svg>
+  </div>
+
+  <!-- 장면 1 -->
+  <section class="scene sky">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🤔</span>
+      <span class="no">장면 1</span>
+      <span class="ti">정말 쉬어도 괜찮을까?</span>
+    </div>
+    <div class="scene-card">
+      <p>시험이 코앞이라서, 경기가 있어서, 일이 밀려서… 우리는 쉬는 날에도 쉬지 못할 때가 많아요.</p>
+      <p>그런데 <em>하나님의 질서를 따라 일하고 쉬는 삶</em>을 실제로 살아낸 사람들이 있어요. 두 사람을 만나 볼까요?</p>
+    </div>
+  </section>
+
+  <!-- 장면 2 에릭 리델 -->
+  <section class="scene leaf">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🏃</span>
+      <span class="no">장면 2</span>
+      <span class="ti">에릭 리델, 금메달보다 주일</span>
+    </div>
+    <div class="scene-card">
+      <p>1924년 파리 올림픽. 달리기 선수 에릭 리델은 100m 금메달 후보였어요. 그런데 예선 경기가 <em>주일</em>이었지요.</p>
+
+      <div class="timeline">
+        <div class="tl"><b>결심</b>“주일은 하나님의 날이에요.” 리델은 100m 출전을 포기했어요.</div>
+        <div class="tl"><b>도전</b>대신 전문 종목이 아니던 400m에 나갔어요.</div>
+        <div class="tl"><b>반전</b>금메달을 따고 세계 기록까지 세웠어요! 🥇</div>
+      </div>
+
+      <div class="reveal">
+        <p class="q">🏅 리델이 보여 준 것은?</p>
+        <p class="a">6일은 최선을 다해 달리고, 하루는 하나님 안에서 쉬기<br><small>영화 〈불의 전차〉의 실제 주인공이에요</small></p>
+      </div>
+
+      <div class="tip"><b>🧒 우리의 적용</b><br>경기, 시험, 학원이 있어도 주일에는 먼저 예배하겠다고 다짐해 봐요.</div>
+    </div>
+  </section>
+
+  <!-- 장면 3 트루엣 캐시 -->
+  <section class="scene sun">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🍗</span>
+      <span class="no">장면 3</span>
+      <span class="ti">트루엣 캐시, 일요일엔 쉬는 식당</span>
+    </div>
+    <div class="scene-card">
+      <p>1946년, 트루엣 캐시는 작은 식당을 열면서 한 가지를 정했어요. <em>“일요일은 문을 닫자.”</em></p>
+      <p>식당이 큰 회사로 자란 뒤에도 이 약속은 이어졌어요. 일요일에는 모든 매장이 쉬어요.</p>
+      <p class="quote-big">“나만 쉬는 게 아니라<br>함께 쉬게 해요.”</p>
+
+      <div class="compare-head">🤝 왜 문을 닫았을까요?</div>
+      <div class="actions">
+        <div class="action"><span class="num">✓</span><span class="txt">직원들도 가족과 쉴 수 있도록</span></div>
+        <div class="action"><span class="num">✓</span><span class="txt">직원들도 예배드릴 수 있도록</span></div>
+      </div>
+
+      <div class="verse-block">
+        <p class="ref">신명기 5:14</p>
+        <p class="txt">“…네 남종이나 네 여종이 너같이 쉬게 하라”</p>
+      </div>
+
+      <div class="tip"><b>🧒 우리의 적용</b><br>우리 가족과 친구들도 함께 쉬고 예배할 수 있도록 배려해 봐요.</div>
+    </div>
+  </section>
+
+  <!-- 장면 4 -->
+  <section class="scene coral">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">💡</span>
+      <span class="no">장면 4</span>
+      <span class="ti">두 사람의 공통점</span>
+    </div>
+    <div class="scene-card">
+      <div class="actions">
+        <div class="action step"><span class="num">1</span><span class="txt">맡은 일에는 <em>최선</em>을 다했어요</span></div>
+        <div class="action step"><span class="num">2</span><span class="txt">쉬는 날에는 <em>하나님 안에서</em> 멈췄어요</span></div>
+        <div class="action step"><span class="num">3</span><span class="txt">세상 방식이 아니라 <em>하나님의 질서</em>를 따랐어요</span></div>
+      </div>
+      <p class="quote-big" style="color:var(--coral)">“하나님이 세상을<br>창조하신 질서대로<br>일하고 쉬어요.”</p>
+    </div>
+  </section>
+
+  <!-- 장면 5 -->
+  <section class="scene sky">
+    <div class="scene-tag">
+      <span class="icon" aria-hidden="true">🙏</span>
+      <span class="no">장면 5</span>
+      <span class="ti">함께 기도해요</span>
+    </div>
+    <div class="scene-card">
+      <div class="prayer">
+        <p>“하나님 아버지! 리델과 캐시처럼 맡은 일에는 최선을 다하고, 주일에는 하나님 안에서 기쁘게 쉬게 해 주세요. 예수님의 이름으로 기도합니다.”</p>
+        <span class="amen">아멘 🤍</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>10단원 35과 · 일과 쉼을 지킨 사람들</span>
+    <span>※ 연도와 수치는 수업 전 한 번 더 확인해 주세요</span>
+  </footer>
+
+</div>
+</body>
+</html>

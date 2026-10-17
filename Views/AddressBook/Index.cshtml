@@ -1,0 +1,403 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 인명 검색 — 이름·아이디 실시간 검색 · 학생/선생님 거르기 · 전화·문자·쪽지·번호 복사 · 최근 검색
+    var thisMonth = DateHelper.GetKoreaNow().Month;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>인명 검색</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        button, input, textarea { font-family: inherit; }
+        .sh { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+        /* 검색 — 스크롤해도 위에 붙음 */
+        .tools { position: sticky; top: 0; z-index: 40; margin-top: 14px; background: #FFFFFF; border-bottom: 1px solid #EEF0F3; }
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .srch { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 18px; border-radius: 999px; background: #F4F6F9; }
+        .srch:focus-within { box-shadow: 0 0 0 2px #CFE0FA; }
+        .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 16px; color: #111827; }
+        .srch input::placeholder { color: #9CA3AF; }
+        .srch button { border: 0; background: none; color: #9CA3AF; font-size: 12.5px; font-weight: 700; padding: 6px; cursor: pointer; }
+        .srch button:hover { color: #2F80ED; }
+        .srch .spin { width: 16px; height: 16px; border: 2px solid #E5E7EB; border-top-color: #2F80ED; border-radius: 50%; animation: spin .8s linear infinite; }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        .seg { display: flex; gap: 6px; margin-top: 8px; }
+        .seg button { flex: 1; font-size: 13px; padding: 8px 2px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+        .seg button:hover { color: #2F80ED; }
+        .seg button.on { background: #2F80ED; color: #fff; font-weight: 800; }
+        .seg b { font-weight: 700; }
+
+        /* 최근 검색 */
+        .recent { margin-top: 22px; }
+        .recent .t { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 800; color: #111827; }
+        .recent .t button { border: 0; background: none; font-size: 12px; font-weight: 700; color: #2F80ED; cursor: pointer; padding: 0; }
+        .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .chips button { font-size: 13.5px; padding: 7px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #374151; cursor: pointer; }
+        .chips button:hover { color: #2F80ED; }
+        .guide { margin-top: 22px; padding: 14px 16px; border-radius: 12px; background: #F4F6F9; font-size: 13px; line-height: 1.85; color: #6B7280; }
+        .guide b { color: #111827; }
+        .guide a { color: #2F80ED; font-weight: 700; }
+
+        /* 결과 */
+        .cnt { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-bottom: 4px; font-size: 12.5px; color: #9CA3AF; }
+        .cnt b { color: #111827; font-weight: 800; }
+        .cnt .more { color: #B4531F; }
+        .list { display: grid; grid-template-columns: 1fr; border-top: 1px solid #EEF0F3; }
+        @@media (min-width: 900px) { .list { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+        .p { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid #EEF0F3; }
+        .ph { flex: none; width: 52px; height: 52px; border-radius: 50%; background: #EAF2FD; overflow: hidden; }
+        .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .bd { flex: 1; min-width: 0; }
+        .nm { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+        .nm b { font-size: 17px; font-weight: 800; color: #111827; }
+        .nm mark { background: #EAF2FD; color: #2B5FA8; border-radius: 4px; padding: 0 1px; }
+        .tg { font-size: 11px; font-weight: 700; padding: 1px 9px; border-radius: 999px; background: #F4F6F9; color: #6B7280; white-space: nowrap; }
+        .tg.st { background: #EAF2FD; color: #2B5FA8; }
+        .tg.bd { background: #FBEFE7; color: #B4531F; }
+        .tg.sent { background: #EAF2FD; color: #2B5FA8; }
+        .kv { margin-top: 6px; display: grid; grid-template-columns: 48px 1fr; gap: 3px 8px; font-size: 13.5px; }
+        .kv dt { color: #9CA3AF; }
+        .kv dd { margin: 0; color: #111827; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+        /* 전화번호 옆 "전화" 알약 버튼 — 누르면 전화 걸기.  /ApplyEvent/Branch 생일 배너(.bdTel)와 같은 모양 (2026-10-06) */
+        .callIc { margin-left: 6px; padding: 1px 9px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+        .callIc:hover { background: #DCEAFC; }
+        .callIc:focus-visible { outline: 2px solid #2F80ED; outline-offset: 2px; }
+        .kv dd.no { color: #D1D5DB; }
+        .act { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .act a, .act button { display: inline-flex; align-items: center; padding: 8px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .act a:hover, .act button:hover { color: #2F80ED; }
+        .act .pri { background: #2F80ED; color: #fff; font-weight: 800; }
+        .act .pri:hover { background: #1F6FDB; color: #fff; }
+        .msg { padding: 44px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+        .hidden { display: none !important; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+
+        /* 쪽지 보내기 — 아래에서 올라옴 */
+        .scrim { position: fixed; inset: 0; z-index: 950; background: rgba(17,24,39,.45); opacity: 0; pointer-events: none; transition: opacity .18s; }
+        .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 960; max-width: 640px; margin: 0 auto; background: #FFFFFF; border-radius: 20px 20px 0 0;
+                 padding: 10px 20px calc(18px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .22s ease; }
+        .open .scrim { opacity: 1; pointer-events: auto; }
+        .open .sheet { transform: none; }
+        .grab { width: 40px; height: 4px; border-radius: 999px; background: #E5E7EB; margin: 0 auto 12px; }
+        .shH { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .shH b { font-size: 19px; font-weight: 800; color: #111827; }
+        .shH small { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; }
+        .shX { flex: none; padding: 6px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+        .sheet textarea { width: 100%; min-height: 140px; margin-top: 12px; padding: 12px 16px; border: 0; border-radius: 12px; background: #F4F6F9; font-size: 15px; line-height: 1.7; color: #111827; resize: vertical; outline: none; }
+        .sheet textarea:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+        .shF { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
+        .shF span { font-size: 12px; color: #9CA3AF; }
+        .send { position: relative; height: 46px; padding: 0 26px; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14.5px; font-weight: 800; cursor: pointer; }
+        .send:hover { background: #1F6FDB; }
+        .send:disabled { cursor: progress; }
+        .send.busy { color: transparent; }
+        .send.busy::after { content: ""; position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; }
+        .shErr { min-height: 18px; margin-top: 6px; font-size: 12.5px; color: #B4531F; }
+
+        .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 990; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; max-width: calc(100% - 32px);
+                 padding: 11px 20px; border-radius: 999px; background: #111827; color: #fff; font-size: 13.5px; transition: opacity .18s, transform .18s; }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); }
+        .toast.bad { background: #B4531F; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><span><a href="/AddressBook/Branch">‹ 인명검색 · 교적부</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">인명 검색</h1>
+    </header>
+
+    <div class="tools">
+        <div class="sh">
+            <label class="srch">
+                <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="이름 또는 아이디 (2글자부터)" aria-label="이름 또는 아이디 검색" />
+                <i class="spin hidden" id="spin" aria-hidden="true"></i>
+                <button type="button" id="qClear" class="hidden" aria-label="검색어 지우기">지우기</button>
+            </label>
+            <div class="seg hidden" id="seg" role="tablist" aria-label="거르기">
+                <button type="button" data-f="all" class="on">전체 <b id="cAll">0</b></button>
+                <button type="button" data-f="st">학생 <b id="cSt">0</b></button>
+                <button type="button" data-f="etc">선생님·기타 <b id="cEtc">0</b></button>
+            </div>
+        </div>
+    </div>
+
+    <main class="sh">
+        @* 검색 전 *@
+        <section id="idle">
+            <div class="recent hidden" id="recent">
+                <div class="t"><span>최근 검색</span><button type="button" id="recentClear">모두 지우기</button></div>
+                <div class="chips" id="recentList"></div>
+            </div>
+            <div class="guide">
+                <b>이렇게 찾아요</b><br />
+                · 이름이나 아이디를 <b>2글자 이상</b> 입력하면 바로 찾아요.<br />
+                · 결과에서 <b>학생 / 선생님·기타</b>로 거를 수 있어요.<br />
+                · 전화번호가 있으면 <b>전화 · 문자 · 번호 복사</b>, 아이디가 있으면 <b>쪽지</b>를 보낼 수 있어요.<br />
+                · 반별 명단은 <a href="/ChurchRecord">교적부관리</a>에서 볼 수 있어요.
+            </div>
+        </section>
+
+        @* 결과 *@
+        <section id="result" class="hidden">
+            <div class="cnt"><span>검색 결과 <b id="cShown">0</b>명</span><span class="more hidden" id="more">최대 30명까지만 보여요 · 이름을 더 입력해 보세요</span></div>
+            <div class="list" id="list"></div>
+            <div class="msg hidden" id="none"></div>
+        </section>
+        <div class="ft"><span>전화 · 문자는 휴대폰에서 바로 열려요. 쪽지는 사이트 안 쪽지함으로 가요.</span></div>
+    </main>
+
+    @* 쪽지 보내기 *@
+    <div class="scrim" id="scrim"></div>
+    <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="toName" aria-hidden="true">
+        <div class="grab"></div>
+        @Html.AntiForgeryToken()
+        <div class="shH">
+            <div><b id="toName">받는 사람</b><small id="toSub">쪽지함으로 보내요</small></div>
+            <button type="button" class="shX" id="shClose" aria-label="닫기">닫기</button>
+        </div>
+        <textarea id="msgIn" maxlength="500" placeholder="따뜻한 메시지를 입력해 주세요." aria-label="쪽지 내용"></textarea>
+        <div class="shErr" id="shErr" aria-live="polite"></div>
+        <div class="shF"><span><span id="msgCnt">0</span> / 500 · Ctrl+Enter 로 보내기</span><button type="button" class="send" id="btnSend">쪽지 보내기</button></div>
+    </section>
+
+    <div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+    const MIN_LEN = 2, TAKE = 30, DEBOUNCE_MS = 350;
+    const THIS_MONTH = @thisMonth;
+    const FALLBACK = '/images/icon/people/people_01.webp';
+    const SENT_TTL_MS = 10 * 60 * 1000;               // "방금 보냄" 표시 10분
+    const BLOCK_WORDS = ['욕설1', '욕설2', '비속어', '광고', '도박', '음란']; // 금칙어(예시)
+    const RECENT_KEY = 'addr_recent_v2', RECENT_MAX = 8;
+
+    const $ = id => document.getElementById(id);
+    const q = $('q'), qClear = $('qClear'), spin = $('spin'), seg = $('seg');
+    const idle = $('idle'), result = $('result'), list = $('list'), none = $('none');
+    let items = [], filter = 'all', timer = null, aborter = null, lastQ = '';
+
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const val = v => (v === null || v === undefined) ? '' : String(v).trim();
+    const isStudent = it => !!(it.classYear && it.classBan);
+    const digits = s => val(s).replace(/\D/g, '');
+    function fmtPhone(s) {
+        const d = digits(s);
+        if (d.length === 11) return d.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+        if (d.length === 10) return d.startsWith('02') ? d.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3') : d.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+        if (d.length === 9 && d.startsWith('02')) return d.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3');
+        return val(s);
+    }
+    function hl(text, term) {
+        const t = val(text); if (!term) return esc(t);
+        const i = t.toLowerCase().indexOf(term.toLowerCase());
+        return i < 0 ? esc(t) : esc(t.slice(0, i)) + '<mark>' + esc(t.slice(i, i + term.length)) + '</mark>' + esc(t.slice(i + term.length));
+    }
+
+    // ── 알림 ──
+    let tt = null;
+    function toast(text, bad) {
+        const el = $('toast'); el.textContent = text; el.classList.toggle('bad', !!bad); el.classList.add('show');
+        clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    // ── 최근 검색 (이 기기에만 저장) ──
+    function recentGet() { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); } catch (e) { return []; } }
+    function recentSet(a) { try { localStorage.setItem(RECENT_KEY, JSON.stringify(a)); } catch (e) { } }
+    function recentAdd(term) { recentSet([term, ...recentGet().filter(x => x !== term)].slice(0, RECENT_MAX)); }
+    function drawRecent() {
+        const a = recentGet();
+        $('recent').classList.toggle('hidden', a.length === 0);
+        $('recentList').innerHTML = a.map(x => `<button type="button" data-q="${esc(x)}">${esc(x)}</button>`).join('');
+    }
+    $('recentList').addEventListener('click', e => { const b = e.target.closest('button[data-q]'); if (b) { q.value = b.dataset.q; run(); } });
+    $('recentClear').addEventListener('click', () => { recentSet([]); drawRecent(); });
+
+    // ── "방금 보냄" ──
+    const sentKey = u => `addr_sent_${u}`;
+    function markSent(u) { try { localStorage.setItem(sentKey(u), String(Date.now())); } catch (e) { } }
+    function recentlySent(u) { try { const t = parseInt(localStorage.getItem(sentKey(u)) || '0', 10); return t > 0 && Date.now() - t <= SENT_TTL_MS; } catch (e) { return false; } }
+
+    // ── 결과 그리기 ──
+    function row(it, i) {
+        const name = val(it.fullName) || '(이름 없음)';
+        const user = val(it.userName), phone = val(it.phoneNumber), email = val(it.email);
+        const d = digits(phone);
+        const st = isStudent(it);
+        const bday = (it.bMonth && it.bDay) ? `${it.bMonth}월 ${it.bDay}일` : '';
+        const bdayNow = it.bMonth === THIS_MONTH;
+        const photo = val(it.photoUrl) || FALLBACK;
+        const dd = (v, s) => v ? `<dd>${s ?? esc(v)}</dd>` : `<dd class="no">—</dd>`;
+        return `<article class="p" data-i="${i}" data-kind="${st ? 'st' : 'etc'}" data-user="${esc(user)}">
+            <div class="ph"><img src="${esc(photo)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${FALLBACK}'"></div>
+            <div class="bd">
+                <div class="nm"><b>${hl(name, lastQ)}</b>
+                    ${st ? `<span class="tg st">${it.classYear}학년 ${it.classBan}반</span>` : `<span class="tg">선생님·기타</span>`}
+                    ${bdayNow ? `<span class="tg bd">이번 달 생일</span>` : ''}
+                    ${user && recentlySent(user) ? `<span class="tg sent">방금 쪽지 보냄</span>` : ''}
+                </div>
+                <dl class="kv">
+                    <dt>아이디</dt>${dd(user, hl(user, lastQ))}
+                    <dt>생일</dt>${dd(bday)}
+                    <dt>전화</dt>${dd(phone, esc(fmtPhone(phone)) + (d.length >= 9 ? `<a class="callIc" href="tel:${d}" aria-label="${esc(name)}에게 전화 걸기" title="전화 걸기">전화</a>` : ''))}
+                    <dt>이메일</dt>${dd(email)}
+                </dl>
+                <div class="act">
+                    ${d.length >= 9 ? `<a class="pri" href="tel:${d}">전화</a><a href="sms:${d}">문자</a>` : ''}
+                    ${user ? `<button type="button" data-act="note">쪽지</button>` : ''}
+                    ${d.length >= 9 ? `<button type="button" data-act="copy">번호 복사</button>` : ''}
+                </div>
+            </div>
+        </article>`;
+    }
+    function applyFilter() {
+        let shown = 0;
+        list.querySelectorAll('.p').forEach(p => { const ok = filter === 'all' || p.dataset.kind === filter; p.classList.toggle('hidden', !ok); if (ok) shown++; });
+        $('cShown').textContent = shown;
+        none.classList.toggle('hidden', shown > 0);
+        if (!shown) none.textContent = filter === 'st' ? '학생 결과가 없어요.' : '선생님·기타 결과가 없어요.';
+    }
+    function draw() {
+        const st = items.filter(isStudent).length;
+        $('cAll').textContent = items.length; $('cSt').textContent = st; $('cEtc').textContent = items.length - st;
+        list.innerHTML = items.map(row).join('');
+        $('more').classList.toggle('hidden', items.length < TAKE);
+        applyFilter();
+    }
+    seg.addEventListener('click', e => {
+        const b = e.target.closest('button[data-f]'); if (!b) return;
+        filter = b.dataset.f;
+        seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+        applyFilter();
+    });
+
+    function showIdle() {
+        idle.classList.remove('hidden'); result.classList.add('hidden'); seg.classList.add('hidden');
+        drawRecent();
+    }
+    function showMsg(text) {
+        idle.classList.add('hidden'); result.classList.remove('hidden'); seg.classList.add('hidden');
+        list.innerHTML = ''; $('more').classList.add('hidden'); $('cShown').textContent = 0;
+        none.textContent = text; none.classList.remove('hidden');
+    }
+
+    // ── 검색 ──
+    async function run() {
+        const term = q.value.trim();
+        qClear.classList.toggle('hidden', !term);
+        if (term.length < MIN_LEN) { if (aborter) aborter.abort(); spin.classList.add('hidden'); term ? showMsg('2글자 이상 입력해 주세요.') : showIdle(); return; }
+        if (aborter) aborter.abort();
+        aborter = new AbortController();
+        spin.classList.remove('hidden');
+        try {
+            const res = await fetch(`/AddressBook/Search?q=${encodeURIComponent(term)}&take=${TAKE}`, { signal: aborter.signal, headers: { 'Accept': 'application/json' }, credentials: 'include' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const data = await res.json();
+            items = (data && data.items) || [];
+            lastQ = term;
+            spin.classList.add('hidden');
+            if (!items.length) { showMsg(`'${term}' 검색 결과가 없어요.`); return; }
+            recentAdd(term);
+            idle.classList.add('hidden'); result.classList.remove('hidden'); seg.classList.remove('hidden');
+            draw();
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            spin.classList.add('hidden');
+            showMsg('검색하지 못했어요. 잠시 뒤 다시 해 주세요.');
+        }
+    }
+    q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, DEBOUNCE_MS); });
+    q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); run(); } });
+    qClear.addEventListener('click', () => { q.value = ''; run(); q.focus(); });
+
+    // ── 카드 버튼: 번호 복사 · 쪽지 ──
+    list.addEventListener('click', async e => {
+        const b = e.target.closest('button[data-act]'); if (!b) return;
+        const it = items[+b.closest('.p').dataset.i]; if (!it) return;
+        if (b.dataset.act === 'copy') {
+            const text = fmtPhone(it.phoneNumber);
+            try { await navigator.clipboard.writeText(text); toast(`${val(it.fullName)} 번호를 복사했어요 · ${text}`); }
+            catch (err) { toast('복사하지 못했어요 · ' + text, true); }
+        } else if (b.dataset.act === 'note') openNote(it, b);
+    });
+
+    // ── 쪽지 보내기 ──
+    const root = document.documentElement, sheet = $('sheet'), msgIn = $('msgIn'), btnSend = $('btnSend'), shErr = $('shErr');
+    let to = null, opener = null, sending = false;
+    function openNote(it, btn) {
+        to = it; opener = btn;
+        $('toName').textContent = val(it.fullName) || val(it.userName);
+        $('toSub').textContent = `${val(it.userName)} · 쪽지함으로 보내요`;
+        msgIn.value = ''; $('msgCnt').textContent = 0; shErr.textContent = '';
+        root.classList.add('open'); sheet.setAttribute('aria-hidden', 'false');
+        setTimeout(() => msgIn.focus(), 60);
+    }
+    function closeNote() {
+        if (sending) return;
+        root.classList.remove('open'); sheet.setAttribute('aria-hidden', 'true');
+        to = null; if (opener) opener.focus({ preventScroll: true });
+    }
+    $('scrim').addEventListener('click', closeNote);
+    $('shClose').addEventListener('click', closeNote);
+    msgIn.addEventListener('input', () => { $('msgCnt').textContent = msgIn.value.length; shErr.textContent = ''; });
+    document.addEventListener('keydown', e => {
+        if (!root.classList.contains('open')) return;
+        if (e.key === 'Escape') closeNote();
+        if (e.key === 'Enter' && e.ctrlKey) send();
+    });
+    btnSend.addEventListener('click', send);
+    async function send() {
+        if (!to || sending) return;
+        const text = msgIn.value.replace(/\r\n?/g, '\n').trim();
+        if (!text) { shErr.textContent = '내용을 입력해 주세요.'; msgIn.focus(); return; }
+        const bad = BLOCK_WORDS.find(w => text.toLowerCase().includes(w.toLowerCase()));
+        if (bad) { shErr.textContent = `쓸 수 없는 말이 들어 있어요: ${bad}`; return; }
+        sending = true; btnSend.disabled = true; btnSend.classList.add('busy');
+        try {
+            const form = new URLSearchParams();
+            form.set('__RequestVerificationToken', document.querySelector('input[name="__RequestVerificationToken"]')?.value || '');
+            form.set('ToUserName', val(to.userName));
+            form.set('MessageText', text);
+            const res = await fetch('/PopMessage/SendAjax', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Accept': 'application/json' }, credentials: 'include', body: form.toString() });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || data.ok !== true) throw new Error(data && data.message || '보내지 못했어요');
+            markSent(val(to.userName));
+            const who = val(to.fullName) || val(to.userName);
+            sending = false; btnSend.disabled = false; btnSend.classList.remove('busy');
+            closeNote();
+            toast(`${who}에게 쪽지를 보냈어요`);
+            draw();
+        } catch (err) {
+            shErr.textContent = (err.message || '보내지 못했어요') + ' · 다시 눌러 주세요';
+            sending = false; btnSend.disabled = false; btnSend.classList.remove('busy');
+        }
+    }
+
+    // 주소에 ?q= 가 있으면 바로 검색
+    const init = new URLSearchParams(location.search).get('q');
+    if (init) { q.value = init; run(); } else showIdle();
+    q.focus({ preventScroll: true });
+})();
+</script>
+</body>
+</html>

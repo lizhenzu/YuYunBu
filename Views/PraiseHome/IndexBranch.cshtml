@@ -1,0 +1,107 @@
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Http
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    찬양 메뉴 — 2026-10-04 시안 A안 확정 (DailyMission4 밝은 흰색 · 번호 목록, 예배 콘텐츠와 같은 결)
+    · 공용 레이아웃(_Layout_Mission) 없이 단독 화면으로 — 예배 콘텐츠 · 기도홈과 머리 모양을 맞춘다
+    · 이전 화면(색 카드 4개)은 IndexBranch.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // 이동 URL (그대로)
+    var urlConti    = "/PraiseHome/IndexQuery?kind=conti";
+    var urlBlessing = "/PraiseHome/IndexQuery?kind=blessing";
+    var urlHymn     = "/PraiseHome/IndexQuery?kind=hymn";
+    var urlCcm      = "/PraiseHome/IndexQuery?kind=ccm";
+
+    var items = new[]
+    {
+        (Url: urlConti,    Img: "/images/ICON/praise/praise_01.webp", Title: "찬양 (주일학교)",  Desc: "신나는 율동 · 함께 부르는 찬양"),
+        (Url: urlBlessing, Img: "/images/ICON/praise/praise_02.webp", Title: "축복송 (주일학교)", Desc: "서로를 축복하며 마음을 따뜻하게"),
+        (Url: urlHymn,     Img: "/images/ICON/praise/praise_03.webp", Title: "찬송가",           Desc: "은혜로운 가사 · 찬송의 고백"),
+        (Url: urlCcm,      Img: "/images/ICON/praise/praise_04.webp", Title: "CCM",              Desc: "밝고 은혜로운 CCM"),
+    };
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>찬양</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px 36px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { flex: none; color: var(--dim); letter-spacing: .04em; }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); word-break: keep-all; }
+        .hdS { margin-top: 4px; font-size: 13px; color: var(--dim2); }
+
+        .sec { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 16px; font-weight: 800; color: var(--ink); }
+        .row { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+        .row:last-of-type { border-bottom: 0; }
+        .row .n { flex: none; width: 28px; font-size: 16px; font-weight: 800; color: #7FA3DB; }
+        .row .im { flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--soft); overflow: hidden; display: grid; place-items: center; }
+        .row .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t b { display: block; font-size: 16px; font-weight: 800; color: var(--ink); transition: color .15s; }
+        .row .t small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--dim2); }
+        .row .g { flex: none; font-size: 18px; font-weight: 300; color: #7FA3DB; }
+        .row:hover .t b, .row:hover .g { color: var(--blue); }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--dim); }
+        .ft a { color: var(--dim2); font-weight: 700; }
+        .ft a:hover { color: var(--blue); }
+    </style>
+</head>
+<body>
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/PrayHome/Branch">예배 콘텐츠</a><span class="sep">›</span>찬양</span>
+        <span>PRAISE</span>
+    </div>
+    <div class="hdK">PRAISE</div>
+    <h1 class="hdT">오늘도 기쁨으로 찬양해요</h1>
+    <div class="hdS">유년부 친구들과 함께 듣는 찬양 모음</div>
+
+    <div class="sec">무엇을 들을까요</div>
+
+    @for (int i = 0; i < items.Length; i++)
+    {
+        var it = items[i];
+        <a class="row" href="@it.Url">
+            <span class="n">@((i + 1).ToString("00"))</span>
+            <span class="im"><img src="@it.Img" alt="" loading="lazy" onerror="this.remove()" /></span>
+            <span class="t"><b>@it.Title</b><small>@it.Desc</small></span>
+            <span class="g">›</span>
+        </a>
+    }
+
+    <div class="ft">
+        <span>@ChurchName · @DepartmentName</span>
+        <a href="/">@ConstatsCommon.ToHome</a>
+    </div>
+
+</div>
+</body>
+</html>

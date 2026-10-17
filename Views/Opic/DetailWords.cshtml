@@ -1,0 +1,495 @@
+﻿@model BulletinBoard.Models.OpicDatas
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"MarriedCouple_{todayDate}.webp";
+
+    string formattedModResultDataOG = $"{@ViewBag.Domain}//images/workspace/MarriedCouple/horizontal/{formattedModResultData}";
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPIC 공부</title>
+    <meta property="og:title" content="@ChurchName · @DepartmentName">
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다.">
+    <meta property="og:image" content="@formattedModResultDataOG">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <style>
+
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #F9F9F9;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 10px auto;
+            padding: 10px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .header {
+            text-align: center;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+
+        .content-header {
+            padding: 5px;
+         /*   text-align: center;*/
+   /*         border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;*/
+            margin: 0px;
+            color: black;
+     /*       background-color: #009900;*/
+        }
+
+        .content-header-1 {
+            padding: 5px;
+            text-align: center; /*
+                    border-top-left-radius: 8px;
+                    border-top-right-radius: 8px;
+                    border-bottom-left-radius: 8px;
+                    border-bottom-right-radius: 8px;*/
+            margin: 5px;
+            color: black;
+            background-color: coral;
+        }
+
+        .header h1 {
+            font-size: 20px;
+        }
+
+        .header h2 {
+            margin: 5px 0 0 0;
+            font-size: 32px;
+        }
+
+        .header h4 {
+            margin: 5px;
+            font-size: 16px;
+        }
+
+
+        .event {
+            background-color: #E8E8FF;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+            .event.green {
+                background-color: #D7FFD9;
+            }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px 0;
+        }
+
+        .buttons2 {
+            display: flex;
+            gap: 10px;
+            padding: 20px 0;
+        }
+
+
+        .buttons, .buttons2 {
+            justify-content: space-between;
+            padding: 20px 0;
+            margin-bottom: 5.5px;
+        }
+
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin: 0 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .button.new-task {
+                background-color: #E8E8FF;
+            }
+
+            .button.new-reminder {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.new-reminder-delete {
+                background-color: #CC0000;
+                color: white;
+            }
+
+
+            .button.choice {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.subjective {
+                background-color: #FFC107;
+            }
+
+            .button.back {
+                background-color: #FF5722; /* Orange */
+                color: white;
+            }
+
+            .button.main {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+
+            .button.home {
+                background-color: #00BCD4; /* Cyan */
+                color: white;
+            }
+
+        .guide {
+            padding: 5px;
+            background-color: coral;
+            color: black;
+        }
+
+    </style>
+
+    <style>
+        .malgun-gothic {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+        }
+
+        .preTag {
+            font-size: 18px;
+            background-color: transparent;
+            border: none;
+            white-space: pre-wrap;
+            overflow: auto;
+            padding: 5px;
+        }
+    </style>
+    <style>
+
+        .button {
+            margin: 5px 0;
+        }
+
+        .buttons {
+            display: flex;
+            padding: 20px 0;
+            flex-direction: column;
+            margin-bottom: 5.5px;
+        }
+
+        .buttons2 {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px 0;
+            margin: 3px;
+            margin-bottom: 5.5px;
+            gap: 7px;
+        }
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin-left: 5px;
+            margin-right: 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #E8E8FF;
+        }
+
+            .button.choice {
+                background-color: #FFEB3B; /* Yellow */
+            }
+
+            .button.delete {
+                background-color: #CC0000; /* Yellow */
+               color :white;
+            }
+
+            .button.subjective {
+                background-color: #2196F3; /* Blue */
+                color: white;
+            }
+
+            .button.back {
+                background-color: #E8E8FF;
+                color: black;
+            }
+
+            .button.main {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+
+            .button.home {
+                background-color: #00BCD4; /* Cyan */
+                color: white;
+            }
+
+        .error {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        @@media (max-width: 600px) {
+
+            .button {
+                margin: 5px 0;
+            }
+        }
+    </style>
+
+    <style>
+        .icon-container {
+            margin-top: 40px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-background {
+            background: white;
+            width: 65px;
+            height: 65px;
+            position: absolute;
+            top: -36px;
+            left: 50%;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            transform: translateX(-35px);
+            z-index: 1; /* Behind the icon but in front of card background */
+        }
+
+        .icon-foreground {
+            background: #0d792d;
+            width: 59px;
+            height: 59px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            border-radius: 50%;
+            position: absolute;
+            top: -33px;
+            left: 50%;
+            transform: translateX(-32px);
+            z-index: 3; /* Above all */
+        }
+
+        .button-hyperlink {
+            border: none;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            display: block; /* Makes the button expand to the width of the container */
+            font-size: 18px;
+            margin: 10px 0; /* Adds space between buttons */
+            cursor: pointer;
+        }
+    </style>
+    <style>
+
+        .image-container {
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            width: 100%; /* 컨테이너의 너비에 맞춥니다 */
+            height: auto; /* 이미지의 비율에 따라 높이 조정 */
+            display: block; /* 이미지를 블록 요소로 만듭니다 */
+            align-items: center;
+            justify-content: center;
+            margin: auto; /* 자동 마진을 사용하여 중앙 정렬 */
+            margin-bottom: 10px; /* 자동 마진을 사용하여 중앙 정렬 */
+            max-width: 800px;
+        }
+    </style>
+    <style>
+        .no-select {
+            user-select: none; /* 기본 브라우저 지원 */
+            -moz-user-select: none; /* Firefox */
+            -webkit-user-select: none; /* Safari 및 Chrome */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+        }
+
+
+        .medication-card {
+       /*     display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 13px;*/
+            border-bottom: 1px solid #ccc;
+            position: relative;
+        }
+    </style>
+
+</head>
+
+
+<body>
+ 
+    <div class="container">
+
+           
+  
+        @{
+            string newString = $"{Model.PageNo}.{Model.Question}({Model.Visited})";
+        }
+
+        <div class="content-header ">
+            <p>@newString</p>
+        </div>
+        <hr />
+
+        <pre class=" medication-card  malgun-gothic preTag">@Model.BodyContents</pre>
+
+
+        <pre class=" medication-card  malgun-gothic preTag">@Model.Vocabulary</pre>
+   
+        <div class="medication-card">
+            @{
+                string[] Memo = Model.Memo.Split("\r\n");
+                foreach (var va in Memo)
+                {
+                    @if (!string.IsNullOrEmpty(va))
+                    {
+                        <p>@va</p>
+                    }
+                }
+            }
+        </div>
+
+    
+
+@*
+
+        <div class="medication-card">
+        @{
+        string[] ModelHeader1 = Model.ModelHeader1.Split("\r\n");
+        foreach (var va in ModelHeader1)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+        <div class="medication-card">
+        @{
+        string[] ModelAnswer1 = Model.ModelAnswer1.Split("\r\n");
+        foreach (var va in ModelAnswer1)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+        <div class="medication-card">
+        @{
+        string[] ModelHeader2 = Model.ModelHeader2.Split("\r\n");
+        foreach (var va in ModelHeader2)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+        <div class="medication-card">
+        @{
+        string[] ModelAnswer2 = Model.ModelAnswer2.Split("\r\n");
+        foreach (var va in ModelAnswer2)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+        <div class="medication-card">
+        @{
+        string[] ModelHeader3 = Model.ModelHeader3.Split("\r\n");
+        foreach (var va in ModelHeader3)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+        <div class="medication-card">
+        @{
+        string[] ModelAnswer3 = Model.ModelAnswer3.Split("\r\n");
+        foreach (var va in ModelAnswer3)
+        {
+        @if (!string.IsNullOrEmpty(va))
+        {
+        <p>@va</p>
+        }
+        }
+        }
+        </div>
+
+        *@
+        <div class="buttons2">
+            <div class="button main no-select" onclick="location.href='/Opic/DetailList'">목록</div>
+            <div class="button home no-select " onclick="location.href='/'">홈</div>
+            <div class="button delete no-select" onclick="location.href='/Opic/DeleteView?Id=@Model.Id'">삭제</div>
+            <div class="button back no-select" onclick="location.href='/Opic/MarkView?Id=@Model.Id'">마크</div>
+            <div class="button back no-select" onclick="location.href='/Opic/ModifyView?Id=@Model.Id'">수정</div>
+
+        </div>
+    </div>
+</body>
+
+</html>

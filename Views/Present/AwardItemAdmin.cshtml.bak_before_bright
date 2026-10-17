@@ -1,0 +1,1098 @@
+﻿@model List<AwardItem>
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Services
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+}
+
+@{
+    // ✅ 독립 페이지
+    Layout = null;
+    ViewData["Title"] = "선물(상품) 관리";
+
+    var list        = Model ?? new List<AwardItem>();
+    if (!isSuperAdmin) list = list.Where(x => !x.IsHidden).ToList();
+    var filterName  = ViewBag.FilterName  as string ?? "";
+    var filterPrice = ViewBag.FilterPrice as string ?? "";
+    int filterPriceMin = (int)(ViewBag.FilterPriceMin ?? -1);
+    int filterPriceMax = (int)(ViewBag.FilterPriceMax ?? -1);
+
+    string Norm(string? s) => (s ?? "").Trim();
+    string NormKey(string? s) => Norm(s).ToLowerInvariant();
+
+    // ✅ SourceType: 카카오/쿠팡만 필터 옵션으로 고정
+    var sourceTypes = new List<string> { "카카오", "쿠팡" };
+
+    // ✅ PresentItemPick에 존재하면 삭제 불가(UI disable)
+    var pickedIds = ViewBag.PickedProductIds as HashSet<int> ?? new HashSet<int>();
+
+    // ✅ SourceType → 배지 클래스
+    string SourceTagClass(string? src)
+    {
+        var t = Norm(src);
+        if (string.Equals(t, "카카오", StringComparison.Ordinal)) return "badge badge-kakao";
+        if (string.Equals(t, "쿠팡", StringComparison.Ordinal)) return "badge badge-coupang";
+        return "badge badge-gray";
+    }
+
+    string ShowSourceText(string? src)
+    {
+        var t = Norm(src);
+        return string.IsNullOrWhiteSpace(t) ? "-" : t;
+    }
+
+    // ✅ 이미지 캐시 무효화는 변경될 때만
+    long ImgVer(AwardItem it)
+        => (it?.ModifiedDate?.Ticks) ?? (it?.CreatedDate?.Ticks) ?? 0L;
+
+    // ✅ 1x1 투명 SVG (lazy placeholder)
+    var tinySvg = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <meta name="description" content="선물(상품) 관리 페이지" />
+
+    <style>
+        /* =========================================================
+                   Present AwardItem Admin - Independent Page (Light Theme)
+                   - Layout=null 유지
+                   - 밝은 테마(화이트/파스텔) + 가독성 강화 + 모바일 우선
+                   ========================================================= */
+
+        :root {
+            --bg0: #f7f9ff;
+            --bg1: #eef2ff;
+            --card: rgba(255,255,255,.78);
+            --card2: rgba(255,255,255,.92);
+            --stroke: rgba(15, 23, 42, .10);
+            --stroke2: rgba(15, 23, 42, .08);
+            --text: rgba(15, 23, 42, .92);
+            --muted: rgba(15, 23, 42, .64);
+            --muted2: rgba(15, 23, 42, .50);
+            --shadow: 0 18px 55px rgba(2, 6, 23, .10);
+            --shadow2: 0 10px 30px rgba(2, 6, 23, .08);
+            --radius: 18px;
+            --radius2: 14px;
+            --sans: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+            --blue: #2563eb;
+            --blue2: #1d4ed8;
+            --green: #16a34a;
+            --amber: #f59e0b;
+            --red: #ef4444;
+            --kakao-bg: rgba(255, 214, 0, .22);
+            --kakao-tx: rgba(124, 92, 0, .95);
+            --coupang-bg: rgba(37, 99, 235, .14);
+            --coupang-tx: rgba(29, 78, 216, .95);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--text);
+            background: radial-gradient(1000px 520px at 12% 12%, rgba(37,99,235,.16), transparent 60%), radial-gradient(900px 500px at 88% 18%, rgba(22,163,74,.12), transparent 62%), radial-gradient(900px 520px at 35% 96%, rgba(245,158,11,.10), transparent 60%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            overflow-x: hidden;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 22px 16px 40px;
+        }
+
+        /* ---------- Header ---------- */
+        .hero {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 280px;
+        }
+
+        .logoDot {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            background: radial-gradient(10px 10px at 30% 35%, rgba(255,255,255,.95), transparent 55%), linear-gradient(135deg, rgba(37,99,235,.92), rgba(22,163,74,.82));
+            box-shadow: 0 12px 28px rgba(2, 6, 23, .10);
+            border: 1px solid rgba(15, 23, 42, .10);
+        }
+
+        .hTitle {
+            font-weight: 1000;
+            font-size: 20px;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+        }
+
+        .hSub {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .heroRight {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* ---------- Buttons ---------- */
+        .btn {
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-weight: 1000;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: transform .08s ease, filter .15s ease, background .15s ease, border-color .15s ease;
+            user-select: none;
+        }
+
+            .btn:active {
+                transform: translateY(1px);
+            }
+
+            .btn[disabled] {
+                opacity: .45;
+                cursor: not-allowed;
+                pointer-events: none;
+            }
+
+        .btnGhost {
+            background: rgba(255,255,255,.74);
+            border-color: rgba(15, 23, 42, .12);
+            box-shadow: 0 8px 18px rgba(2,6,23,.06);
+        }
+
+            .btnGhost:hover {
+                filter: brightness(1.03);
+            }
+
+        .btnCoupang {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb);
+            color: #fff !important;
+            border-color: transparent;
+            box-shadow: 0 6px 18px rgba(37,99,235,.38);
+            font-size: 14px;
+            padding: 9px 18px;
+            letter-spacing: .01em;
+        }
+        .btnCoupang:hover {
+            filter: none;
+            opacity: .9;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 22px rgba(37,99,235,.50);
+        }
+        .btnCoupang:active {
+            transform: translateY(0);
+            box-shadow: 0 4px 12px rgba(37,99,235,.30);
+        }
+
+        .btnPrimary {
+            color: white;
+            background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(29,78,216,.95));
+            border-color: rgba(37,99,235,.20);
+            box-shadow: 0 14px 30px rgba(37,99,235,.18);
+        }
+
+            .btnPrimary:hover {
+                filter: brightness(1.03);
+            }
+
+        .btnDanger {
+            color: white;
+            background: linear-gradient(135deg, rgba(239,68,68,.96), rgba(220,38,38,.94));
+            border-color: rgba(239,68,68,.20);
+            box-shadow: 0 14px 30px rgba(239,68,68,.14);
+        }
+
+            .btnDanger:hover {
+                filter: brightness(1.03);
+            }
+
+        /* ---------- Panel ---------- */
+        .panel {
+            border: 1px solid var(--stroke);
+            background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,.60));
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        /* ---------- Controls ---------- */
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 14px;
+            border-bottom: 1px solid var(--stroke2);
+            background: rgba(255,255,255,.56);
+        }
+
+        .field {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, .12);
+            background: rgba(255,255,255,.72);
+            min-width: 240px;
+            box-shadow: 0 8px 18px rgba(2,6,23,.05);
+        }
+
+            .field span {
+                color: var(--muted);
+                font-weight: 900;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+        select, input {
+            width: 100%;
+            background: transparent;
+            border: 0;
+            outline: none;
+            color: var(--text);
+            font-weight: 900;
+            font-size: 14px;
+        }
+
+            select option {
+                color: #111827;
+            }
+
+            input::placeholder {
+                color: rgba(15, 23, 42, .38);
+                font-weight: 800;
+            }
+
+        .metaLine {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, .12);
+            background: rgba(255,255,255,.72);
+            color: var(--muted);
+            font-weight: 900;
+            font-size: 12px;
+            box-shadow: 0 8px 18px rgba(2,6,23,.05);
+        }
+
+        .countStrong {
+            color: var(--text);
+        }
+
+        /* ---------- Grid (cards) ---------- */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            padding: 14px;
+        }
+
+        @@media (max-width: 1100px) {
+            .grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @@media (max-width: 720px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .field {
+                min-width: 0;
+                flex: 1 1 auto;
+            }
+
+            .metaLine {
+                width: 100%;
+                justify-content: space-between;
+                margin-left: 0;
+            }
+        }
+
+        .card {
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, .10);
+            background: radial-gradient(700px 140px at 20% 0%, rgba(37,99,235,.08), transparent 62%), radial-gradient(700px 140px at 80% 0%, rgba(22,163,74,.07), transparent 62%), rgba(255,255,255,.86);
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 180px;
+        }
+
+        .cardTop {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            align-items: center;
+        }
+
+        .thumb {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, .10);
+            background: rgba(15, 23, 42, .03);
+            object-fit: cover;
+            flex: 0 0 auto;
+            display: block;
+        }
+
+        /* placeholder 상태 */
+        img[data-src].thumb {
+            filter: blur(2px);
+            opacity: .88;
+            transform: scale(1.01);
+        }
+
+        .info {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .nameRow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .pName {
+            font-weight: 1000;
+            letter-spacing: -0.01em;
+            line-height: 1.2;
+            font-size: 15px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            cursor: pointer;
+            transition: color .12s;
+        }
+        .pName:hover { color: var(--blue); text-decoration: underline; }
+
+        .pMeta {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-weight: 900;
+            font-size: 12.5px;
+        }
+
+        .mono {
+            font-variant-numeric: tabular-nums;
+            letter-spacing: .02em;
+        }
+
+        .desc {
+            padding: 0 12px 10px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+            min-height: 18px;
+        }
+
+            .desc.clamp {
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+        .cardBottom {
+            margin-top: auto;
+            padding: 12px;
+            border-top: 1px solid rgba(15, 23, 42, .08);
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            background: rgba(255,255,255,.62);
+        }
+
+        .statusRow {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, .12);
+            background: rgba(15, 23, 42, .04);
+            font-weight: 1000;
+            font-size: 12px;
+            white-space: nowrap;
+            color: rgba(15, 23, 42, .78);
+        }
+
+        .badge-kakao {
+            background: var(--kakao-bg);
+            color: var(--kakao-tx);
+            border-color: rgba(255,214,0,.28);
+        }
+
+        .badge-coupang {
+            background: var(--coupang-bg);
+            color: var(--coupang-tx);
+            border-color: rgba(37,99,235,.22);
+        }
+
+        .badge-gray {
+            background: rgba(15, 23, 42, .04);
+            color: rgba(15, 23, 42, .62);
+        }
+
+        .stShow {
+            background: rgba(22,163,74,.12);
+            border-color: rgba(22,163,74,.18);
+            color: rgba(20, 83, 45, .92);
+        }
+
+        .stHide {
+            background: rgba(239,68,68,.10);
+            border-color: rgba(239,68,68,.18);
+            color: rgba(127, 29, 29, .92);
+        }
+
+        .picked {
+            background: rgba(245,158,11,.14);
+            border-color: rgba(245,158,11,.20);
+            color: rgba(120, 53, 15, .95);
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .price {
+            font-weight: 1000;
+            color: rgba(15, 23, 42, .92);
+        }
+
+        .empty {
+            padding: 26px 16px;
+            text-align: center;
+            color: var(--muted);
+            font-weight: 1000;
+        }
+
+        /* ---------- Footer hint ---------- */
+        .footHint {
+            margin-top: 12px;
+            color: var(--muted2);
+            font-size: 12px;
+            font-weight: 900;
+            text-align: right;
+        }
+
+        /* ---------- Desc wrap ---------- */
+        .desc-wrap {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 0 12px 10px;
+        }
+        .desc-wrap .desc {
+            padding: 0;
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* ---------- Copy button ---------- */
+        .copyBtn {
+            flex-shrink: 0;
+            background: rgba(37,99,235,.08);
+            border: 1px solid rgba(37,99,235,.18);
+            border-radius: 8px;
+            padding: 3px 7px;
+            font-size: 13px;
+            cursor: pointer;
+            line-height: 1;
+            transition: background .15s, transform .1s;
+        }
+        .copyBtn:hover { background: rgba(37,99,235,.16); }
+        .copyBtn:active { transform: scale(.92); }
+        .copyBtn.done {
+            background: rgba(22,163,74,.15);
+            border-color: rgba(22,163,74,.25);
+        }
+
+        /* ---------- Accessibility focus ---------- */
+        .btn:focus-visible, select:focus-visible, input:focus-visible {
+            outline: 2px solid rgba(37,99,235,.35);
+            outline-offset: 2px;
+            border-radius: 12px;
+        }
+
+        /* ---------- Image Modal ---------- */
+        .imgModal {
+            display: none;
+            position: fixed; inset: 0; z-index: 999;
+            background: rgba(2,6,23,.82);
+            backdrop-filter: blur(6px);
+            align-items: center; justify-content: center;
+            padding: 16px;
+            animation: modalFadeIn .18s ease;
+        }
+        .imgModal.open { display: flex; }
+        @@keyframes modalFadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .imgModalBox {
+            position: relative;
+            max-width: min(680px, 96vw);
+            width: 100%;
+            background: #fff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 32px 80px rgba(2,6,23,.5);
+            animation: modalSlideUp .2s ease;
+        }
+        @@keyframes modalSlideUp {
+            from { transform: translateY(24px) scale(.96); opacity: 0; }
+            to   { transform: translateY(0) scale(1);     opacity: 1; }
+        }
+        .imgModalBox img {
+            width: 100%;
+            max-height: 70vh;
+            object-fit: contain;
+            display: block;
+            background: #f8f8f8;
+        }
+        .imgModalName {
+            padding: 12px 16px;
+            font-size: 14px; font-weight: 800;
+            color: #1e293b;
+            text-align: center;
+            border-top: 1px solid #f0f0f0;
+            line-height: 1.4;
+        }
+        .imgModalClose {
+            position: fixed;
+            top: 16px; right: 16px;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,.18);
+            color: #fff;
+            font-size: 18px; font-weight: 900;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .15s, transform .1s;
+            z-index: 1000;
+        }
+        .imgModalClose:hover { background: rgba(255,255,255,.30); transform: scale(1.1); }
+        @@media (max-width: 480px) {
+            .imgModalBox { border-radius: 14px; }
+            .imgModalBox img { max-height: 60vh; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="hero">
+            <div class="brand">
+                <div class="logoDot" aria-hidden="true"></div>
+                <div>
+                    <div class="hTitle">선물(상품) 관리</div>
+                    <div class="hSub">카카오/쿠팡 상품만 관리 · 숨김 토글 · 선택된 상품 삭제 제한</div>
+                </div>
+            </div>
+
+            <div class="heroRight">
+                @if (!string.IsNullOrWhiteSpace(filterName))
+                {
+                    <a class="btn btnGhost" href="/Present/AwardItemCountByKind">← 종류별</a>
+                }
+                else
+                {
+                    <a class="btn btnGhost" href="/Present/AwardItemCountByKind">📊 종류별</a>
+                    <a class="btn btnGhost" href="/Present/AwardItemCountByPrice">💰 가격대별</a>
+                }
+                <a class="btn btnGhost" href="/">🏠 홈</a>
+                <a class="btn btnPrimary" href="/Present/AwardItemCreate">＋ 상품 등록</a>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(filterName))
+        {
+            <div style="margin:14px 0 10px;padding:12px 18px;background:rgba(37,99,235,.08);border:1.5px solid rgba(37,99,235,.22);border-radius:14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;color:#1d4ed8;">
+                <span>🔍 필터: <b>@filterName</b></span>
+                <span style="font-size:12px;font-weight:700;color:#64748b;">(@list.Count 개 상품)</span>
+                <a href="/Present/AwardItemAdmin" style="margin-left:auto;font-size:12px;font-weight:800;color:#64748b;text-decoration:none;border:1px solid rgba(15,23,42,.12);padding:4px 10px;border-radius:8px;background:#fff;">✕ 필터 해제</a>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(filterPrice))
+        {
+            <div style="margin:14px 0 10px;padding:12px 18px;background:rgba(16,185,129,.07);border:1.5px solid rgba(16,185,129,.28);border-radius:14px;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:800;color:#065f46;">
+                <span>💰 가격 필터: <b>@filterPrice</b></span>
+                <span style="font-size:12px;font-weight:700;color:#64748b;">(@list.Count 개 상품)</span>
+                <a href="/Present/AwardItemCountByPrice" style="margin-left:auto;font-size:12px;font-weight:800;color:#64748b;text-decoration:none;border:1px solid rgba(15,23,42,.12);padding:4px 10px;border-radius:8px;background:#fff;">← 가격대별 목록</a>
+            </div>
+        }
+
+        <div class="panel">
+            <div class="controls">
+                <div class="field" title="SourceType 필터">
+                    <span>SourceType</span>
+                    <select id="sourceFilter" aria-label="SourceType 필터">
+                        <option value="">전체</option>
+                        @foreach (var st in sourceTypes)
+                        {
+                            <option value="@st">@st</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="field" title="상품명/ID 검색">
+                    <span>검색</span>
+                    <input id="q" type="text" placeholder="상품명, ID 또는 상품 설명" />
+                </div>
+
+                @if (isSuperAdmin)
+                {
+                    <div class="field" title="숨김 상품 필터">
+                        <span>숨김</span>
+                        <button id="hiddenToggle" type="button"
+                                style="padding:6px 14px;border-radius:8px;border:1.5px solid rgba(239,68,68,.30);background:#fff;color:#dc2626;font-size:13px;font-weight:800;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;">
+                            🙈 숨김만 보기
+                        </button>
+                    </div>
+                }
+
+                <div class="metaLine">
+                    <div class="pill" title="현재 목록/필터 결과">
+                        📦 <span class="countStrong" id="countNow">0</span> / <span class="mono">@list.Count</span>
+                    </div>
+                    <div class="pill" title="URL 파라미터">
+                        🔗 <span class="mono">?st=카카오</span>
+                    </div>
+                </div>
+            </div>
+
+            @if (!list.Any())
+            {
+                <div class="empty">등록된 상품이 없습니다.</div>
+            }
+            else
+            {
+                <div class="grid" id="grid">
+                    @foreach (var it in list)
+                    {
+                        var v = ImgVer(it);
+                        var realImg = $"/images/AwardItem/{it.ProductID}.jpg?v={v}";
+
+                        var srcText = ShowSourceText(it.SourceType);
+                        var srcClass = SourceTagClass(it.SourceType);
+
+                        bool isPicked = pickedIds.Contains(it.ProductID);
+
+                        <div class="card rowItem"
+                             data-source="@Norm(it.SourceType)"
+                             data-name="@NormKey(it.ProductName)"
+                             data-id="@it.ProductID"
+                             data-desc="@NormKey(it.ProductDescription)"
+                             data-hidden="@(it.IsHidden ? "1" : "0")">
+
+                            <div class="cardTop">
+                                <img class="thumb lazyImg"
+                                     src="@tinySvg"
+                                     data-src="@realImg"
+                                     loading="lazy"
+                                     decoding="async"
+                                     fetchpriority="low"
+                                     alt="@it.ProductName"
+                                     onclick="openImgModal(this)"
+                                     style="cursor:zoom-in;"
+                                     onerror="this.onerror=null; this.src='/images/common/no-image.jpg'; this.removeAttribute('data-src');" />
+
+                                <div class="info">
+                                    <div class="nameRow">
+                                        <a class="pName" title="@it.ProductName (같은 종류 보기)"
+                                           href="/Present/AwardItemAdminByName?name=@Uri.EscapeDataString(it.ProductName ?? "")">@it.ProductName</a>
+                                    </div>
+
+                                    <div class="pMeta">
+                                        <span class="mono">#@it.ProductID</span>
+                                        <span class="price">@it.UnitPrice.ToString("N0")원</span>
+                                        <span class="@srcClass">@srcText</span>
+                                    </div>
+                                    <div class="pMeta" style="margin-top:4px; font-size:11.5px; color:var(--muted2);">
+                                        @if (it.ModifiedDate.HasValue)
+                                        {
+                                            <span title="수정일">✏️ @it.ModifiedDate.Value.ToString("yyyy-MM-dd")</span>
+                                        }
+                                        else if (it.CreatedDate.HasValue)
+                                        {
+                                            <span title="등록일">📅 @it.CreatedDate.Value.ToString("yyyy-MM-dd")</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="desc-wrap">
+                                <div class="desc clamp">
+                                    @if (!string.IsNullOrWhiteSpace(it.ProductDescription))
+                                    {
+                                        @it.ProductDescription
+                                    }
+                                    else
+                                    {
+                                        <span style="opacity:.55;">설명 없음</span>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(it.ProductDescription))
+                                {
+                                    <button class="copyBtn" type="button" onclick="copyDesc(this)" title="설명 복사">📋</button>
+                                }
+                            </div>
+
+                            <div class="cardBottom">
+                                <div class="statusRow">
+                                    @if (it.IsHidden)
+                                    {
+                                        <span class="badge stHide">🙈 숨김</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge stShow">👀 노출</span>
+                                    }
+
+                                    @if (isPicked)
+                                    {
+                                        <span class="badge picked" title="누군가 선택한 상품이라 삭제할 수 없습니다.">🚫 선택됨 · 삭제 불가</span>
+                                    }
+                                </div>
+
+                                <div class="actions">
+                                    @if (!string.IsNullOrWhiteSpace(it.ExternalUrl))
+                                    {
+                                        <a class="btn btnCoupang" href="@it.ExternalUrl" target="_blank" rel="noopener noreferrer">
+                                            🛒 쿠팡에서 보기
+                                        </a>
+                                    }
+                                    <a class="btn btnGhost" href="/Present/AwardItemEdit/@it.ProductID">수정</a>
+
+                                    <!-- ✅ Toggle: 서버에서 토글 -->
+                                    <form method="post" action="/Present/AwardItemToggleHidden" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@it.ProductID" />
+                                        <button type="submit" class="btn btnGhost">
+                                            @(it.IsHidden ? "공개하기" : "숨기기")
+                                        </button>
+                                    </form>
+
+                                    <!-- ✅ 삭제: PresentItemPick에 존재하면 UI에서 disabled -->
+                                    <form method="post" action="/Present/AwardItemDelete" style="display:inline;"
+                                          onsubmit="return @(isPicked ? "false" : "confirm('정말 삭제할까요? 이미지 파일도 함께 삭제됩니다.');")">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@it.ProductID" />
+                                        <button type="submit" class="btn btnDanger" @(isPicked ? "disabled title=\"누군가 선택한 상품이라 삭제할 수 없습니다.\"" : "")>삭제</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="footHint">필터는 즉시 적용됩니다. (URL 파라미터: <span class="mono">?st=카카오</span>)</div>
+    </div>
+
+    <!-- 이미지 모달 -->
+    <div id="imgModal" class="imgModal" role="dialog" aria-modal="true" aria-label="상품 이미지 확대" onclick="closeImgModal()">
+        <button class="imgModalClose" onclick="closeImgModal()" title="닫기" aria-label="닫기">✕</button>
+        <div class="imgModalBox" onclick="event.stopPropagation()">
+            <img id="imgModalSrc" src="" alt="확대 이미지" />
+            <div id="imgModalName" class="imgModalName"></div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // ==========================
+            // 1) 필터/검색 (기존 기능 유지)
+            // ==========================
+            const sel = document.getElementById("sourceFilter");
+            const q = document.getElementById("q");
+            const items = Array.from(document.querySelectorAll(".rowItem"));
+            const countNow = document.getElementById("countNow");
+
+            // ── 숨김 필터 토글 ──
+            let hiddenOnly = false;
+            const hiddenToggleBtn = document.getElementById("hiddenToggle");
+            if (hiddenToggleBtn) {
+                hiddenToggleBtn.addEventListener("click", function() {
+                    hiddenOnly = !hiddenOnly;
+                    if (hiddenOnly) {
+                        hiddenToggleBtn.style.background = "#dc2626";
+                        hiddenToggleBtn.style.color = "#fff";
+                        hiddenToggleBtn.style.borderColor = "#dc2626";
+                        hiddenToggleBtn.textContent = "🙈 숨김만 보기 ✓";
+                    } else {
+                        hiddenToggleBtn.style.background = "#fff";
+                        hiddenToggleBtn.style.color = "#dc2626";
+                        hiddenToggleBtn.style.borderColor = "rgba(239,68,68,.30)";
+                        hiddenToggleBtn.textContent = "🙈 숨김만 보기";
+                    }
+                    apply();
+                });
+            }
+
+            function getParam(name) {
+                const u = new URL(location.href);
+                return (u.searchParams.get(name) || "").trim();
+            }
+
+            function setParam(name, value) {
+                const u = new URL(location.href);
+                if (!value) u.searchParams.delete(name);
+                else u.searchParams.set(name, value);
+                history.replaceState(null, "", u.toString());
+            }
+
+            function apply() {
+                const st = (sel.value || "").trim();
+                const kw = (q.value || "").trim().toLowerCase();
+
+                setParam("st", sel.value || "");
+
+                let visible = 0;
+                items.forEach(el => {
+                    const src    = (el.dataset.source || "").trim();
+                    const nm     = (el.dataset.name || "");
+                    const id     = (el.dataset.id || "");
+                    const desc   = (el.dataset.desc || "");
+                    const isHid  = el.dataset.hidden === "1";
+
+                    const ok1 = !st || src === st;
+                    const ok2 = !kw || nm.includes(kw) || id.includes(kw) || desc.includes(kw);
+                    const ok3 = !hiddenOnly || isHid;
+
+                    const show = (ok1 && ok2 && ok3);
+                    el.style.display = show ? "" : "none";
+                    if (show) visible++;
+                });
+
+                if (countNow) countNow.textContent = String(visible);
+
+                // 필터 결과만 lazy 관찰
+                refreshLazyObserve();
+            }
+
+            const initSt = getParam("st");
+            if (initSt) {
+                const opt = Array.from(sel.options).find(o => (o.value || "") === initSt);
+                if (opt) sel.value = opt.value;
+            }
+
+            sel.addEventListener("change", apply);
+            q.addEventListener("input", apply);
+
+            // ==========================
+            // 2) 이미지 지연 로딩 (lazy)
+            // ==========================
+            const lazyImgs = () => Array.from(document.querySelectorAll("img.lazyImg[data-src]"));
+            let io = null;
+
+            function loadImg(img) {
+                const src = img.getAttribute("data-src");
+                if (!src) return;
+
+                img.src = src;
+                img.removeAttribute("data-src");
+
+                img.addEventListener("load", function () {
+                    img.style.filter = "";
+                    img.style.opacity = "";
+                    img.style.transform = "";
+                }, { once: true });
+            }
+
+            function refreshLazyObserve() {
+                const imgs = lazyImgs().filter(img => {
+                    const row = img.closest(".rowItem");
+                    if (!row) return true;
+                    return row.style.display !== "none";
+                });
+
+                if ("IntersectionObserver" in window) {
+                    if (!io) {
+                        io = new IntersectionObserver((entries) => {
+                            entries.forEach(entry => {
+                                if (entry.isIntersecting) {
+                                    const img = entry.target;
+                                    io.unobserve(img);
+                                    loadImg(img);
+                                }
+                            });
+                        }, {
+                            root: null,
+                            rootMargin: "320px 0px",
+                            threshold: 0.01
+                        });
+                    }
+                    imgs.forEach(img => io.observe(img));
+                } else {
+                    const queue = imgs.slice();
+                    const work = () => {
+                        const start = Date.now();
+                        while (queue.length && (Date.now() - start) < 12) {
+                            loadImg(queue.shift());
+                        }
+                        if (queue.length) setTimeout(work, 16);
+                    };
+                    if ("requestIdleCallback" in window) requestIdleCallback(work);
+                    else setTimeout(work, 0);
+                }
+            }
+
+            // 초기 실행
+            apply();
+
+            // ==========================
+            // 3) 설명 복사
+            // ==========================
+            // ==========================
+            // 4) 이미지 모달
+            // ==========================
+            var modal    = document.getElementById('imgModal');
+            var modalImg = document.getElementById('imgModalSrc');
+            var modalName= document.getElementById('imgModalName');
+
+            window.openImgModal = function (img) {
+                var src = img.getAttribute('data-src') || img.src;
+                if (!src || src.startsWith('data:')) return;
+                modalImg.src = src;
+                modalName.textContent = img.alt || '';
+                modal.classList.add('open');
+                document.body.style.overflow = 'hidden';
+            };
+
+            window.closeImgModal = function () {
+                modal.classList.remove('open');
+                document.body.style.overflow = '';
+                setTimeout(function () { modalImg.src = ''; }, 200);
+            };
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeImgModal();
+            });
+
+            window.copyDesc = function (btn) {
+                const wrap = btn.closest('.desc-wrap');
+                const desc = wrap ? wrap.querySelector('.desc') : null;
+                const text = desc ? desc.innerText.trim() : '';
+                if (!text) return;
+                navigator.clipboard.writeText(text).then(function () {
+                    btn.textContent = '✅';
+                    btn.classList.add('done');
+                    setTimeout(function () {
+                        btn.textContent = '📋';
+                        btn.classList.remove('done');
+                    }, 1500);
+                }).catch(function () {
+                    // fallback
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    ta.style.position = 'fixed'; ta.style.opacity = '0';
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    btn.textContent = '✅';
+                    btn.classList.add('done');
+                    setTimeout(function () { btn.textContent = '📋'; btn.classList.remove('done'); }, 1500);
+                });
+            };
+            refreshLazyObserve();
+
+            window.addEventListener("resize", () => refreshLazyObserve(), { passive: true });
+        })();
+    </script>
+</body>
+</html>

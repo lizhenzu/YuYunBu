@@ -1,0 +1,127 @@
+﻿@model IEnumerable<BulletinBoard.Models.BibleQuizEnrollInfos>
+
+@{
+    ViewData["Title"] = "List";
+}
+
+<style>
+
+    .text-right {
+        text-align: right;
+    }
+
+    .card-typeA-body {
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .card-typeA {
+        background-color: white;
+        width: 300px;
+        margin: 3px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+        transition: transform 0.2s;
+    }
+
+        .card-typeA:hover {
+            transform: scale(1.05);
+        }
+
+    .card-typeA-content {
+        padding: 5px;
+    }
+
+    .card-typeA-title {
+        font-size: 20px;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .card-typeA-text {
+        font-size: 16px;
+        color: #666;
+        line-height: 1.5;
+    }
+</style>
+<style>
+    .card-button {
+        flex: 1;
+        padding: 10px;
+        margin: 5px;
+        text-align: center;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+        .card-button.create {
+            background-color: #00C853;
+            color: white;
+        }
+
+        .card-button.modify {
+            background-color: #FFC107;
+            color: white;
+        }
+
+        .card-button.delete {
+            background-color: #CC0000;
+            color: white;
+        }
+
+</style>
+<h3>@ViewBag.screenName</h3>
+@await Html.PartialAsync("_displayDynamicMenu")
+
+
+
+
+<p>
+    @ViewBag.BibleText | @ViewBag.Jang of  @ViewBag.MaxJang
+</p>
+<p>
+    <a href='/BibleBulk/BibleDetailList?BibleText=@ViewBag.BibleText&Jang=@ViewBag.MaxJang'>등록현황보기</a>
+
+</p>
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.QuestionQ)
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+
+                <td>
+                    @{
+                        string sssss = $"{@item.BibleText} {@item.Jang}장 {@item.zul}절";
+                    }
+                    <p asp-display-for="@item.QuestionQ">   @item.QuestionQ (정답 : @item.CorrectAnswer) </p>
+                    @if (item.QuestionType.ToLower() == "o")
+                    {
+                        <ol>
+                            <li>@item.Question1</li>
+                            <li>@item.Question2</li>
+                            <li>@item.Question3</li>
+                            <li>@item.Question4</li>
+                        </ol>
+                    }
+                    <p asp-display-for="@item.QuestionQ"> @sssss</p>
+                    <div class="card-button delete" onclick="location.href='/BibleBulk/DeleteQuestionBank?Id=@item.Id&BibleText=@Html.Raw(ViewBag.BibleText)&Jang=@ViewBag.Jang&MaxJang=@ViewBag.MaxJang'">이(@item.sequenceNo) 퀴즈 퀴즈뱅크에서 삭제</div>
+                    <div class="card-button modify" onclick="location.href='/BibleBulk/BibleSheet2?BibleText=@Html.Raw(ViewBag.BibleText)&Jang=@item.Jang'">이 성경보기</div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+ 

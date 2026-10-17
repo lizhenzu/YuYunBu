@@ -1,0 +1,425 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+    var pageTitle = "유형 선택";
+    var postUrl = Url.Action("PickUserType", "Home");
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light only" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+
+    <style>
+        :root {
+            --bg0: #ffffff;
+            --bg1: #f7fafc;
+            --bg2: #f2fbff;
+            --card: rgba(255,255,255,.78);
+            --stroke: rgba(2, 6, 23, .10);
+            --ink: #0b1220;
+            --muted: rgba(11,18,32,.62);
+            --blue: #2563eb;
+            --green: #22c55e;
+            --purple: #a855f7;
+            --orange: #f97316;
+            --shadow: 0 18px 50px rgba(2, 6, 23, .10);
+            --r24: 24px;
+            --r18: 18px;
+            /* ✅ iOS 자동 다크 색상 보정 방지 */
+            color-scheme: light;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+/*             font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif; */
+            color: var(--ink);
+            background: radial-gradient(1200px 600px at 15% 10%, rgba(37,99,235,.14), transparent 55%), radial-gradient(900px 520px at 85% 12%, rgba(34,197,94,.12), transparent 55%), radial-gradient(900px 520px at 55% 88%, rgba(168,85,247,.10), transparent 60%), linear-gradient(180deg, var(--bg2) 0%, var(--bg1) 55%, var(--bg0) 100%);
+        }
+
+        .wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px 14px;
+        }
+
+        .card {
+            width: min(520px, 100%);
+            border-radius: var(--r24);
+            background: rgba(255,255,255,.82);
+            border: 1px solid var(--stroke);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .head {
+            padding: 18px 18px 12px;
+            background: linear-gradient(135deg, rgba(255,255,255,.65), rgba(255,255,255,.92));
+            border-bottom: 1px solid rgba(2,6,23,.08);
+        }
+
+        .topOrg {
+            font-size: 12.5px;
+            font-weight: 950;
+            letter-spacing: .3px;
+            color: rgba(11,18,32,.62);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(2,6,23,.10);
+            background: rgba(255,255,255,.78);
+            box-shadow: 0 10px 22px rgba(2,6,23,.06);
+        }
+
+            .topOrg .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: rgba(34,197,94,.95);
+                box-shadow: 0 8px 16px rgba(34,197,94,.18);
+            }
+
+        .welcome {
+            margin-top: 10px;
+            font-size: 15px;
+            font-weight: 850;
+            letter-spacing: -.2px;
+        }
+
+        .title {
+            margin-top: 12px;
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: -.3px;
+        }
+
+        .sub {
+            margin-top: 8px;
+            font-size: 14.5px;
+            color: var(--muted);
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .body {
+            padding: 14px 14px 16px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        /* =========================================================
+                   ✅ Type Button (학생/학부모/교사/전체)
+                   - iOS Safari 글자색/레이어/탭하이라이트 안정화 포함
+                   ========================================================= */
+        .btnType {
+            width: 100%;
+            border: 1px solid rgba(2,6,23,.10);
+            border-radius: 22px;
+            background: rgba(255,255,255,.78);
+            background-color: rgba(255,255,255,.78);
+            padding: 14px 14px 12px;
+            cursor: pointer;
+            text-align: left;
+            box-shadow: 0 10px 22px rgba(2,6,23,.08);
+            position: relative;
+            overflow: hidden;
+            transform: translateZ(0);
+            /* ✅ iOS/Safari 안정화 */
+            color: var(--ink);
+            -webkit-text-fill-color: var(--ink);
+            -webkit-appearance: none;
+            appearance: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+            .btnType::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                opacity: .95;
+                pointer-events: none;
+                z-index: 0; /* ✅ 배경층 */
+            }
+
+            .btnType:hover {
+                transform: translateY(-2px);
+            }
+
+            .btnType:active {
+                transform: translateY(0);
+            }
+
+            .btnType:focus {
+                outline: 3px solid rgba(37,99,235,.25);
+                outline-offset: 3px;
+            }
+
+        .row {
+            position: relative;
+            z-index: 1; /* ✅ 내용층 */
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,.80);
+            border: 1px solid rgba(2,6,23,.08);
+            box-shadow: 0 10px 20px rgba(2,6,23,.06);
+            flex: 0 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btnType .t1 {
+            font-size: 17px;
+            font-weight: 900;
+            letter-spacing: -.2px;
+            color: var(--ink);
+            -webkit-text-fill-color: var(--ink);
+        }
+
+        .btnType .t2 {
+            margin-top: 6px;
+            font-size: 13px;
+            font-weight: 650;
+            line-height: 1.35;
+            color: var(--muted);
+            -webkit-text-fill-color: var(--muted);
+        }
+
+        /* 배경 그라데이션(버튼 타입별) */
+        .c::before {
+            background: radial-gradient(320px 180px at 0% 0%, rgba(34,197,94,.20), transparent 62%);
+        }
+
+        .p::before {
+            background: radial-gradient(320px 180px at 0% 0%, rgba(37,99,235,.20), transparent 62%);
+        }
+
+        .t::before {
+            background: radial-gradient(320px 180px at 0% 0%, rgba(168,85,247,.18), transparent 62%);
+        }
+
+        .a::before {
+            background: radial-gradient(320px 180px at 0% 0%, rgba(249,115,22,.18), transparent 62%);
+        }
+
+        .foot {
+            padding: 12px 14px 16px;
+            border-top: 1px solid rgba(2,6,23,.08);
+            color: rgba(11,18,32,.55);
+            font-size: 12.5px;
+            font-weight: 650;
+            text-align: center;
+        }
+
+        form {
+            margin: 0;
+        }
+
+        input[type="hidden"] {
+            display: none;
+        }
+
+        @@media (max-width: 520px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* =========================================================
+                   ✅ 이모지 정렬 안정화: 케이스별 좌표 고정
+                   ========================================================= */
+        .emojiStack {
+            position: relative;
+            width: 54px;
+            height: 54px;
+        }
+
+            .emojiStack .e {
+                position: absolute;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                line-height: 1;
+                user-select: none;
+                font-size: 26px;
+                filter: saturate(1.02);
+            }
+
+            /* 2개 겹침(학생/교사/관리자) */
+            .emojiStack.stack2 .e1 {
+                transform: translate(-62%, -62%);
+            }
+
+            .emojiStack.stack2 .e2 {
+                transform: translate(-38%, -38%);
+                font-size: 21px;
+                opacity: .92;
+            }
+
+            /* 3개 겹침(학부모) */
+            .emojiStack.stack3 .e1 {
+                transform: translate(-70%, -58%);
+            }
+
+            .emojiStack.stack3 .e2 {
+                transform: translate(-30%, -58%);
+            }
+
+            .emojiStack.stack3 .e3 {
+                transform: translate(-50%, -20%);
+                font-size: 20px;
+                opacity: .90;
+            }
+
+        /* ✅ 일부 이모지(🛠️) 렌더링 편차 보정 */
+        .emojiFix {
+            letter-spacing: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="head">
+
+                <div class="topOrg"><span class="dot"></span>안녕하세요.</div>
+                <div class="welcome">@($"{@ChurchName} · {@DepartmentName}")에 오심을 환영합니다. ✨</div>
+
+                <div class="title">당신은 누구인가요?</div>
+
+                <div class="sub">
+                    메뉴를 <b>더 보기 쉽고 집중되게</b> 보여주기 위한 선택이에요. 화면 구성(배치/강조 방식)만 바꾸며, 권한이나 제한은 없어요.<br />
+                    누구나 상황에 맞게 자유롭게 선택하고 언제든 다시 바꿀 수 있어요 🙂
+                </div>
+            </div>
+
+            <div class="body">
+                <div class="grid">
+
+                    <!-- 학생 C -->
+                    <form method="post" action="@postUrl">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="userType" value="C" />
+                        <button class="btnType c" type="submit">
+                            <div class="row">
+                                <div class="icon" aria-hidden="true">
+                                    <div class="emojiStack stack2">
+                                        <span class="e e1">👧</span>
+                                        <span class="e e2">🧒</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="t1">학생형 메뉴</div>
+                                    <div class="t2">아이들이 보기 쉬운 메뉴 중심으로 보여줘요.</div>
+                                </div>
+                            </div>
+                        </button>
+                    </form>
+
+                    <!-- 학부모 P -->
+                    <form method="post" action="@postUrl">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="userType" value="P" />
+                        <button class="btnType p" type="submit">
+                            <div class="row">
+                                <div class="icon" aria-hidden="true">
+                                    <div class="emojiStack stack3">
+                                        <span class="e e1">👨</span>
+                                        <span class="e e2">👩</span>
+                                        <span class="e e3">👧</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="t1">학부모형 메뉴</div>
+                                    <div class="t2">가정 연계/공지/행사 안내를 더 쉽게 보이게 해요.</div>
+                                </div>
+                            </div>
+                        </button>
+                    </form>
+
+                    <!-- 교사 T -->
+                    <form method="post" action="@postUrl">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="userType" value="T" />
+                        <button class="btnType t" type="submit">
+                            <div class="row">
+                                <div class="icon" aria-hidden="true">
+                                    <div class="emojiStack stack2">
+                                        <span class="e e1">🧑</span>
+                                        <span class="e e2">🏫</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="t1">교사형 메뉴</div>
+                                    <div class="t2">출석/관리/공지 등 운영 메뉴를 중심으로 보여줘요.</div>
+                                </div>
+                            </div>
+                        </button>
+                    </form>
+
+                    <!-- 관리자/전체 A -->
+                    <form method="post" action="@postUrl">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="userType" value="A" />
+                        <button class="btnType a" type="submit">
+                            <div class="row">
+                                <div class="icon" aria-hidden="true">
+                                    <div class="emojiStack stack2">
+                                        <span class="e e1 emojiFix">🛠️</span>
+                                        <span class="e e2">⚙️</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="t1">전체 메뉴 보임</div>
+                                    <div class="t2">모든 메뉴를 전부 보여줘요.</div>
+                                </div>
+                            </div>
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+
+            <div class="foot">
+                © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+            </div>
+        </div>
+    </div>
+</body>
+</html>

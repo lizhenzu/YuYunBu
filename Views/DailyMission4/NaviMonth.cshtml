@@ -1,0 +1,725 @@
+﻿@model IEnumerable<BulletinBoard.Models.AllStatusData>
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+
+    var groupedByMonth = Model
+        .GroupBy(x => new { x.DateBy.Year, x.DateBy.Month })
+        .OrderBy(g => g.Key.Year).ThenBy(g => g.Key.Month)
+        .ToList();
+
+    int word_Cnt = 1;
+    int quiz_Cnt = 1;
+    int pray_Cnt = 1;
+    int recite_Cnt = 1;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>월별 미션 달력</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        :root {
+            /* ✅ 귀여운 파스텔 테마 */
+            --bg1: #FFF7FB;
+            --bg2: #F3FBFF;
+            --bg3: #F3FFF4;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --card: #ffffff;
+            --line: rgba(31,41,55,.10);
+            --shadow: 0 10px 25px rgba(31,41,55,.10);
+            --pink: #FF6FAE;
+            --sky: #5EC9FF;
+            --mint: #33D3A3;
+            --lemon: #FFD54A;
+            --grape: #8B7CFF;
+            --radius: 22px;
+            /* ✅ footer 높이(JS가 실제 높이로 갱신) */
+        
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Noto Sans KR', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            color: var(--ink);
+            background: radial-gradient(900px 450px at 10% 0%, rgba(255,111,174,.18), transparent 60%), radial-gradient(900px 450px at 90% 10%, rgba(94,201,255,.18), transparent 60%), radial-gradient(900px 450px at 40% 100%, rgba(51,211,163,.18), transparent 60%), linear-gradient(180deg, var(--bg1), var(--bg2) 40%, var(--bg3));
+            padding: 14px 12px 24px;
+            text-align: center;
+        }
+
+        /* 상단 타이틀 */
+        .hero {
+            max-width: 1040px;
+            margin: 8px auto 14px;
+            padding: 14px 14px 16px;
+            border-radius: 26px;
+            background: linear-gradient(135deg, rgba(255,255,255,.88), rgba(255,255,255,.70));
+            border: 1px solid rgba(255,255,255,.75);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .hero:before {
+                content: "";
+                position: absolute;
+                inset: -40px -60px auto auto;
+                width: 180px;
+                height: 180px;
+                background: radial-gradient(circle at 30% 30%, rgba(255,213,74,.45), transparent 60%);
+                transform: rotate(18deg);
+            }
+
+            .hero:after {
+                content: "";
+                position: absolute;
+                inset: auto auto -70px -80px;
+                width: 220px;
+                height: 220px;
+                background: radial-gradient(circle at 40% 40%, rgba(139,124,255,.30), transparent 60%);
+                transform: rotate(-12deg);
+            }
+
+        .titleRow {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.85);
+            border: 1px dashed rgba(31,41,55,.18);
+            font-weight: 900;
+            letter-spacing: .2px;
+        }
+
+            .badge .spark {
+                filter: drop-shadow(0 4px 6px rgba(0,0,0,.10));
+            }
+
+        h1 {
+            margin: 2px 0 0;
+            font-size: clamp(22px, 4vw, 34px);
+            line-height: 1.12;
+            font-weight: 1000;
+        }
+
+        .subTitle {
+            margin: 0;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        /* 프로필 카드 */
+        .profileCard {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .avatarWrap {
+            position: relative;
+            width: 92px;
+            height: 92px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(255,111,174,.25), rgba(94,201,255,.25), rgba(51,211,163,.25));
+            padding: 6px;
+            box-shadow: 0 12px 22px rgba(31,41,55,.12);
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            object-fit: cover;
+            background: #fff;
+            border: 2px solid rgba(255,255,255,.9);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .nameBox {
+            padding: 10px 14px;
+            border-radius: 18px;
+            background: rgba(255,255,255,.85);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 8px 18px rgba(31,41,55,.08);
+            min-width: 220px;
+        }
+
+            .nameBox .name {
+                margin: 0;
+                font-weight: 1000;
+                font-size: 18px;
+            }
+
+            .nameBox .mini {
+                margin: 4px 0 0;
+                color: var(--muted);
+                font-weight: 800;
+                font-size: 13px;
+            }
+
+        .hintCard {
+            max-width: 1040px;
+            margin: 12px auto 14px;
+            padding: 12px 14px;
+            border-radius: 18px;
+            background: rgba(255,255,255,.82);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 22px rgba(31,41,55,.08);
+            text-align: left;
+            font-weight: 800;
+        }
+
+            .hintCard b {
+                color: var(--pink);
+            }
+
+        .legend {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(31,41,55,.10);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 4px 10px rgba(0,0,0,.12);
+        }
+
+        /* 월 카드 */
+        .monthCard {
+            max-width: 1040px;
+            margin: 14px auto;
+            border-radius: 26px;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(255,255,255,.75);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .monthHead {
+            padding: 14px 14px 12px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(135deg, rgba(255,111,174,.18), rgba(94,201,255,.18), rgba(51,211,163,.14));
+            border-bottom: 1px solid rgba(31,41,55,.08);
+        }
+
+        .monthTitle {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 1000;
+            text-align: left;
+        }
+
+        .monthScoreMini {
+            margin: 0;
+            font-weight: 1000;
+            color: rgba(31,41,55,.88);
+            background: rgba(255,255,255,.75);
+            border: 1px solid rgba(31,41,55,.10);
+            border-radius: 999px;
+            padding: 8px 12px;
+            white-space: nowrap;
+        }
+
+        /* 캘린더 테이블 */
+        table.calendar {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+            padding: 12px;
+            table-layout: fixed;
+        }
+
+        .calendar thead th {
+            font-size: 13px;
+            font-weight: 1000;
+            color: rgba(31,41,55,.85);
+            padding: 10px 0;
+            border-radius: 14px;
+            background: rgba(255,255,255,.85);
+            border: 1px solid rgba(31,41,55,.10);
+        }
+
+        .calendar td {
+            height: 76px;
+            border-radius: 18px;
+            background: #fff;
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 8px 18px rgba(31,41,55,.08);
+            padding: 8px 8px 10px;
+            vertical-align: top;
+            transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .clickable {
+            cursor: pointer;
+        }
+
+        .calendar td.clickable:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px rgba(31,41,55,.14);
+            filter: saturate(1.05);
+        }
+
+        .cell {
+            width: 100%;
+            height: 100%;
+        }
+
+        .dateText {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 1000;
+            font-size: 13px;
+            color: rgba(31,41,55,.88);
+        }
+
+        .sticker {
+            font-size: 14px;
+            filter: drop-shadow(0 6px 8px rgba(0,0,0,.12));
+            user-select: none;
+        }
+
+        .scorePill {
+            margin-top: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-weight: 1000;
+            font-size: 13px;
+            border: 1px solid rgba(31,41,55,.10);
+            background: rgba(255,255,255,.85);
+            box-shadow: 0 10px 18px rgba(31,41,55,.10);
+            white-space: nowrap;
+        }
+
+        .emptySpace {
+            height: 32px;
+        }
+
+        /* ✅ 점수에 따른 색상 */
+        .score-0 {
+            background: #fff !important;
+        }
+
+        .score-low {
+            background: radial-gradient(120px 80px at 20% 10%, rgba(255,213,74,.38), transparent 60%), linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.80)) !important;
+        }
+
+        .score-high {
+            background: radial-gradient(140px 90px at 20% 10%, rgba(51,211,163,.35), transparent 60%), linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.80)) !important;
+        }
+
+        .score-very-high {
+            background: radial-gradient(140px 90px at 20% 10%, rgba(94,201,255,.35), transparent 60%), linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.80)) !important;
+        }
+
+        .score-most-high {
+            background: radial-gradient(160px 100px at 20% 10%, rgba(255,111,174,.38), transparent 60%), linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.80)) !important;
+        }
+
+        /* 총점 */
+        .totalCard {
+            max-width: 1040px;
+            margin: 12px auto 0;
+            padding: 14px;
+            border-radius: 22px;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(255,255,255,.75);
+            box-shadow: var(--shadow);
+            font-weight: 1000;
+        }
+
+            .totalCard .big {
+                font-size: 18px;
+                margin: 0;
+            }
+
+                .totalCard .big b {
+                    color: var(--grape);
+                }
+
+        /* 푸터 */
+        footer {
+            margin-top: 20px; /* ✅ 위 div와 간격 */
+            padding: 16px 12px calc(12px + env(safe-area-inset-bottom));
+            background: linear-gradient(135deg, rgba(255,111,174,.35), rgba(94,201,255,.30), rgba(51,211,163,.28));
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,.60);
+            box-shadow: 0 -8px 20px rgba(31,41,55,.12);
+        }
+
+
+        .footerBar {
+            max-width: 1040px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btnNav {
+            flex: 1 1 140px;
+            min-width: 120px;
+            max-width: 220px;
+            border: 0;
+            border-radius: 18px;
+            padding: 12px 12px;
+            font-weight: 1000;
+            cursor: pointer;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 18px rgba(31,41,55,.12);
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+            .btnNav:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 14px 28px rgba(31,41,55,.16);
+            }
+
+        /* =========================
+                   ✅ 모바일 최종(완전체)
+                   - 셀 간격 거의 0
+                   - 꽃/점수: 셀 안쪽 배지
+                   - 날짜 숫자 안 가리도록 오른쪽 공간 확보
+                   - footer 높이만큼 body padding 자동 확보
+                   ========================= */
+        @@media (max-width: 520px) {
+
+            body {
+                padding: 10px 8px calc(var(--footerH) + 24px);
+            }
+
+            table.calendar {
+                border-spacing: 2px;
+                padding: 6px;
+                table-layout: fixed;
+            }
+
+            .calendar thead th {
+                padding: 7px 0;
+                font-size: 11.5px;
+                border-radius: 10px;
+            }
+
+            .calendar td {
+                height: auto;
+                padding: 2px;
+                border-radius: 14px;
+                vertical-align: top;
+                overflow: hidden;
+                box-shadow: 0 6px 14px rgba(31,41,55,.08);
+            }
+
+                .calendar td .cell {
+                    position: relative;
+                    aspect-ratio: 1 / 1;
+                    display: block;
+                    padding: 6px 6px 26px;
+                    border-radius: 12px;
+                    height: auto;
+                }
+            /* ✅ 날짜 숫자: 꽃과 겹치지 않게 오른쪽 공간 확보 */
+            .dateText {
+                display: block;
+                font-weight: 1000;
+                font-size: 11.5px;
+                color: rgba(31,41,55,.88);
+                padding-right: 28px; /* ✅ 꽃 자리 */
+                white-space: nowrap;
+            }
+
+                .dateText span:first-child {
+                    display: inline-block;
+                    padding: 2px 6px;
+                    border-radius: 999px;
+                    background: rgba(255,255,255,.92);
+                    border: 1px solid rgba(31,41,55,.12);
+                    box-shadow: 0 6px 12px rgba(31,41,55,.10);
+                }
+
+            .sticker {
+                position: absolute;
+                top: 4px;
+                right: 4px;
+                font-size: 13px;
+                line-height: 1;
+                padding: 2px 5px;
+                border-radius: 999px;
+                background: rgba(255,255,255,.94);
+                border: 1px solid rgba(31,41,55,.16);
+                box-shadow: 0 8px 14px rgba(31,41,55,.14);
+                pointer-events: none;
+            }
+
+            .scorePill {
+                position: absolute;
+                left: 50%;
+                bottom: 4px;
+                transform: translateX(-50%);
+                margin-top: 0;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 1000;
+                border-radius: 999px;
+                background: rgba(255,255,255,.94);
+                border: 1px solid rgba(31,41,55,.16);
+                box-shadow: 0 10px 16px rgba(31,41,55,.14);
+                white-space: nowrap;
+            }
+
+            .emptySpace {
+                height: 10px;
+            }
+
+            .nameBox {
+                min-width: 0;
+            }
+        }
+    </style>
+
+    <script>
+        // Razor 변수 데이터를 JavaScript 변수에 전달 (기능 유지)
+        var currentUserName = '@__UserInfos.UserName';
+        var loggedInUserName = '@ViewData["LoginUserName"]';
+
+        function goToPage(url) {
+            if (currentUserName === loggedInUserName) {
+                window.location.href = url;
+            }
+        }
+
+      
+    </script>
+</head>
+
+<body>
+    <div class="hero">
+        <div class="titleRow">
+            <div class="badge"><span class="spark">✨</span> 매일매일 미션 달력</div>
+            <h1>@ConstatsCommon.MainKeyTitle</h1>
+            <p class="subTitle">월별 미션 수행 현황</p>
+
+            <div class="profileCard">
+                <div class="avatarWrap">
+                    <img src="@__UserInfos.ProfilePicturePath"
+                         onclick="ManageUserInfo('@__UserInfos.UserId')"
+                         alt="Profile Picture"
+                         loading="lazy"
+                         class="avatar" />
+                </div>
+
+                <div class="nameBox">
+                    <p class="name">@($"{@__UserInfos.FullName}님")</p>
+                    <p class="mini">오늘도 말씀과 함께 한 걸음! 🌱</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (__UserInfos.UserName == ViewData["LoginUserName"].ToString())
+    {
+        <div class="hintCard">
+            <div>📌 <b>날짜를 톡!</b> 누르면 그날 미션으로 이동해요.</div>
+            <div class="legend" aria-hidden="true">
+                <span class="chip"><span class="dot" style="background: #ffffff;border:1px solid rgba(31,41,55,.15)"></span>0점</span>
+                <span class="chip"><span class="dot" style="background: rgba(255,213,74,.85)"></span>조금</span>
+                <span class="chip"><span class="dot" style="background: rgba(51,211,163,.85)"></span>좋아!</span>
+                <span class="chip"><span class="dot" style="background: rgba(94,201,255,.85)"></span>멋져!</span>
+                <span class="chip"><span class="dot" style="background: rgba(255,111,174,.85)"></span>최고!</span>
+            </div>
+        </div>
+    }
+
+    @{
+        int scoreSumSum = 0;
+    }
+
+    @foreach (var monthGroup in groupedByMonth)
+    {
+        var year = monthGroup.Key.Year;
+        int scoreSum = 0;
+        var month = monthGroup.Key.Month;
+        var baseDate = new DateTime(year, month, 1);
+        var daysInMonth = DateTime.DaysInMonth(year, month);
+        var startDayOfWeek = (int)baseDate.DayOfWeek;
+        var grouped = monthGroup.ToDictionary(x => x.DateBy.Date, x => x);
+
+        <section class="monthCard">
+            <div class="monthHead">
+                <h2 class="monthTitle">@($"{@year}년 {@month}월")</h2>
+                <p class="monthScoreMini">이번 달 누적: <b>@scoreSum</b>점</p>
+            </div>
+
+            <table class="calendar" cellspacing="1">
+                <thead>
+                    <tr>
+                        <th>일</th>
+                        <th>월</th>
+                        <th>화</th>
+                        <th>수</th>
+                        <th>목</th>
+                        <th>금</th>
+                        <th>토</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        int dayCounter = 1;
+                        for (int week = 0; week < 6; week++)
+                        {
+                            <tr>
+                                @for (int day = 0; day < 7; day++)
+                                {
+                                    int cellIndex = week * 7 + day;
+                                    if (cellIndex < startDayOfWeek || dayCounter > daysInMonth)
+                                    {
+                                        <td></td>
+                                    }
+                                    else
+                                    {
+                                        var currentDate = new DateTime(year, month, dayCounter);
+                                        int score = 0;
+
+                                        if (grouped.ContainsKey(currentDate))
+                                        {
+                                            var item = grouped[currentDate];
+                                            if (item.word_ToMe == "y") score += item.word_Cnt;
+                                            if (item.word_ToParent == "y") score += item.word_Cnt;
+                                            if (item.quiz_result == "t") score += item.quiz_Cnt;
+                                            if (item.pray_ToMe == "y") score += item.pray_Cnt;
+                                            if (item.pray_ToParent == "y") score += item.pray_Cnt;
+                                            if (item.Recite_yn == "y") score += item.Recite_Cnt;
+                                        }
+
+                                        scoreSum += score;
+
+                                        var colorClass =
+                                        score == 0 ? "score-0" :
+                                        score < 5 ? "score-low" :
+                                        score < 6 ? "score-high" :
+                                        score < 7 ? "score-very-high" :
+                                        "score-most-high";
+
+                                        var clickable = (__UserInfos.UserName == ViewData["LoginUserName"].ToString()) ? "clickable" : "";
+
+                                        string sticker =
+                                        score == 0 ? "" :
+                                        score < 5 ? "🌼" :
+                                        score < 6 ? "🌿" :
+                                        score < 7 ? "🌈" :
+                                        "🏆";
+
+                                        <td style="user-select:none;"
+                                            class="@colorClass @clickable"
+                                            onclick="goToPage('/Home/goWorkDT?workDT=@currentDate.ToString("yyyy-MM-dd")')">
+
+                                            <div class="cell">
+                                                <div class="dateText">
+                                                    <span>@($"{@dayCounter}일")</span>
+                                                    <span class="sticker">@sticker</span>
+                                                </div>
+
+                                                @if (score > 0)
+                                                {
+                                                    <div class="scorePill">@($"{@score}점")</div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="emptySpace"></div>
+                                                }
+                                            </div>
+                                        </td>
+
+                                        dayCounter++;
+                                    }
+                                }
+                            </tr>
+
+                            if (dayCounter > daysInMonth) break;
+                        }
+                    }
+                </tbody>
+            </table>
+
+            <div style="padding: 0 14px 14px; text-align:left;">
+                <div class="chip" style="display:inline-flex;">
+                    📣 @($"{@month}월 총점") : <b style="margin-left:6px;color:var(--grape);">@($"{@scoreSum}점")</b>
+                </div>
+            </div>
+        </section>
+
+        scoreSumSum += scoreSum;
+    }
+
+    <div class="totalCard">
+        <p class="big">나의 총점 : <b>@($"{@scoreSumSum}점")</b> 🎉</p>
+        <p style="margin:6px 0 0;color:var(--muted);font-weight:900;">꾸준히 하면 하나님 말씀 습관이 쑥쑥 자라요 🌱</p>
+    </div>
+
+    <footer>
+        <div class="footerBar">
+            <button class="btnNav" onclick="window.location.href='/Admin/IndexPoint'">🎁 포인트</button>
+            <button class="btnNav" onclick="location.href='/DailyMission2/NaviHistory?userName=@ViewData["UserName"]'">📆 일별현황</button>
+            <button class="btnNav" onclick="location.href='/'">🏠 홈으로</button>
+            <button class="btnNav" onclick="location.href='/DailyMission2/index'">🧭 @ConstatsCommon.MainKeyTitle</button>
+        </div>
+    </footer>
+</body>
+</html>

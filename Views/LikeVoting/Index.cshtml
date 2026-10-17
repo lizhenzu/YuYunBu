@@ -1,0 +1,499 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model List<DrawingVoteViewModel>
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+
+}
+
+@{
+    Layout = null;
+    var sortBy = Context.Request.Query["sortBy"].ToString();
+    var likesActive = sortBy == "likes" ? "active" : "";
+    var numberActive = (string.IsNullOrEmpty(sortBy) || sortBy == "number") ? "active" : "";
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>도전 성경 역대하 감상문 투표하기</title>
+
+    <style>
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+
+        .page-wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+            font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+            color: #222;
+        }
+
+        /* 상단 헤더 배너 */
+        .main-banner {
+            background: linear-gradient(135deg,#fff6e5,#ffe4f0);
+            text-align: center;
+            border-radius: 1rem;
+            padding: 1.2rem .8rem;
+            margin-top: 1rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+            .main-banner h1 {
+                font-size: 1.6rem;
+                font-weight: 700;
+                color: #d14;
+                margin: 0;
+                line-height: 1.4;
+                letter-spacing: -0.3px;
+            }
+
+                .main-banner h1 span {
+                    color: #ff6600;
+                }
+
+        .vote-header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin: 1rem 0;
+            gap: .75rem;
+        }
+
+        .left-head {
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .home-link-btn {
+            display: inline-block;
+            font-size: .8rem;
+            padding: .4rem .7rem;
+            border-radius: .5rem;
+            border: 1px solid #999;
+            background: #fff;
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            text-align: center;
+            min-width: 120px;
+        }
+
+            .home-link-btn:active {
+                transform: scale(.97);
+            }
+
+        .instructions {
+            font-size: 1rem;
+            color: #444;
+            line-height: 1.6;
+            text-align: left;
+            margin-top: .5rem;
+        }
+
+            .instructions .hl1 {
+                color: #d14;
+                font-weight: 600;
+            }
+
+            .instructions .hl2 {
+                color: #ff6600;
+                font-weight: 600;
+            }
+
+        .sort-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+            .sort-buttons a {
+                display: inline-block;
+                padding: .4rem .8rem;
+                font-size: .8rem;
+                border-radius: .5rem;
+                border: 1px solid #ccc;
+                text-decoration: none;
+                color: #333;
+                background: #fff;
+            }
+
+                .sort-buttons a.active {
+                    border-color: #333;
+                    font-weight: 600;
+                }
+
+        /* 카드 그리드 */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
+            gap: 1.5rem;
+        }
+
+        .card-item {
+            border: 1px solid #eee;
+            border-radius: .75rem;
+            padding: 1rem;
+            background: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            transition: transform .2s ease;
+            position: relative;
+        }
+
+            .card-item:hover {
+                transform: scale(1.02);
+            }
+
+        .thumb-wrap {
+            width: 100%;
+            border-radius: .75rem;
+            overflow: hidden;
+            background: #fff;
+            /* border: 1px solid #ddd; */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          
+        }
+
+            .thumb-wrap img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                background: #fff;
+                display: block;
+            }
+
+        .img-num {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-top: .6rem;
+        }
+
+        .like-row {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: .6rem;
+            gap: .4rem;
+            position: relative;
+        }
+
+        .like-count {
+            font-size: 1.8rem;
+            color: #555;
+            position: relative;
+        }
+
+        /* "+1" 애니메이션 튀어나오는 요소 */
+        .like-burst {
+            position: absolute;
+            top: -1.2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: .9rem;
+            font-weight: 700;
+            color: #d11;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .like-btn {
+            appearance: none;
+            border-radius: .5rem;
+            padding: .45rem .8rem;
+            font-size: .85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .4rem;
+            cursor: pointer;
+            font-weight: 600;
+            line-height: 1.2;
+            min-width: 120px;
+            border: 1px solid transparent;
+            transition: transform .15s ease;
+        }
+
+        /* 안 좋아요 상태 */
+        .like-off {
+            background: #fff;
+            border: 1px solid #ccc;
+            color: #333;
+        }
+
+        /* 좋아요 중 */
+        .like-on {
+            background: #ffefef;
+            border: 1px solid #ffcccc;
+            color: #d11;
+        }
+
+        .like-btn:active {
+            transform: scale(0.97);
+        }
+
+        /* 좋아요 눌렀을 때 버튼에 살짝 커지는 효과 */
+        .like-pulse {
+            animation: pulseScale .3s ease;
+        }
+        @@keyframes pulseScale {
+            0%
+
+        {
+            transform: scale(1);
+        }
+
+        50% {
+            transform: scale(1.15);
+        }
+
+        100% {
+            transform: scale(1);
+        }
+
+        }
+
+        /* +1 / -1 올라가는 효과 */
+        .burst-anim {
+            animation: burstUp .6s ease-out forwards;
+        }
+        @@keyframes burstUp {
+            0%
+
+        {
+            opacity: 1;
+            transform: translate(-50%,0) scale(1);
+        }
+
+        80% {
+            opacity: 1;
+            transform: translate(-50%,-15px) scale(1.2);
+        }
+
+        100% {
+            opacity: 0;
+            transform: translate(-50%,-25px) scale(1.2);
+        }
+
+        }
+
+        footer {
+            text-align: center;
+            font-size: .7rem;
+            color: #777;
+            margin: 2rem 0 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrap">
+
+        <div class="main-banner">
+            <h1>🎨 도전 성경 <span>역대하</span> 시청 후 감상문 작품 투표하기 🎉</h1>
+        </div>
+
+        <div class="vote-header">
+            <div class="left-head">
+                <a class="home-link-btn" href="/">← 홈으로 가기</a>
+
+                <div class="instructions">
+                    마음에 남는 <span class="hl1">감상문</span>에
+                    <span class="hl2">‘좋아요 ❤️’</span> 버튼을 눌러 주세요!<br />
+                    마음이 바뀌면 다시 눌러서 <span class="hl1">취소</span>할 수도 있어요.<br />
+                    <span class="hl2">좋아요가 많은 감상문</span>은
+                    <span class="hl1">다가오는 주일</span>에 소정의 상품을 수여할 예정입니다.✨
+                </div>
+            </div>
+@* 
+            @if (isSuperAdmin)
+            { *@
+                <div class="sort-buttons">
+                    <a class="@numberActive"
+                       href="@Url.Action("Index", "LikeVoting", new { sortBy = "number" })">번호순</a>
+                    <a class="@likesActive"
+                       href="@Url.Action("Index", "LikeVoting", new { sortBy = "likes" })">인기순</a>
+                </div>
+            @* } *@
+        </div>
+        @{
+            int loopConut = 1;
+        }
+        <div class="card-grid">
+            @foreach (var item in Model)
+            {
+                var btnClass = item.IsLikedByMe ? "like-btn like-on" : "like-btn like-off";
+                var btnText = item.IsLikedByMe ? "❤️ 좋아요 취소" : "🤍 좋아요";
+
+                <div class="card-item" data-id="@item.Id">
+                    <div class="thumb-wrap">
+                        <img src="@item.ImageUrl" alt="이미지 @item.ImageNumber" />
+                    </div>
+                    @if (string.IsNullOrEmpty(@item.Who))
+                    {
+                        <div class="img-num">@loopConut. @item.ImageNumber</div>
+                    }
+                    else
+                    {
+                        <div class="img-num">@loopConut. @item.Who</div>
+                    }
+                    <div class="like-row">
+                        <div class="like-count">
+                  @*           @if (!isSuperAdmin)
+                            {
+                                <span class="like-value">***</span>
+                        
+                                <text> 표</text>
+                            }
+                            else
+                            { *@
+                                <span class="like-value">@item.LikeCount</span>
+                        
+                                <text> 표</text>
+                            @* } *@
+                        </div>
+
+                        <!-- +1 / -1 애니메이션 효과 엘리먼트 -->
+                        <div class="like-burst"></div>
+
+                        <button class="@btnClass"
+                                data-like-id="@item.Id"
+                                data-liked="@item.IsLikedByMe.ToString().ToLower()">
+                            @btnText
+                        </button>
+                    </div>
+                </div>
+                loopConut += 1;
+            }
+        </div>
+
+        <footer>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</footer>
+    </div>
+
+    <script>
+        // Razor 변수 -> JS로 내려주기
+        const isSuperAdmin = @isSuperAdmin.ToString().ToLower();
+
+        // 버튼 시각 상태 토글 (좋아요 on/off)
+        function updateButtonVisual(btn, isLiked) {
+            if (isLiked) {
+                btn.classList.remove('like-off');
+                btn.classList.add('like-on');
+                btn.textContent = "❤️ 좋아요 취소";
+                btn.setAttribute('data-liked', 'true');
+            } else {
+                btn.classList.remove('like-on');
+                btn.classList.add('like-off');
+                btn.textContent = "🤍 좋아요";
+                btn.setAttribute('data-liked', 'false');
+            }
+
+            // 살짝 커졌다 돌아오는 효과
+            btn.classList.remove('like-pulse');
+            // 강제로 리플로우 해서 애니메이션 다시 재생되게 함
+            // eslint-disable-next-line no-unused-expressions
+            btn.offsetWidth;
+            btn.classList.add('like-pulse');
+        }
+
+        // +1 / -1 애니메이션 보여주기
+        function showBurst(likeRowEl, deltaText) {
+            const burst = likeRowEl.querySelector('.like-burst');
+            if (!burst) return;
+
+            burst.textContent = deltaText; // "+1" 또는 "-1"
+            burst.classList.remove('burst-anim');
+            // 리플로우 강제
+            burst.offsetWidth;
+            burst.classList.add('burst-anim');
+        }
+
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.like-btn');
+            if (!btn) return;
+
+            const id = btn.getAttribute('data-like-id');
+            const wasLikedBefore = btn.getAttribute('data-liked') === 'true';
+
+            const formData = new FormData();
+            formData.append('id', id);
+
+            fetch('@Url.Action("Like", "LikeVoting")', {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With':'XMLHttpRequest'
+                },
+                cache: 'no-store', // 캐시 방지
+                body: formData
+            })
+            .then(async r => {
+                if (!r.ok) {
+                    throw new Error('HTTP ' + r.status);
+                }
+                let data;
+                try {
+                    data = await r.json();
+                } catch (err) {
+                    throw new Error('JSON parse error');
+                }
+
+                // 카드 범위
+                const card = btn.closest('.card-item');
+                const likeSpan = card.querySelector('.like-value');
+                const likeRowEl = card.querySelector('.like-row');
+
+                // 서버에서 최신 카운트 받아오고 갱신 (슈퍼관리자는 숫자 감춤 유지)
+                if (isSuperAdmin && data.likes !== undefined) {
+                    likeSpan.textContent = data.likes;
+                }
+
+                // 버튼 비주얼(텍스트/색상) 갱신
+                updateButtonVisual(btn, data.isLiked);
+
+                // +1 / -1 이펙트
+                // wasLikedBefore=false -> 지금 좋아요 true -> +1
+                // wasLikedBefore=true  -> 지금 좋아요 false -> -1
+                const nowLiked = data.isLiked === true;
+                const deltaText = (!wasLikedBefore && nowLiked) ? "+1" :
+                                  (wasLikedBefore && !nowLiked) ? "-1" : "";
+                if (deltaText) {
+                    showBurst(likeRowEl, deltaText);
+                }
+            })
+            .catch(err => {
+                console.error('투표 중 에러:', err);
+                alert('서버와 통신 중 문제가 발생했어요. (' + err.message + ')');
+            });
+        });
+    </script>
+
+</body>
+</html>

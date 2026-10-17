@@ -1,0 +1,982 @@
+﻿@using BulletinBoard.Models
+@model List<BulletinBoard.Models.UserRolesViewModel>
+
+@{
+    ViewData["Title"] = "User Roles";
+    Layout = null; // ✅ 독립 페이지
+
+    int loopCount = 1;
+
+    string Norm(string? s) => (s ?? "").Trim().ToLowerInvariant();
+    string FullNameKey(UserRolesViewModel u) => $"{Norm(u?.LastName)}|{Norm(u?.FirstName)}";
+
+    // 이름 중복 카운트
+    var nameCounts = (Model ?? new List<UserRolesViewModel>())
+        .GroupBy(u => FullNameKey(u))
+        .ToDictionary(g => g.Key, g => g.Count());
+
+    // 중복 그룹에 색상 인덱스 부여(그룹마다 다른 색)
+    var dupKeys = nameCounts.Where(kv => kv.Value > 1).Select(kv => kv.Key).ToList();
+    var dupIndex = new Dictionary<string, int>();
+    for (int i = 0; i < dupKeys.Count; i++) dupIndex[dupKeys[i]] = i;
+
+    // 0~N 톤 회전
+    string DupTone(string key)
+    {
+        if (!dupIndex.TryGetValue(key, out var idx)) return "";
+        var tones = new[] { "dup-a", "dup-b", "dup-c", "dup-d", "dup-e", "dup-f" };
+        return tones[idx % tones.Length];
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <!-- ✅ 1) FOUC 방지: 처음에는 숨기고, DOM 준비되면 표시 -->
+    <style>
+        html {
+            background: #f6f7fb;
+        }
+
+        body {
+            margin: 0;
+            background: #f6f7fb;
+            opacity: 0;
+        }
+
+            body.is-ready {
+                opacity: 1;
+                transition: opacity .12s ease;
+            }
+    </style>
+
+    <!-- ✅ 2) 본 스타일은 반드시 head에 둬서 "대충 보이다가 적용" 현상 제거 -->
+    <style>
+        /* =========================
+                           PAGE BASE
+                ========================= */
+        body {
+            margin: 0;
+            background: #f6f7fb;
+        }
+
+        .urPage {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 14px 14px 30px;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+            color: #0f172a;
+        }
+
+        /* Top Nav */
+        .topNav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 0 14px;
+        }
+
+        .topNavLeft {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .topNavTitle {
+            font-size: 13px;
+            font-weight: 900;
+            color: rgba(15,23,42,.70);
+            padding: 8px 12px;
+            background: rgba(15,23,42,.05);
+            border: 1px solid rgba(15,23,42,.10);
+            border-radius: 999px;
+        }
+
+        .navBtn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 12px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 950;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 8px 16px rgba(15,23,42,.06);
+            transition: transform .06s ease, box-shadow .12s ease, border-color .12s ease;
+            white-space: nowrap;
+        }
+
+            .navBtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 22px rgba(15,23,42,.10);
+                border-color: rgba(2,132,199,.35);
+            }
+
+        .navBtnAdmin {
+            background: rgba(99,102,241,.10);
+            border-color: rgba(99,102,241,.22);
+            color: #3730a3;
+        }
+
+        /* Header */
+        .urHead {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .urTitle {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -.2px;
+        }
+
+        .urSub {
+            margin-top: 6px;
+            font-size: 13px;
+            color: rgba(15,23,42,.75);
+            font-weight: 700;
+        }
+
+        .urTools {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        /* Bars */
+        .urFilterBar, .urSortBar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 6px;
+            border-radius: 14px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            box-shadow: 0 6px 18px rgba(15,23,42,.06);
+        }
+
+        .urFBtn, .urSBtn {
+            appearance: none;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            color: #0f172a;
+            padding: 9px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 950;
+            cursor: pointer;
+            transition: transform .06s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+            white-space: nowrap;
+        }
+
+            .urFBtn:hover, .urSBtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 22px rgba(15,23,42,.10);
+                border-color: rgba(2,132,199,.35);
+            }
+
+            .urFBtn.isActive {
+                background: rgba(2,132,199,.10);
+                border-color: rgba(2,132,199,.22);
+                color: #075985;
+            }
+
+            .urSBtn.isActive {
+                background: rgba(99,102,241,.10);
+                border-color: rgba(99,102,241,.22);
+                color: #3730a3;
+            }
+
+            .urSBtn .arrow {
+                display: inline-block;
+                margin-left: 6px;
+                font-weight: 950;
+                opacity: .85;
+            }
+
+        .urSearch {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 6px 18px rgba(15,23,42,.06);
+            min-width: 320px;
+        }
+
+        .urIcon {
+            opacity: .55;
+            font-weight: 900;
+        }
+
+        .urSearch input {
+            width: 100%;
+            border: 0;
+            outline: none;
+            font-size: 14px;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+            .urSearch input::placeholder {
+                color: rgba(15,23,42,.45);
+                font-weight: 700;
+            }
+
+        /* Table */
+        .urTableWrap {
+            background: #fff;
+            border: 1px solid rgba(15,23,42,.10);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(15,23,42,.06);
+        }
+
+        .urTable {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+            .urTable thead th {
+                text-align: left;
+                font-size: 12px;
+                letter-spacing: .4px;
+                text-transform: uppercase;
+                color: rgba(15,23,42,.55);
+                background: linear-gradient(180deg, rgba(15,23,42,.03), rgba(15,23,42,.01));
+                padding: 12px 14px;
+                border-bottom: 1px solid rgba(15,23,42,.08);
+                font-weight: 900;
+            }
+
+            .urTable tbody td {
+                padding: 12px 14px;
+                border-bottom: 1px solid rgba(15,23,42,.06);
+                vertical-align: middle;
+                font-size: 14px;
+            }
+
+            .urTable tbody tr:hover {
+                background: rgba(2,132,199,.04);
+            }
+
+        .colNo {
+            width: 64px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            color: rgba(15,23,42,.65);
+            font-weight: 800;
+        }
+
+        .colName {
+            width: 220px;
+        }
+
+        .colEmail {
+            width: 260px;
+        }
+
+        .colRoles {
+            width: auto;
+        }
+
+        .colAct {
+            width: 290px;
+        }
+
+        .colDate {
+            width: 110px;
+            text-align: center;
+            font-weight: 700;
+            color: rgba(15,23,42,.75);
+        }
+
+        .nameLine {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .nameText {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .emailText {
+            display: inline-block;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: rgba(15,23,42,.75);
+            font-weight: 700;
+        }
+
+        /* Roles */
+        .roleWrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .roleChip {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.06);
+            border: 1px solid rgba(15,23,42,.10);
+            font-size: 12px;
+            font-weight: 900;
+            color: rgba(15,23,42,.85);
+            white-space: nowrap;
+        }
+
+        .roleEmpty {
+            background: rgba(148,163,184,.22);
+            border-color: rgba(148,163,184,.35);
+            color: rgba(51,65,85,.95);
+        }
+
+        /* Duplicate badge */
+        .dupBadge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 22px;
+            min-width: 22px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 950;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .dup-a {
+            background: rgba(59,130,246,.14);
+            color: #1d4ed8;
+            border-color: rgba(59,130,246,.25);
+        }
+
+        .dup-b {
+            background: rgba(16,185,129,.14);
+            color: #047857;
+            border-color: rgba(16,185,129,.25);
+        }
+
+        .dup-c {
+            background: rgba(245,158,11,.18);
+            color: #92400e;
+            border-color: rgba(245,158,11,.28);
+        }
+
+        .dup-d {
+            background: rgba(168,85,247,.16);
+            color: #6d28d9;
+            border-color: rgba(168,85,247,.28);
+        }
+
+        .dup-e {
+            background: rgba(244,63,94,.14);
+            color: #be123c;
+            border-color: rgba(244,63,94,.25);
+        }
+
+        .dup-f {
+            background: rgba(20,184,166,.14);
+            color: #0f766e;
+            border-color: rgba(20,184,166,.25);
+        }
+
+        /* Action buttons */
+        .btnRow {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .btnSoft {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 12px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 950;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 8px 16px rgba(15,23,42,.06);
+            transition: transform .06s ease, box-shadow .12s ease, border-color .12s ease;
+            white-space: nowrap;
+        }
+
+            .btnSoft:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 22px rgba(15,23,42,.10);
+                border-color: rgba(2,132,199,.35);
+            }
+
+        .btnManage {
+            background: rgba(2,132,199,.10);
+            border-color: rgba(2,132,199,.22);
+            color: #075985;
+        }
+
+        .btnDelete {
+            background: rgba(239,68,68,.10);
+            border-color: rgba(239,68,68,.22);
+            color: #991b1b;
+        }
+
+        .btnImp {
+            background: rgba(99,102,241,.10);
+            border-color: rgba(99,102,241,.22);
+            color: #3730a3;
+        }
+
+        /* Mobile cards (기본: 숨김) */
+        .urCards {
+            display: none;
+            margin-top: 12px;
+        }
+
+        .urCard {
+            background: #fff;
+            border: 1px solid rgba(15,23,42,.10);
+            border-radius: 18px;
+            padding: 12px;
+            box-shadow: 0 10px 22px rgba(15,23,42,.06);
+            margin-bottom: 10px;
+        }
+
+        .noPill {
+            font-size: 12px;
+            font-weight: 950;
+            color: rgba(15,23,42,.70);
+            background: rgba(15,23,42,.06);
+            border: 1px solid rgba(15,23,42,.10);
+            padding: 3px 8px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        /* Responsive */
+        @@media (max-width: 860px) {
+            .topNav {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .urHead {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .urTools {
+                justify-content: flex-start;
+            }
+
+            .urSearch {
+                min-width: unset;
+                width: 100%;
+            }
+
+            .urTableWrap {
+                display: none;
+            }
+
+            .urCards {
+                display: block;
+            }
+            /* ✅ 모바일 카드 레이아웃 개선 */
+            .urCardHeader {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 10px;
+            }
+
+            .urCardName {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: 0;
+                flex: 1 1 auto;
+            }
+
+                .urCardName .nameText {
+                    min-width: 0;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    font-weight: 900;
+                }
+
+            .urCardRoleInline {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                justify-content: flex-end;
+                flex: 0 0 auto;
+                max-width: 48%;
+            }
+
+            .urCardMeta {
+                margin-top: 10px;
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .metaPill {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 8px 10px;
+                border-radius: 14px;
+                background: rgba(15,23,42,.04);
+                border: 1px solid rgba(15,23,42,.08);
+            }
+
+            .metaKey {
+                font-size: 12px;
+                font-weight: 900;
+                color: rgba(15,23,42,.60);
+                white-space: nowrap;
+            }
+
+            .metaVal {
+                font-size: 13px;
+                font-weight: 900;
+                color: rgba(15,23,42,.85);
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                text-align: right;
+            }
+
+            .urCardActions {
+                margin-top: 12px;
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 8px;
+            }
+
+                .urCardActions .btnSoft {
+                    padding: 10px 10px;
+                }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="urPage">
+        <!-- ✅ Top Nav -->
+        <div class="topNav">
+            <div class="topNavLeft">
+                <a class="navBtn" href="/">홈으로 가기</a>
+                <a class="navBtn navBtnAdmin" href="/Admin/Index">관리자홈</a>
+            </div>
+            <div class="topNavRight">
+                <span class="topNavTitle">User Roles</span>
+            </div>
+        </div>
+
+        <div class="urHead">
+            <div>
+                <div class="urTitle">User Roles</div>
+                <div class="urSub">
+                    총 <b>@(Model?.Count ?? 0)</b>명 · 이름이 중복되면 배지 색이 바뀝니다
+                </div>
+            </div>
+
+            <div class="urTools">
+                <!-- ✅ Filter buttons -->
+                <div class="urFilterBar" role="tablist" aria-label="Filter">
+                    <button type="button" class="urFBtn isActive" data-mode="all">전체보기</button>
+                    <button type="button" class="urFBtn" data-mode="dup">중복이름 보기</button>
+                </div>
+
+                <!-- ✅ Sort buttons -->
+                <div class="urSortBar" role="tablist" aria-label="Sort">
+                    <button type="button" class="urSBtn isActive" data-sort="none" data-dir="asc">
+                        기본순<span class="arrow">•</span>
+                    </button>
+                    <button type="button" class="urSBtn" data-sort="name" data-dir="asc">
+                        이름순<span class="arrow">▲</span>
+                    </button>
+                    <button type="button" class="urSBtn" data-sort="date" data-dir="desc">
+                        등록일<span class="arrow">▼</span>
+                    </button>
+                </div>
+
+                <div class="urSearch">
+                    <span class="urIcon">⌕</span>
+                    <input id="urSearchInput" type="text" placeholder="이름/이메일/Role 검색" />
+                </div>
+            </div>
+        </div>
+
+        <!-- 데스크톱/태블릿: 테이블 -->
+        <div class="urTableWrap" aria-label="User roles table">
+            <table class="urTable" id="urTable">
+                <thead>
+                    <tr>
+                        <th class="colNo">No</th>
+                        <th class="colName">Name</th>
+                        <th class="colEmail">Email</th>
+                        <th class="colRoles">Roles</th>
+                        <th class="colDate">등록일</th>
+                        <th class="colDate">연락처</th>
+                        <th class="colAct">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in (Model ?? new List<UserRolesViewModel>()))
+                    {
+                        var key = FullNameKey(user);
+                        var isDup = nameCounts.TryGetValue(key, out var c) && c > 1;
+                        var tone = isDup ? DupTone(key) : "";
+
+                        // 정렬용 키/날짜 (JS에서 사용)
+                        var sortName = $"{Norm(user.LastName)} {Norm(user.FirstName)}";
+                        var sortDate = user.InsertDT.HasValue ? user.InsertDT.Value.ToString("yyyy-MM-dd") : "0000-00-00";
+
+                        <tr class="urRow"
+                            data-dup="@(isDup ? "1" : "0")"
+                            data-filter="@($"{user.LastName} {user.FirstName} {user.Email} {string.Join(" ", user.Roles ?? new List<string>())}".ToLowerInvariant())"
+                            data-sort-name="@sortName"
+                            data-sort-date="@sortDate"
+                            data-orig="@loopCount">
+                            <td class="colNo">@(@loopCount++)</td>
+
+                            <td class="colName">
+                                <div class="nameLine">
+                                    <span class="nameText">
+                                        <b>@user.LastName</b> @user.FirstName
+                                    </span>
+                                    @if (isDup)
+                                    {
+                                        <span class="dupBadge @tone" title="동명이인">@c</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <td class="colEmail">
+                                <span class="emailText">@user.Email</span>
+                            </td>
+
+                            <td class="colRoles">
+                                @{
+                                    var roles = (user.Roles ?? new List<string>()).ToList();
+                                }
+                                <div class="roleWrap">
+                                    @if (roles.Count == 0)
+                                    {
+                                        <span class="roleChip roleEmpty">no role</span>
+                                    }
+                                    else
+                                    {
+                                        foreach (var r in roles)
+                                        {
+                                            <span class="roleChip">@r</span>
+                                        }
+                                    }
+                                </div>
+                            </td>
+
+                            <td class="colDate">
+                                @(user.InsertDT?.ToString("yyyy-MM-dd") ?? "-")
+                            </td>
+
+                            <td class="colDate">
+                                @(user.PhoneNumber)
+                            </td>
+
+                            <td class="colAct">
+                                <div class="btnRow">
+                                    <a class="btnSoft btnManage"
+                                       asp-controller="UserRoles"
+                                       asp-action="Manage"
+                                       asp-route-userId="@user.UserId">관리</a>
+
+                                    <a class="btnSoft btnDelete"
+                                       asp-controller="UserRoles"
+                                       asp-action="Delete"
+                                       asp-route-userId="@user.UserId"
+                                       onclick="return confirm('정말 삭제할까요?');">삭제</a>
+
+                                    <a class="btnSoft btnImp"
+                                       asp-controller="UserRoles"
+                                       asp-action="ImpersonateUser"
+                                       asp-route-userId="@user.UserId"
+                                       onclick="return confirm('해당 사용자로 가장할까요?');">가장</a>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ✅ 모바일: 카드 -->
+        <div class="urCards" id="urCards">
+            @{
+                int cardNo = 1;
+            }
+            @foreach (var user in (Model ?? new List<UserRolesViewModel>()))
+            {
+                var key = FullNameKey(user);
+                var isDup = nameCounts.TryGetValue(key, out var c) && c > 1;
+                var tone = isDup ? DupTone(key) : "";
+
+                var roles = (user.Roles ?? new List<string>()).ToList();
+                var filter = $"{user.LastName} {user.FirstName} {user.Email} {string.Join(" ", roles)}".ToLowerInvariant();
+
+                var sortName = $"{Norm(user.LastName)} {Norm(user.FirstName)}";
+                var sortDate = user.InsertDT.HasValue ? user.InsertDT.Value.ToString("yyyy-MM-dd") : "0000-00-00";
+
+                <article class="urCard"
+                         data-dup="@(isDup ? "1" : "0")"
+                         data-filter="@filter"
+                         data-sort-name="@sortName"
+                         data-sort-date="@sortDate"
+                         data-orig="@cardNo">
+
+                    <div class="urCardHeader">
+                        <div class="urCardName">
+                            <span class="noPill">#@cardNo</span>
+                            <span class="nameText">
+                                <b>@user.LastName</b> @user.FirstName
+                            </span>
+                            @if (isDup)
+                            {
+                                <span class="dupBadge @tone" title="동명이인">@c</span>
+                            }
+                        </div>
+
+                        <div class="urCardRoleInline" aria-label="Roles">
+                            @if (roles.Count == 0)
+                            {
+                                <span class="roleChip roleEmpty">no role</span>
+                            }
+                            else
+                            {
+                                foreach (var r in roles)
+                                {
+                                    <span class="roleChip">@r</span>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="urCardMeta">
+                        <div class="metaPill metaEmail" title="@user.Email">
+                            <span class="metaKey">Email</span>
+                            <span class="metaVal">@user.Email</span>
+                        </div>
+
+                        <div class="metaPill metaDate" title="연락처">
+                            <span class="metaKey">연락처</span>
+                            <span class="metaVal">@(user.PhoneNumber)</span>
+                        </div>
+
+                        <div class="metaPill metaDate" title="가입일">
+                            <span class="metaKey">가입일</span>
+                            <span class="metaVal">@(user.InsertDT?.ToString("yyyy-MM-dd") ?? "-")</span>
+                        </div>
+                    </div>
+
+                    <div class="urCardActions">
+                        <a class="btnSoft btnManage"
+                           asp-controller="UserRoles"
+                           asp-action="Manage"
+                           asp-route-userId="@user.UserId">관리</a>
+
+                        <a class="btnSoft btnDelete"
+                           asp-controller="UserRoles"
+                           asp-action="Delete"
+                           asp-route-userId="@user.UserId"
+                           onclick="return confirm('정말 삭제할까요?');">삭제</a>
+
+                        <a class="btnSoft btnImp"
+                           asp-controller="UserRoles"
+                           asp-action="ImpersonateUser"
+                           asp-route-userId="@user.UserId"
+                           onclick="return confirm('해당 사용자로 가장할까요?');">가장</a>
+                    </div>
+                </article>
+
+                cardNo++;
+            }
+        </div>
+    </div>
+
+    <script>
+        // ✅ FOUC 방지 해제: DOM 준비되면 화면 표시
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.add('is-ready');
+        });
+
+        (function () {
+            const input = document.getElementById('urSearchInput');
+            const table = document.getElementById('urTable');
+            const tbody = table ? table.querySelector('tbody') : null;
+
+            const tableRows = Array.from(document.querySelectorAll('#urTable .urRow'));
+            const cardsWrap = document.getElementById('urCards');
+            const cards = Array.from(document.querySelectorAll('#urCards .urCard'));
+
+            const filterBtns = Array.from(document.querySelectorAll('.urFilterBar .urFBtn'));
+            const sortBtns = Array.from(document.querySelectorAll('.urSortBar .urSBtn'));
+
+            let mode = 'all';   // 'all' | 'dup'
+            let sortKey = 'none'; // 'none' | 'name' | 'date'
+            let sortDir = 'asc';  // 'asc' | 'desc'
+
+            function setActive(btns, btn) {
+                btns.forEach(b => b.classList.toggle('isActive', b === btn));
+            }
+
+            function arrowFor(dir) { return dir === 'asc' ? '▲' : '▼'; }
+
+            function updateSortBtnUI(activeBtn) {
+                sortBtns.forEach(b => {
+                    const span = b.querySelector('.arrow');
+                    if (!span) return;
+
+                    if (b === activeBtn) {
+                        const k = b.getAttribute('data-sort') || 'none';
+                        if (k === 'none') span.textContent = '•';
+                        else span.textContent = arrowFor(sortDir);
+                    } else {
+                        const k = b.getAttribute('data-sort') || 'none';
+                        span.textContent = (k === 'none') ? '•' : '▲';
+                    }
+                });
+            }
+
+            function compare(a, b) {
+                if (sortKey === 'name') {
+                    const av = (a.getAttribute('data-sort-name') || '');
+                    const bv = (b.getAttribute('data-sort-name') || '');
+                    const r = av.localeCompare(bv, 'ko');
+                    return sortDir === 'asc' ? r : -r;
+                }
+                if (sortKey === 'date') {
+                    // yyyy-MM-dd 문자열 비교는 정렬 안전
+                    const av = (a.getAttribute('data-sort-date') || '0000-00-00');
+                    const bv = (b.getAttribute('data-sort-date') || '0000-00-00');
+                    const r = av.localeCompare(bv);
+                    // 기본값: 등록일 최신 먼저(desc)
+                    return sortDir === 'asc' ? r : -r;
+                }
+                // none: 원래 순서
+                const ao = parseInt(a.getAttribute('data-orig') || '0', 10);
+                const bo = parseInt(b.getAttribute('data-orig') || '0', 10);
+                return ao - bo;
+            }
+
+            function renderSorted() {
+                // 테이블 정렬
+                if (tbody) {
+                    const sortedRows = tableRows.slice().sort(compare);
+                    sortedRows.forEach(r => tbody.appendChild(r));
+                }
+
+                // 카드 정렬
+                if (cardsWrap) {
+                    const sortedCards = cards.slice().sort(compare);
+                    sortedCards.forEach(c => cardsWrap.appendChild(c));
+                }
+            }
+
+            function applyFilter() {
+                const q = (input?.value || '').trim().toLowerCase();
+
+                const match = (el) => {
+                    const hay = (el.getAttribute('data-filter') || '');
+                    const isDup = (el.getAttribute('data-dup') || '0') === '1';
+
+                    const okText = !q || hay.includes(q);
+                    const okMode = (mode === 'all') || (mode === 'dup' && isDup);
+
+                    el.style.display = (okText && okMode) ? '' : 'none';
+                };
+
+                tableRows.forEach(match);
+                cards.forEach(match);
+            }
+
+            function applyAll() {
+                renderSorted();
+                applyFilter();
+            }
+
+            if (input) input.addEventListener('input', applyFilter);
+
+            // Filter
+            filterBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    mode = btn.getAttribute('data-mode') || 'all';
+                    setActive(filterBtns, btn);
+                    applyFilter();
+                });
+            });
+
+            // Sort
+            sortBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const k = btn.getAttribute('data-sort') || 'none';
+
+                    if (k === 'none') {
+                        sortKey = 'none';
+                        sortDir = 'asc';
+                    } else if (sortKey === k) {
+                        // 같은 버튼 다시 누르면 방향 토글
+                        sortDir = (sortDir === 'asc') ? 'desc' : 'asc';
+                    } else {
+                        sortKey = k;
+                        // 기본 방향: name=asc, date=desc
+                        sortDir = (k === 'date') ? 'desc' : 'asc';
+                    }
+
+                    setActive(sortBtns, btn);
+                    updateSortBtnUI(btn);
+                    applyAll();
+                });
+            });
+
+            // 초기 표시: 기본순/등록일 desc 버튼의 arrow 정리
+            const activeSortBtn = sortBtns.find(b => b.classList.contains('isActive')) || sortBtns[0];
+            updateSortBtnUI(activeSortBtn);
+            applyAll();
+        })();
+    </script>
+</body>
+</html>

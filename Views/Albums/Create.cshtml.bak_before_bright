@@ -1,0 +1,54 @@
+@{
+    Layout = "~/Views/Shared/_AlbumLayout.cshtml";
+    ViewData["Title"] = "새 앨범";
+    ViewData["Crumb"] = "새 앨범";
+}
+
+@section Head {
+    <style>
+        .cf { max-width: 640px; }
+        .cf .fIn.bad { border-color: var(--danger); }
+        .cf .err { display: none; margin-top: 6px; font-size: 12.5px; color: var(--danger); }
+        .cf .err.show { display: block; }
+        .cf .cnt { float: right; font-family: "Inter", sans-serif; font-size: 11.5px; color: var(--dim); letter-spacing: 0; font-weight: 400; }
+        .cf textarea.fIn { min-height: 120px; resize: vertical; line-height: 1.6; }
+    </style>
+}
+
+@section PageHeader {
+    <div class="hdK">NEW ALBUM</div>
+    <h1 class="hdT">새 앨범 만들기</h1>
+    <div class="hdS">앨범을 만든 뒤, 앨범 안에서 사진을 올릴 수 있어요.</div>
+}
+
+<form asp-action="Create" method="post" class="fm cf" id="cf" novalidate>
+    @Html.AntiForgeryToken()
+    <div class="fRow">
+        <label class="fLbl" for="name">앨범 이름 <span style="color:var(--danger)">*</span><span class="cnt"><span id="nCnt">0</span> / 200</span></label>
+        <input id="name" name="name" class="fIn @(ViewData.ModelState["name"]?.Errors.Count > 0 ? "bad" : "")" required maxlength="200" placeholder="예) 2026 여름성경학교" autocomplete="off" autofocus />
+        <div class="err @(ViewData.ModelState["name"]?.Errors.Count > 0 ? "show" : "")" id="nErr">앨범 이름을 넣어 주세요.</div>
+    </div>
+    <div class="fRow">
+        <label class="fLbl" for="description">설명 <span class="cnt"><span id="dCnt">0</span> / 1000</span></label>
+        <textarea id="description" name="description" class="fIn" maxlength="1000" placeholder="어떤 사진을 모은 앨범인지 짧게 적어 주세요. (선택)"></textarea>
+    </div>
+    <div class="fAct">
+        <a class="btn" href="@Url.Action("Index")">취소</a>
+        <button class="btn btn-brand" type="submit">앨범 만들기</button>
+    </div>
+</form>
+
+@section Scripts {
+    <script>
+        (function () {
+            const f = document.getElementById('cf'), n = document.getElementById('name'), d = document.getElementById('description');
+            const cnt = () => { document.getElementById('nCnt').textContent = n.value.length; document.getElementById('dCnt').textContent = d.value.length; };
+            n.addEventListener('input', () => { cnt(); n.classList.remove('bad'); document.getElementById('nErr').classList.remove('show'); });
+            d.addEventListener('input', cnt);
+            f.addEventListener('submit', e => {
+                if (!n.value.trim()) { e.preventDefault(); n.classList.add('bad'); document.getElementById('nErr').classList.add('show'); n.focus(); }
+            });
+            cnt();
+        })();
+    </script>
+}

@@ -1,0 +1,481 @@
+﻿@model BulletinBoard.Models.DailyMission2.ParticipantCardsVM
+@using BulletinBoard.Common
+@using Microsoft.Extensions.Configuration
+@using System.IO
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject IConfiguration Configuration
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@*  ══════════════════════════════════════════════════════════════
+    참여자(개인) — Bone 스킨
+
+    TOP 3 를 위에 세 칸으로 두고, 4위부터 한 줄씩 늘어놓는다.
+    한 줄에 : 사진 · 이름 · 아이디(관리자만) · 역할 · 최근 수행일 · 점수 · 달성률
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+
+    ViewData["Title"] = "개인 참여자";
+    Layout = null;
+
+    string Safe(string? s) => (s ?? "").Trim();
+
+    var todayKst = DateHelper.GetKoreaNow().Date;
+
+    // 마지막 수행일 — 오늘·어제만 말로, 그 밖은 날짜로 (예: 2026-09-01)
+    string LastText(DateTime? dt)
+    {
+        if (!dt.HasValue) return "수행 기록 없음";
+        var d = dt.Value.Date;
+        if (d == todayKst) return "오늘";
+        if (d == todayKst.AddDays(-1)) return "어제";
+        return d.ToString("yyyy-MM-dd");
+    }
+
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var phys = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+            if (System.IO.File.Exists(phys)) return $"/images/profile/{uid}.png";
+        }
+        return "/images/icon/people/people_01.webp";
+    }
+
+    // 부모 → 자녀 정보 딕셔너리
+    var _parentChildInfo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    try
+    {
+        var cs = Configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrWhiteSpace(cs))
+        {
+            using var conn = new System.Data.SqlClient.SqlConnection(cs);
+            conn.Open();
+            const string sql = @"
+SELECT p.UserName AS ParentUserName,
+       ISNULL(NULLIF(LTRIM(RTRIM(pm.FullName)), ''), c.UserName) AS ChildName,
+       ci.ClassYear, ci.ClassBan
+FROM dbo.DM2_FamilyMember p WITH(NOLOCK)
+JOIN dbo.DM2_FamilyTeam t  WITH(NOLOCK) ON t.FamilyTeamId = p.FamilyTeamId AND t.IsActive = 1
+JOIN dbo.DM2_FamilyMember c  WITH(NOLOCK) ON c.FamilyTeamId = p.FamilyTeamId AND c.IsActive = 1 AND c.RoleCode = 0
+LEFT JOIN [Identity].[User] u  WITH(NOLOCK) ON u.UserName = c.UserName
+LEFT JOIN dbo.view_PersonMaster_2026 pm WITH(NOLOCK) ON pm.UserId = u.Id
+LEFT JOIN dbo.ClassInfo_2026 ci WITH(NOLOCK) ON ci.PersonId = pm.PersonId
+WHERE p.IsActive = 1 AND p.RoleCode IN (1,2)
+ORDER BY p.UserName, ci.ClassYear, ci.ClassBan, ChildName;";
+            using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
+            using var rd  = cmd.ExecuteReader();
+            var tmp = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            while (rd.Read())
+            {
+                var pu = (rd.IsDBNull(0) ? "" : rd.GetString(0))?.Trim() ?? "";
+                if (string.IsNullOrWhiteSpace(pu)) continue;
+                var cn = (rd.IsDBNull(1) ? "" : rd.GetString(1))?.Trim() ?? "";
+                var cy = rd.IsDBNull(2) ? (int?)null : Convert.ToInt32(rd.GetValue(2));
+                var cb = rd.IsDBNull(3) ? (int?)null : Convert.ToInt32(rd.GetValue(3));
+                var txt = (cy.HasValue && cb.HasValue) ? $"{cy}학년 {cb}반 {cn}" : (!string.IsNullOrWhiteSpace(cn) ? cn : "자녀정보확인필요");
+                if (!tmp.TryGetValue(pu, out var lst)) { lst = new(); tmp[pu] = lst; }
+                if (!lst.Any(x => string.Equals(x, txt, StringComparison.OrdinalIgnoreCase))) lst.Add(txt);
+            }
+            foreach (var kv in tmp) _parentChildInfo[kv.Key] = string.Join(" / ", kv.Value);
+        }
+    }
+    catch { }
+
+    var rows = Model?.Rows ?? new();
+    int totalCount = rows.Count;
+    int reachedCount = rows.Count(r => r.AchievePercent >= 100);
+
+    string GetRoleKey(BulletinBoard.Models.DailyMission2.ParticipantCardRow r)
+    {
+        if (r.IsStudent) return "student";
+        if (r.IsTeacher && !r.IsParent) return "teacher";
+        return "needcheck";
+    }
+
+    string RoleLabel(BulletinBoard.Models.DailyMission2.ParticipantCardRow r)
+    {
+        var key = GetRoleKey(r);
+        if (key == "student") return $"{r.ClassYear}학년 {r.ClassBan}반";
+        if (key == "teacher") return !string.IsNullOrWhiteSpace(r.RoleName) ? r.RoleName : "교사";
+        _parentChildInfo.TryGetValue(Safe(r.UserName), out var pci);
+        return !string.IsNullOrWhiteSpace(pci) ? $"부모 / {pci}" : "확인필요";
+    }
+
+    var top3 = rows.Take(3).ToList();
+    var rest = rows.Skip(3).ToList();
+    // 2등 → 1등 → 3등 순으로 세운다.
+    int[] order = top3.Count == 1 ? new[] { 0 } : top3.Count == 2 ? new[] { 1, 0 } : new[] { 1, 0, 2 };
+
+    var me = Safe(Model?.CurrentUserName);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@ViewData["Title"] — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    /* 참여자 화면 전용 — 공통 규칙은 /css/mission3/bone.css 에 있다. */
+    .qz .ppPgm { padding: 2px 0 18px; border-bottom: 1px solid var(--rule); margin-bottom: 0; }
+    .qz .ppPgmK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin-bottom: 9px; }
+    .qz .ppPgmT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 20px; line-height: 1.45; }
+    .qz .ppPgmS { font-size: 11.5px; color: var(--dim); line-height: 1.7; margin-top: 7px; }
+
+    /* 개인 / 가족팀 */
+    .qz .ppSeg {
+        display: grid; grid-template-columns: 1fr 1fr;
+        border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    }
+    .qz .ppSeg a {
+        text-align: center; padding: 13px 0; text-decoration: none;
+        font-size: 12.5px; font-weight: 600; letter-spacing: .06em; color: var(--dim); position: relative;
+    }
+    .qz .ppSeg a.on { color: var(--tx); }
+    .qz .ppSeg a.on::before {
+        content: ""; position: absolute; top: -1px; left: 0; right: 0; height: 2px; background: var(--acc);
+    }
+
+    /* 요약 */
+    .qz .ppTot {
+        display: flex; justify-content: space-between; align-items: flex-end; gap: 14px;
+        padding: 20px 0 18px; border-bottom: 1px solid var(--rule);
+    }
+    .qz .ppTotL { font-size: 9.5px; font-weight: 600; letter-spacing: .18em; color: var(--dim); margin-bottom: 9px; }
+    .qz .ppTotN {
+        font-family: "Inter", sans-serif; font-weight: 200; font-size: 44px; line-height: .9;
+        font-variant-numeric: tabular-nums;
+    }
+    .qz .ppTotN u { text-decoration: none; font-size: 13px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+    .qz .ppTotR { text-align: right; flex: 0 0 auto; white-space: nowrap; }
+    .qz .ppTotRV {
+        font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px;
+        color: var(--acc); font-variant-numeric: tabular-nums;
+    }
+
+    /* TOP 3 */
+    .qz .ppTop3 {
+        display: grid; grid-template-columns: repeat(3, 1fr);
+        border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    }
+    .qz .ppT3 {
+        padding: 18px 6px 16px; text-align: center;
+        border-right: 1px solid var(--rule); text-decoration: none; color: inherit;
+    }
+    .qz .ppT3:last-child { border-right: 0; }
+    .qz .ppT3No {
+        font-family: "Inter", sans-serif; font-size: 10px; font-weight: 600;
+        letter-spacing: .18em; color: var(--acc); margin-bottom: 11px;
+    }
+    /* 사진 테두리 — 바탕색으로 한 겹 띄우고 그 바깥에 색 링을 두른다. */
+    .qz .ppT3Ph {
+        width: 52px; height: 52px; border-radius: 50%; object-fit: cover;
+        margin: 0 auto 10px; display: block; background: var(--mark);
+        box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--acc);
+    }
+    .qz .ppT3N { font-family: "Noto Serif KR", serif; font-size: 14.5px; line-height: 1.3; }
+    .qz .ppT3U { font-family: "Inter", sans-serif; font-size: 10px; font-weight: 300; color: var(--dim); margin-top: 3px; }
+    .qz .ppT3P {
+        font-family: "Inter", sans-serif; font-size: 15px; font-weight: 400;
+        font-variant-numeric: tabular-nums; margin-top: 7px;
+    }
+    .qz .ppT3P u { text-decoration: none; font-size: 9.5px; color: var(--dim); margin-left: 2px; }
+    .qz .ppT3L { font-size: 9.5px; color: var(--dim); margin-top: 5px; }
+    .qz .ppT3.first { background: var(--mark); }
+    .qz .ppT3.first .ppT3Ph {
+        width: 60px; height: 60px;
+        /* 1등은 바탕이 브라스라서 띄우는 겹도 그 색으로 맞춘다. */
+        box-shadow: 0 0 0 2px var(--mark), 0 0 0 3px var(--acc);
+    }
+
+    /* 도구 : 필터 · 검색 · 정렬 */
+    .qz .ppFilt { display: flex; border-bottom: 1px solid var(--rule); margin-top: 14px; }
+    .qz .ppFilt button {
+        flex: 1; text-align: center; padding: 11px 0 12px;
+        border: 0; background: none; font-family: inherit;
+        font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+        color: var(--dim); position: relative; cursor: pointer;
+    }
+    .qz .ppFilt button.on { color: var(--tx); }
+    .qz .ppFilt button.on::before {
+        content: ""; position: absolute; bottom: -1px; left: 6px; right: 6px; height: 1px; background: var(--acc);
+    }
+    .qz .ppSrch {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 0; border-bottom: 1px solid var(--rule);
+    }
+    .qz .ppSrch input {
+        flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
+        font-family: inherit; font-size: 13px; color: var(--tx); padding: 2px 0;
+    }
+    .qz .ppSrch input::placeholder { color: #C9C6BF; }
+    .qz .ppSortBar { display: flex; align-items: center; gap: 6px; padding: 10px 0 12px; border-bottom: 1px solid var(--rule); }
+    .qz .ppSortBar .lb { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--dim); margin-right: 4px; }
+    .qz .ppSortBar button { font-family: inherit; font-size: 12px; padding: 6px 11px; border: 1px solid var(--rule); background: #fff; color: var(--dim2); cursor: pointer; }
+    .qz .ppSortBar button.on { background: var(--tx); color: var(--bg); border-color: var(--tx); font-weight: 600; }
+    .qz .ppSortNote { font-size: 10.5px; color: var(--acc); padding: 8px 0 0; }
+    .qz .ppToday { display: inline-block; background: var(--acc); color: #fff; font-size: 9.5px; font-weight: 600; padding: 1px 5px; margin-right: 5px; vertical-align: 1px; }
+    .qz .ppSrch select {
+        border: 0; background: transparent; outline: none; font-family: inherit;
+        font-size: 11.5px; font-weight: 600; letter-spacing: .06em; color: var(--dim);
+        text-align: right; cursor: pointer;
+    }
+
+    /* 순위 줄 */
+    .qz .ppRk {
+        display: flex; align-items: flex-start; gap: 14px;
+        padding: 15px 4px; border-bottom: 1px solid var(--rule);
+        text-decoration: none; color: inherit;
+    }
+    .qz .ppRkNo {
+        font-family: "Inter", sans-serif; font-size: 11px; color: var(--dim);
+        width: 22px; flex: 0 0 auto; font-variant-numeric: tabular-nums; padding-top: 12px;
+    }
+    .qz .ppRkPh {
+        width: 40px; height: 40px; border-radius: 50%; object-fit: cover;
+        flex: 0 0 auto; background: var(--mark); display: block;
+        /* 평소에는 옅은 선, 내 줄에서는 브라스 링 */
+        box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--rule);
+    }
+    .qz .ppRk.me .ppRkPh { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--acc); }
+    .qz .ppRkTx { flex: 1 1 auto; min-width: 0; }
+    .qz .ppRkNameRow { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+    .qz .ppRkN { font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.35; }
+    .qz .ppRkU { font-family: "Inter", sans-serif; font-size: 10.5px; font-weight: 300; color: var(--dim); }
+    .qz .ppRkR { font-size: 10.5px; color: var(--dim); margin-top: 5px; letter-spacing: .02em; }
+    .qz .ppRkR i { font-style: normal; color: var(--rule); margin: 0 6px; }
+    .qz .ppRkBarWrap { margin-top: 9px; }
+    .qz .ppRkBar { height: 2px; background: var(--rule); }
+    .qz .ppRkBar i { display: block; height: 2px; background: var(--acc); }
+    .qz .ppRkP { text-align: right; flex: 0 0 auto; white-space: nowrap; padding-top: 2px; }
+    .qz .ppRkPV {
+        font-family: "Inter", sans-serif; font-size: 17px; font-weight: 400; font-variant-numeric: tabular-nums;
+    }
+    .qz .ppRkPV u { text-decoration: none; font-size: 10px; color: var(--dim); margin-left: 2px; }
+    .qz .ppRkPS {
+        font-size: 10px; color: var(--acc); margin-top: 4px;
+        font-family: "Inter", sans-serif; font-variant-numeric: tabular-nums;
+    }
+    .qz .ppRk.zero .ppRkPV { color: #B4B1AA; }
+    .qz .ppRk.zero .ppRkPS { color: #D5D2CB; }
+    .qz .ppRk.me { background: rgba(237,229,216,.5); }
+    .qz .ppRk[hidden] { display: none; }
+
+    .qz .ppNone { font-size: 12.5px; color: var(--dim); padding: 28px 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                    <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">@Model.Year</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="ppPgm">
+            <div class="ppPgmK">@ConstatsCommon.MainKeyTitle</div>
+            <div class="ppPgmT">@ConstatsCommon.MainKeyTitle</div>
+            <div class="ppPgmS">@(Model.Year)년 · 목표 @Model.TargetPoint.ToString("N0")점</div>
+        </div>
+
+        <div class="ppSeg">
+            <a class="on" href="/DailyMission4/ParticipantPersons">개인</a>
+            <a href="/DailyMission4/ParticipantTeams">가족팀</a>
+        </div>
+
+        <div class="ppTot">
+            <div>
+                <div class="ppTotL">참여자</div>
+                <div class="ppTotN">@totalCount<u>명</u></div>
+            </div>
+            <div class="ppTotR">
+                <div class="ppTotL">목표 달성</div>
+                <div class="ppTotRV">@(reachedCount)명</div>
+            </div>
+        </div>
+
+        @* ── TOP 3 ── *@
+        @if (top3.Count > 0)
+        {
+            <div class="qzLabel" style="margin-top:24px">TOP 3</div>
+            <div class="ppTop3">
+                @foreach (var oi in order)
+                {
+                    if (oi >= top3.Count) { continue; }
+                    var r = top3[oi];
+                    var nm = !string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName;
+
+                    <a class="ppT3 @(oi == 0 ? "first" : "")" href="/DailyMission4/UserMonthlyPoints?userName=@Uri.EscapeDataString(Safe(r.UserName))">
+                        <div class="ppT3No">0@(oi + 1)</div>
+                        <img class="ppT3Ph" src="@ProfileOrDefault(r.UserId)" alt="@nm"
+                             onerror="this.src='/images/icon/people/people_01.webp'" />
+                        <div class="ppT3N">@nm</div>
+                        @if (isSuperAdmin && !string.IsNullOrWhiteSpace(r.UserName))
+                        {
+                            <div class="ppT3U">@@@r.UserName</div>
+                        }
+                        <div class="ppT3P">@r.YearPoint.ToString("N0")<u>점</u></div>
+                        <div class="ppT3L">@LastText(r.LastActionDate)</div>
+                    </a>
+                }
+            </div>
+        }
+
+        @* ── 필터 · 검색 · 정렬 ── *@
+        <div class="ppFilt" id="ppFilt">
+            <button class="on" data-role="all">전체</button>
+            <button data-role="student">학생</button>
+            <button data-role="teacher">교사</button>
+            <button data-role="needcheck">확인필요</button>
+        </div>
+        <div class="ppSrch">
+            <input id="ppQ" type="search" placeholder="이름 · 아이디 검색" autocomplete="off" />
+        </div>
+        @* 정렬 — 눈에 잘 띄게 버튼으로. 고른 정렬은 기억한다. *@
+        <div class="ppSortBar" id="ppSort" role="group" aria-label="정렬">
+            <span class="lb">정렬</span>
+            <button type="button" class="on" data-sort="score">점수순</button>
+            <button type="button" data-sort="last">최근 수행순</button>
+            <button type="button" data-sort="name">이름순</button>
+        </div>
+        <div class="ppSortNote" id="ppSortNote" hidden>마지막으로 미션을 한 날이 최근인 순이에요</div>
+
+        @* ── 4위부터 ── *@
+        <div id="ppList" style="margin-top:6px">
+            @{ int no = 4; }
+            @foreach (var r in rows)
+            {
+                var nm    = !string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName;
+                var pct   = Math.Max(0, Math.Min(100, r.AchievePercent));
+                var isMe  = !string.IsNullOrWhiteSpace(me) && string.Equals(me, Safe(r.UserName), StringComparison.OrdinalIgnoreCase);
+                var cls   = (isMe ? "me " : "") + (r.YearPoint <= 0 ? "zero" : "");
+
+                bool isTop3 = top3.Contains(r);
+                <a class="ppRk @cls @(isTop3 ? "ppTop" : "")"
+                   href="/DailyMission4/UserMonthlyPoints?userName=@Uri.EscapeDataString(Safe(r.UserName))"
+                   data-role="@GetRoleKey(r)"
+                   data-name="@($"{Safe(r.FullName)} {Safe(r.UserName)}".ToLowerInvariant())"
+                   data-score="@r.YearPoint"
+                   data-sortname="@nm.ToLowerInvariant()"
+                   data-last="@(r.LastActionDate.HasValue ? r.LastActionDate.Value.ToString("yyyy-MM-dd HH:mm:ss") : "")"
+                   @(isTop3 ? "hidden" : "")>
+                    <span class="ppRkNo">@(no < 10 ? "0" + no : no.ToString())</span>
+                    <img class="ppRkPh" src="@ProfileOrDefault(r.UserId)" alt="@nm"
+                         onerror="this.src='/images/icon/people/people_01.webp'" />
+                    <span class="ppRkTx">
+                        <span class="ppRkNameRow">
+                            <span class="ppRkN">@nm</span>
+                            @if (isSuperAdmin && !string.IsNullOrWhiteSpace(r.UserName))
+                            {
+                                <span class="ppRkU">@@@r.UserName</span>
+                            }
+                        </span>
+                        <span class="ppRkR">@if (r.LastActionDate.HasValue && r.LastActionDate.Value.Date == todayKst) {<span class="ppToday">오늘</span>}@RoleLabel(r)<i>·</i>@LastText(r.LastActionDate)</span>
+                        <span class="ppRkBarWrap"><span class="ppRkBar"><i style="width:@(pct)%"></i></span></span>
+                    </span>
+                    <span class="ppRkP">
+                        <span class="ppRkPV">@r.YearPoint.ToString("N0")<u>점</u></span>
+                        <span class="ppRkPS">@(pct)%</span>
+                    </span>
+                </a>
+                no++;
+            }
+        </div>
+
+        <div class="ppNone" id="ppNone" hidden>찾는 사람이 없어요</div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var list  = document.getElementById('ppList');
+        if (!list) return;
+        var items = Array.prototype.slice.call(list.querySelectorAll('.ppRk'));
+        var none  = document.getElementById('ppNone');
+        var q     = document.getElementById('ppQ');
+        var sort  = document.getElementById('ppSort');
+        var filt  = document.getElementById('ppFilt');
+        var role  = 'all';
+
+        var key = 'score';
+        try { key = localStorage.getItem('ppSortKey') || 'score'; } catch (err) { }
+        var note = document.getElementById('ppSortNote');
+
+        function apply() {
+            var term = (q.value || '').trim().toLowerCase();
+            var shown = 0;
+
+            items.forEach(function (el) {
+                var okRole = (role === 'all') || (el.dataset.role === role);
+                var okTerm = !term || (el.dataset.name || '').indexOf(term) >= 0;
+                // 점수순일 때 1~3위는 위 시상대에 있으므로 목록에서는 숨긴다
+                var okTop  = !(key === 'score' && el.classList.contains('ppTop'));
+                el.hidden = !(okRole && okTerm && okTop);
+                if (!el.hidden) shown++;
+            });
+            none.hidden = (shown > 0);
+
+            // 최근 수행순: 마지막 수행일이 최근인 순 → 같으면 점수 높은 순 → 기록 없는 사람은 맨 아래
+            var sorted = items.slice().sort(function (a, b) {
+                if (key === 'name') return (a.dataset.sortname || '').localeCompare(b.dataset.sortname || '', 'ko');
+                if (key === 'last') {
+                    var la = a.dataset.last || '', lb = b.dataset.last || '';
+                    if (la !== lb) return lb.localeCompare(la);
+                }
+                return (+b.dataset.score) - (+a.dataset.score);
+            });
+            sorted.forEach(function (el) { list.appendChild(el); });
+
+            // 번호 — 점수순은 시상대 다음이라 4부터, 나머지 정렬은 1부터
+            var n = key === 'score' ? 4 : 1;
+            sorted.forEach(function (el) {
+                if (el.hidden) return;
+                var noEl = el.querySelector('.ppRkNo');
+                if (noEl) noEl.textContent = (n < 10 ? '0' + n : String(n));
+                n++;
+            });
+
+            sort.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x.dataset.sort === key); });
+            if (note) note.hidden = key !== 'last';
+        }
+        q.addEventListener('input', apply);
+        sort.addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-sort]');
+            if (!b) return;
+            key = b.dataset.sort;
+            try { localStorage.setItem('ppSortKey', key); } catch (err) { }
+            apply();
+        });
+        apply();
+        filt.addEventListener('click', function (e) {
+            var b = e.target.closest('button');
+            if (!b) return;
+            filt.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+            b.classList.add('on');
+            role = b.dataset.role;
+            apply();
+        });
+    })();
+</script>
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+</body>
+</html>

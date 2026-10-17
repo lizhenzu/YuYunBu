@@ -1,0 +1,171 @@
+@model BulletinBoard.Models.EntranceExamPrays.EntranceExamPray
+@{
+    Layout = null;
+    bool isNew = Model == null || Model.PrayId <= 0;
+    var err = TempData["Error"] as string;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F7F6FC" />
+    <title>@(isNew ? "기도문 등록" : "기도문 수정") · 수험생을 위한 기도문</title>
+    @await Html.PartialAsync("_Study")
+    <style>
+    .ehero{ padding:26px 0 16px; }
+    .ehero h1{ font-family:var(--f-read); margin:10px 0 0; font-size:clamp(20px,4.6vw,27px); font-weight:800; letter-spacing:-.02em; }
+    .ehero-sub{ margin-top:8px; font-size:12.5px; color:var(--muted); font-weight:600; }
+    .radio-row{ display:flex; gap:9px; }
+    .radio-opt{
+        flex:1; display:flex; align-items:center; justify-content:center; gap:7px;
+        height:44px; border-radius:10px; cursor:pointer;
+        border:1.5px solid var(--line); background:var(--card-2);
+        font-size:13.5px; font-weight:700; color:var(--ink2); transition:.15s;
+    }
+    .radio-opt input{ accent-color:var(--leaf); width:16px; height:16px; }
+    .radio-opt:has(input:checked){ border-color:var(--leaf); background:var(--leaf-sf); color:var(--leaf-dk); }
+    </style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        <a class="nb-btn" href="/EntranceExamPray/List">← 목록</a>
+        <div class="nb-mid">@(isNew ? "기도문 등록" : "기도문 수정")</div>
+        <a class="nb-btn" href="/EntranceExamPray/Index">📖 오늘</a>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="ehero">
+        <span class="chip chip-leaf">🔒 관리자 전용</span>
+        <h1>@(isNew ? "새 기도문 등록" : "기도문 수정")</h1>
+        <div class="ehero-sub">
+            @if (isNew) { <text>순서 번호가 작을수록 순환에서 먼저 나옵니다.</text> }
+            else        { <text>조회수와 좋아요 수는 수정해도 그대로 유지됩니다.</text> }
+        </div>
+    </section>
+
+    @if (!string.IsNullOrEmpty(err)) { <div class="flash flash-err">@err</div> }
+
+    <form method="post" action="/EntranceExamPray/Save">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="PrayId" value="@(Model?.PrayId ?? 0)" />
+
+        <div class="ncard">
+            <div class="ncard-hd">
+                <div class="ncard-ico">🙏</div>
+                <span class="ncard-tt">기도문 내용</span>
+            </div>
+            <div class="ncard-bd">
+
+                <div class="field">
+                    <label class="field-lb" for="Title">기도 제목</label>
+                    <input class="field-in" id="Title" name="Title" maxlength="200" required
+                           value="@(Model?.Title ?? "")"
+                           placeholder="예) 수능 전날 밤에" />
+                </div>
+
+                <div class="field">
+                    <label class="field-lb" for="PrayText">기도문</label>
+                    <textarea class="field-ta" id="PrayText" name="PrayText" required rows="20"
+                              placeholder="기도문을 입력해 주세요. 줄바꿈은 그대로 표시됩니다.">@(Model?.PrayText ?? "")</textarea>
+                    <div class="field-hint">
+                        줄바꿈이 화면에 그대로 나타납니다.
+                        이름을 넣어 기도할 자리는 <b>**○○(이)**</b> 로 적으면 화면에서 밑줄로 표시됩니다.
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="ncard">
+            <div class="ncard-hd">
+                <div class="ncard-ico" style="background:var(--sun-sf);">📖</div>
+                <span class="ncard-tt">성경 구절 <span style="font-weight:600; color:var(--muted); font-size:11.5px;">(선택)</span></span>
+            </div>
+            <div class="ncard-bd">
+                <div class="field">
+                    <label class="field-lb" for="BibleRef">구절 표기</label>
+                    <input class="field-in" id="BibleRef" name="BibleRef" maxlength="100"
+                           value="@(Model?.BibleRef ?? "")" placeholder="예) 빌립보서 4:6" />
+                </div>
+                <div class="field" style="margin-bottom:0;">
+                    <label class="field-lb" for="BibleText">구절 본문</label>
+                    <input class="field-in" id="BibleText" name="BibleText" maxlength="1000"
+                           value="@(Model?.BibleText ?? "")" placeholder="구절 내용을 입력해 주세요" />
+                </div>
+            </div>
+        </div>
+
+        <div class="ncard">
+            <div class="ncard-hd">
+                <div class="ncard-ico" style="background:var(--water-sf);">⚙️</div>
+                <span class="ncard-tt">노출 설정</span>
+            </div>
+            <div class="ncard-bd">
+                <div class="field-row">
+                    <div class="field">
+                        <label class="field-lb" for="SortOrder">순서 번호</label>
+                        <input class="field-in" id="SortOrder" name="SortOrder" type="number" min="0" step="1"
+                               value="@(Model?.SortOrder ?? 0)" />
+                        <div class="field-hint">작을수록 먼저 나옵니다.</div>
+                    </div>
+                    <div class="field">
+                        <label class="field-lb">사용 여부</label>
+                        <div class="radio-row">
+                            <label class="radio-opt">
+                                <input type="radio" name="UseYN" value="Y"
+                                       checked="@(Model == null || !string.Equals(Model.UseYN, "N", StringComparison.OrdinalIgnoreCase))" />
+                                사용
+                            </label>
+                            <label class="radio-opt">
+                                <input type="radio" name="UseYN" value="N"
+                                       checked="@(Model != null && string.Equals(Model.UseYN, "N", StringComparison.OrdinalIgnoreCase))" />
+                                숨김
+                            </label>
+                        </div>
+                        <div class="field-hint">숨김은 목록에서도 사라집니다.</div>
+                    </div>
+                </div>
+
+                @* 특정한 날에만 읽는 기도문은 매일 순환에서 빼 둡니다.
+                   목록에는 그대로 남아 필요한 날 직접 골라 읽습니다. *@
+                <div class="field" style="margin-bottom:0;">
+                    <label class="field-lb">매일 순환</label>
+                    <div class="radio-row">
+                        <label class="radio-opt">
+                            <input type="radio" name="RotateYN" value="Y"
+                                   checked="@(Model == null || !string.Equals(Model.RotateYN, "N", StringComparison.OrdinalIgnoreCase))" />
+                            매일 순환에 포함
+                        </label>
+                        <label class="radio-opt">
+                            <input type="radio" name="RotateYN" value="N"
+                                   checked="@(Model != null && string.Equals(Model.RotateYN, "N", StringComparison.OrdinalIgnoreCase))" />
+                            그날에만 읽기
+                        </label>
+                    </div>
+                    <div class="field-hint">
+                        “그날에만 읽기”는 오늘의 기도문으로 나오지 않습니다. 목록의 <b>그날에 읽는 기도문</b>에 모여
+                        필요한 날 직접 골라 읽습니다. (예: 수능 날 아침에, 면접을 앞두고)
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-row">
+            <button type="submit" class="btn btn-leaf">@(isNew ? "✚ 등록하기" : "💾 저장하기")</button>
+            <a class="btn" href="/EntranceExamPray/List">취소</a>
+            @if (!isNew)
+            {
+                <a class="btn btn-danger" href="/EntranceExamPray/Delete?PrayId=@Model.PrayId">🗑 삭제</a>
+            }
+        </div>
+    </form>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,391 @@
+﻿@model IEnumerable<BulletinBoard.Models.UserInfo>
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+
+    var eventMater = ViewData["EventMater"] as EventMater;
+    bool isEventMaterEmpty = eventMater == null || string.IsNullOrEmpty(eventMater.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>참가자 명단</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f1f8e9; /* Soft green background */
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            color: #37474f;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #33691e; /* Dark green */
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .event-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            border: 1px solid #c5e1a5;
+        }
+
+        .event-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        .event-info {
+            font-size: 1.2em;
+            color: #546e7a;
+            margin: 5px 0;
+        }
+
+        .participant-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .participant-card {
+            display: flex;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border: 1px solid #c5e1a5;
+        }
+
+        .profile-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 15px;
+            border: 3px solid #81c784;
+        }
+
+        .participant-info {
+            text-align: left;
+            flex-grow: 1;
+        }
+
+        .participant-name {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        .participant-class {
+            font-size: 0.8em;
+            color: #546e7a;
+        }
+
+        .participant-event {
+            font-size: 1em;
+            color: #33691e;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .stamp {
+            width: 50px;
+            height: 50px;
+        }
+
+        .nav-buttons {
+            margin-top: 30px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .apply-btn {
+            background-color: #81c784;
+        }
+
+        .view-btn {
+            background-color: #64b5f6;
+        }
+
+        .home-btn {
+            background-color: #ff7043;
+        }
+
+        .back-btn {
+            background-color: #64b5f6;
+        }
+
+        .btn:hover {
+            opacity: 0.85;
+        }
+    </style>
+
+    <style>
+        .pending {
+            background: #FF9800;
+            color: white;
+        }
+
+        .exceeed {
+            background: red;
+            color: white;
+        }
+
+        .mission-status {
+            padding: 10px 10px;
+            border-radius: 50%;
+            font-size: 16px;
+            border: 3px solid white;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+
+
+      <style>
+        /* Overlay for dark background */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Dark background */
+            display: none;
+            z-index: 9999;
+        }
+
+        /* Centered horizontal message box with animation */
+        .loading-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px 70px; /* Padding adjusted for horizontal layout */
+            font-size: 18px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            animation: fadeIn 0.5s forwards, pulse 1.5s infinite ease-in-out; /* Fade in and pulse animation */
+            white-space: nowrap; /* Ensure text stays in a single line */
+        }
+
+        /* Pulse effect */
+        @@keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        /* Fade in effect */
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+    </style>
+
+    <script>
+        function ManageUserInfo(UserId) {
+
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+        }
+
+        async  function CancelEnroll(UserId, EventId) {
+            let result = await confirmMessage(true, ['정말 취소하시겠습니까?']); // 취소 버튼 표시
+            if (result === 'y') {
+
+                showLoading();
+                //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                // 여기에 다음 작업을 넣습니다
+                window.location.href = "/ApplyEvent/CancelEnroll?UserId=" + UserId + "&EventId=" + EventId;
+            } else if (result === 'c') {
+                //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                // 작업 취소 로직
+            }
+        }
+    </script>
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+        function goBack() {
+            window.history.back();
+        }
+    </script>
+    <script src="/js/common2.js"></script>
+
+</head>
+@{
+    int loopCount = 1;
+}
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+    <div class="container">
+        <div class="event-card">
+            <div class="event-title">🌸 @eventMater.EventTitle</div>
+            <div class="event-info">📅 @eventMater.EventDayFrom.ToString("yyyy-MM-dd") ~ @eventMater.EventDayTo.ToString("yyyy-MM-dd")</div>
+            <div class="event-info">📍  @eventMater.EventPlace</div>
+            <div class="event-info">🧑 학생 : @eventMater.EventCountLimitStudent 명, 👨‍💼 인솔자 : @eventMater.EventCountLimitTeacher 명</div>
+        </div>
+        <h1>👥 참가자 명단(학생) </h1>
+        <div class="participant-list">
+
+            @foreach (var item in Model)
+            {
+                @if (item.RoleCode == "T1001")
+                {
+                    string coutDD = $"{0}건";
+                    <div class="participant-card">
+                        <img class="profile-image" src="@item.ProfilePicturePath" onclick="ManageUserInfo('@item.UserId')" alt="프로필">
+                        <div class="participant-info">
+                            <div class="participant-name" style="text-align:center;font-size: 0.8em;">순번 : @loopCount</div>
+                            <div class="participant-name" style="text-align:center;">@item.FullName (@item.RoleNM)</div>
+                            <div class="participant-class"> 신청일시 : -</div>
+                            <div class="participant-class"> 신청이력 : -</div>
+                            @*
+                    <div class="button-container">
+                    <button class="btn apply-btn">신청취소</button>
+                    </div>
+                    <div class="participant-event">행사 참가 이력: . </div>
+                    *@
+                        </div>
+                        @if (loopCount > @eventMater.EventCountLimitStudent)
+                        {
+                            <span class="mission-status exceeed no-select" onclick="CancelEnroll('@item.UserId','@eventMater.EventId')">초과</span>
+                        }
+                        else
+                        {
+                            <span class="mission-status pending no-select" onclick="CancelEnroll('@item.UserId','@eventMater.EventId')">취소</span>
+                        }
+                        @*
+                <img class="stamp" src="https://bit2001-001-site4.dtempurl.com/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_00.png" alt="완료 스탬프">
+                *@
+
+                    </div>
+
+                    loopCount += 1;
+                }
+            }
+        </div>
+        <h1>👥 참가자 명단(기타) </h1>
+        <div class="participant-list">
+            @{
+                loopCount = 1;
+            }
+            @foreach (var item in Model)
+            {
+                @if (item.RoleCode != "T1001")
+                {
+                    string coutDD = $"{0}건";
+                    <div class="participant-card">
+                        <img class="profile-image" src="@item.ProfilePicturePath" onclick="ManageUserInfo('@item.UserId')" alt="프로필">
+                        <div class="participant-info">
+                            <div class="participant-name" style="text-align:center;font-size: 0.8em;">순번 : @loopCount</div>
+                            <div class="participant-name" style="text-align:center;">@item.FullName (@item.RoleNM)</div>
+                            <div class="participant-class"> 신청일시 :</div>
+                            <div class="participant-class"> 신청이력 :</div>
+                            @*
+                    <div class="button-container">
+                    <button class="btn apply-btn">신청취소</button>
+                    </div>
+                    <div class="participant-event">행사 참가 이력: . </div>
+                    *@
+                        </div>
+                        @if (loopCount > @eventMater.EventCountLimitTeacher)
+                        {
+                            <span class="mission-status exceeed no-select" onclick="CancelEnroll('@item.UserId','@eventMater.EventId')">초과</span>
+                        }
+                        else
+                        {
+                            <span class="mission-status pending no-select" onclick="CancelEnroll('@item.UserId','@eventMater.EventId')">취소</span>
+                        }
+                        @*
+                <img class="stamp" src="https://bit2001-001-site4.dtempurl.com/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_00.png" alt="완료 스탬프">
+                *@
+
+                    </div>
+
+                    loopCount += 1;
+                }
+            }
+        </div>
+        <div class="nav-buttons">
+            <button class="btn home-btn" onclick="window.location.href='/'">🏠 홈페이지</button>
+            <button class="btn back-btn" onclick="window.location.href='/ApplyEvent/EventList'">🔙 이전 화면</button>
+        </div>
+    </div>
+</body>
+</html>

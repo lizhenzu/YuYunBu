@@ -1,0 +1,275 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*
+    DailyMission2 전용 신규 레이아웃 (기존 레이아웃 수정/의존 최소화)
+    - 초등학생 친화: 밝은 파스텔 + 카드형
+    - hover에서 버튼이 하얗게 날아가는 이슈 방지(특히 .btnPrimary)
+    - 페이지별 Head/Styles/Scripts 섹션 지원
+*@
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@(ViewData["Title"] ?? "DailyMission2")</title>
+
+    <!-- ✅ 폰트 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <!-- ✅ (선택) 전용 CSS 파일 -->
+    <link rel="stylesheet" href="~/css/mission2/mission2.css" asp-append-version="true" />
+
+    <style>
+        /* ✅ 전역 리셋(안전) */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        :root {
+            --bg1: #FFF7FB;
+            --bg2: #F3FBFF;
+            --bg3: #F3FFF4;
+            --card: #ffffff;
+            --line: rgba(31,41,55,.10);
+            --ink: #111827;
+            --muted: #6b7280;
+            --accent: #7c3aed;
+            --ok: #22c55e;
+            --warn: #f59e0b;
+            --danger: #fb7185;
+            --shadow: 0 16px 30px rgba(15, 23, 42, .10);
+            --r: 18px;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Noto Sans KR', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            color: var(--ink);
+            background: #faf8f4;
+            /* background: radial-gradient(900px 520px at 12% 10%, rgba(109,40,217,.16), transparent 60%), radial-gradient(760px 520px at 92% 18%, rgba(14,165,164,.14), transparent 60%), radial-gradient(760px 520px at 40% 110%, rgba(245,158,11,.14), transparent 60%), linear-gradient(180deg, var(--bgTop), var(--bgMid) 55%, var(--bgBot)); */
+        }
+
+        /* ✅ 레이아웃 래퍼 (중요: padding 빠지면 화면이 “이상해” 보이는 경우 많음) */
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px 14px 24px;
+        }
+
+        /* -------------------------------
+                   ✅ (선택) 상단바
+                   ------------------------------- */
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+            min-width: 0;
+        }
+
+        .logo {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(124,58,237,.18), rgba(14,165,233,.18));
+            border: 1px solid rgba(255,255,255,.65);
+            box-shadow: var(--shadow);
+            flex: 0 0 auto;
+        }
+
+        .brand .t1 {
+            font-weight: 800;
+            font-size: 18px;
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .brand .t2 {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* -------------------------------
+                   ✅ 공통 버튼(레이아웃용)
+                   - 주의: 각 View(Dashboard 등)에서도 .btn을 정의하면,
+                     “나중에 선언된 CSS가 우선”이므로 View쪽 스타일이 적용됩니다.
+                   ------------------------------- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.65);
+            background: rgba(255,255,255,.78);
+            box-shadow: 0 10px 20px rgba(2,6,23,.08);
+            color: var(--ink);
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform .08s ease, filter .12s ease, background-color .12s ease;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                filter: brightness(1.02);
+            }
+
+            .btn:active {
+                transform: translateY(0px);
+            }
+
+            .btn.primary {
+                background: linear-gradient(135deg, rgba(124,58,237,.18), rgba(14,165,233,.18));
+            }
+
+            /* ---------------------------------------------------------
+                   ✅ BibleRead/Pray/Recite 등에서 쓰는 .btnPrimary(초록 버튼) 보호
+                   --------------------------------------------------------- */
+            .btn.btnPrimary:hover,
+            .btn.btnPrimary:active,
+            .btn.btnPrimary:focus {
+                filter: none !important;
+                color: #fff !important;
+            }
+
+            .btn.btnPrimary:hover {
+                background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92)) !important;
+                border-color: rgba(34,197,94,.18) !important;
+            }
+
+        footer {
+            margin-top: 22px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        @@media (max-width: 520px) {
+            .wrap
+
+        {
+            padding: 14px 12px 22px;
+        }
+
+        .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+        }
+
+        .brand .t1 {
+            font-size: 16px;
+        }
+
+        }
+    </style>
+
+    @* ✅ 페이지별 head 확장 *@
+    @RenderSection("Head", required: false)
+
+    @* ✅ 페이지별 CSS를 head에 추가하고 싶을 때 *@
+    @RenderSection("Styles", required: false)
+</head>
+<body>
+    <div class="wrap">
+
+        @* (원하면 주석 해제) *@
+        @*
+        <div class="topbar">
+            <div class="brand">
+                <div class="logo"></div>
+                <div>
+                    <div class="t1">DailyMission2</div>
+                    <div class="t2">매일 조금씩, 하나님과 함께 💛</div>
+                </div>
+            </div>
+
+            <a class="btn primary" href="/">🏠 홈</a>
+        </div>
+        *@
+
+        @RenderBody()
+
+        <footer>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</footer>
+    </div>
+
+    @* ══════════════════════════════════════════════════════════
+       모바일 여백 — 모든 미션 화면(말씀·기도·퀴즈·암송)에 함께 적용
+
+       래퍼와 카드가 층층이 안쪽 여백을 갖고 있어, 좁은 화면에서
+       한쪽에만 50px 넘게 잡아먹고 있었습니다.
+       바깥 여백은 래퍼가 한 번만 담당하고 안쪽은 조금씩 줄입니다.
+
+       ⚠️ 이 블록은 반드시 @@RenderBody() 뒤에 있어야 합니다.
+          각 화면의 <style> 이 본문 안에 있어서, 앞에 두면 그쪽에 밀립니다.
+    ══════════════════════════════════════════════════════════ *@
+    <style>
+        @@media (max-width: 520px) {
+            /* 바깥 여백은 여기 한 번만 */
+            .wrap { padding: 12px 12px 20px; }
+
+            /* 화면이 자기 래퍼를 또 두는 경우(암송) 안쪽은 좌우 여백 없음 */
+            .wrap .wrap { padding: 0 0 8px; }
+
+            .box { padding: 12px 0 22px; }
+
+            .secHead { padding: 9px 11px; }
+            .secBody { padding: 11px; }
+            .cardBd  { padding: 12px 11px; }
+
+            .quizQ {
+                margin: 9px 0 11px 0;
+                padding: 12px 11px;
+            }
+
+            .textBox  { padding: 11px; }
+            .optLabel { padding: 11px; }
+
+            /* 제목 줄이 두 줄로 접히지 않게 */
+            .top   { gap: 8px; }
+            .title { font-size: 18px; }
+            .chip  { padding: 7px 11px; }
+        }
+    </style>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

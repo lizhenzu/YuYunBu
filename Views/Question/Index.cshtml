@@ -1,0 +1,252 @@
+@model BulletinBoard.Models.CalendarViewModel
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 달력 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 예전 _Layout_Quiz 대신 단독 화면.  달력 스크립트 · 주소(수정 · 삭제 · 미리보기 · 입력)는 그대로
+    · 이전 화면은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string kind = ViewBag.KindData as string ?? "";
+    bool isBroad = kind == QuizCategory.Broad.ToString();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>퀴즈 달력</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .cal-nav { display: flex; gap: 6px; align-items: center; margin-top: 12px; }
+        .cal-nav .sp { flex: 1; }
+        .cal-nav button { border: 0; font: inherit; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 7px 12px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+        .cal-nav button:hover { color: #2F80ED; }
+        .legend { display: flex; gap: 12px; margin-top: 10px; font-size: 11.5px; color: #6B7280; }
+        .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 4px; vertical-align: -1px; margin-right: 5px; background: #F4F6F9; }
+        .legend i.ev { background: #EAF2FD; }
+        .wk, .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .wk { margin-top: 12px; }
+        .wk div { text-align: center; font-size: 11px; font-weight: 700; color: #9CA3AF; padding: 4px 0; }
+        .wk div:first-child { color: #B4531F; }
+        .calendar { margin-top: 4px; }
+        .calendar > div { aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; font-size: 13px; }
+        .calendar .day { background: #F4F6F9; color: #374151; cursor: pointer; user-select: none; }
+        .calendar .day:hover { box-shadow: inset 0 0 0 1px #2F80ED; }
+        .calendar .day.has-event { background: #EAF2FD; color: #2F80ED; font-weight: 800; }
+        .calendar .day.selected { background: #fff; box-shadow: 0 0 0 2px #2F80ED; }
+        .calendar .day.picked { background: #2F80ED; color: #fff; }
+        #event-details { margin-top: 16px; padding: 14px; border-radius: 14px; background: #F4F6F9; font-size: 13.5px; line-height: 1.7; color: #374151; }
+        #event-details .dt { font-size: 12px; font-weight: 800; color: #2F80ED; }
+        #event-details .qq { margin-top: 6px; font-size: 14.5px; color: #111827; white-space: pre-wrap; word-wrap: break-word; }
+        #event-details ol { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+        #event-details li { font-size: 13px; padding: 7px 10px; border-radius: 10px; background: #fff; }
+        #event-details li.ans { background: #EAF7EF; color: #15803D; font-weight: 700; }
+        #event-details .ans-line { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: #15803D; }
+        #event-details .none b { display: block; font-size: 14px; color: #111827; }
+        #event-details-guide { margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: #EAF2FD; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; }
+        #event-details-guide .gk { font-size: 11.5px; font-weight: 800; color: #2F80ED; }
+        .qb-btns[hidden] { display: none; }
+    </style>
+</head>
+<body>
+<script>
+    var globalID = "";
+    var questionType = "";
+    var selectedDate = null;
+</script>
+<script src="/js/common2.js"></script>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/QuestionDetailList?KindData=@kind">퀴즈</a><span class="sep">›</span>달력</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k" id="desc">QUIZ · @(isBroad ? "돌발퀴즈 출제" : "일반 퀴즈 출제")</div>
+    <h1 class="qb-h1"><span id="year">@Model.CurrentDate.Year</span>년 <span id="month">@(Model.CurrentDate.Month)월</span></h1>
+
+    <div class="qb-chips">
+        <a href="/Question/QuestionDetailList?KindData=@kind">목록</a>
+        <a class="on" href="/Question/Index?KindData=@kind">달력</a>
+    </div>
+
+    <div class="cal-nav">
+        <button type="button" onclick="prevMonth('@ViewBag.PrevDateTime')">이전달</button>
+        <span class="sp"></span>
+        <button type="button" onclick="goToToday('@ViewBag.NowDateTime')">오늘</button>
+        <button type="button" onclick="nextMonth('@ViewBag.NextDateTime')">다음달</button>
+    </div>
+    <div class="legend"><span><i class="ev"></i>퀴즈 있음</span><span><i></i>퀴즈 없음</span></div>
+
+    <div class="wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+    <div class="calendar" id="calendar"></div>
+
+    <div id="event-details"><div class="none">위 달력에서 날짜를 눌러 퀴즈를 확인하세요.</div></div>
+    <div id="event-details-guide" style="display:none;"></div>
+
+    <div class="qb-btns" id="btns-has" hidden>
+        <button type="button" class="qb-btn" id="modify-button" onclick="modifyQuestion()">퀴즈 수정</button>
+        <button type="button" class="qb-btn d" id="delete-button" onclick="deleteQuestion()">퀴즈 삭제</button>
+        <button type="button" class="qb-btn p w" id="preview-button" onclick="PreViewQuestion()">퀴즈 미리보기</button>
+    </div>
+    <div class="qb-btns" id="btns-none" hidden>
+        <button type="button" class="qb-btn p w" id="add-button" onclick="AddQuestion()">이 날 퀴즈 입력</button>
+    </div>
+
+    <div class="qb-ft">
+        <span>@(isBroad ? "돌발" : "일반") 퀴즈</span>
+        <span><a href="/Question/QuestionDetailList?KindData=@kind">퀴즈 목록</a><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    function modifyQuestion() {
+        window.location.href = "/Question/ModifyQuiz?Id=" + globalID;
+    }
+    async function deleteQuestion() {
+        let result = await confirmMessage(true, ['이 퀴즈를 삭제 할까요?'], null, '진행'); // 취소 버튼 표시
+        if (result === 'y') {
+            window.location.href = "/Question/DeleteQuestion?Id=" + globalID;
+        }
+    }
+
+    function AddQuestion() {
+        if (selectedDate) {
+            var todayDate = toYmdLocal(selectedDate);
+            window.location.href = "/Question/BranchQuestionMethod?KindData=@kind&WhenDate=" + todayDate;
+        }
+    }
+
+    // 달력에서 고른 날짜를 그대로 YYYY-MM-DD 로 만든다.
+    // toISOString() 은 UTC 로 바꿔 버려서 한국 시간 기준 하루 전으로 밀린다.
+    function toYmdLocal(d) {
+        var y  = d.getFullYear();
+        var m  = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + dd;
+    }
+    function toKorDate(d) {
+        var w = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+        return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + w + '요일';
+    }
+
+    function PreViewQuestion() {
+        if (selectedDate) {
+            window.location.href = "/DailyMission2/Quiz?date=" + toYmdLocal(selectedDate);
+        }
+    }
+
+    // 화면에 그대로 넣는 글자는 태그로 해석되지 않게 바꾼다
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+    }
+
+    const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+    let currentDate = new Date(@Model.CurrentDate.Year, @Model.CurrentDate.Month - 1, @Model.CurrentDate.Day);
+    let events = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(@Model.Events));
+    let pickedCell = null;
+
+    function renderCalendar(date) {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        document.getElementById("year").textContent = year;
+        document.getElementById("month").textContent = monthNames[month];
+
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const lastDateOfMonth = new Date(year, month + 1, 0).getDate();
+
+        const calendar = document.getElementById("calendar");
+        calendar.innerHTML = "";
+
+        for (let i = 0; i < firstDayOfMonth; i++) {
+            calendar.appendChild(document.createElement("div"));
+        }
+
+        for (let i = 1; i <= lastDateOfMonth; i++) {
+            const dayCell = document.createElement("div");
+            dayCell.textContent = i;
+            dayCell.className = "day";
+            const cellDate = new Date(year, month, i);
+            const event = events.find(e => new Date(e.Date).toDateString() === cellDate.toDateString());
+            dayCell.onclick = () => {
+                // 칸의 원본 날짜를 지키려고 복사본을 쓴다
+                selectedDate = new Date(cellDate);
+                if (pickedCell) pickedCell.classList.remove('picked');
+                pickedCell = dayCell; dayCell.classList.add('picked');
+                if (event) {
+                    showEventDetails(event);
+                } else {
+                    showAddButton(selectedDate);
+                }
+            };
+            if (event) {
+                dayCell.className += " has-event";
+            }
+            if (i === currentDate.getDate() && month === currentDate.getMonth() && year === currentDate.getFullYear()) {
+                dayCell.className += " selected";
+            }
+            calendar.appendChild(dayCell);
+        }
+    }
+
+    function showEventDetails(event) {
+        const q = event.QuestionData || {};
+        const t = String(q.QuestionType || '').toLowerCase();
+        const typeName = t === 'o' ? '객관식' : (t === 'a' ? 'O/X' : '주관식');
+        let html = '<div class="dt">' + esc(toKorDate(selectedDate)) + ' · ' + typeName + '</div>';
+        html += '<div class="qq">' + esc(event.Description) + '</div>';
+        const guide = document.getElementById("event-details-guide");
+        if (t === 'o') {
+            html += '<ol>';
+            for (let n = 1; n <= 4; n++) {
+                const ok = String(q.CorrectAnswer) === String(n);
+                html += '<li class="' + (ok ? 'ans' : '') + '">' + n + ') ' + esc(q['Question' + n]) + (ok ? ' · 정답' : '') + '</li>';
+            }
+            html += '</ol>';
+            guide.style.display = "none";
+        } else {
+            html += '<div class="ans-line">정답 ' + esc(q.CorrectAnswer) + '</div>';
+            if (q.AnswerGuide) {
+                guide.style.display = "block";
+                guide.innerHTML = '<div class="gk">답변 가이드</div>' + esc(q.AnswerGuide);
+            } else {
+                guide.style.display = "none";
+            }
+        }
+        document.getElementById("event-details").innerHTML = html;
+
+        globalID = q.Id;
+        questionType = q.QuestionType;
+        document.getElementById('btns-has').hidden = false;
+        document.getElementById('btns-none').hidden = true;
+    }
+
+    function showAddButton() {
+        const d = toKorDate(selectedDate);
+        document.getElementById("event-details").innerHTML =
+            '<div class="none"><b>' + esc(d) + '에는 퀴즈가 없어요</b>아래 버튼으로 이 날 퀴즈를 새로 넣을 수 있어요.</div>';
+        document.getElementById("event-details-guide").style.display = "none";
+        document.getElementById('btns-has').hidden = true;
+        document.getElementById('btns-none').hidden = false;
+    }
+
+    function prevMonth(va) { window.location.href = "/Question/Index?KindData=@kind&selectedDate=" + va; }
+    function nextMonth(va) { window.location.href = "/Question/Index?KindData=@kind&selectedDate=" + va; }
+    function goToToday(va) { window.location.href = "/Question/Index?KindData=@kind&selectedDate=" + va; }
+
+    renderCalendar(currentDate);
+</script>
+</body>
+</html>

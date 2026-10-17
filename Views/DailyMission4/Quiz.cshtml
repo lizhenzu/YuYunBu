@@ -1,0 +1,490 @@
+﻿@using System
+@using System.Globalization
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using BulletinBoard.Models.DailyMission2
+@{
+    Layout = "_Layout_Mission3";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var dPretty = Model.SelectedDate.ToString("yyyy.MM.dd", CultureInfo.InvariantCulture)
+                  + " " + Model.SelectedDate.ToString("ddd", new CultureInfo("en-US")).ToUpperInvariant();
+    var toast = (ViewBag.Toast ?? "").ToString();
+    bool canAct = Model.IsActionable;
+
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+
+    ViewBag.DM2Page = "quiz";
+    ViewBag.DM2Done = Model.DayStatus?.QuizDone ?? false;
+
+    // 퀴즈수정 버튼 — superadmin · basic · SuperAdmin 역할에게만
+    var _quizUser     = await AuthService.GetSignedUser(User);
+    var _quizSignedIn = await AuthService.IsSignedIn(User);
+    bool canEditQuiz  = false;
+    if (_quizSignedIn && _quizUser != null)
+    {
+        var _uname = _quizUser.UserName ?? "";
+        canEditQuiz = string.Equals(_uname, "superadmin", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(_uname, "basic",      StringComparison.OrdinalIgnoreCase)
+                   || await AuthService.IsInRole(_quizUser, nameof(Roles.SuperAdmin));
+    }
+}
+
+@functions {
+    string S(object v) => (v == null) ? "" : v.ToString();
+    int I(object v) { try { return v == null ? 0 : Convert.ToInt32(v); } catch { return 0; } }
+    bool B(object v) { try { return v == null ? false : Convert.ToBoolean(v); } catch { return false; } }
+
+    // synopsis 우선, 없으면 BibleSummary
+    string GetWordGuide(dynamic wr)
+    {
+        try
+        {
+            var syn = S(wr?.synopsis);
+            if (!string.IsNullOrWhiteSpace(syn)) return syn;
+            return S(wr?.BibleSummary) ?? "";
+        }
+        catch { return ""; }
+    }
+
+    string GetWordGuideTitle(dynamic wr)
+    {
+        try
+        {
+            var syn = S(wr?.synopsis);
+            if (!string.IsNullOrWhiteSpace(syn)) return "오늘 말씀 한눈에 보기";
+            return "오늘의 말씀 가이드";
+        }
+        catch { return "오늘의 말씀"; }
+    }
+
+    // 문제 본문이 "배경 … Q. 질문" 형태이면 배경과 질문을 갈라 준다.
+    // 갈리지 않으면 배경은 비우고 전체를 질문으로 쓴다.
+    (string bg, string q) SplitQuestion(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return ("", "");
+        var text = raw.Replace("\r\n", "\n").Trim();
+
+        int idx = -1;
+        foreach (var marker in new[] { "\nQ.", "\nQ)", "\n질문.", "\n[문제]" })
+        {
+            var p = text.IndexOf(marker, StringComparison.Ordinal);
+            if (p >= 0) { idx = p; break; }
+        }
+        if (idx < 0) return ("", text);
+
+        var bg = text.Substring(0, idx).Trim();
+        var q  = text.Substring(idx).Trim();
+        // 앞머리 표식 제거
+        foreach (var marker in new[] { "Q.", "Q)", "질문.", "[문제]" })
+        {
+            if (q.StartsWith(marker, StringComparison.Ordinal)) { q = q.Substring(marker.Length).Trim(); break; }
+        }
+        return (bg, q);
+    }
+}
+
+@{
+    dynamic wordRow = ViewBag.TodayWordToReadRow;
+
+    DailyMission2QuizContent q = ViewBag.TodayQuestionRow as DailyMission2QuizContent;
+
+    int tryCnt = 0;
+    bool isCorrect = false;
+    try { tryCnt = I(ViewBag.QuizTryCnt); } catch { tryCnt = 0; }
+    try { isCorrect = B(ViewBag.QuizCorrect); } catch { isCorrect = false; }
+
+    int qid = q?.QuestionId ?? 0;
+
+    string rawType = (q?.QuestionType ?? "").Trim().ToLowerInvariant();
+    string qType;
+    if (rawType == "o" || rawType == "a" || rawType == "s") qType = rawType;
+    else qType = (q?.HasChoices ?? false) ? "o" : "s";
+
+    string qTypeLabel =
+        (qType == "a") ? "O · X" :
+        (qType == "o") ? "객관식" :
+        (qType == "s") ? "주관식" : "퀴즈";
+
+    // 이 사람이 실제로 고른 답 (ClickHistoryForQuestion 기록).
+    // TempData 와 달리 새로고침해도 남아 있어서, 끝난 뒤에도 고른 자리를 표시할 수 있다.
+    var myAnswers = ViewBag.QuizMyAnswers as List<string> ?? new List<string>();
+
+    bool doneByStatus = Model.DayStatus?.QuizDone ?? false;
+    bool finished = doneByStatus || isCorrect || tryCnt >= 2;
+
+    var parts = SplitQuestion(q?.QuestionQ);
+    string qBg   = parts.bg;
+    string qBody = parts.q;
+
+    int chancesLeft = Math.Max(0, 2 - tryCnt);
+
+    // 정답 보기 문구 (객관식일 때만 골라낸다)
+    string correctRaw = (q?.CorrectAnswer ?? "").Trim();
+    string correctText = "";
+    if (qType == "o")
+    {
+        if (correctRaw == "1") correctText = q?.Question1;
+        else if (correctRaw == "2") correctText = q?.Question2;
+        else if (correctRaw == "3") correctText = q?.Question3;
+        else if (correctRaw == "4") correctText = q?.Question4;
+    }
+    else if (qType == "a")
+    {
+        correctText = correctRaw.ToLowerInvariant() == "o" ? "O (맞다)" : "X (아니다)";
+    }
+    else
+    {
+        correctText = correctRaw;
+    }
+
+}
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 미션 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정 · 말씀 화면과 같은 옷)
+      제목 → 01 배경 → 02 문제 → 03 정답을 골라요(보기) → (끝나면) 04 해설
+    · 카드 · 테두리 · 알약 버튼 없이 연한 회색 줄로만 나눈다.  강조색은 맑은 파랑, 맞으면 초록, 내가 고른 틀린 답은 분홍.
+    · 배경이 없는 문제는 번호가 01부터 다시 매겨진다.  해설이 없으면 해설 칸이 없다.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    bool correct = isCorrect || doneByStatus;
+    int _sn = 0;
+    string QNo() { return (++_sn).ToString("00"); }
+
+    string optHead; string optSmall = null; string optSmallCls = "";
+    if (finished)
+    {
+        if (correct) { optHead = "정답이에요"; optSmall = "+1점"; optSmallCls = "ok"; }
+        else         { optHead = "아쉬워요";   optSmall = "내일 또 도전해요"; }
+    }
+    else if (tryCnt >= 1) { optHead = "다시 골라요"; optSmall = $"기회 {chancesLeft}번 남았어요"; optSmallCls = "warn"; }
+    else { optHead = (qType == "s") ? "답을 적어요" : "정답을 골라요"; optSmall = "기회 2번"; }
+
+    bool hasQuiz = q != null && !string.IsNullOrWhiteSpace(q.QuestionQ);
+    bool hasGuide = hasQuiz && !string.IsNullOrWhiteSpace(q.AnswerGuide);
+    string titleText = !string.IsNullOrWhiteSpace(S(wordRow?.BibleSubject)) ? S(wordRow?.BibleSubject) : "오늘의 퀴즈";
+    string refText = wordRow == null ? "" : $"{S(wordRow?.BibleText)} {BulletinBoard.Common.SharedComm.MakeBibleSerialJangZul(wordRow?.BibleText, wordRow?.FromJang, wordRow?.FromZul, wordRow?.ToJang, wordRow?.ToZul)}".Trim();
+}
+
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* ── 밝은 흰색 버전 : 이 화면만 (공통 bone.css 위에 덮어쓴다) ── */
+    body { background: #FFFFFF; }
+    .qz.qd { --dBlue: #2F80ED; --dBlueSoft: #EAF2FD; --dNoBlue: #7FA3DB; --dGreen: #16A34A; --dGreenD: #15803D; --dGreenBg: #EAF7EF; --dRose: #E5484D; --dRoseBg: #FDEEF0;
+             --dInk: #111827; --dTx: #374151; --dDim: #9CA3AF; --dDim2: #6B7280; --dLine: #EEF0F3; --dSoft: #F4F6F9;
+             background: #FFFFFF; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; }
+    .qz.qd .qzBody { background: #FFFFFF; }
+    .qz.qd .qzBar { border-bottom-color: var(--dLine); }
+    .qz.qd .qzProg { display: none; }
+    .qz.qd .qzLock { background: #F3F7FD; color: var(--dDim2); border: 0; }
+
+    .qz.qd .dK { font-size: 12px; font-weight: 800; color: var(--dBlue); margin-top: 18px; letter-spacing: .02em; }
+    .qz.qd .dTtl { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
+    .qz.qd .dTtl h2 { margin: 0; font-size: 23px; font-weight: 800; line-height: 1.35; color: var(--dInk); letter-spacing: -.02em; word-break: keep-all; }
+    .qz.qd .dRef { font-size: 13px; color: var(--dDim2); margin-top: 4px; }
+    .qz.qd .qzCalLink { flex: 0 0 auto; text-decoration: none; color: inherit; }
+    .qz.qd .dEmpty { margin-top: 26px; padding: 26px 0; text-align: center; color: var(--dDim2); font-size: 14px; border-top: 1px solid var(--dLine); border-bottom: 1px solid var(--dLine); }
+
+    /* 01 · 02 · 03 칸 — 연한 회색 줄로만 나눈다 (숫자는 제목 줄에만, 아래 내용은 왼쪽 끝부터) */
+    .qz.qd .dSec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: baseline; padding: 18px 0 16px; border-top: 1px solid var(--dLine); }
+    .qz.qd .dSec > div { display: contents; }
+    .qz.qd .dSec > div > :not(.dH) { grid-column: 1 / -1; }
+    .qz.qd .dTtl + .dSec { margin-top: 26px; }
+    .qz.qd .dNo { font-weight: 900; font-size: 17px; color: #7FA3DB; letter-spacing: .02em; }
+    .qz.qd .dSec.done .dNo { color: #6FBF8B; }
+    .qz.qd .dH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 16px; font-weight: 800; color: var(--dInk); }
+    .qz.qd .dH small { font-size: 11.5px; font-weight: 600; color: var(--dDim); white-space: nowrap; }
+    .qz.qd .dH small.ok { color: var(--dGreen); font-weight: 800; }
+    .qz.qd .dH small.warn { color: var(--dRose); font-weight: 800; }
+    .qz.qd .dBg { margin: 8px 0 0; font-size: 15px; line-height: 1.85; color: var(--dTx); word-break: keep-all; }
+    .qz.qd .dBg + .dBg { margin-top: 6px; }
+    .qz.qd .dQ { margin: 8px 0 0; font-size: 18px; line-height: 1.6; font-weight: 800; color: var(--dInk); word-break: keep-all; white-space: pre-line; }
+    .qz.qd .dExpl { margin: 8px 0 0; font-size: 15px; line-height: 1.9; color: var(--dTx); word-break: keep-all; white-space: pre-line; }
+
+    /* 보기 — 연회색 줄, 테두리 없음.  번호는 흐린 파랑 글자 */
+    .qz.qd .dOpts { display: grid; gap: 8px; margin-top: 12px; }
+    .qz.qd .dOpt { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: var(--dSoft); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s; }
+    .qz.qd .dOpt input { position: absolute; opacity: 0; pointer-events: none; }
+    .qz.qd .dOpt i { flex: none; width: 18px; text-align: center; font-style: normal; font-weight: 900; font-size: 15px; color: var(--dNoBlue); }
+    .qz.qd .dOpt .t { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 700; color: #1F2937; line-height: 1.45; word-break: keep-all; }
+    .qz.qd .dOpt .t small { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 800; }
+    .qz.qd .dOpt.ox i { display: none; }
+    .qz.qd .dOpt.ox .t { font-size: 24px; font-weight: 900; text-align: center; }
+    .qz.qd label.dOpt:active { background: #E9EDF3; }
+    .qz.qd label.dOpt.on { background: var(--dBlueSoft); }
+    .qz.qd label.dOpt.on .t { color: #1D5FBF; }
+    .qz.qd label.dOpt.on i { color: var(--dBlue); }
+    .qz.qd .dOpt.fixed { cursor: default; }
+    .qz.qd .dOpt.ans { background: var(--dGreenBg); }
+    .qz.qd .dOpt.ans .t { color: var(--dGreenD); }
+    .qz.qd .dOpt.ans i, .qz.qd .dOpt.ans .t small { color: var(--dGreen); }
+    .qz.qd .dOpt.bad { background: var(--dRoseBg); }
+    .qz.qd .dOpt.bad .t { color: #B42318; }
+    .qz.qd .dOpt.bad i, .qz.qd .dOpt.bad .t small { color: var(--dRose); }
+    .qz.qd .dOpt.dim { opacity: .55; }
+
+    .qz.qd .dInput { width: 100%; margin-top: 12px; padding: 14px; border: 0; border-radius: 14px; background: var(--dSoft); font: inherit; font-size: 16px; color: var(--dInk); outline: 0; }
+    .qz.qd .dInput:focus { background: var(--dBlueSoft); box-shadow: inset 0 0 0 2px var(--dBlue); }
+    .qz.qd .dNote { margin-top: 8px; font-size: 12px; color: var(--dDim); }
+
+    .qz.qd .dHint { display: inline-block; margin-top: 12px; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--dBlue); cursor: pointer; }
+    .qz.qd .dHintBox { margin-top: 6px; padding: 10px 12px; border-radius: 12px; background: #F9FAFB; font-size: 14px; line-height: 1.75; color: var(--dTx); white-space: pre-line; word-break: keep-all; }
+
+    /* 제출 — 말씀 화면의 "읽으러 가기"와 같은 파란 밑줄 글자. 고르기 전에는 회색 */
+    .qz.qd .dGo { display: flex; width: 100%; justify-content: space-between; align-items: baseline; margin-top: 14px; padding: 0 0 8px; border: 0; border-bottom: 2px solid var(--dBlue);
+                  background: none; font: inherit; font-size: 15.5px; font-weight: 800; color: var(--dBlue); text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .qz.qd .dGo em { font-style: normal; font-size: 17px; }
+    .qz.qd .dGo[disabled] { color: #C4C9D2; border-bottom-color: #E5E7EB; cursor: default; }
+    @@media (prefers-reduced-motion: reduce) { .qz.qd .dOpt { transition: none; } }
+</style>
+
+<div class="qz qd" id="qzRoot">
+    <div class="qzBody">
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a></div>
+            @await Html.PartialAsync("~/Views/DailyMission4/Partials/_FontSizeCtl.cshtml")
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        @if (!canAct)
+        {
+            <div class="qzLock"><b>다른 날짜의 미션이에요</b><br>오늘 · 어제 · 그저께만 할 수 있어요</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="qzLock">@toast</div>
+        }
+
+        <div class="dK">오늘의 퀴즈</div>
+        <div class="dTtl">
+            @if (canEditQuiz && q != null && qid > 0)
+            {
+                @* 퀴즈 수정 권한자만 — 날짜 칩을 누르면 퀴즈 수정으로 *@
+                <a class="qzCalLink" href="/Question/ModifyQuiz?Id=@qid" title="@d 퀴즈 수정 (Id @qid)">
+                    @await Html.PartialAsync("~/Views/DailyMission4/Partials/_DateChip.cshtml", Model.SelectedDate)
+                </a>
+            }
+            else
+            {
+                @await Html.PartialAsync("~/Views/DailyMission4/Partials/_DateChip.cshtml", Model.SelectedDate)
+            }
+            <div>
+                <h2>@titleText</h2>
+                @if (!string.IsNullOrWhiteSpace(refText)) { <div class="dRef">@refText</div> }
+            </div>
+        </div>
+
+        @if (!hasQuiz)
+        {
+            <div class="dEmpty">이 날짜(@d)에는 퀴즈가 없어요</div>
+        }
+        else
+        {
+            @* ── 배경 (있을 때만) ── *@
+            @if (!string.IsNullOrWhiteSpace(qBg))
+            {
+                <div class="dSec @(correct ? "done" : "")">
+                    <span class="dNo">@QNo()</span>
+                    <div>
+                        <div class="dH">배경</div>
+                        @* 문단 사이 빈 줄은 한 번만 띄운다 (빈 줄이 겹쳐 길어지지 않게) *@
+                        @foreach (var para in qBg.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            <p class="dBg">@para</p>
+                        }
+                    </div>
+                </div>
+            }
+
+            @* ── 문제 ── *@
+            <div class="dSec @(correct ? "done" : "")">
+                <span class="dNo">@QNo()</span>
+                <div>
+                    <div class="dH">문제<small>@qTypeLabel</small></div>
+                    <p class="dQ">@qBody</p>
+                </div>
+            </div>
+
+            @* ── 보기 · 답 ── *@
+            <div class="dSec @(correct ? "done" : "")">
+                <span class="dNo">@QNo()</span>
+                <div>
+                    <div class="dH">@optHead<small class="@optSmallCls">@optSmall</small></div>
+
+                    <form method="post" action="/DailyMission4/AnswerQuestion" id="quizForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="date" value="@d" />
+                        <input type="hidden" name="questionId" value="@qid" />
+                        <input type="hidden" name="answerQ" id="answerQ" value="" />
+
+                        @if (qType == "o" || qType == "a")
+                        {
+                            string[] vals, texts;
+                            if (qType == "o")
+                            {
+                                vals  = new[] { "1", "2", "3", "4" };
+                                texts = new[] { q.Question1, q.Question2, q.Question3, q.Question4 };
+                            }
+                            else
+                            {
+                                vals  = new[] { "o", "x" };
+                                texts = new[] { "O", "X" };
+                            }
+
+                            <div class="dOpts">
+                                @for (int i = 0; i < vals.Length; i++)
+                                {
+                                    if (string.IsNullOrWhiteSpace(texts[i])) { continue; }
+
+                                    var val      = vals[i];
+                                    var isMine   = myAnswers.Contains(val, StringComparer.OrdinalIgnoreCase);
+                                    var isAnswer = string.Equals(val, correctRaw, StringComparison.OrdinalIgnoreCase);
+                                    var mark     = qType == "o" ? val : val.ToUpperInvariant();
+
+                                    @if (finished)
+                                    {
+                                        var cls = isAnswer ? "ans" : (isMine ? "bad" : "dim");
+                                        <div class="dOpt @(qType == "a" ? "ox " : "")fixed @cls">
+                                            <i>@mark</i>
+                                            <div class="t">
+                                                @texts[i]
+                                                @if (isMine && isAnswer) { <small>내가 고른 답 · 정답</small> }
+                                                else if (isMine)        { <small>내가 고른 답 · 오답</small> }
+                                                else if (isAnswer)      { <small>정답</small> }
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <label class="dOpt @(qType == "a" ? "ox" : "")">
+                                            <input type="radio" name="AnswerRadio" value="@val" />
+                                            <i>@mark</i>
+                                            <span class="t">@texts[i]</span>
+                                        </label>
+                                    }
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            if (finished)
+                            {
+                                var mine = myAnswers.Count > 0 ? myAnswers[myAnswers.Count - 1] : "";
+                                <div class="dOpts">
+                                    <div class="dOpt fixed @(correct ? "ans" : "bad")">
+                                        <i>답</i>
+                                        <div class="t">
+                                            @(string.IsNullOrWhiteSpace(mine) ? "(입력 없음)" : mine)
+                                            <small>내가 쓴 답 · @(correct ? "정답" : "오답")</small>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(correctRaw) && !correct)
+                                    {
+                                        <div class="dOpt fixed ans">
+                                            <i>정답</i>
+                                            <div class="t">@correctRaw<small>정답</small></div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <input id="AnswerText" class="dInput" type="text" placeholder="답을 적어 주세요" value="" autocomplete="off" />
+                                <div class="dNote">주관식은 띄어쓰기를 빼고 채점해요</div>
+                            }
+                        }
+
+                        @if (!finished && !string.IsNullOrWhiteSpace(q.AnswerGuide))
+                        {
+                            <button type="button" class="dHint" data-fold="foldHint">힌트 보기 ＋</button>
+                            <div class="dHintBox" id="foldHint" hidden>@q.AnswerGuide</div>
+                        }
+                    </form>
+
+                    @if (!finished)
+                    {
+                        <button type="button" class="dGo" id="btnSubmit" disabled data-can="@((canAct && q != null) ? "1" : "0")">답 제출하기<em>→</em></button>
+                    }
+                </div>
+            </div>
+
+            @* ── 해설 (끝난 뒤 · 해설이 있을 때만) ── *@
+            @if (finished && hasGuide)
+            {
+                <div class="dSec @(correct ? "done" : "")">
+                    <span class="dNo">@QNo()</span>
+                    <div>
+                        <div class="dH">해설</div>
+                        <p class="dExpl">@q.AnswerGuide</p>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @await Html.PartialAsync("~/Views/DailyMission4/Partials/_Dm2Nav.cshtml", Model)
+</div>
+
+@{
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+
+<script>
+    (function () {
+        var root = document.getElementById('qzRoot');
+        if (!root) return;
+        var qtype = "@qType";
+        var btn = document.getElementById('btnSubmit');
+        var canAct = btn && btn.getAttribute('data-can') === '1';
+
+        // 힌트 — 누르면 펼치고 다시 누르면 접는다
+        root.querySelectorAll('[data-fold]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var box = document.getElementById(b.dataset.fold);
+                if (!box) return;
+                box.hidden = !box.hidden;
+                b.textContent = box.hidden ? '힌트 보기 ＋' : '힌트 닫기 －';
+            });
+        });
+
+        function currentAnswer() {
+            if (qtype === "s") return (document.getElementById('AnswerText') ? document.getElementById('AnswerText').value : "").trim();
+            var els = document.getElementsByName("AnswerRadio");
+            for (var i = 0; i < els.length; i++) { if (els[i].checked) return els[i].value; }
+            return "";
+        }
+        function refresh() { if (btn) btn.disabled = !(canAct && currentAnswer()); }
+
+        // 보기를 고르면 그 줄을 연한 파랑으로, 제출을 켠다
+        root.querySelectorAll('.dOpt input').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                root.querySelectorAll('label.dOpt').forEach(function (l) { l.classList.remove('on'); });
+                inp.closest('.dOpt').classList.add('on');
+                refresh();
+            });
+        });
+        var txt = document.getElementById('AnswerText');
+        if (txt) txt.addEventListener('input', refresh);
+        refresh();
+
+        // 제출
+        if (btn) {
+            btn.addEventListener('click', function () {
+                var answer = currentAnswer();
+                if (!answer) return;
+                if (qtype === "s") answer = answer.replace(/\s+/g, "");
+                document.getElementById('answerQ').value = answer;
+                document.getElementById('quizForm').submit();
+            });
+        }
+    })();
+</script>

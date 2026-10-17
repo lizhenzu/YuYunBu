@@ -1,0 +1,264 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.ViewModels.Dashboard.StudentPointDashboardVM
+
+@*  ══════════════════════════════════════════════════════════════
+    도토리 보드 — DailyMission4 밝은 흰색 버전 (장부형 목록 + 비율 막대)
+    이전 화면은 Dashboard.cshtml.bak_before_bright / Dashboard_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var urlChallengeMain  = "/DailyMission4/Index";
+    var urlBibleReading   = "/Bible2/Welcome";
+    var urlAttendance     = "/Attendance/DashboardAll";
+    var urlWorldview      = "/Worldview/Intro";
+    var urlThanksDetail   = "/DevotionPoints/MyMonthly";
+    var urlGift           = "/StudentPointDashboard4/MyGiftBox3";
+    var urlIntegratedRank = "/StudentPointDashboard4/TotalRank";
+
+    string N(int v) => v.ToString("N0");
+
+    var ChurchName     = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var name = ((ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string)
+               ?? HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserFullName.ToString())
+               ?? "").Trim();
+
+    bool isStudent     = (ViewBag.ShowGiftList as bool?) ?? false;
+    bool hasAffordable = (ViewBag.GiftHasAffordable as bool?) ?? false;
+
+    int total   = Math.Max(0, Model.IntegratedTotal);
+    int spent   = Model.SpentMilestone;
+    int remain  = Math.Max(0, total - spent);
+    int credit  = Model.AvailableCredit;
+
+    // 다음 선물 = 다음 100점 단위 (최대 2000점)
+    const int GiftCap = 2000;
+    int nextMs    = Math.Min(GiftCap, (total / 100 + 1) * 100);
+    bool capped   = total >= GiftCap;
+    int toNext    = capped ? 0 : Math.Max(0, nextMs - total);
+    int stepPct   = capped ? 100 : (int)Math.Round((total % 100) / 100.0 * 100);
+
+    // 구성 네 항목 (파란 계열 + 회색)
+    var parts = new[]
+    {
+        new { No = 1, Name = ConstatsCommon.MainKeyTitle,            Sub = "말씀 · 기도 · 암송 · 퀴즈",                        Val = Model.BiblePoint,       Color = "#2F80ED", Url = urlChallengeMain },
+        new { No = 2, Name = ConstatsCommon.MissionBibleWithparent,  Sub = "과별 점수 합",                                     Val = Model.MissionBookPoint, Color = "#7BAEF2", Url = urlWorldview },
+        new { No = 3, Name = ConstatsCommon.HolyWordAndRead,         Sub = "감사 기록",                                        Val = Model.ThanksPointTotal, Color = "#BCD5F8", Url = urlThanksDetail },
+        new { No = 4, Name = $"출석 × {ConstatsCommon.attendancePoint}", Sub = $"올해 {Model.AttendanceWeeksTotal}주 중 {Model.AttendanceCount}주", Val = Model.AttendancePoint, Color = "#9CA3AF", Url = urlAttendance },
+    };
+    int partSum = Math.Max(1, parts.Sum(p => Math.Max(0, p.Val)));
+    int Pct(int v) => (int)Math.Round(Math.Max(0, v) * 100.0 / partSum);
+}
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator  = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    bool isStaff     = (isAdmin || isSuperAdmin || isModerator);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>@ConstatsCommon.myDoToRi 보드 — @ConstatsCommon.MainKeyTitle</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+    /* 머리 */
+    .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+    .hdTop a { color: #374151; }
+    .hdTop a:hover { color: #2F80ED; }
+    .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+    .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .hdT { margin: 6px 0 0; font-size: 22px; font-weight: 800; line-height: 1.45; letter-spacing: -.02em; color: #111827; }
+    .hdT .who { font-size: 26px; }
+    .hdT .whoS { font-size: 14px; font-weight: 400; color: #9CA3AF; margin-left: 4px; letter-spacing: 0; }
+    .hdS { margin-top: 6px; font-size: 13px; color: #9CA3AF; }
+
+    /* 내 점수 */
+    .tot { margin-top: 20px; }
+    .lbl { font-size: 12px; color: #9CA3AF; }
+    .big { margin-top: 2px; font-size: 56px; font-weight: 300; line-height: 1.1; color: #2F80ED; font-variant-numeric: tabular-nums; }
+    .big u { text-decoration: none; font-size: 14px; font-weight: 400; color: #9CA3AF; margin-left: 4px; }
+    .prog { height: 6px; margin-top: 12px; border-radius: 999px; background: #F4F6F9; overflow: hidden; }
+    .prog i { display: block; height: 100%; border-radius: 999px; background: #2F80ED; }
+    .pn { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+
+    .s3 { display: flex; margin-top: 16px; padding: 12px 0; border-top: 1px solid #EEF0F3; border-bottom: 1px solid #EEF0F3; text-align: center; }
+    .s3 > div { flex: 1; }
+    .s3 .v { margin-top: 2px; font-size: 20px; font-weight: 300; color: #111827; font-variant-numeric: tabular-nums; }
+    .s3 .v.acc { color: #2F80ED; }
+
+    /* 선물 안내 */
+    .gift { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: #EAF2FD; }
+    .gift b { font-size: 15px; font-weight: 800; color: #2B5FA8; }
+    .gift small { display: block; margin-top: 2px; font-size: 12px; color: #6B7280; }
+    .gift .go { flex: none; padding: 8px 14px; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+    .gift:hover .go { background: #1F6FDB; }
+
+    /* 구역 */
+    .sec { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+    .secT { font-size: 16px; font-weight: 800; color: #111827; }
+    .secS { font-size: 12px; color: #9CA3AF; }
+
+    .stack { display: flex; height: 10px; margin: 12px 0 2px; border-radius: 999px; background: #F4F6F9; overflow: hidden; }
+    .stack i { display: block; }
+
+    /* 목록 줄 */
+    .ln { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #EEF0F3; color: inherit; }
+    a.ln:hover .lnN { color: #2F80ED; }
+    .sw { width: 9px; height: 9px; flex: none; border-radius: 50%; }
+    .lnT { flex: 1; min-width: 0; }
+    .lnN { font-size: 14.5px; font-weight: 700; color: #111827; line-height: 1.4; word-break: keep-all; transition: color .15s; }
+    .lnS { margin-top: 2px; font-size: 11.5px; color: #9CA3AF; }
+    .mini { height: 3px; margin-top: 8px; border-radius: 999px; background: #F4F6F9; position: relative; overflow: hidden; }
+    .mini i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+    .lnV { text-align: right; font-size: 18px; font-weight: 300; color: #111827; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .lnV u { text-decoration: none; font-size: 11px; color: #9CA3AF; margin-left: 2px; }
+    .pct { margin-top: 2px; font-size: 11px; color: #9CA3AF; }
+    .go2 { flex: none; width: 10px; font-size: 18px; font-weight: 300; color: #D1D5DB; }
+    a.ln:hover .go2 { color: #2F80ED; }
+    .lnM { font-size: 15px; font-weight: 700; color: #111827; }
+
+    .foot { padding: 28px 0 40px; text-align: center; font-size: 11.5px; color: #9CA3AF; }
+</style>
+</head>
+<body>
+
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/DailyMission4">미션홈</a></span>
+        <span>@ConstatsCommon.myDoToRi 보드</span>
+    </div>
+
+    <div class="hdK">@ConstatsCommon.MainKeyTitle</div>
+    <h1 class="hdT">
+        @if (!string.IsNullOrWhiteSpace(name))
+        {
+            <span class="who">@name</span><span class="whoS">님의</span><br />
+        }
+        @ConstatsCommon.myDoToRi 보드
+    </h1>
+    <div class="hdS">네 가지를 모두 더한 점수가 @(ConstatsCommon.myDoToRi)예요</div>
+
+    @* ── 나의 도토리 ── *@
+    <div class="tot">
+        <div class="lbl">@ConstatsCommon.myDoToRi</div>
+        <div class="big">@N(total)<u>점</u></div>
+        <div class="prog"><i style="width:@(stepPct)%"></i></div>
+        <div class="pn">
+            @if (capped)
+            {
+                <span>최고 단계 @N(GiftCap)점에 도달했어요</span><span></span>
+            }
+            else
+            {
+                <span>다음 단계 @(N(nextMs))점</span><span>@(N(toNext))점 남음</span>
+            }
+        </div>
+    </div>
+
+    <div class="s3">
+        <div><div class="lbl">소멸</div><div class="v">@N(spent)</div></div>
+        <div><div class="lbl">잔여</div><div class="v">@N(remain)</div></div>
+        <div><div class="lbl">크레딧</div><div class="v acc">@N(credit)</div></div>
+    </div>
+
+    @if (isStudent && hasAffordable)
+    {
+        <a class="gift" href="@urlGift">
+            <div><b>선물을 고를 수 있어요</b><small>@(N(credit)) credit 사용 가능</small></div>
+            <span class="go">내 선물함</span>
+        </a>
+    }
+
+    @* ── 나의 도토리 구성 + 비율 막대 ── *@
+    <div class="sec">
+        <span class="secT">@ConstatsCommon.myDoToRi 구성</span>
+        <span class="secS">네 가지 합산</span>
+    </div>
+    <div class="stack" role="img" aria-label="@ConstatsCommon.myDoToRi 구성 비율">
+        @foreach (var p in parts.Where(x => x.Val > 0))
+        {
+            <i style="flex:@p.Val;background:@p.Color" title="@p.Name @Pct(p.Val)%"></i>
+        }
+    </div>
+    @foreach (var p in parts)
+    {
+        <a class="ln" href="@p.Url">
+            <span class="sw" style="background:@p.Color"></span>
+            <span class="lnT">
+                <span class="lnN" style="display:block">@p.Name</span>
+                <span class="lnS" style="display:block">@p.Sub</span>
+                <span class="mini" style="display:block"><i style="width:@(Pct(p.Val))%;background:@p.Color"></i></span>
+            </span>
+            <span class="lnV">@N(p.Val)<u>점</u><span class="pct" style="display:block">@(Pct(p.Val))%</span></span>
+            <span class="go2">›</span>
+        </a>
+    }
+
+    @* ── 따로 보는 기록 ── *@
+    <div class="sec">
+        <span class="secT">따로 보는 기록</span>
+        <span class="secS">@(ConstatsCommon.myDoToRi)와 별도</span>
+    </div>
+    <div class="ln">
+        <span class="lnT">
+            <span class="lnN" style="display:block">전도상</span>
+            <span class="lnS" style="display:block">친구에게 교회 이야기를 전해요</span>
+        </span>
+        <span class="lnV">@N(Model.EvangelismCount)<u>명</u></span>
+        <span class="go2"></span>
+    </div>
+    <a class="ln" href="@urlBibleReading">
+        <span class="lnT">
+            <span class="lnN" style="display:block">@ConstatsCommon.ReadBibleAllTitleButton</span>
+            <span class="lnS" style="display:block">진행률만 보여요</span>
+            @* 통독률 — 장 기준 · 소수 1자리 (홈 · 성경통독 · 오늘의 말씀과 같은 값, 2026-10-04) *@
+            <span class="mini" style="display:block"><i style="width:@(Model.BibleReadRate.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))%;background:#2F80ED"></i></span>
+        </span>
+        <span class="lnV">@(Model.BibleReadRate.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))<u>%</u></span>
+        <span class="go2">›</span>
+    </a>
+
+    @* ── 더보기 ── *@
+    <div class="sec">
+        <span class="secT">더보기</span>
+        <span class="secS"></span>
+    </div>
+    @if (isStudent)
+    {
+        <a class="ln" href="@urlGift"><span class="lnT lnM">내 선물함</span><span class="go2">›</span></a>
+    }
+    <a class="ln" href="@urlIntegratedRank"><span class="lnT lnM">친구들 현황 한눈에 보기</span><span class="go2">›</span></a>
+    @if (isAdmin || isSuperAdmin)
+    {
+        <a class="ln" href="/StudentPointDashboard4/AdminPurchaseList"><span class="lnT lnM">선물 받는 친구들</span><span class="go2">›</span></a>
+    }
+
+    <div class="foot">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+</div>
+
+@* 다른 화면으로 가는 모든 링크를 누르면 '잠시만 기다려 주세요' 대기 카드를 먼저 보여 준다 (DailyMission4 공통 부품) *@
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+
+</body>
+</html>

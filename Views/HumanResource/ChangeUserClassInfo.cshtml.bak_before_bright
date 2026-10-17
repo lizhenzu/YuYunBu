@@ -1,0 +1,205 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model UserInfo
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Information Change</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+          /*  background-color: #fff;*/
+            padding: 20px;
+            border-radius: 8px;
+          /*  box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);*/
+            width: 400px;
+            min-height: 200px; /* 최소 높이 설정 */
+            overflow: visible; /* 자식 요소 잘리지 않게 설정 */
+
+            text-align: center;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+            .form-group label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+
+            .form-group input {
+                width: 100%;
+                padding: 10px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                font-size: 16px;
+            }
+
+                /* readonly 필드에 다른 스타일 적용 */
+                .form-group input[readonly] {
+                    background-color: #e9ecef; /* 회색 배경 */
+                    color: #6c757d; /* 텍스트 색상 */
+                    border-color: #ced4da; /* 테두리 색상 */
+                }
+
+        .profile-pic {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin-bottom: 20px;
+            object-fit: cover;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: space-between;
+        }
+
+            .buttons button {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+            }
+
+        .save-btn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .cancel-btn {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.3/dist/jquery.validate.min.js"></script>
+    <style>
+        .form-group input {
+            width: 95%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box; /* Ensures padding and borders are included in the width */
+            margin-left: 10px; /* Optional: Adds left margin */
+            margin-right: 10px; /* Optional: Adds right margin */
+        }
+
+    </style>
+
+
+
+</head>
+<body>
+    @{
+        string deptString = $"현재 {@ViewData["DeptNM"]}의 {@ViewData["RoleNM"]}를 선택하셨습니다.";
+    }
+    
+    <div class="container">
+        <h2>주일학교부서 정보변경</h2>
+      @*  <img id="myImage" src="@Model.ProfilePicturePath" alt="Profile Picture"  style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); margin-top: 160px; position: relative; z-index: 10;">
+*@
+        <h3>이름 : @Model.FullName</h3>
+        <h4>@deptString</h4>
+        
+
+        <h4>학년 반을 입력해 주세요</h4>
+        <form action="/HumanResource/ChangeUserClassInfoProcess" method="POST">
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="form-group">
+                <label asp-for="@Model.ClassYear"></label>
+                <input asp-for="ClassYear" placeholder=@Html.DisplayNameFor(model => model.ClassYear) class="form-control" style="text-align:right;" />
+                <span asp-validation-for="ClassYear" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="@Model.ClassBan"></label>
+                <input asp-for="ClassBan" placeholder=@Html.DisplayNameFor(model => model.ClassBan) class="form-control" style="text-align:right;" />
+                <span asp-validation-for="ClassBan" class="text-danger"></span>
+            </div>
+            <div class="buttons">
+                <button type="button" class="cancel-btn" onclick="window.location.href='/HumanResource/ManageUserInfo?UserId=@Model.UserId';">Home(정보변경)</button>
+                <button type="button" onclick="window.location.href='/HumanResource/ChangeUseRoleMain?UserId=@Model.UserId&DeptCode=@Model.DeptCode&DeptNM=@Model.DeptNM';">이전화면</button>
+                <button type="submit" class="save-btn">저장</button>
+            </div>
+            <input type="hidden" id="UserId" name="UserId" value="@Model.UserId" />
+            <input type="hidden" id="DeptCode" name="DeptCode" value="@ViewData["DeptCode"]" />
+            <input type="hidden" id="DeptNM" name="DeptNM" value="@ViewData["DeptNM"]" />
+            <input type="hidden" id="RoleCode" name="RoleCode" value="@ViewData["RoleCode"]" />
+            <input type="hidden" id="RoleNM" name="RoleNM" value="@ViewData["RoleNM"]" />
+        </form>
+    </div>
+    <script>
+        function showLoading() {
+            $('#loadingOverlay').show();
+            $('body').addClass('disable-input');
+        }
+
+        function hideLoading() {
+            $('#loadingOverlay').hide();
+            $('body').removeClass('disable-input');
+        }
+
+    </script>
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+
+    </script>
+
+    <script>
+        function loadLatestImage() {
+            const imageElement = document.getElementById('myImage');
+            const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+            imageElement.src = `@Model.ProfilePicturePath?${timestamp}`;
+        }
+
+        // 페이지 로드 시 실행 또는 필요할 때 호출
+        window.onload = loadLatestImage;
+                // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+    </script>
+</body>
+</html>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

@@ -1,0 +1,237 @@
+@model IEnumerable<BulletinBoard.Models.AwardItem>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    선물 목록(구경) — 성경통독 · 생일 · 새친구 · 특별.  종류만 다르고 화면은 하나.
+    DailyMission4 밝은 흰색 버전.  선물 고르기(GiftSelect) 와 같은 격자를 쓴다.  사진을 누르면 상세.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var option      = (ViewBag.ProductDisplayOpton + "").Trim();
+    var optionLower = option.ToLowerInvariant();
+
+    bool isChallenge = optionLower == ProductDisplayOpton.challengeMissionBible.ToString().ToLowerInvariant();
+    bool isBirth     = optionLower == ProductDisplayOpton.birth.ToString().ToLowerInvariant();
+    bool isNewComer  = optionLower == ProductDisplayOpton.newComer.ToString().ToLowerInvariant();
+    bool isSpecial   = optionLower == ProductDisplayOpton.Special.ToString().ToLowerInvariant();
+
+    string pageTitle =
+        isChallenge ? $"{ConstatsCommon.ReadBibleAllTitleButton} 선물" :
+        isBirth     ? "생일 선물" :
+        isNewComer  ? "새친구 선물" :
+        isSpecial   ? "특별 선물" : "선물 목록";
+
+    string why =
+        isChallenge ? $"{ConstatsCommon.myDoToRi}를 모으면 단계마다 고를 수 있는 선물이에요. 고르는 곳은 나의 선물함." :
+        isBirth     ? "생일이 가까워지면 선물함에서 고를 수 있어요. 마음이 바뀌면 다시 골라도 돼요." :
+        isNewComer  ? "처음 온 친구와 등반한 친구에게 드리는 환영 선물이에요." :
+        isSpecial   ? "특별한 날을 위해 준비한 선물이에요." :
+        "받을 수 있는 선물을 미리 구경해요.";
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isAdmin || isSuperAdmin;
+
+    // 가격이 0인 품목은 SuperAdmin 만 본다 (예전 규칙 그대로)
+    var items = (Model ?? Enumerable.Empty<BulletinBoard.Models.AwardItem>())
+                .Where(x => isSuperAdmin || x.UnitPrice > 0).ToList();
+
+    string N(int v) => v.ToString("N0");
+    var priced = items.Where(x => x.UnitPrice > 0).Select(x => x.UnitPrice).ToList();
+    string rangeText = priced.Count == 0 ? "" : (priced.Min() == priced.Max() ? N(priced.Min()) : $"{N(priced.Min())} ~ {N(priced.Max())}");
+
+    // 종류 = 상품명별 묶음 (GiftSelect 와 같은 꼬리표)
+    string Kind(BulletinBoard.Models.AwardItem x) => string.IsNullOrWhiteSpace(x.ProductName) ? "기타" : x.ProductName.Trim();
+    var kinds = items.GroupBy(Kind).Select(g => new { Name = g.Key, Count = g.Count() })
+                     .OrderByDescending(g => g.Count).ThenBy(g => g.Name).ToList();
+
+    string returnUrl = (Context?.Request?.Path ?? "/") + (Context?.Request?.QueryString.ToString() ?? "");
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    var tabs = new[]
+    {
+        (Key: "display",  Label: ConstatsCommon.ReadBibleAllTitleButton, On: isChallenge),
+        (Key: "birth",    Label: "생일",   On: isBirth),
+        (Key: "newComer", Label: "새친구", On: isNewComer),
+        (Key: "Special",  Label: "특별",   On: isSpecial),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@pageTitle — @ConstatsCommon.MainKeyTitle</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+<style>
+    .pw { max-width: 920px; }
+    .pW { margin-top: 8px; font-size: 13px; line-height: 1.7; color: #6B7280; word-break: keep-all; }
+    .pSum { margin-top: 10px; font-size: 12px; color: #9CA3AF; display: flex; gap: 10px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+    .pSum b { font-weight: 700; color: #2B5FA8; }
+
+    /* 종류 탭 (알약) */
+    .pTabs { display: flex; gap: 6px; margin-top: 16px; overflow-x: auto; scrollbar-width: none; }
+    .pTabs::-webkit-scrollbar { display: none; }
+    .pTabs a { flex: none; padding: 8px 15px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; white-space: nowrap; }
+    .pTabs a:hover { color: #2F80ED; }
+    .pTabs a.on { background: #2F80ED; color: #fff; font-weight: 800; }
+
+    .pHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .pHeadS { font-size: 12px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+
+    /* 종류 거르기 */
+    .pChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .pChip { font-size: 12.5px; padding: 6px 12px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+    .pChip b { font-weight: 400; color: #9CA3AF; margin-left: 4px; }
+    .pChip:hover { color: #2F80ED; }
+    .pChip.on { background: #EAF2FD; color: #2B5FA8; font-weight: 700; }
+    .pChip.on b { color: #2B5FA8; }
+
+    /* 격자 : 모바일 2열 → 3 · 4열 */
+    .pGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; margin-top: 16px; }
+    .pCard { display: flex; flex-direction: column; min-width: 0; }
+    .pCard[hidden] { display: none; }
+    .pImg { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; background: #F4F6F9; overflow: hidden; }
+    .pImg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .pPt { position: absolute; left: 6px; bottom: 6px; padding: 2px 9px; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 11px; font-weight: 700; }
+    .pPrice { position: absolute; right: 6px; bottom: 6px; padding: 2px 9px; border-radius: 999px; background: rgba(17,24,39,.78); color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .pNm { margin-top: 8px; font-size: 14px; font-weight: 700; color: #111827; line-height: 1.4; word-break: keep-all; }
+    .pNm a:hover, .pCard:hover .pNm { color: #2F80ED; }
+    .pDs { margin-top: 3px; font-size: 12px; color: #9CA3AF; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+    .pFt { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12px; font-weight: 700; }
+    .pFt a { color: #2F80ED; white-space: nowrap; }
+    .pFt a:hover { color: #1F6FDB; }
+    .pEmpty { padding: 48px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+
+    @@media (min-width: 560px) { .pGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @@media (min-width: 860px) { .pGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+
+<div class="pw">
+    <div class="pbar">
+        <span><a href="/">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Present/Kind">선물 목록</a></span>
+        <span>@dateText</span>
+    </div>
+
+    <div class="pK">잠실새내 유년부 입니다.</div>
+    <h1 class="pT">@pageTitle</h1>
+    <div class="pW">@why</div>
+    <div class="pSum">
+        <span>선물 @(items.Count)종@(kinds.Count > 1 ? $" · {kinds.Count}가지" : "")</span>
+        @if (isStaff && rangeText != "")
+        {
+            <b>@rangeText credit</b>
+        }
+    </div>
+
+    <div class="pTabs">
+        @foreach (var t in tabs)
+        {
+            <a href="/Present/ListPresent?productDisplayOpton=@t.Key" class="@(t.On ? "on" : "")">@t.Label</a>
+        }
+    </div>
+
+    @if (items.Count == 0)
+    {
+        <div class="pEmpty">아직 준비된 선물이 없어요.</div>
+    }
+    else
+    {
+        <section class="psec">
+            <div class="pHead">
+                <span class="psecT">구경하기</span>
+                <span class="pHeadS" id="gsCount">@(items.Count)종</span>
+            </div>
+
+            @if (kinds.Count > 1)
+            {
+                <div class="pChips" id="gsChips">
+                    <button type="button" class="pChip on" data-kind="">전체<b>@items.Count</b></button>
+                    @foreach (var k in kinds)
+                    {
+                        <button type="button" class="pChip" data-kind="@k.Name">@k.Name<b>@k.Count</b></button>
+                    }
+                </div>
+            }
+
+            <div class="pGrid" id="gsGrid">
+                @foreach (var item in items)
+                {
+                    string detailUrl = $"/Present/Detail?productId={item.ProductID}&returnUrl={Uri.EscapeDataString(returnUrl)}&productDisplayOpton={Uri.EscapeDataString(option)}";
+                    <article class="pCard" data-kind="@Kind(item)">
+                        <a class="pImg" href="@detailUrl" title="@item.ProductName 자세히">
+                            <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" loading="lazy"
+                                 onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                            @if (isChallenge && !string.IsNullOrWhiteSpace(item.PointRequirement))
+                            {
+                                <span class="pPt">@item.PointRequirement</span>
+                            }
+                            @if (isStaff && item.UnitPrice > 0)
+                            {
+                                <span class="pPrice">@N(item.UnitPrice) credit</span>
+                            }
+                        </a>
+                        <div class="pNm"><a href="@detailUrl">@item.ProductName</a></div>
+                        @if (!string.IsNullOrWhiteSpace(item.ProductDescription))
+                        {
+                            <div class="pDs">@item.ProductDescription</div>
+                        }
+                        <div class="pFt">
+                            <a href="@detailUrl">자세히</a>
+                            @if (isStaff && !string.IsNullOrWhiteSpace(item.ExternalUrl))
+                            {
+                                <a href="@item.ExternalUrl" target="_blank" rel="noopener noreferrer">쿠팡</a>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <div class="pft">
+        <span>© 유년부 · 선물</span>
+        <span>
+            @if (isChallenge) { <a href="/Home/MissionMainBoard">@ConstatsCommon.MainKeyTitle</a><text> · </text> }
+            <a href="/Present/Kind">선물 목록</a> · <a href="/">@ConstatsCommon.ToHome</a>
+        </span>
+    </div>
+</div>
+
+<script>
+    // 종류 거르기 (GiftSelect 와 같은 동작)
+    (function () {
+        var chips = document.getElementById('gsChips');
+        if (!chips) return;
+        var cards = Array.prototype.slice.call(document.querySelectorAll('#gsGrid .pCard'));
+        var count = document.getElementById('gsCount');
+        chips.addEventListener('click', function (e) {
+            var btn = e.target.closest('.pChip');
+            if (!btn) return;
+            var kind = btn.getAttribute('data-kind') || '';
+            chips.querySelectorAll('.pChip').forEach(function (c) { c.classList.toggle('on', c === btn); });
+            var n = 0;
+            cards.forEach(function (c) {
+                var show = !kind || c.getAttribute('data-kind') === kind;
+                if (show) { c.removeAttribute('hidden'); n++; } else { c.setAttribute('hidden', ''); }
+            });
+            if (count) count.textContent = n + '종';
+        });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,229 @@
+@model BulletinBoard.Models.FamilyPhoto.FamilyPhotoManageVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+
+@*  STEP 2 — 사진 3칸.  칸마다 사진 고르기(바로 올라감) · 설명 · 지우기.  기간이 끝나면 읽기만. *@
+
+@{
+    Layout = null;
+    var e = Model.Entry;
+    string DM(DateTime d) => $"{d.Month}.{d.Day}";
+    var bySlot = e.Photos.ToDictionary(p => p.Slot, p => p);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@e.FamilyName 사진 — @ConstatsCommon.MainKeyTitle</title>
+<partial name="_FamilyPhotoStyle" />
+<style>
+    .qz .slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+    .qz .slot { border: 1px solid var(--rule); background: #fff; padding: 8px; display: flex; flex-direction: column; }
+    .qz .slot .im { position: relative; aspect-ratio: 1 / 1; background: repeating-linear-gradient(45deg, #EFEDE8 0 6px, #E7E4DE 6px 12px); display: grid; place-items: center; font-size: 10px; letter-spacing: .14em; color: var(--dim); overflow: hidden; }
+    .qz .slot .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .qz .slot .im.empty { background: transparent; border: 1px dashed #D6CBB7; cursor: pointer; }
+    .qz .slot .im.empty:hover { border-color: var(--acc); color: var(--acc); }
+    .qz .slot .im .no { position: absolute; left: 5px; top: 5px; font-family: "Inter", sans-serif; font-weight: 300; font-size: 10px; background: rgba(247,246,243,.9); color: var(--dim2); padding: 2px 6px; }
+    .qz .slot input[type=file] { display: none; }
+    .qz .slot input.cap { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--rule); padding: 7px 2px; font: inherit; font-size: 11.5px; margin-top: 6px; background: transparent; outline: none; }
+    .qz .slot input.cap:focus { border-bottom-color: var(--acc); }
+    .qz .slot .ops { display: flex; justify-content: space-between; gap: 6px; margin-top: 8px; }
+    .qz .slot .ops button, .qz .slot .ops label { font-family: inherit; font-size: 9.5px; letter-spacing: .1em; color: var(--dim2); background: none; border: 0; padding: 0; cursor: pointer; }
+    .qz .slot .ops button:hover, .qz .slot .ops label:hover { color: var(--acc); }
+    .qz .slot .ops button.del { color: var(--warn); }
+    /* ── 올리는 중 진행 카드 ── */
+    .upMask { display: none; position: fixed; inset: 0; background: rgba(22,24,28,.6); z-index: 9500; align-items: center; justify-content: center; padding: 18px; }
+    .upMask.on { display: flex; }
+    .upCard { background: #F7F6F3; border: 1px solid #16181C; width: 100%; max-width: 380px; padding: 22px 22px 20px; text-align: left;
+              font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; color: #16181C; }
+    .upK { font-size: 10px; font-weight: 600; letter-spacing: .24em; color: #9A7B4F; }
+    .upT { font-family: "Noto Serif KR", serif; font-size: 18px; margin-top: 8px; line-height: 1.4; }
+    .upF { font-size: 11.5px; color: #83868C; margin-top: 6px; word-break: break-all; line-height: 1.6; }
+    .upBar { margin-top: 16px; height: 6px; background: #E2E0DB; position: relative; overflow: hidden; }
+    .upBar i { display: block; height: 100%; width: 0; background: #9A7B4F; transition: width .25s ease; }
+    .upBar.wait i { width: 30% !important; animation: upSlide 1.1s ease-in-out infinite; }
+    @@keyframes upSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(340%); } }
+    .upPct { display: flex; justify-content: space-between; margin-top: 8px; font-family: "Inter", sans-serif; font-weight: 300; font-size: 12px; color: #5C5F66; font-variant-numeric: tabular-nums; }
+    .upMsg { margin-top: 14px; font-size: 11.5px; color: #83868C; line-height: 1.7; word-break: keep-all; }
+    .upErr { margin-top: 14px; padding: 10px 12px; background: #F3E4DC; color: #B4531F; font-size: 12px; line-height: 1.6; display: none; }
+    .upCard.err .upErr { display: block; }
+    .upCard.err .upBar, .upCard.err .upPct { display: none; }
+    .upBtn { display: none; width: 100%; margin-top: 14px; padding: 11px; border: 1px solid #16181C; background: #16181C; color: #F7F6F3; font: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
+    .upCard.err .upBtn { display: block; }
+    @@media (max-width: 480px) { .qz .slots { grid-template-columns: 1fr; } .qz .slot .im { aspect-ratio: 4 / 3; } }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/FamilyPhoto">가족 사진</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>내 가족</em></span>
+            </div>
+            <div class="qzDate">@DM(Cfg.UploadStart) –</div>
+        </div>
+
+        <div class="brK">STEP 2 · 사진 @(Cfg.MaxPhotos)장</div>
+        <div class="brH1"><b>@e.FamilyName</b> 사진</div>
+        <div class="brSum">
+            @if (Model.CanUpload)
+            {
+                <text>한 장에 @(Cfg.MaxFileBytes / 1024 / 1024)MB까지 · 세로든 가로든 괜찮아요 · 설명은 @(Cfg.CaptionMax)자까지. 사진을 고르면 바로 올라가요.</text>
+            }
+            else
+            {
+                <text>사진 올리기 기간이 끝나서 지금은 보기만 할 수 있어요.</text>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Error)) { <div class="msg err">@Model.Error</div> }
+        @if (!string.IsNullOrWhiteSpace(Model.Toast)) { <div class="msg">@Model.Toast</div> }
+        @if (e.IsHidden) { <div class="msg err">이 가족은 관리자가 보류해 두었어요. 갤러리에는 보이지 않아요.</div> }
+
+        <div class="slots">
+            @for (int slot = 1; slot <= Cfg.MaxPhotos; slot++)
+            {
+                bySlot.TryGetValue(slot, out var p);
+                <div class="slot">
+                    @if (p != null)
+                    {
+                        <div class="im"><img src="@p.ThumbPath" alt="" /><span class="no">@slot</span></div>
+                        @if (Model.CanUpload)
+                        {
+                            <form method="post" action="/FamilyPhoto/Caption">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="slot" value="@slot" />
+                                <input class="cap" name="caption" maxlength="@Cfg.CaptionMax" value="@(p.Caption ?? "")" placeholder="설명 (선택) · 바꾸고 Enter" />
+                            </form>
+                            <div class="ops">
+                                <form method="post" action="/FamilyPhoto/Upload" enctype="multipart/form-data" data-up>
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="slot" value="@slot" />
+                                    <input type="hidden" name="caption" value="@(p.Caption ?? "")" />
+                                    <label>바꾸기<input type="file" name="file" accept="image/*" /></label>
+                                </form>
+                                <form method="post" action="/FamilyPhoto/Remove" onsubmit="return confirm('이 사진을 지울까요? 받은 좋아요도 같이 지워져요.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="slot" value="@slot" />
+                                    <button type="submit" class="del">지우기</button>
+                                </form>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cap" style="font-size:11.5px;color:var(--dim2);margin-top:6px">@(p.Caption ?? "")</div>
+                        }
+                    }
+                    else if (Model.CanUpload)
+                    {
+                        <form method="post" action="/FamilyPhoto/Upload" enctype="multipart/form-data" data-up>
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="slot" value="@slot" />
+                            <label class="im empty">+ 사진 @slot<input type="file" name="file" accept="image/*" /></label>
+                            <input class="cap" name="caption" maxlength="@Cfg.CaptionMax" placeholder="설명 (선택) · 사진 고르기 전에 적어요" />
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="im" style="background:transparent;border:1px dashed var(--rule)">비어 있음</div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="acts">
+            <a class="btn" href="/FamilyPhoto">갤러리 보기 →</a>
+            <form method="post" action="/FamilyPhoto/Leave" style="flex:1 1 160px;display:flex">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn line" style="flex:1">다른 가족으로 들어가기</button>
+            </form>
+            @if (Model.CanUpload)
+            {
+                <form method="post" action="/FamilyPhoto/DeleteEntry" style="flex:1 1 160px;display:flex" onsubmit="return confirm('가족 참가를 취소할까요? 사진과 좋아요가 모두 지워져요.');">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn line" style="flex:1;color:var(--warn)">참가 취소</button>
+                </form>
+            }
+        </div>
+
+        <div class="hint">올리면 바로 갤러리에 보여요. 다른 사람 얼굴이 크게 나온 사진은 그분 허락을 받고 올려 주세요. 아이폰 사진이 안 올라가면 카톡으로 한 번 보낸 사진을 쓰면 돼요.</div>
+
+        <div class="brFoot"><a href="/FamilyPhoto">갤러리로 →</a></div>
+
+    </div>
+</div>
+
+<div class="upMask" id="upMask" aria-hidden="true">
+    <div class="upCard" id="upCard" role="dialog" aria-modal="true">
+        <div class="upK">UPLOADING</div>
+        <div class="upT" id="upT">사진을 올리는 중이에요</div>
+        <div class="upF" id="upF"></div>
+        <div class="upBar" id="upBar"><i id="upFill"></i></div>
+        <div class="upPct"><span id="upPct">0%</span><span id="upSize"></span></div>
+        <div class="upMsg" id="upMsg">사진이 크면 조금 걸려요. 화면을 닫지 말고 잠시만 기다려 주세요.</div>
+        <div class="upErr" id="upErr"></div>
+        <button type="button" class="upBtn" id="upClose">닫기</button>
+    </div>
+</div>
+
+<script>
+    // 파일을 고르면 바로 보낸다 — XHR 로 보내서 진행률을 카드에 보여 준다
+    (function () {
+        var mask = document.getElementById('upMask'), card = document.getElementById('upCard');
+        var fill = document.getElementById('upFill'), bar = document.getElementById('upBar');
+        var pct = document.getElementById('upPct'), size = document.getElementById('upSize');
+        var tEl = document.getElementById('upT'), fEl = document.getElementById('upF'), msgEl = document.getElementById('upMsg'), errEl = document.getElementById('upErr');
+        function mb(n) { return (n / 1024 / 1024).toFixed(1) + 'MB'; }
+        function show() { card.classList.remove('err'); mask.classList.add('on'); mask.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
+        function hide() { mask.classList.remove('on'); mask.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+        function fail(m) { card.classList.add('err'); tEl.textContent = '올리지 못했어요'; errEl.textContent = m || '잠시 후 다시 해 주세요.'; msgEl.textContent = ''; }
+        document.getElementById('upClose').addEventListener('click', hide);
+
+        document.querySelectorAll('form[data-up] input[type=file]').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                if (!inp.files || !inp.files.length) return;
+                var f = inp.files[0];
+                if (f.size > @Cfg.MaxFileBytes) { alert('사진은 한 장에 @(Cfg.MaxFileBytes / 1024 / 1024)MB까지예요.'); inp.value = ''; return; }
+
+                tEl.textContent = '사진을 올리는 중이에요'; fEl.textContent = f.name + ' · ' + mb(f.size);
+                msgEl.textContent = '사진이 크면 조금 걸려요. 화면을 닫지 말고 잠시만 기다려 주세요.';
+                fill.style.width = '0%'; pct.textContent = '0%'; size.textContent = '0 / ' + mb(f.size); bar.classList.remove('wait');
+                show();
+
+                var form = inp.form;
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', form.getAttribute('action'), true);
+                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+                xhr.upload.onprogress = function (e) {
+                    if (!e.lengthComputable) return;
+                    var p = Math.round(e.loaded * 100 / e.total);
+                    fill.style.width = p + '%'; pct.textContent = p + '%'; size.textContent = mb(e.loaded) + ' / ' + mb(e.total);
+                    if (p >= 100) { tEl.textContent = '사진을 정리하고 있어요'; msgEl.textContent = '크기를 맞추고 미리보기를 만드는 중이에요.'; bar.classList.add('wait'); }
+                };
+                xhr.onload = function () {
+                    var j = null; try { j = JSON.parse(xhr.responseText); } catch (e) { }
+                    if (xhr.status === 200 && j && j.ok) {
+                        bar.classList.remove('wait'); fill.style.width = '100%'; pct.textContent = '100%';
+                        tEl.textContent = '다 올렸어요'; msgEl.textContent = j.msg || '';
+                        setTimeout(function () { location.href = '/FamilyPhoto/Manage'; }, 500);
+                    } else if (j && j.redirect) {
+                        location.href = j.redirect;
+                    } else {
+                        fail((j && j.msg) || ('올리지 못했어요. (' + xhr.status + ')'));
+                    }
+                };
+                xhr.onerror = function () { fail('연결이 끊겼어요. 다시 해 주세요.'); };
+                xhr.ontimeout = function () { fail('너무 오래 걸려서 멈췄어요. 사진을 조금 줄여서 다시 해 주세요.'); };
+                xhr.timeout = 180000;
+                xhr.send(new FormData(form));
+            });
+        });
+    })();
+</script>
+</body>
+</html>

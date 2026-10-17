@@ -1,0 +1,400 @@
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    전도상 · 선물 선택 안내 — 운영 흐름(4주) · 선물 선택 방법 · 부모님께 보낼 문구.
+    DailyMission4 밝은 흰색 버전.  탭 · 복사 · 링크 열기 스크립트는 예전 안내문 그대로.
+    주소: /Admin/evangelism_reward_guide_v1
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>전도상 · 선물 선택 안내</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; }
+    .sh { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+
+    /* 머리 */
+    .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+    .hdTop a { color: #374151; }
+    .hdTop a:hover { color: #2F80ED; }
+    .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+    .hdAct { display: flex; gap: 12px; font-weight: 700; }
+    .hdAct a, .hdAct button { color: #2F80ED; background: none; border: 0; padding: 0; font: inherit; font-weight: 700; cursor: pointer; }
+    .hdAct a:hover, .hdAct button:hover { color: #1F6FDB; }
+    .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+    .hdS { margin-top: 6px; font-size: 12.5px; color: #9CA3AF; }
+
+    /* 탭 */
+    .tabs { display: flex; gap: 6px; margin-top: 16px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { flex: 1; min-width: max-content; padding: 10px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .tab:hover { color: #2F80ED; }
+    .tab[aria-selected="true"] { background: #2F80ED; color: #fff; font-weight: 800; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* 구역 */
+    .sec { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+    .secT { font-size: 16px; font-weight: 800; color: #111827; }
+    .secD { margin-top: 4px; font-size: 12.5px; line-height: 1.7; color: #9CA3AF; }
+
+    /* 주차 줄 */
+    .wk { display: flex; gap: 14px; padding: 18px 0; border-bottom: 1px solid #EEF0F3; scroll-margin-top: 10px; }
+    .wk:last-of-type { border-bottom: 0; }
+    .wkNo { flex: none; width: 34px; font-size: 20px; font-weight: 300; color: #8DB5F3; line-height: 1.4; font-variant-numeric: tabular-nums; }
+    .wkBd { flex: 1; min-width: 0; }
+    .wkH { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .wkH h3 { margin: 0; font-size: 15.5px; font-weight: 800; color: #111827; line-height: 1.45; }
+    .wkM { margin-top: 3px; font-size: 12.5px; line-height: 1.65; color: #9CA3AF; word-break: keep-all; }
+    .tag { flex: none; padding: 2px 10px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .tag.warn { background: #FBEFE7; color: #B4531F; }
+    ul.ls { margin: 10px 0 0; padding: 0 0 0 18px; font-size: 14px; line-height: 1.75; color: #374151; }
+    ul.ls li { margin: 4px 0; word-break: keep-all; }
+    ul.ls b { font-weight: 800; color: #111827; }
+
+    /* 강조 상자 */
+    .co { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: #EAF2FD; }
+    .co h4 { margin: 0 0 3px; font-size: 13px; font-weight: 800; color: #2B5FA8; }
+    .co p { margin: 0; font-size: 13px; line-height: 1.7; color: #6B7280; word-break: keep-all; }
+    .co p b { color: #111827; font-weight: 800; }
+    .co.warn { background: #FBEFE7; }
+    .co.warn h4 { color: #B4531F; }
+
+    /* 링크 · 문구 상자 */
+    .lk { margin-top: 10px; padding: 14px 16px; border-radius: 12px; background: #F4F6F9; }
+    .lkL { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 800; color: #111827; }
+    .lkL small { font-size: 12px; font-weight: 400; color: #9CA3AF; }
+    .url { margin: 6px 0 0; font-size: 12.5px; line-height: 1.7; color: #6B7280; word-break: break-all; }
+    .url.msg { white-space: pre-wrap; margin-top: 8px; color: #374151; font-size: 13.5px; line-height: 1.85; word-break: keep-all; }
+    .lkB { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .sb { padding: 8px 16px; border: 0; border-radius: 999px; background: #fff; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .sb:hover { color: #2F80ED; }
+    .sb.pri { background: #2F80ED; color: #fff; font-weight: 800; }
+    .sb.pri:hover { background: #1F6FDB; color: #fff; }
+
+    .note { margin-top: 14px; padding: 12px 14px; border-radius: 12px; background: #F4F6F9; font-size: 12.5px; line-height: 1.8; color: #6B7280; }
+    .note b { color: #111827; }
+    .back { display: inline-block; margin-top: 14px; padding: 10px 18px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .back:hover { color: #2F80ED; }
+
+    .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+    .ft a { color: #6B7280; }
+    .ft a:hover { color: #2F80ED; }
+
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 10px 20px; border-radius: 999px; background: #111827; color: #fff; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease; z-index: 99; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+    @@media print {
+        .hdAct, .tabs, .toast, .back { display: none !important; }
+        .panel { display: block !important; }
+    }
+</style>
+</head>
+<body>
+
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Admin/LifeGuide">생활가이드</a></span>
+        <span class="hdAct">
+            <button type="button" onclick="window.print()">인쇄</button>
+            <button type="button" onclick="copyAll()">전체 복사</button>
+            <a href="#links" onclick="jumpTo('links'); return false;">링크 바로가기</a>
+        </span>
+    </div>
+
+    <div class="hdK">총 4주 운영 · 기록 불필요 · 로그인 없이 선물 선택</div>
+    <h1 class="hdT">전도상 · 선물 선택 안내</h1>
+    <div class="hdS">4주 진행 · 링크 안내(3주차) · 캡처로 확인</div>
+
+    <!-- 탭 -->
+    <div class="tabs" role="tablist" aria-label="안내 탭">
+        <button class="tab" id="tab-flow" role="tab" aria-selected="true" aria-controls="panel-flow" onclick="openTab('flow')">운영 흐름</button>
+        <button class="tab" id="tab-how" role="tab" aria-selected="false" aria-controls="panel-how" onclick="openTab('how')">선물 선택 방법</button>
+        <button class="tab" id="tab-msg" role="tab" aria-selected="false" aria-controls="panel-msg" onclick="openTab('msg')">부모님께 보낼 문구</button>
+    </div>
+
+    <!-- 운영 흐름 -->
+    <section class="panel active" id="panel-flow" aria-labelledby="tab-flow">
+
+        <section class="wk" id="week1">
+            <div class="wkNo">1</div>
+            <div class="wkBd">
+                <div class="wkH"><h3>1주차 · 전도자 선물 제공</h3><span class="tag">즉시 지급</span></div>
+                <div class="wkM">전도자(초대한 아이)에게 “감사”의 의미로 소정의 선물을 제공합니다.</div>
+                <ul class="ls">
+                    <li><b>대상:</b> 전도자(초대한 아이)</li>
+                    <li><b>내용:</b> 소정의 선물 제공</li>
+                </ul>
+                <div class="co">
+                    <h4>핵심</h4>
+                    <p>1주차에는 “감사 선물”로 운영하고, 본 선물(선택 선물)은 4주차에 전달합니다.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="wk" id="week23">
+            <div class="wkNo">2~3</div>
+            <div class="wkBd">
+                <div class="wkH"><h3>2~3주차 · 추가 선물 없음</h3><span class="tag warn">선물 없음</span></div>
+                <div class="wkM">운영의 일관성을 위해 2~3주차에는 별도 선물을 제공하지 않습니다.</div>
+                <ul class="ls">
+                    <li><b>2~3주차</b>에는 별도의 선물이 없습니다.</li>
+                    <li>대신 <b>3주차에 링크 안내</b>로 선물 선택을 진행합니다.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="wk" id="week3">
+            <div class="wkNo">3</div>
+            <div class="wkBd">
+                <div class="wkH"><h3>3주차 · 부모님께 링크 안내</h3><span class="tag">링크 안내</span></div>
+                <div class="wkM">새친구/전도자 부모님께 링크를 보내고, 선물 선택 화면을 “캡처”로 받습니다.</div>
+                <ul class="ls">
+                    <li><b>새친구 부모님</b>과 <b>전도자 부모님</b>께 아래 링크를 각각 발송합니다.</li>
+                    <li>부모님이 홈페이지를 보고 <b>원하는 선물을 고른 뒤</b> 해당 화면을 <b>캡처</b>합니다.</li>
+                    <li>캡처 이미지를 <b>선물 담당 선생님</b>께 보내주시면 됩니다.</li>
+                </ul>
+                <div class="co">
+                    <h4>로그인 없이 선물 선택 가능</h4>
+                    <p>선물은 별도로 기록할 필요가 없으므로, <b>로그인 없이</b> 선물 리스트를 확인하고 선택할 수 있습니다. 선택한 선물 화면을 <b>캡처</b>하여 선물 담당 선생님께 보내주세요.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="wk" id="week4">
+            <div class="wkNo">4</div>
+            <div class="wkBd">
+                <div class="wkH"><h3>4주차 · 선물 전달</h3><span class="tag">전달</span></div>
+                <div class="wkM">3주차에 받은 “캡처” 기준으로 선물을 준비하여 전달합니다.</div>
+                <ul class="ls">
+                    <li>대상: <b>새친구</b>, <b>전도자</b></li>
+                    <li>기준: <b>캡처로 받은 선택 선물</b></li>
+                    <li>방법: 담당 선생님이 준비 후 전달</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- 링크 -->
+        <section class="sec" id="links">
+            <div class="secT">3주차 링크 (부모님께 발송용)</div>
+            <div class="secD">아래 버튼으로 바로 열거나 주소를 복사할 수 있어요.</div>
+
+            <div class="lk">
+                <div class="lkL"><span>새친구 부모님께</span><small>(선물 선택)</small></div>
+                <p class="url" id="url-newfriend">https://www.jamsilkids.com/Present/PresentForNewFriend</p>
+                <div class="lkB">
+                    <button class="sb pri" type="button" onclick="openUrl('url-newfriend')">열기</button>
+                    <button class="sb" type="button" onclick="copyTextById('url-newfriend')">주소 복사</button>
+                </div>
+            </div>
+
+            <div class="lk">
+                <div class="lkL"><span>전도자 부모님께</span><small>(선물 선택)</small></div>
+                <p class="url" id="url-inviter">https://www.jamsilkids.com/Present/PresentForInvitFriend</p>
+                <div class="lkB">
+                    <button class="sb pri" type="button" onclick="openUrl('url-inviter')">열기</button>
+                    <button class="sb" type="button" onclick="copyTextById('url-inviter')">주소 복사</button>
+                </div>
+            </div>
+
+            <div class="note">
+                <b>캡처 전송 안내</b><br />
+                · 선택한 선물 화면을 캡처하여 <b>선물 담당 선생님</b>께 보내주세요.<br />
+                · (예시) “김은경 선생님” / 부서 상황에 맞게 담당자명은 수정해 사용하시면 됩니다.
+            </div>
+        </section>
+    </section>
+
+    <!-- 선물 선택 방법 -->
+    <section class="panel" id="panel-how" aria-labelledby="tab-how">
+        <section class="sec">
+            <div class="secT">선물 선택 방법 (부모님용)</div>
+            <div class="secD">아래 순서대로 하시면 1분이면 끝나요.</div>
+            <ul class="ls">
+                <li><b>1) 링크 접속</b> → 선물 리스트 확인</li>
+                <li><b>2) 원하는 선물 고르기</b> → 해당 화면에서 멈추기</li>
+                <li><b>3) 화면 캡처</b> → 선물 담당 선생님께 전송</li>
+            </ul>
+
+            <div class="co">
+                <h4>로그인 없이 가능해요</h4>
+                <p>로그인/회원가입 없이 선물 확인 및 선택이 가능합니다. 별도 기록도 필요 없습니다.</p>
+            </div>
+            <div class="co warn">
+                <h4>캡처는 이렇게 보내주세요</h4>
+                <p>“아이 이름/반” + “선물 캡처 이미지”를 함께 보내주시면 가장 정확합니다.</p>
+            </div>
+        </section>
+
+        <section class="sec">
+            <div class="secT">빠른 체크</div>
+            <div class="secD">부모님께 안내할 때 꼭 포함하면 좋아요.</div>
+            <ul class="ls">
+                <li>로그인 필요 없음</li>
+                <li>선물 기록 필요 없음</li>
+                <li>캡처만 보내면 완료</li>
+                <li>3주차에 링크 발송</li>
+                <li>4주차에 선물 전달</li>
+            </ul>
+            <button class="back" type="button" onclick="openTab('flow')">운영 흐름으로 돌아가기</button>
+        </section>
+    </section>
+
+    <!-- 부모님께 보낼 문구 -->
+    <section class="panel" id="panel-msg" aria-labelledby="tab-msg">
+        <section class="sec">
+            <div class="secT">부모님께 보내기 좋은 문구</div>
+            <div class="secD">“새친구/전도자” 버전으로 각각 준비했어요. 복사해서 사용하세요.</div>
+
+            <div class="lk">
+                <div class="lkL"><span>새친구 부모님께 (예시)</span></div>
+                <p class="url msg" id="msg-newfriend">안녕하세요! 😊
+이번 주에 우리 유년부에 새친구로 와주셔서 정말 감사드립니다.
+
+아래 링크에서 원하시는 선물을 확인하신 뒤,
+선택하신 화면을 ‘캡처’해서 선물 담당 선생님께 보내주시면 됩니다.
+(✅ 로그인 없이 확인 가능 / 별도 기록 불필요)
+
+링크:
+https://www.jamsilkids.com/Present/PresentForNewFriend
+
+감사합니다!</p>
+                <div class="lkB">
+                    <button class="sb pri" type="button" onclick="copyTextById('msg-newfriend')">문구 복사</button>
+                </div>
+            </div>
+
+            <div class="lk">
+                <div class="lkL"><span>전도자(초대한 아이) 부모님께 (예시)</span></div>
+                <p class="url msg" id="msg-inviter">안녕하세요! 😊
+친구를 교회에 초대해 준 ○○에게 정말 고마운 마음을 전합니다.
+하나님께서도 기뻐하실 거예요!
+
+아래 링크에서 원하시는 선물을 확인하신 뒤,
+선택하신 화면을 ‘캡처’해서 선물 담당 선생님께 보내주시면 됩니다.
+(✅ 로그인 없이 확인 가능 / 별도 기록 불필요)
+
+링크:
+https://www.jamsilkids.com/Present/PresentForInvitFriend
+
+감사합니다!</p>
+                <div class="lkB">
+                    <button class="sb pri" type="button" onclick="copyTextById('msg-inviter')">문구 복사</button>
+                </div>
+            </div>
+
+            <div class="note">필요하시면 문구 안의 “담당 선생님/아이 이름/반” 부분을 실제 운영에 맞게 바꿔 사용하세요.</div>
+        </section>
+    </section>
+
+    <div class="ft"><span>© 유년부 · 전도상 안내</span><a href="/Admin/LifeGuide">생활가이드</a></div>
+</div>
+
+<div class="toast" id="toast" aria-live="polite">복사 완료!</div>
+
+<script>
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg || '완료!';
+    t.classList.add('show');
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 1200);
+  }
+
+  function openTab(key){
+    const map = {
+      flow: { tab:'tab-flow', panel:'panel-flow' },
+      how:  { tab:'tab-how',  panel:'panel-how'  },
+      msg:  { tab:'tab-msg',  panel:'panel-msg'  }
+    };
+    Object.values(map).forEach(x=>{
+      document.getElementById(x.tab).setAttribute('aria-selected', 'false');
+      document.getElementById(x.panel).classList.remove('active');
+    });
+    document.getElementById(map[key].tab).setAttribute('aria-selected', 'true');
+    document.getElementById(map[key].panel).classList.add('active');
+
+    // 패널 첫 부분으로 스크롤 살짝 유도
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function jumpTo(id){
+    openTab('flow');
+    setTimeout(function(){
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.scrollIntoView({ behavior:'smooth', block:'start' });
+    }, 60);
+  }
+
+  function getTextById(id){
+    const el = document.getElementById(id);
+    if(!el) return '';
+    return (el.innerText || el.textContent || '').trim();
+  }
+
+  async function copyText(txt){
+    try{
+      await navigator.clipboard.writeText(txt);
+      toast('복사 완료!');
+    }catch(e){
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast('복사 완료!');
+    }
+  }
+
+  function copyTextById(id){
+    const txt = getTextById(id);
+    if(!txt) return toast('복사할 내용이 없어요');
+    copyText(txt);
+  }
+
+  function openUrl(id){
+    const url = getTextById(id);
+    if(!url) return toast('URL이 없어요');
+    window.open(url, '_blank', 'noopener');
+  }
+
+  function copyAll(){
+    const lines = [];
+    lines.push('전도상 · 선물 선택 안내');
+    lines.push('');
+    lines.push('[운영 흐름]');
+    lines.push('1주차: 전도자(초대한 아이)에게 소정의 선물 제공');
+    lines.push('2~3주차: 추가 선물 없음');
+    lines.push('3주차: 부모님께 링크 안내 → 선물 선택 화면 캡처 → 담당 선생님께 전송');
+    lines.push('4주차: 캡처 기준으로 선물 전달');
+    lines.push('');
+    lines.push('[링크]');
+    lines.push('새친구: ' + getTextById('url-newfriend'));
+    lines.push('전도자: ' + getTextById('url-inviter'));
+    lines.push('');
+    lines.push('[캡처 안내]');
+    lines.push('✅ 로그인 없이 선물 선택 가능 / 별도 기록 불필요');
+    lines.push('선택한 선물 화면을 캡처하여 선물 담당 선생님께 보내주세요.');
+    copyText(lines.join('\n'));
+  }
+</script>
+</body>
+</html>

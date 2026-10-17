@@ -1,0 +1,173 @@
+﻿@{
+    Layout = null;
+}
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@*  ══════════════════════════════════════════════════════════════
+    성경미션 속으로 (갈림길) — Bone 스킨 (A안: 장부형 두 묶음)
+    도전!!! 성경말씀 / 성경 66권 완독 을 큰 숫자 + 화살표 줄로 나눈다.
+    이전 화면은 Branch_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+
+    // 도전!!! 성경말씀 총 점수 (기존 대시보드 배너와 같은 값)
+    int totalPoint = 0;
+    if (ViewBag.YearTotalPoint is int ytp)
+    {
+        totalPoint = ytp;   // 홈 · 미션홈과 같은 계산
+    }
+    else if (ViewBag.TodayCheckCompositeData != null)
+    {
+        dynamic data = ViewBag.TodayCheckCompositeData;
+        try { totalPoint = data.Total_All == null ? 0 : Convert.ToInt32(data.Total_All); } catch { totalPoint = 0; }
+    }
+
+    // 성경 66권 완독률
+    double speed = 0;
+    if (ViewBag.TotalProgressRate != null)
+    {
+        double.TryParse(ViewBag.TotalProgressRate.ToString(), out speed);
+        if (speed <= 1) speed *= 100;
+    }
+    int readPct = (int)Math.Round(Math.Clamp(speed, 0, 100));
+
+    // 최근 읽은 성경
+    string ActionSource     = HttpContextAccessor.HttpContext?.Session.GetString(MVCInfomation.ActionSource.ToString()) ?? "";
+    string ControllerSource = HttpContextAccessor.HttpContext?.Session.GetString(MVCInfomation.ControllerSource.ToString()) ?? "";
+    var lastRead = ViewBag.BibleLastReadInfo as BibleLastReadInfo;
+    string? lastReadUrl = null, lastReadLabel = null;
+    if (lastRead != null)
+    {
+        lastReadUrl = $"/DailyMission/BibleSheetJangByJang?ControllerSource={ControllerSource}&ActionSource={ActionSource}"
+                    + $"&BibleText={lastRead.BibleText}&FromJang={lastRead.Jang}&FromZul=0&ToJang={lastRead.Jang}&ToZul=0";
+        var bt = (lastRead.BibleText ?? "").Trim();
+        lastReadLabel = (!string.IsNullOrEmpty(bt) && lastRead.Jang > 0) ? $"{bt} · {lastRead.Jang}장"
+                      : !string.IsNullOrEmpty(bt) ? bt : (lastRead.Jang > 0 ? $"{lastRead.Jang}장" : "");
+    }
+
+    var today = DateHelper.GetKoreaNow().ToString("yyyy.MM.dd");
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>성경미션 속으로 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .brPgm { padding: 2px 0 18px; border-bottom: 1px solid var(--rule); }
+    .qz .brK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin-bottom: 9px; }
+    .qz .brT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 23px; line-height: 1.4; }
+    .qz .brS { font-size: 12px; color: var(--dim); margin-top: 6px; }
+
+    .qz .brSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 30px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); gap: 10px; }
+    .qz .brSecT { font-family: "Noto Serif KR", serif; font-size: 16px; }
+    .qz .brSecS { font-size: 11px; color: var(--dim); text-align: right; }
+
+    .qz .brBig { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding: 16px 2px 14px; }
+    .qz .brLbl { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--dim); }
+    .qz .brNum { font-family: "Inter", sans-serif; font-weight: 200; font-size: 44px; line-height: 1; color: var(--acc); margin-top: 7px; font-variant-numeric: tabular-nums; }
+    .qz .brNum small { font-size: 12px; font-weight: 400; color: var(--dim); margin-left: 3px; }
+    .qz .brCta { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; background: var(--tx); color: var(--bg); padding: 10px 14px; text-decoration: none; white-space: nowrap; }
+    .qz .brCta:hover { background: var(--acc); }
+
+    .qz .brProg { height: 3px; background: var(--rule); position: relative; margin: 0 2px 2px; }
+    .qz .brProg i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--acc); }
+
+    .qz .brLn { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 2px; border-bottom: 1px solid var(--rule); color: inherit; text-decoration: none; font-size: 14px; }
+    .qz .brLn:hover .brLnT { color: var(--acc); }
+    .qz .brLnT small { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; }
+    .qz .brGo { font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; line-height: 1; color: var(--acc); flex: 0 0 auto; }
+    .qz .brExt { font-size: 13px; color: var(--dim); flex: 0 0 auto; }
+    .qz .brLn.admin .brLnT { color: var(--dim2); }
+
+    .qz .brHome { margin-top: 30px; border-top: 1px solid var(--tx); }
+    .qz .brFoot { text-align: center; font-size: 10px; color: var(--dim); padding: 26px 0 8px; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="qzDate">@today</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="brPgm">
+            <div class="brK">성경미션 속으로</div>
+            <div class="brT">말씀으로 하루를 시작해요</div>
+            <div class="brS">두 가지 도전 중 하나를 골라요</div>
+        </div>
+
+        @* ══════════ 도전!!! 성경말씀 ══════════ *@
+        <div class="brSec">
+            <span class="brSecT">@ConstatsCommon.MainKeyTitle</span>
+            <span class="brSecS">말씀 · 퀴즈 · 기도 · 암송</span>
+        </div>
+        <div class="brBig">
+            <div>
+                <div class="brLbl">총 점수</div>
+                <div class="brNum">@totalPoint.ToString("N0")<small>점</small></div>
+            </div>
+            <a class="brCta" href="/DailyMission4/Index">미션홈 ›</a>
+        </div>
+        <a class="brLn" href="/DailyMission4/ParticipantPersons"><span class="brLnT">참여자 보기</span><span class="brGo">›</span></a>
+        <a class="brLn" href="/Present/ListPresent?productDisplayOpton=display"><span class="brLnT">선물 보기</span><span class="brGo">›</span></a>
+        <a class="brLn" href="https://www.youtube.com/watch?v=nmEH3FeHk3A" target="_blank" rel="noopener noreferrer"><span class="brLnT">소개 영상<small>유튜브로 이동해요</small></span><span class="brExt">↗</span></a>
+        <a class="brLn" href="https://www.youtube.com/watch?v=s6os4aGVKCY" target="_blank" rel="noopener noreferrer"><span class="brLnT">관련 영상 모음<small>유튜브로 이동해요</small></span><span class="brExt">↗</span></a>
+
+        @* ══════════ 성경 66권 완독 ══════════ *@
+        <div class="brSec">
+            <span class="brSecT">@ConstatsCommon.ReadBibleAllTitleButton</span>
+            <span class="brSecS">통독</span>
+        </div>
+        <div class="brBig">
+            <div>
+                <div class="brLbl">완독률</div>
+                <div class="brNum">@readPct<small>%</small></div>
+            </div>
+            <a class="brCta" href="/Bible/Welcome">성경 대시보드 ›</a>
+        </div>
+        <div class="brProg"><i style="width:@(readPct)%"></i></div>
+        @if (!string.IsNullOrEmpty(lastReadUrl))
+        {
+            <a class="brLn" href="@lastReadUrl"><span class="brLnT">최근 읽은 곳 이어 읽기 @if (!string.IsNullOrWhiteSpace(lastReadLabel)) {<small>@lastReadLabel</small>}</span><span class="brGo">›</span></a>
+        }
+        <a class="brLn" href="/Bible/Participants"><span class="brLnT">참여자 보기</span><span class="brGo">›</span></a>
+        <a class="brLn" href="/bibleCenter/bibleBookMark"><span class="brLnT">성경노트</span><span class="brGo">›</span></a>
+
+        @* ══════════ 홈 · 관리자 테스트 ══════════ *@
+        <div class="brHome">
+            <a class="brLn" href="/"><span class="brLnT">홈으로</span><span class="brGo">›</span></a>
+            @if (isSuperAdmin)
+            {
+                <a class="brLn admin" href="/Home/MissionMainBoard"><span class="brLnT">테스트<small>미션 2025</small></span><span class="brGo">›</span></a>
+                <a class="brLn admin" href="/DailyMission2Award/Dashboard"><span class="brLnT">테스트<small>미션 2026 시상 들어가기</small></span><span class="brGo">›</span></a>
+            }
+        </div>
+
+        <div class="brFoot">© Challenge Bible &amp; Reading</div>
+    </div>
+</div>
+
+<script src="/js/GlobalCookie.js"></script>
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+</body>
+</html>

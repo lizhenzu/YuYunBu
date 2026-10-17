@@ -1,0 +1,139 @@
+@using BulletinBoard.ViewModels.Notice
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model NoticeListVm
+
+@{
+    Layout = null;
+    ViewData["Title"] = "공지사항";
+    var totalPages = (int)Math.Ceiling((double)Model.TotalCount / Model.PageSize);
+    if (totalPages < 1) totalPages = 1;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - 유년부</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+        /* 머리 */
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .nbtn { font-family: inherit; font-size: 12.5px; font-weight: 800; padding: 8px 14px; border-radius: 999px; background: #2F80ED; color: #fff; white-space: nowrap; }
+        .nbtn:hover { background: #1F6FDB; color: #fff; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+        /* 검색 */
+        .sr { display: flex; gap: 8px; margin-top: 16px; }
+        .sr input { flex: 1; min-width: 0; font-family: inherit; font-size: 14px; padding: 10px 16px; border: 0; border-radius: 999px; background: #F4F6F9; color: #111827; outline: none; }
+        .sr input::placeholder { color: #9CA3AF; }
+        .sr input:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+        .sr button { flex: none; font-family: inherit; font-size: 13.5px; font-weight: 800; padding: 0 18px; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; cursor: pointer; }
+        .sr button:hover { background: #1F6FDB; }
+
+        /* 구역 */
+        .sec { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+        .secH { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .secT { font-size: 16px; font-weight: 800; color: #111827; }
+        .secN { font-size: 12px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .empty { padding: 48px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+
+        /* 목록 줄 */
+        .nr { display: flex; gap: 14px; align-items: flex-start; padding: 15px 0; border-bottom: 1px solid #EEF0F3; }
+        .nr:last-of-type { border-bottom: 0; }
+        .nr:hover .nrT { color: #2F80ED; }
+        .nrNo { flex: none; width: 26px; padding-top: 1px; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+        .nrTx { flex: 1; min-width: 0; }
+        .nrT { font-size: 15.5px; font-weight: 700; line-height: 1.5; color: #111827; word-break: keep-all; overflow-wrap: anywhere; transition: color .15s; }
+        .tag { display: inline-block; margin-right: 6px; padding: 2px 8px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 11px; font-weight: 700; vertical-align: 1px; }
+        .nrM { margin-top: 3px; font-size: 11.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .nrM i { font-style: normal; margin: 0 5px; color: #D1D5DB; }
+
+        /* 쪽 넘김 */
+        .pg { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+        .pg a { min-width: 32px; height: 32px; padding: 0 6px; display: grid; place-items: center; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; font-variant-numeric: tabular-nums; }
+        .pg a:hover { color: #2F80ED; }
+        .pg a.on { background: #2F80ED; color: #fff; font-weight: 700; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .ft a { color: #6B7280; }
+        .ft a:hover { color: #2F80ED; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "Home")">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Notice/Branch">소통공간</a></span>
+            <a class="nbtn" href="@Url.Action("Create", "Notice")">새 공지</a>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">공지사항</h1>
+        <form method="get" class="sr">
+            <input type="text" name="keyword" value="@Model.Keyword" placeholder="제목 또는 내용 검색" />
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="sh">
+        <section class="sec">
+            <div class="secH">
+                <span class="secT">@(string.IsNullOrWhiteSpace(Model.Keyword) ? "전체 공지" : $"‘{Model.Keyword}’ 검색 결과")</span>
+                <span class="secN">@Model.TotalCount.ToString("N0")건</span>
+            </div>
+
+            @if (Model.Items == null || !Model.Items.Any())
+            {
+                <div class="empty">등록된 공지사항이 없습니다.</div>
+            }
+            else
+            {
+                int no = Model.TotalCount - (Model.Page - 1) * Model.PageSize;
+                foreach (var item in Model.Items)
+                {
+                    <a class="nr" href="@Url.Action("Details", "Notice", new { id = item.Id })">
+                        <span class="nrNo">@(item.IsPinned ? "—" : no.ToString("00"))</span>
+                        <span class="nrTx">
+                            <span class="nrT" style="display:block">
+                                @if (item.IsPinned)
+                                {
+                                    <span class="tag">고정</span>
+                                }
+                                @item.Title
+                            </span>
+                            <span class="nrM" style="display:block">@(!string.IsNullOrEmpty(item.AuthorName) ? item.AuthorName : "관리자")<i>·</i>@item.CreatedAt.ToString("yyyy.MM.dd")<i>·</i>조회 @item.ViewCount.ToString("N0")</span>
+                        </span>
+                    </a>
+                    no--;
+                }
+            }
+        </section>
+
+        @if (totalPages > 1)
+        {
+            <nav class="pg" aria-label="쪽 넘김">
+                @for (int p = 1; p <= totalPages; p++)
+                {
+                    <a class="@(p == Model.Page ? "on" : "")" href="@Url.Action("Index", "Notice", new { page = p, keyword = Model.Keyword })">@p</a>
+                }
+            </nav>
+        }
+
+        <div class="ft">
+            <span>© 유년부 · 공지사항</span>
+            <span><a href="/Notice/Branch">소통공간</a> · <a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a></span>
+        </div>
+    </main>
+</body>
+</html>

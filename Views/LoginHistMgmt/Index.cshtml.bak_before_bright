@@ -1,0 +1,639 @@
+﻿@model IEnumerable<BulletinBoard.Models.LoginHistoryData>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = "_Layout_Mission";
+    string keyWordTitle = "로그";
+    string ViewBag_Kind = ViewBag.Kind as string ?? "";
+}
+
+<link rel="stylesheet" href="/css/missionCommon.css">
+<link rel="stylesheet" href="/css/missionC.css">
+<link rel="stylesheet" href="/css/common.layer.css">
+
+<style>
+    :root {
+        --bg0: #070A12;
+        --bg1: #0B1220;
+        --card: rgba(255,255,255,.08);
+        --card2: rgba(255,255,255,.06);
+        --line: rgba(255,255,255,.12);
+        --text: rgba(255,255,255,.92);
+        --muted: rgba(255,255,255,.70);
+        --muted2: rgba(255,255,255,.55);
+        --accent: #7FE7C4;
+        --accent2: #9AD7FF;
+        --danger: #FF5C7A;
+        --warn: #FBBF24;
+        --shadow: 0 24px 70px rgba(0,0,0,.45);
+        --radius: 22px;
+        --radius2: 16px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --sans: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+    }
+
+    body {
+        margin: 0;
+        font-family: var(--sans);
+        background: radial-gradient(1200px 700px at 10% 10%, rgba(127,231,196,.18), transparent 55%), radial-gradient(900px 600px at 90% 20%, rgba(154,215,255,.16), transparent 55%), radial-gradient(900px 700px at 60% 90%, rgba(255,92,122,.10), transparent 55%), linear-gradient(180deg, var(--bg0), var(--bg1));
+        color: var(--text);
+    }
+
+    .page {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 18px 14px 26px;
+    }
+
+    /* ===== Hero Header ===== */
+    .hero {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(135deg, rgba(127,231,196,.14), rgba(154,215,255,.10));
+        border-radius: 26px;
+        box-shadow: var(--shadow);
+        padding: 18px 18px 16px;
+        margin-top: 10px;
+    }
+
+    .heroRow {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .heroTitle {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 240px;
+    }
+
+    .heroIcon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, rgba(127,231,196,.95), rgba(154,215,255,.95));
+        color: #06101a;
+        font-weight: 1000;
+        box-shadow: 0 18px 40px rgba(0,0,0,.25);
+    }
+
+    .heroText h1 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 950;
+        letter-spacing: -.2px;
+    }
+
+    .heroText p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .heroMeta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+    }
+
+    .pill {
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        color: var(--muted);
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        user-select: none;
+        backdrop-filter: blur(10px);
+    }
+
+        .pill strong {
+            color: var(--text);
+            font-weight: 900;
+        }
+
+    /* ===== Hero Actions (Home Button) ===== */
+    .heroActions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-left: auto;
+    }
+
+    .homeBtn {
+        border: 0;
+        cursor: pointer;
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-weight: 950;
+        font-size: 12px;
+        letter-spacing: -.1px;
+        color: #06101a;
+        background: linear-gradient(135deg, rgba(127,231,196,.95), rgba(154,215,255,.95));
+        box-shadow: 0 18px 45px rgba(0,0,0,.25);
+        transition: transform .12s ease, filter .12s ease;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+        .homeBtn:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.03);
+        }
+
+        .homeBtn:active {
+            transform: translateY(0px) scale(.99);
+        }
+
+        .homeBtn .sub {
+            font-weight: 900;
+            opacity: .85;
+        }
+
+    /* ===== Banner Image ===== */
+    .banner {
+        margin-top: 14px;
+        border-radius: 22px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.12);
+        box-shadow: 0 18px 55px rgba(0,0,0,.35);
+        background: rgba(255,255,255,.04);
+    }
+
+        .banner img {
+            width: 100%;
+            height: auto;
+            display: block;
+            filter: saturate(1.08) contrast(1.06);
+        }
+
+    /* ===== Cards Grid ===== */
+    .grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .logCard {
+        position: relative;
+        border-radius: var(--radius);
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+        box-shadow: 0 18px 55px rgba(0,0,0,.35);
+        overflow: hidden;
+    }
+
+        .logCard::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(700px 240px at 20% 0%, rgba(127,231,196,.18), transparent 60%), radial-gradient(700px 240px at 90% 10%, rgba(154,215,255,.16), transparent 60%);
+            pointer-events: none;
+        }
+
+    .cardInner {
+        position: relative;
+        display: flex;
+        gap: 12px;
+        padding: 14px;
+        align-items: center;
+    }
+
+    .avatar {
+        width: 54px;
+        height: 54px;
+        border-radius: 18px;
+        overflow: hidden;
+        flex: 0 0 auto;
+        border: 1px solid rgba(255,255,255,.16);
+        background: rgba(255,255,255,.06);
+        box-shadow: 0 16px 40px rgba(0,0,0,.25);
+        cursor: pointer;
+    }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+    .info {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .topLine {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .name {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        min-width: 0;
+    }
+
+        .name strong {
+            font-size: 15px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 320px;
+        }
+
+        .name span {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 220px;
+        }
+
+    .badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid rgba(255,255,255,.14);
+        background: rgba(255,255,255,.06);
+        color: var(--muted);
+        user-select: none;
+        backdrop-filter: blur(10px);
+    }
+
+        .badge .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 3px rgba(127,231,196,.14);
+        }
+
+        .badge.teacher .dot {
+            background: var(--accent2);
+            box-shadow: 0 0 0 3px rgba(154,215,255,.14);
+        }
+
+        .badge.warn {
+            color: rgba(255,255,255,.88);
+            border-color: rgba(255,92,122,.35);
+            background: rgba(255,92,122,.10);
+        }
+
+    .metaRow {
+        margin-top: 10px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+    }
+
+    .metaItem {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: rgba(255,255,255,.05);
+        backdrop-filter: blur(10px);
+    }
+
+    .metaKey {
+        color: var(--muted2);
+    }
+
+    .metaVal {
+        color: var(--text);
+        font-weight: 850;
+    }
+
+    .actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .btn {
+        border: 0;
+        cursor: pointer;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-weight: 900;
+        font-size: 12px;
+        color: rgba(255,255,255,.92);
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.14);
+        transition: transform .12s ease, background .12s ease, border-color .12s ease;
+        user-select: none;
+        backdrop-filter: blur(10px);
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,.11);
+            border-color: rgba(255,255,255,.20);
+        }
+
+        .btn.primary {
+            color: #06101a;
+            background: linear-gradient(135deg, rgba(127,231,196,.95), rgba(154,215,255,.95));
+            border-color: transparent;
+        }
+
+        .btn.danger {
+            background: rgba(255,92,122,.10);
+            border-color: rgba(255,92,122,.35);
+            color: rgba(255,255,255,.92);
+        }
+
+            .btn.danger:hover {
+                background: rgba(255,92,122,.16);
+            }
+
+    /* ===== Bottom Home Bar ===== */
+    .bottomBar {
+        margin-top: 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(255,255,255,.12);
+        background: linear-gradient(135deg, rgba(255,255,255,.07), rgba(255,255,255,.04));
+        box-shadow: 0 22px 60px rgba(0,0,0,.35);
+        overflow: hidden;
+        position: relative;
+    }
+
+        .bottomBar::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            background: radial-gradient(800px 260px at 15% 0%, rgba(127,231,196,.18), transparent 60%), radial-gradient(800px 260px at 85% 10%, rgba(154,215,255,.16), transparent 60%);
+            pointer-events: none;
+        }
+
+    .bottomBarInner {
+        position: relative;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .bottomBarText {
+        min-width: 220px;
+    }
+
+        .bottomBarText .t1 {
+            font-weight: 950;
+            letter-spacing: -.2px;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .bottomBarText .t2 {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+    .bottomBarActions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .homeBtn.secondary {
+        color: rgba(255,255,255,.92);
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.14);
+        box-shadow: none;
+    }
+
+        .homeBtn.secondary:hover {
+            background: rgba(255,255,255,.11);
+            filter: none;
+        }
+
+    /* ===== Responsive ===== */
+    @@media (max-width: 640px) {
+        .name strong {
+            max-width: 190px;
+        }
+
+        .name span {
+            max-width: 150px;
+        }
+
+        .cardInner {
+            padding: 12px;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 16px;
+        }
+
+        .actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .btn {
+            padding: 9px 10px;
+        }
+
+        .heroActions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .bottomBarActions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+    }
+</style>
+
+<script>
+    function ManageUserInfo(UserId) {
+        window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+    }
+
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+
+    function goHome() {
+        window.location.href = "/";
+    }
+</script>
+
+<div class="page">
+
+    <section class="hero">
+        <div class="heroRow">
+            <div class="heroTitle">
+                <div class="heroIcon">LOG</div>
+                <div class="heroText">
+                    <h1>@keyWordTitle 관리</h1>
+                    <p>최근 활동 기록을 카드로 빠르게 확인하고, 필요 시 사용자 관리/삭제를 진행할 수 있어요.</p>
+                </div>
+            </div>
+
+            <div class="heroMeta">
+                <div class="pill">모델 <strong>@(Model?.Count() ?? 0)</strong> 건</div>
+                @if (!string.IsNullOrWhiteSpace(ViewBag_Kind))
+                {
+                    <div class="pill">필터 <strong>@ViewBag_Kind</strong></div>
+                }
+                <div class="pill">업데이트 <strong>@DateHelper.GetKoreaNow().ToString("yyyy-MM-dd HH:mm")</strong></div>
+            </div>
+
+            <!-- ✅ 상단 홈으로 가기 버튼 -->
+            <div class="heroActions">
+                <button type="button" class="homeBtn" onclick="goHome()">
+                    🏠 <span>홈으로 가기</span> <span class="sub">/</span> <span class="sub">Home</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <div class="banner">
+        <img src="/images/admin/admin002.webp" alt="Admin Banner">
+    </div>
+
+    <section class="grid">
+        @foreach (var item in Model)
+        {
+            // ✅ 새 로직: ClassYear & ClassBan 이 0보다 크면 학생, 아니면 교사
+            bool isStudent = (item.ClassYear > 0 && item.ClassBan > 0);
+            string roleText = isStudent ? $"{item.ClassYear}학년 {item.ClassBan}반" : "교사";
+
+            <article class="logCard">
+                <div class="cardInner">
+
+                    <div class="avatar" onclick="ManageUserInfo('@item.UserId')" title="사용자 관리로 이동">
+                        <img src="@item.ProfilePicturePath" alt="Profile">
+                    </div>
+
+                    <div class="info">
+                        <div class="topLine">
+                            <div class="name">
+                                <strong title="@item.FullName">@item.FullName</strong>
+                                <span title="@item.UserName">@item.UserName</span>
+                            </div>
+
+                            <div class="badges">
+                                <span class="badge @(isStudent ? "" : "teacher")">
+                                    <span class="dot"></span>
+                                    @(isStudent ? "학생" : "교사")
+                                </span>
+
+                                <span class="badge">
+                                    <span class="dot" style="background: var(--warn); box-shadow:0 0 0 3px rgba(251,191,36,.14);"></span>
+                                    순번 @item.sequenceNo
+                                </span>
+
+                                @* 필요하면 조건에 따라 경고 배지 표시 가능
+                                <span class="badge warn"><span class="dot" style="background:var(--danger)"></span>주의</span>
+                                *@
+                            </div>
+                        </div>
+
+                        <div class="metaRow">
+                            <div class="metaItem">
+                                <span class="metaKey">역할</span>
+                                <span class="metaVal">@roleText</span>
+                            </div>
+
+                            <div class="metaItem">
+                                <span class="metaKey">최근 로그</span>
+                                <span class="metaVal">@item.maxInsertDT.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            </div>
+
+                            <div class="actions">
+                                <button type="button" class="btn primary"
+                                        onclick="ManageUserInfo('@item.UserId')">
+                                    사용자 관리
+                                </button>
+
+                                <button type="button" class="btn danger"
+                                        onclick="redirectToPage('/LoginHistMgmt/DeleteLoginHistory?UserName=@item.UserName')">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </article>
+        }
+    </section>
+
+    <!-- ✅ 하단 홈 바로가기 영역 (Partial 제거 후 대체) -->
+    <section class="bottomBar">
+        <div class="bottomBarInner">
+            <div class="bottomBarText">
+                <p class="t1">작업을 마치셨나요?</p>
+                <p class="t2">홈으로 돌아가서 다른 메뉴도 이어서 진행할 수 있어요.</p>
+            </div>
+            <div class="bottomBarActions">
+                <button type="button" class="homeBtn" onclick="goHome()">🏠 홈으로 가기</button>
+                <button type="button" class="homeBtn secondary" onclick="window.scrollTo({top:0, behavior:'smooth'})">⬆️ 맨 위로</button>
+            </div>
+        </div>
+    </section>
+
+</div>

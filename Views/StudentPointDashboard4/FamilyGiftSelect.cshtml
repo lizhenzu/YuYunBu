@@ -1,0 +1,357 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Services.Abstract;
+@using System.Collections.Generic;
+@using System.Linq;
+@inject IAuthService AuthService
+@model List<BulletinBoard.Models.AwardItem>
+
+@*  ══════════════════════════════════════════════════════════════
+    가족 합산 선물 고르기 — Bone 스킨 (B안: 2열 격자 + 종류 거르기)
+    · 카드를 누르면 아래 확인 상자에 고른 선물이 뜨고, "이 선물로 신청"으로 보낸다
+    · 가격은 관리자에게만 보인다
+    이전 화면은 FamilyGiftSelect_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var teamName   = ViewBag.TeamName  as string ?? "";
+    var topScorer  = ViewBag.TopScorer as string ?? "";
+    var teamTotal  = (int)(ViewBag.TeamTotal ?? 0);
+    var threshold  = (int)(ViewBag.Threshold ?? 1000);
+    int priceLimit = ViewBag.FamilyPriceLimit is int pl ? pl : 0;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isAdmin || isSuperAdmin;
+
+    var items = Model ?? new List<BulletinBoard.Models.AwardItem>();
+
+    // 종류 = 상품명(문구세트·장난감·무드등 …). 많은 순으로 꼬리표를 만든다.
+    string Kind(BulletinBoard.Models.AwardItem x) => string.IsNullOrWhiteSpace(x.ProductName) ? "기타" : x.ProductName.Trim();
+    var kinds = items.GroupBy(Kind).Select(g => new { Name = g.Key, Count = g.Count() })
+                     .OrderByDescending(g => g.Count).ThenBy(g => g.Name).ToList();
+
+    string limitText = priceLimit > 0 ? $"{priceLimit / 10000}만원 미만 선물" : "";
+
+    // 헤더에 보여 줄 선물 가격 범위 — 규칙상의 한도가 아니라 지금 목록의 실제 최저~최고. 단위는 credit.
+    var priceList  = items.Where(x => x.UnitPrice > 0).Select(x => x.UnitPrice).ToList();
+    string rangeText = priceList.Count == 0
+        ? ""
+        : (priceList.Min() == priceList.Max()
+            ? $"{priceList.Min():N0}"
+            : $"{priceList.Min():N0} ~ {priceList.Max():N0}");
+
+    // 지금 고른 선물 (없으면 null) — 무엇을 골랐는지 보여 주고 취소할 수 있게 한다
+    var famPick = ViewBag.FamilyPick as BulletinBoard.Services.Abstract.GiftOrderVM;
+    var famMsg  = ViewBag.FamilyMsg as string ?? "";
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>가족 선물 고르기 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz { padding-bottom: 150px; }
+
+    .qz .fgHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 26px var(--pad) 22px; }
+    .qz .fgK { font-size: 10px; font-weight: 600; letter-spacing: .24em; color: #C9AE82; }
+    .qz .fgH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.4; margin: 9px 0 0; color: var(--bg); word-break: keep-all; }
+    .qz .fgPts { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 14px; }
+    .qz .fgBig { font-family: "Inter", sans-serif; font-weight: 200; font-size: 40px; line-height: 1; color: #D9C29B; font-variant-numeric: tabular-nums; }
+    .qz .fgBig small { font-size: 12px; font-weight: 400; color: #9A9690; margin-left: 4px; }
+    /* 달성 단계 — 점수 옆에 붙여 두 숫자가 서로 부딪히지 않게 한다 */
+    .qz .fgStage { font-size: 11px; color: #9A9690; padding-bottom: 5px; white-space: nowrap; }
+
+    /* 선물 조건 — 점수와 다른 값이라 가는 선 아래 별도 줄로 내린다. 누구에게나 보인다. */
+    .qz .fgCond { margin-top: 18px; padding-top: 14px; border-top: 1px solid #33352F;
+                  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .qz .fgCondK { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: #8F8B84; }
+    .qz .fgCondV { font-family: "Inter", sans-serif; font-size: 14px; color: #E8D9BE; font-variant-numeric: tabular-nums; }
+    .qz .fgCondV u { text-decoration: none; font-size: 11px; color: #9A9690; margin-left: 4px; }
+    .qz .fgCondV em { font-style: normal; font-family: inherit; font-size: 11px; color: #8F8B84; margin-left: 8px; }
+
+    /* 안내문은 어두운 머리 밖(본문)으로 내렸다 */
+    .qz .fgNote { font-size: 11.5px; color: var(--dim2); margin-top: 14px; line-height: 1.7; }
+
+    .qz .fgSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 24px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .fgSecT { font-family: "Noto Serif KR", serif; font-size: 16px; }
+    .qz .fgSecS { font-size: 11px; color: var(--dim); }
+
+    /* 종류 거르기 */
+    .qz .fgChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .qz .fgChip { font-family: inherit; font-size: 12px; padding: 6px 11px; border: 1px solid var(--rule); background: transparent; color: var(--dim2); cursor: pointer; border-radius: 1px; }
+    .qz .fgChip b { font-family: "Inter", sans-serif; font-weight: 400; color: var(--dim); margin-left: 4px; }
+    .qz .fgChip.on { background: var(--tx); border-color: var(--tx); color: var(--bg); }
+    .qz .fgChip.on b { color: #B9B3A8; }
+
+    /* 2열 격자 */
+    .qz .fgGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+    .qz .fgCard { position: relative; background: var(--bg); padding: 10px; text-align: left; border: 0; font-family: inherit; color: inherit; cursor: pointer; display: flex; flex-direction: column; }
+    .qz .fgCard[hidden] { display: none; }
+    .qz .fgCard:hover .fgNm { color: var(--acc); }
+    .qz .fgCard.sel { background: var(--mark); outline: 2px solid var(--acc); outline-offset: -2px; }
+    .qz .fgImg { position: relative; width: 100%; aspect-ratio: 1 / 1; background: repeating-linear-gradient(45deg, #EFEDE8 0 6px, #E7E4DE 6px 12px); overflow: hidden; }
+    .qz .fgImg img { width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; }
+    .qz .fgPrice { position: absolute; right: 6px; bottom: 6px; font-family: "Inter", sans-serif; font-size: 10.5px; background: rgba(22,24,28,.82); color: #F7F6F3; padding: 2px 6px; }
+    .qz .fgCheck { position: absolute; left: 6px; top: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--acc); color: #fff; font-size: 12px; display: none; place-items: center; }
+    .qz .fgCard.sel .fgCheck { display: grid; }
+    .qz .fgNm { font-family: "Noto Serif KR", serif; font-size: 14px; margin-top: 9px; }
+    .qz .fgDs { font-size: 11px; color: var(--dim); margin-top: 3px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+    .qz .fgEmpty { padding: 40px 0; text-align: center; font-size: 13px; color: var(--dim); }
+
+    /* 알림 한 줄 (취소 결과 등) */
+    .qz .fgMsg { margin-top: 16px; padding: 11px 13px; background: var(--mark); font-size: 12.5px; color: var(--tx); line-height: 1.6; }
+
+    /* 지금 고른 선물 */
+    .qz .fgCur { display: flex; gap: 14px; align-items: flex-start; padding: 14px; background: var(--mark); margin-top: 12px; }
+    .qz .fgCurImg { width: 84px; height: 84px; object-fit: cover; background: #fff; flex: 0 0 auto; display: block; }
+    .qz .fgCurTx { flex: 1 1 auto; min-width: 0; }
+    .qz .fgCurN { font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.4; word-break: keep-all; }
+    .qz .fgCurD { font-size: 11.5px; color: var(--dim2); margin-top: 4px; line-height: 1.6; word-break: keep-all; }
+    .qz .fgCurM { font-size: 11px; color: var(--dim); margin-top: 7px; font-variant-numeric: tabular-nums; }
+    .qz .fgCurM i { font-style: normal; color: #CFC6B5; margin: 0 6px; }
+    .qz .fgCurBtn {
+        border: 1px solid #D6CBB7; background: transparent; color: var(--dim2);
+        padding: 8px 13px; font-family: inherit; font-size: 11px; font-weight: 600;
+        letter-spacing: .08em; border-radius: 1px; cursor: pointer;
+    }
+    .qz .fgCurBtn:hover { border-color: var(--acc); color: var(--acc); }
+
+    /* 카드가 곧 버튼이라는 표시 — 없으면 누를 수 있는 줄 모른다 */
+    .qz .fgHint { font-size: 11.5px; color: var(--dim); margin-top: 10px; line-height: 1.7; }
+    .qz .fgPickTag {
+        margin-top: auto; padding-top: 9px; font-size: 11px; font-weight: 600;
+        letter-spacing: .08em; color: var(--acc);
+    }
+    .qz .fgCard.sel .fgPickTag { color: var(--tx); }
+
+    @@media (min-width: 720px) { .qz .fgGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+    /* 아래 확인 상자 — 항상 보인다. 고르기 전에는 무엇을 해야 하는지 안내만 띄운다.
+       예전에는 화면 밖(translateY)에 숨어 있어서, 카드를 누르기 전까지 신청 버튼이 어디에도 보이지 않았다. */
+    body { padding-bottom: 150px; }
+    .fgSheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: #fff; border-top: 1px solid #16181C;
+               padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 24px rgba(0,0,0,.08); }
+    .fgSheetIn { max-width: 760px; margin: 0 auto; }
+    .fgIdle { font-size: 12.5px; color: #5C5F66; text-align: center; padding: 6px 0 4px; line-height: 1.6; }
+    .fgPicked { display: none; }
+    .fgSheet.open .fgPicked { display: block; }
+    .fgSheet.open .fgIdle { display: none; }
+    .fgSheetK { font-size: 10px; font-weight: 600; letter-spacing: .18em; color: #9A7B4F; }
+    .fgSheetN { font-family: "Noto Serif KR", serif; font-size: 16px; margin-top: 5px; color: #16181C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fgSheetI { font-size: 11.5px; color: #5C5F66; line-height: 1.7; margin-top: 6px; }
+    .fgActs { display: flex; gap: 8px; margin-top: 12px; }
+    .fgActs form { flex: 2; display: flex; margin: 0; }
+    .fgBtn { flex: 1; font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: .04em; padding: 12px 0; border: 1px solid #E2E0DB; background: transparent; color: #5C5F66; cursor: pointer; border-radius: 1px; }
+    .fgBtn.ok { width: 100%; background: #16181C; border-color: #16181C; color: #F7F6F3; }
+    .fgBtn.ok:hover { background: #9A7B4F; border-color: #9A7B4F; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">← 홈으로</a></div>
+            <div class="qzDate">선물 고르기</div>
+        </div>
+
+        <header class="fgHead">
+            <div class="fgK">@ConstatsCommon.MainKeyTitle · 가족 합산 시상</div>
+            <h1 class="fgH1">@teamName</h1>
+            <div class="fgPts">
+                <div class="fgBig">@(teamTotal.ToString("N0"))<small>점</small></div>
+                <div class="fgStage">@(threshold.ToString("N0"))점 단계 달성</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(rangeText))
+            {
+                <div class="fgCond">
+                    <span class="fgCondK">고를 수 있는 선물 가격</span>
+                    <span class="fgCondV">
+                        @rangeText<u>credit</u>
+                        @if (!string.IsNullOrEmpty(limitText) && isStaff)
+                        {
+                            <em>한도 @limitText</em>
+                        }
+                    </span>
+                </div>
+            }
+        </header>
+
+        <div class="fgNote">가족 모두의 @ConstatsCommon.MainKeyTitle 점수를 더했어요. 선물은 가족 중 본인에게 드려요.</div>
+
+        @if (!string.IsNullOrWhiteSpace(famMsg))
+        {
+            <div class="fgMsg">@famMsg</div>
+        }
+
+        @* ── 지금 고른 선물 ── *@
+        @if (famPick != null)
+        {
+            <div class="fgSec">
+                <span class="fgSecT">지금 고른 선물</span>
+                <span class="fgSecS">바꾸려면 아래에서 다시 고르세요</span>
+            </div>
+            <div class="fgCur">
+                <img class="fgCurImg" src="/images/AwardItem/@(famPick.ProductID).jpg" alt="@famPick.ProductName"
+                     onerror="this.onerror=null;this.style.visibility='hidden';" />
+                <div class="fgCurTx">
+                    <div class="fgCurN">@famPick.ProductName</div>
+                    @if (!string.IsNullOrWhiteSpace(famPick.ProductDescription))
+                    {
+                        <div class="fgCurD">@famPick.ProductDescription</div>
+                    }
+                    <div class="fgCurM">@famPick.CreatedAt.ToString("yyyy-MM-dd") 신청<i>·</i>관리자 확인 대기</div>
+                    <form method="post" action="/StudentPointDashboard4/FamilyGiftCancel"
+                          onsubmit="return confirm('고른 선물 신청을 취소할까요?');" style="margin-top:11px">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="teamName"          value="@teamName" />
+                        <input type="hidden" name="topScorerUserName" value="@topScorer" />
+                        <input type="hidden" name="teamTotal"         value="@teamTotal" />
+                        <input type="hidden" name="threshold"         value="@threshold" />
+                        <input type="hidden" name="returnTo"          value="select" />
+                        <button type="submit" class="fgCurBtn">신청 취소</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        <div class="fgSec">
+            <span class="fgSecT">@(famPick != null ? "다른 선물로 바꾸기" : "고를 수 있는 선물")</span>
+            <span class="fgSecS"><span id="fgCount">@items.Count</span>종</span>
+        </div>
+
+        @if (items.Count == 0)
+        {
+            <div class="fgEmpty">지금 고를 수 있는 선물이 없어요</div>
+        }
+        else
+        {
+            <div class="fgHint">선물을 눌러 고른 뒤, 화면 아래에서 <b>이 선물로 신청</b>을 누르세요.</div>
+
+            <div class="fgChips" id="fgChips">
+                <button type="button" class="fgChip on" data-kind="">전체<b>@items.Count</b></button>
+                @foreach (var k in kinds)
+                {
+                    <button type="button" class="fgChip" data-kind="@k.Name">@k.Name<b>@k.Count</b></button>
+                }
+            </div>
+
+            <div class="fgGrid" id="fgGrid">
+                @foreach (var item in items)
+                {
+                    var desc = (item.ProductDescription ?? "").Trim();
+                    <button type="button" class="fgCard"
+                            data-pid="@item.ProductID"
+                            data-kind="@Kind(item)"
+                            data-name="@(string.IsNullOrWhiteSpace(desc) ? item.ProductName : $"{item.ProductName} · {desc}")">
+                        <span class="fgImg">
+                            <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" loading="lazy"
+                                 onerror="this.onerror=null;this.style.visibility='hidden';" />
+                            <span class="fgCheck" aria-hidden="true">✓</span>
+                            @if (isStaff)
+                            {
+                                <span class="fgPrice">@(item.UnitPrice.ToString("N0"))원</span>
+                            }
+                        </span>
+                        <span class="fgNm">@item.ProductName</span>
+                        @if (!string.IsNullOrWhiteSpace(desc))
+                        {
+                            <span class="fgDs">@desc</span>
+                        }
+                        <span class="fgPickTag">고르기</span>
+                    </button>
+                }
+            </div>
+        }
+
+    </div>
+</div>
+
+@* ── 아래 확인 상자 ── *@
+<div class="fgSheet" id="fgSheet" role="dialog" aria-live="polite" aria-label="고른 선물 확인">
+    <div class="fgSheetIn">
+        <div class="fgIdle">위에서 선물을 눌러 고르면, 여기에서 신청할 수 있어요</div>
+        <div class="fgPicked">
+            <div class="fgSheetK">고른 선물</div>
+            <div class="fgSheetN" id="fgSheetName"></div>
+            <div class="fgSheetI"><b>@teamName</b>의 @(threshold.ToString("N0"))점 선물로 신청돼요. 관리자 확인 후 가족 중 본인에게 드려요.</div>
+            <div class="fgActs">
+                <button type="button" class="fgBtn" onclick="fgClear()">다시 고르기</button>
+                <form method="post" action="/StudentPointDashboard4/FamilyGiftSelectPost">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="productId"         id="fgPid" value="" />
+                    <input type="hidden" name="teamName"          value="@teamName" />
+                    <input type="hidden" name="topScorerUserName" value="@topScorer" />
+                    <input type="hidden" name="teamTotal"         value="@teamTotal" />
+                    <input type="hidden" name="threshold"         value="@threshold" />
+                    <button type="submit" class="fgBtn ok">이 선물로 신청</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var grid  = document.getElementById('fgGrid');
+    if (!grid) return;
+    var cards = Array.prototype.slice.call(grid.querySelectorAll('.fgCard'));
+    var sheet = document.getElementById('fgSheet');
+    var pid   = document.getElementById('fgPid');
+    var nameEl = document.getElementById('fgSheetName');
+    var countEl = document.getElementById('fgCount');
+
+    function tagOf(c) { return c.querySelector('.fgPickTag'); }
+    function resetTags() {
+        cards.forEach(function (x) {
+            x.classList.remove('sel');
+            var t = tagOf(x); if (t) { t.textContent = '고르기'; }
+        });
+    }
+
+    cards.forEach(function (c) {
+        c.addEventListener('click', function () {
+            resetTags();
+            c.classList.add('sel');
+            var t = tagOf(c); if (t) { t.textContent = '고른 선물'; }
+            pid.value = c.dataset.pid;
+            nameEl.textContent = c.dataset.name;
+            sheet.classList.add('open');
+        });
+    });
+
+    window.fgClear = function () {
+        resetTags();
+        pid.value = '';
+        sheet.classList.remove('open');
+    };
+
+    document.querySelectorAll('#fgChips .fgChip').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('#fgChips .fgChip').forEach(function (x) { x.classList.remove('on'); });
+            b.classList.add('on');
+            var k = b.dataset.kind, n = 0;
+            cards.forEach(function (c) {
+                var show = !k || c.dataset.kind === k;
+                c.hidden = !show;
+                if (show) n++;
+                if (!show && c.classList.contains('sel')) fgClear();
+            });
+            if (countEl) countEl.textContent = n;
+        });
+    });
+
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fgClear(); });
+})();
+</script>
+</body>
+</html>

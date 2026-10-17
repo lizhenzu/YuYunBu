@@ -1,0 +1,384 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.Attendance.NewComerIndexVM
+@using System
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 출석부 "새친구" — 몇 번 왔는지 한눈에 · ＋ 오늘 방문 한 번에
+    ViewData["AttTab"] = "new";
+
+    var msg = TempData["NewComerMsg"]?.ToString();
+    var today = DateHelper.GetKoreaToday();
+    int activeCount    = Model?.ActiveList?.Count    ?? 0;
+    int completedCount = Model?.CompletedList?.Count ?? 0;
+    int visitedToday   = (Model?.ActiveList ?? new()).Count(x => x.LastVisitDate?.Date == today);
+    const string NoPhoto = "/images/icon/people/people_01.webp";
+    const int CareWeeks = 4; // 4주 케어
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>출석부 · 새친구</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <style>
+        :root { --ok: #2F6B4F; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .prog { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--headdim); }
+        .prog b { font-family: "Inter", sans-serif; font-weight: 200; font-size: 36px; line-height: 1; color: var(--headtx); }
+        .prog i { font-style: normal; color: var(--headk); }
+
+        .top2 { display: flex; gap: 6px; margin-top: 16px; }
+        .addBtn { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 16px; border: 1px dashed var(--acc); background: var(--card); color: var(--acc); font-family: inherit; font-size: 14.5px; cursor: pointer; }
+        .addBtn:hover { background: var(--mark); }
+        .srch { flex: 1; min-width: 0; display: flex; }
+        .srch input { flex: 1; min-width: 0; height: 46px; padding: 0 12px; border: 1px solid var(--rule); border-right: 0; background: var(--card); font-family: inherit; font-size: 15px; color: var(--tx); outline: none; border-radius: 0; }
+        .srch input:focus { border-color: var(--tx); }
+        .srch button { flex: none; width: 46px; border: 1px solid var(--rule); background: var(--card); font-size: 16px; color: var(--dim2); cursor: pointer; }
+        .ok { margin-top: 12px; padding: 10px 14px; border-left: 2px solid var(--ok); background: var(--card); font-size: 14px; color: var(--ok); }
+
+        .nc { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+        .ph { flex: none; position: relative; width: 48px; height: 48px; padding: 0; border: 1px solid var(--rule); background: var(--mark); cursor: pointer; overflow: hidden; }
+        .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ph span { position: absolute; right: 0; bottom: 0; background: rgba(22,24,28,.7); color: #fff; font-size: 9px; padding: 1px 3px; }
+        .ncTx { flex: 1; min-width: 0; }
+        .ncN { display: block; font-size: 16px; font-weight: 600; color: var(--tx); }
+        .ncN:hover { color: var(--acc); }
+        .ncN small { font-weight: 400; font-size: 12px; color: var(--dim); margin-left: 5px; }
+        .ncM { margin-top: 2px; font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .ncM form { display: inline; margin: 0; }
+        .ncM .del { border: 0; background: none; padding: 0; font-family: inherit; font-size: 12px; color: var(--dim); text-decoration: underline; cursor: pointer; margin-left: 4px; }
+        .ncM .del:hover { color: var(--danger); }
+        .vb { display: flex; gap: 3px; margin-top: 6px; }
+        .vb i { width: 16px; height: 4px; background: var(--rule); }
+        .vb i.on { background: var(--acc); }
+        .vb em { font-style: normal; font-size: 11px; color: var(--dim); margin-left: 5px; line-height: 4px; }
+        .ncA { flex: none; }
+        .ncA form { margin: 0; }
+        /* C안 — 케어 중 새친구: 두 줄 (윗줄 정보 / 아랫줄 큰 버튼) */
+        .ncItem { padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        .ncTop { display: flex; align-items: center; gap: 12px; }
+        .ncAct { display: flex; gap: 6px; margin-top: 12px; }
+        .ncAct form { margin: 0; display: flex; }
+        .bigB { height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; font-family: inherit; font-size: 15px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .bigB.add { flex: 1; width: 100%; background: var(--tx); border-color: var(--tx); color: var(--bg); }
+        .bigB.add:hover { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .bigB.came { flex: 1; min-width: 0; background: var(--ok); border-color: var(--ok); color: #fff; font-weight: 600; cursor: default; }
+        .bigB.undo { width: 112px; color: var(--dim2); }
+        .bigB.undo:hover { border-color: var(--danger); color: var(--danger); }
+        .bigB:active { transform: scale(.98); }
+        .grad { display: inline-flex; align-items: center; height: 32px; padding: 0 9px; border: 1px solid var(--rule); color: var(--dim2); font-size: 12px; }
+
+        /* 등록 · 사진 창 */
+        .mb { position: fixed; inset: 0; z-index: 1000; display: none; align-items: flex-end; justify-content: center; background: rgba(12,13,15,.55); }
+        .mb.show { display: flex; }
+        .mdl { width: min(560px, 100%); max-height: 92vh; overflow: auto; background: var(--bg); }
+        .mdl.wide { width: min(900px, 100%); }
+        @@media (min-width: 640px) { .mb { align-items: center; padding: 16px; } }
+        .mH { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--head); color: var(--headtx); }
+        .mH b { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 17px; }
+        .mH button { width: 34px; height: 34px; border: 1px solid #3A3C40; background: none; color: var(--headtx); font-size: 16px; cursor: pointer; }
+        .mB { padding: 18px; }
+        .mF { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 6px; padding: 12px 18px; background: var(--bg); border-top: 1px solid var(--rule); }
+        .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+        .g2 .full { grid-column: 1 / -1; }
+        .req { color: var(--danger); margin-left: 2px; }
+        .rg { display: flex; gap: 6px; }
+        .rg label { flex: 1; }
+        .rg input { position: absolute; opacity: 0; }
+        .rg span { display: block; text-align: center; padding: 11px 6px; border: 1px solid var(--rule); background: var(--card); font-size: 14px; cursor: pointer; }
+        .rg input:checked + span { background: var(--tx); color: var(--bg); border-color: var(--tx); font-weight: 600; }
+
+        .cropL { display: grid; grid-template-columns: 1fr 200px; gap: 14px; }
+        @@media (max-width: 700px) { .cropL { grid-template-columns: 1fr; } }
+        .cropT { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .cropW { min-height: 300px; background: var(--card); border: 1px solid var(--rule); display: grid; place-items: center; }
+        .cropW img { max-width: 100%; display: block; }
+        .cropE { font-size: 13px; color: var(--dim); text-align: center; line-height: 1.7; padding: 20px; }
+        .nc-hidden, .file-hidden { display: none; }
+        .prev { width: 100%; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--rule); background: var(--mark); display: block; }
+        .confirm { width: 100%; margin-top: 8px; }
+        .confirm.done { background: var(--ok) !important; border-color: var(--ok) !important; color: #fff !important; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><a href="/Attendance/Index">출석부</a><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdK">NEW FRIENDS</div>
+            <h1 class="hdT">새친구</h1>
+            <div class="prog"><b>@activeCount</b><span>명 케어 중 · 오늘 방문 <i>@visitedToday</i> · 등반 @completedCount</span></div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="top2">
+            <button type="button" class="addBtn" onclick="openNewComerModal()">＋ 새친구 등록</button>
+            <form method="get" action="@Url.Action("NewComer","Attendance")" class="srch">
+                <input type="search" name="keyword" value="@Model?.Keyword" placeholder="이름 · 보호자 · 전화" aria-label="새친구 검색" />
+                <button type="submit" aria-label="검색">⌕</button>
+            </form>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="ok">@msg</div>
+        }
+
+        <section class="sec" id="section-active">
+            <div class="secH">
+                <div><div class="secK">@(CareWeeks)-WEEK CARE</div><div class="secT">케어 중 · 최근 방문순</div></div>
+                <span class="secN">막대 = 방문 횟수</span>
+            </div>
+
+            @if (Model?.ActiveList == null || Model.ActiveList.Count == 0)
+            {
+                <div class="empty">케어 중인 새친구가 없습니다.</div>
+            }
+            else
+            {
+                foreach (var item in Model.ActiveList.OrderByDescending(x => x.LastVisitDate ?? x.FirstVisitDate))
+                {
+                    var pu = !string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : NoPhoto;
+                    bool cameToday = item.LastVisitDate?.Date == today;
+                    @* C안 — 두 줄: 윗줄 사진·이름·정보 / 아랫줄 화면 너비 큰 버튼 *@
+                    <div class="ncItem">
+                        <div class="ncTop">
+                            <button type="button" class="ph" onclick="openPhotoModal(@item.Id, this.dataset.name)" data-name="@item.ChildName" aria-label="@item.ChildName 사진 바꾸기">
+                                <img src="@pu" alt="" loading="lazy" onerror="this.onerror=null;this.src='@NoPhoto';" /><span>사진</span>
+                            </button>
+                            <div class="ncTx">
+                                <a class="ncN" href="@Url.Action("NewComerDetail","Attendance",new{id=item.Id})">@item.ChildName<small>@item.ClassText</small></a>
+                                <div class="ncM">
+                                    마지막 @(item.LastVisitDate?.ToString("M.d") ?? item.FirstVisitDate.ToString("M.d"))
+                                    · @(item.IsVoluntary ? "자진" : $"전도{(string.IsNullOrWhiteSpace(item.EvangelistName) ? "" : " · " + item.EvangelistName)}")
+                                    <form method="post" action="@Url.Action("DeleteNewComer","Attendance")" onsubmit="return confirm('@(item.ChildName) 새친구를 삭제할까요? 되돌릴 수 없어요.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="del">삭제</button>
+                                    </form>
+                                </div>
+                                <div class="vb" aria-label="방문 @item.VisitCount 번">
+                                    @for (int i = 1; i <= CareWeeks; i++) { <i class="@(i <= item.VisitCount ? "on" : "")"></i> }
+                                    @if (item.VisitCount > CareWeeks) { <em>+@(item.VisitCount - CareWeeks)</em> }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ncAct">
+                            @if (cameToday)
+                            {
+                                <span class="bigB came" role="status">✓ 오늘 방문 · @(item.VisitCount)번째</span>
+                                <form method="post" action="@Url.Action("CancelNewComerVisitToday","Attendance")"
+                                      onsubmit="return confirm(this.dataset.name + ' 오늘 방문을 취소할까요?');" data-name="@item.ChildName">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="newComerId" value="@item.Id" />
+                                    <button type="submit" class="bigB undo">↺ 취소</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form method="post" action="@Url.Action("AddNewComerVisitToday","Attendance")" style="flex:1">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="newComerId" value="@item.Id" />
+                                    <button type="submit" class="bigB add">＋ 오늘 방문 기록하기</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+
+        <section class="sec" id="section-completed">
+            <div class="secH">
+                <div><div class="secK">SETTLED</div><div class="secT">등반한 새친구</div></div>
+                <span class="secN">@completedCount 명</span>
+            </div>
+            @if (Model?.CompletedList == null || Model.CompletedList.Count == 0)
+            {
+                <div class="empty">등반한 새친구가 없습니다.</div>
+            }
+            else
+            {
+                foreach (var item in Model.CompletedList)
+                {
+                    var pu = !string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : NoPhoto;
+                    <div class="nc">
+                        <button type="button" class="ph" onclick="openPhotoModal(@item.Id, this.dataset.name)" data-name="@item.ChildName" aria-label="@item.ChildName 사진 바꾸기">
+                            <img src="@pu" alt="" loading="lazy" onerror="this.onerror=null;this.src='@NoPhoto';" /><span>사진</span>
+                        </button>
+                        <div class="ncTx">
+                            <a class="ncN" href="@Url.Action("NewComerDetail","Attendance",new{id=item.Id})">@item.ChildName<small>@item.ClassText</small></a>
+                            <div class="ncM">
+                                첫 방문 @item.FirstVisitDate.ToString("yyyy.M.d") · @item.VisitCount 번
+                                <form method="post" action="@Url.Action("DeleteNewComer","Attendance")" onsubmit="return confirm('@(item.ChildName) 새친구를 삭제할까요? 되돌릴 수 없어요.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="del">삭제</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="ncA"><span class="grad">@item.NewComerStatus</span></div>
+                    </div>
+                }
+            }
+        </section>
+
+        <div class="ft"><span>이름을 누르면 방문 기록 · 정보 수정</span></div>
+    </main>
+
+    <!-- ══ 새친구 등록 창 ══ -->
+    <div id="newComerModal" class="mb" onclick="bdClose(event,'newComerModal',closeNewComerModal)">
+        <div class="mdl" role="dialog" aria-modal="true" aria-labelledby="ncTitle">
+            <div class="mH"><b id="ncTitle">새친구 등록</b><button type="button" onclick="closeNewComerModal()" aria-label="닫기">✕</button></div>
+            <form method="post" action="@Url.Action("SaveNewComer","Attendance")">
+                @Html.AntiForgeryToken()
+                <div class="mB">
+                    <div class="g2">
+                        <div class="fRow"><label class="fLbl">이름<span class="req">*</span></label><input class="fIn" type="text" name="ChildName" required /></div>
+                        <div class="fRow"><label class="fLbl">보호자<span class="req">*</span></label><input class="fIn" type="text" name="ParentName" required /></div>
+                        <div class="fRow"><label class="fLbl">전화번호<span class="req">*</span></label><input class="fIn" type="tel" name="Phone" inputmode="tel" required /></div>
+                        <div class="fRow"><label class="fLbl">첫 출석일<span class="req">*</span></label><input class="fIn" type="date" name="FirstVisitDate" required value="@today.ToString("yyyy-MM-dd")" /></div>
+                        <div class="fRow"><label class="fLbl">생일 · 월<span class="req">*</span></label><input class="fIn" type="number" name="BirthMonth" min="1" max="12" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">생일 · 일<span class="req">*</span></label><input class="fIn" type="number" name="BirthDay" min="1" max="31" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">학년<span class="req">*</span></label><input class="fIn" type="number" name="ClassYear" min="1" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">반<span class="req">*</span></label><input class="fIn" type="number" name="ClassBan" min="1" inputmode="numeric" required /></div>
+                        <div class="fRow full"><label class="fLbl">학교</label><input class="fIn" type="text" name="School" placeholder="선택" /></div>
+                        <div class="fRow full">
+                            <span class="fLbl">어떻게 왔나요?<span class="req">*</span></span>
+                            <div class="rg">
+                                <label><input type="radio" name="IsVoluntary" value="true" checked onchange="toggleEv(this)" /><span>스스로 왔어요</span></label>
+                                <label><input type="radio" name="IsVoluntary" value="false" onchange="toggleEv(this)" /><span>전도로 왔어요</span></label>
+                            </div>
+                        </div>
+                        <div class="fRow full" id="evField" style="display:none;"><label class="fLbl">전도한 사람</label><input class="fIn" type="text" name="EvangelistName" placeholder="이름" /></div>
+                    </div>
+                </div>
+                <div class="mF">
+                    <button type="button" class="nbtn" onclick="closeNewComerModal()">취소</button>
+                    <button type="submit" class="nbtn pri">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══ 사진 등록 창 ══ -->
+    <div id="photoModal" class="mb" onclick="bdClose(event,'photoModal',closePhotoModal)">
+        <div class="mdl wide" role="dialog" aria-modal="true" aria-labelledby="photoModalTitle">
+            <div class="mH"><b id="photoModalTitle">사진 등록</b><button type="button" onclick="closePhotoModal()" aria-label="닫기">✕</button></div>
+            <form method="post" action="@Url.Action("UploadNewComerPhoto","Attendance")" onsubmit="return submitPhoto();">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="photoNCId" name="newComerId" value="0" />
+                <input type="hidden" id="croppedData" name="croppedImageData" />
+                <div class="mB">
+                    <div class="cropL">
+                        <div>
+                            <div class="cropT">
+                                <span>
+                                    <input type="file" id="fileInput" class="file-hidden" accept="image/*" onchange="onFile(event)" />
+                                    <label for="fileInput" class="nbtn pri" style="cursor:pointer">사진 고르기</label>
+                                    <span id="fileName" style="font-size:12px;color:var(--dim);margin-left:6px"></span>
+                                </span>
+                                <span>
+                                    <button type="button" class="nbtn sm" onclick="rotC(-90)" aria-label="왼쪽으로 돌리기">↺</button>
+                                    <button type="button" class="nbtn sm" onclick="rotC(90)" aria-label="오른쪽으로 돌리기">↻</button>
+                                    <button type="button" class="nbtn sm" onclick="rstC()">원래대로</button>
+                                </span>
+                            </div>
+                            <div class="cropW">
+                                <img id="cropImg" class="nc-hidden" alt="자르기" />
+                                <div id="cropEmpty" class="cropE">사진을 고르면<br />여기서 얼굴 위치를 맞출 수 있어요.</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="fLbl">미리보기</span>
+                            <img id="cropPreview" class="prev" src="@NoPhoto" alt="미리보기" />
+                            <button type="button" id="cropConfirmBtn" class="nbtn confirm" onclick="doConfirm()">자르기 확정</button>
+                            <div class="fHint">정사각형으로 저장돼요. 얼굴이 가운데 오게 맞춘 뒤 <b>자르기 확정</b>을 눌러 주세요.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mF">
+                    <button type="button" class="nbtn" onclick="closePhotoModal()">취소</button>
+                    <button type="submit" class="nbtn pri">사진 저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+    // ══ 창 공통 ══
+    function bdClose(e, id, fn) { if (e.target.id === id) fn(); }
+    function openNewComerModal() { document.getElementById('newComerModal').classList.add('show'); document.body.style.overflow = 'hidden'; }
+    function closeNewComerModal() { document.getElementById('newComerModal').classList.remove('show'); document.body.style.overflow = ''; }
+
+    // ══ 전도자 칸 ══
+    function toggleEv(r) { var f = document.getElementById('evField'); if (f) f.style.display = r.value === 'true' ? 'none' : ''; }
+
+    // ══ 사진 ══
+    let cropper = null;
+    function resetConfirm() { var b = document.getElementById('cropConfirmBtn'); b.classList.remove('done'); b.textContent = '자르기 확정'; }
+    function openPhotoModal(id, name) {
+        document.getElementById('photoNCId').value = id;
+        document.getElementById('photoModalTitle').textContent = (name || '새친구') + ' 사진';
+        document.getElementById('croppedData').value = '';
+        document.getElementById('cropPreview').src = '@NoPhoto';
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileName').textContent = '';
+        var img = document.getElementById('cropImg'); img.src = ''; img.classList.add('nc-hidden');
+        document.getElementById('cropEmpty').style.display = '';
+        resetConfirm();
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById('photoModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    function closePhotoModal() {
+        document.getElementById('photoModal').classList.remove('show');
+        document.body.style.overflow = '';
+        if (cropper) { cropper.destroy(); cropper = null; }
+    }
+    function onFile(e) {
+        var file = e.target.files && e.target.files[0]; if (!file) return;
+        document.getElementById('fileName').textContent = file.name;
+        resetConfirm();
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+            var img = document.getElementById('cropImg');
+            img.src = ev.target.result; img.classList.remove('nc-hidden');
+            document.getElementById('cropEmpty').style.display = 'none';
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(img, {
+                aspectRatio: 1, viewMode: 1, dragMode: 'move', autoCropArea: 1, responsive: true, background: false,
+                checkOrientation: true, guides: true, center: true, highlight: false, cropBoxMovable: true, cropBoxResizable: true,
+                toggleDragModeOnDblclick: false
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+    function rotC(deg) { if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; } cropper.rotate(deg); }
+    function rstC() { if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; } cropper.reset(); resetConfirm(); }
+    function doConfirm() {
+        if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; }
+        var canvas = cropper.getCroppedCanvas({ width: 600, height: 600, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+        var url = canvas.toDataURL('image/jpeg', 0.92);
+        document.getElementById('croppedData').value = url;
+        document.getElementById('cropPreview').src = url;
+        var b = document.getElementById('cropConfirmBtn'); b.classList.add('done'); b.textContent = '✓ 자르기 완료';
+    }
+    function submitPhoto() {
+        var id = document.getElementById('photoNCId').value;
+        if (!id || id === '0') { alert('대상 새친구 정보가 없습니다.'); return false; }
+        if (!document.getElementById('croppedData').value) { alert('자르기 확정 버튼을 눌러 사진을 먼저 확정해 주세요.'); return false; }
+        return true;
+    }
+</script>
+</body>
+</html>

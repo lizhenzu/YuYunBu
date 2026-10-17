@@ -1,0 +1,278 @@
+﻿@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+@inject IGlobalCookieService GlobalCookieService
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@{
+    var cookieKey = "4Mission_NewNotce_20260217";
+    var showBanner = await GlobalCookieService.ShouldShowAsync(cookieKey, HttpContextAccessor.HttpContext);
+}
+
+@if (showBanner)
+{
+    <style>
+        /* ================== Banner ================== */
+
+        .bd30-wrap {
+            margin: 1.4rem 0 2rem;
+        }
+
+        .bd30-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 22px;
+            padding: 1.15rem;
+            color: #fff;
+            background: radial-gradient(700px 360px at 12% -10%, rgba(59,130,246,.35), transparent 60%), radial-gradient(680px 340px at 110% 110%, rgba(16,185,129,.22), transparent 62%), linear-gradient(135deg,#0b1220 0%,#0f172a 45%,#020617 100%);
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: 0 28px 70px rgba(2,6,23,.62);
+        }
+
+            .bd30-card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                border-radius: 22px;
+                background: linear-gradient(90deg, rgba(59,130,246,.42), rgba(16,185,129,.30), rgba(99,102,241,.34));
+                opacity: .10;
+            }
+
+        .bd30-inner {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== TOP ===== */
+
+        .bd30-top {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .bd30-titlebox {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            min-width: 260px;
+        }
+
+        .bd30-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            font-size: 1.4rem;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+        }
+
+        .bd30-title {
+            font-weight: 900;
+            font-size: 1.1rem;
+        }
+
+        /* ===== 숨기기 버튼 ===== */
+
+        .bd30-hide {
+            display: flex;
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        .bd30-hidebtn {
+            border: 0;
+            border-radius: 999px;
+            padding: .52rem 1.02rem;
+            font-size: .82rem;
+            font-weight: 900; /* ✅ 수정 */
+            color: #fff;
+            background: linear-gradient(135deg,#2563eb,#0ea5e9);
+            cursor: pointer;
+        }
+
+        /* ===== BODY ===== */
+
+        .bd30-body {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+
+        .bd30-msg {
+            flex: 1 1 460px;
+            line-height: 1.7;
+        }
+
+            .bd30-msg .em {
+               @*  padding: .22rem .62rem;
+                border-radius: 999px; *@
+                font-weight: 900;
+                background: rgba(59,130,246,.26);
+                border: 1px solid rgba(59,130,246,.4);
+            }
+
+        .bd30-pills {
+            margin-top: .75rem;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .bd30-pill {
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: .82rem;
+            font-weight: 800;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+        }
+
+        /* ===== CTA 버튼 ===== */
+
+        .bd30-cta {
+            display: flex;
+            align-items: center;
+        }
+
+        .bd30-btn {
+            border: 0;
+            cursor: pointer;
+            border-radius: 999px;
+            padding: .9rem 1.15rem;
+            font-size: .95rem;
+            font-weight: 900; /* ⭐ 핵심 */
+            letter-spacing: -0.01em;
+            font-family: "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif;
+            color: #0b1220;
+            background: linear-gradient(135deg,#3b82f6,#10b981);
+            box-shadow: 0 18px 36px rgba(59,130,246,.35);
+            white-space: nowrap;
+        }
+
+        .bd30-foot {
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,.12);
+            font-size: .8rem;
+            color: rgba(255,255,255,.7);
+        }
+
+        /* ===== 모바일 ===== */
+
+        @@media (max-width:640px) {
+
+            .bd30-msg {
+                flex-basis: 100%;
+            }
+
+            .bd30-cta {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .bd30-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+
+    <div class="bd30-wrap js-global-cookie-section"
+         data-cookie-key="@cookieKey">
+
+        <section class="bd30-card">
+            <div class="bd30-inner">
+
+                <div class="bd30-top">
+
+                    <div class="bd30-titlebox">
+                        <div class="bd30-icon">📢</div>
+                        <div class="bd30-title">
+                            @ConstatsCommon.MainKeyTitle · 통합 시상 안내
+                        </div>
+                    </div>
+
+                    <div class="bd30-hide">
+                        <button type="button"
+                                class="bd30-hidebtn js-global-cookie-hide-btn"
+                                data-hide="99year">
+                            공지 숨기기
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="bd30-body">
+
+                    <div class="bd30-msg">
+
+                        올해는 <span class="em">@ConstatsCommon.MainKeyTitle</span>를
+                        별도로 시상하지 않고
+                        <span class="em">통합 시상 방식</span>으로 진행됩니다.<br /><br />
+
+                        🌰 <b>“@ConstatsCommon.myDoToRi” @ConstatsCommon.myDoToRi</b>로 시상합니다.<br /><br />
+
+                        @(ConstatsCommon.myDoToRi)는 아래 활동 점수를 모두 합산합니다.
+
+                        <div class="bd30-pills">
+                            <span class="bd30-pill">📖 @ConstatsCommon.MainKeyTitle</span>
+                            <span class="bd30-pill">📘 @ConstatsCommon.MissionBibleWithparent</span>
+                            <span class="bd30-pill">📝 @ConstatsCommon.HolyWordAndRead</span>
+                        </div>
+
+                        <br />
+                        메인 화면 ‘@ConstatsCommon.myDoToRi’에서 확인하세요 😊
+
+                    </div>
+
+                    <div class="bd30-cta">
+                        <button type="button"
+                                class="bd30-btn"
+                                onclick="location.href='/StudentPointDashboard4/Index'">
+                            @(@ConstatsCommon.myDoToRi)에서 확인하기 →
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="bd30-foot">
+                    ※ 통합 시상은 “@ConstatsCommon.MainKeyTitle + @ConstatsCommon.MissionBibleWithparent + @ConstatsCommon.HolyWordAndRead” 포인트를 합산하여 진행됩니다.
+                </div>
+
+            </div>
+        </section>
+    </div>
+
+    <script>
+        document.addEventListener("click", async (e) => {
+
+            const btn = e.target.closest(".js-global-cookie-hide-btn");
+            if (!btn) return;
+
+            const section = btn.closest(".js-global-cookie-section");
+            const cookieKey = section.dataset.cookieKey;
+
+            await fetch("/GlobalCookie/Hide", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    cookieKey: cookieKey,
+                    durationCode: "99year"
+                })
+            });
+
+            section.style.display = "none";
+        });
+    </script>
+}

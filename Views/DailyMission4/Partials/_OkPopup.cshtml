@@ -1,0 +1,250 @@
+﻿@model object
+@using System
+
+@functions {
+    private static string GetStr(object m, string name)
+    {
+        try
+        {
+            if (m == null) return null;
+            var p = m.GetType().GetProperty(name);
+            if (p == null) return null;
+            var v = p.GetValue(m);
+            return v?.ToString();
+        }
+        catch { return null; }
+    }
+
+    private static int GetInt(object m, string name, int def = 0)
+    {
+        try
+        {
+            var s = GetStr(m, name);
+            if (string.IsNullOrWhiteSpace(s)) return def;
+            if (int.TryParse(s, out var n)) return n;
+            return def;
+        }
+        catch { return def; }
+    }
+
+    private static bool GetBool(object m, string name, bool def = false)
+    {
+        try
+        {
+            if (m == null) return def;
+            var p = m.GetType().GetProperty(name);
+            if (p == null) return def;
+            var v = p.GetValue(m);
+            if (v == null) return def;
+
+            if (v is bool b) return b;
+
+            var s = v.ToString();
+            if (string.IsNullOrWhiteSpace(s)) return def;
+            if (bool.TryParse(s, out var bb)) return bb;
+
+            // "1"/"0" 같은 값도 처리
+            if (int.TryParse(s, out var n)) return n != 0;
+
+            return def;
+        }
+        catch { return def; }
+    }
+}
+
+@{
+    var msg = GetStr(Model, "Message");
+    int autoCloseSeconds = GetInt(Model, "AutoCloseSeconds", 0);
+
+    var redirectUrl = GetStr(Model, "RedirectUrl"); // ✅ 없어도 절대 예외 안남
+    var returnUrl = GetStr(Model, "ReturnUrl");     // ✅ 없어도 절대 예외 안남
+
+    // ✅ 추가: 버튼(다음/3일/7일) 표시 여부
+    bool showActions = GetBool(Model, "ShowActions", false);
+}
+
+@if (!string.IsNullOrWhiteSpace(msg))
+{
+    <style>
+        .dm2PopupBg {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 16px;
+        }
+
+        .dm2PopupCard {
+            width: min(560px,94vw);
+            border-radius: 22px;
+            background: rgba(255,255,255,.98);
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: 0 26px 70px rgba(15,23,42,.28);
+            padding: 16px 16px 14px;
+            text-align: center;
+        }
+
+        .dm2PopupTitle {
+            font-weight: 950;
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        .dm2PopupMsg {
+          @*   font-weight: 900; *@
+            font-size: 14px;
+            color: rgba(15,23,42,.90);
+            line-height: 1.45;
+            white-space: pre-line;
+        }
+
+        .dm2PopupMsgA {
+            font-weight: 900;
+            font-size: 14px;
+            color: rgba(15,23,42,.90);
+            line-height: 1.45;
+        }
+
+        .dm2PopupBtns {
+            margin-top: 14px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .dm2PopupBtn {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            border: 1px solid rgba(226,232,240,.95);
+            font-weight: 950;
+            cursor: pointer;
+        }
+
+        .dm2Primary {
+            background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+            color: #fff;
+            border-color: rgba(34,197,94,.35);
+        }
+
+        .dm2Ghost {
+            background: rgba(248,250,252,.95);
+            color: rgba(15,23,42,.92);
+        }
+
+        .dm2Row3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+        }
+
+        @@media (max-width:520px) {
+            .dm2Row3 { grid-template-columns: 1fr; }
+        }
+
+        .dm2PopupHint {
+            margin-top: 10px;
+            font-weight: 900;
+            font-size: 12.5px;
+            color: rgba(71,85,105,.92);
+        }
+    </style>
+
+    <div id="dm2OkPopupBg" class="dm2PopupBg" aria-hidden="false">
+        <div class="dm2PopupCard" role="dialog" aria-modal="true" aria-label="안내">
+            <div class="dm2PopupTitle">🎁 안내</div>
+            <div class="dm2PopupMsg">@msg</div>
+            <div class="dm2PopupMsgA">
+                ⭐ 모은 포인트 :
+                <span style="margin-left:10px;font-size:30px; font-weight:900; color:#ff7a00;">
+                    @ViewBag.YearTotalPoint
+                </span>
+                점
+            </div>
+            
+
+            <div class="dm2PopupBtns">
+                @* ✅ 이동 버튼: redirectUrl 있을 때만 *@
+                @if (!string.IsNullOrWhiteSpace(redirectUrl))
+                {
+                    <button type="button" class="dm2PopupBtn dm2Primary" onclick="location.href='@redirectUrl'">
+                        지금 선물 선택하러 가기
+                    </button>
+                }
+
+                @* ✅ Dashboard에서만: 숨김 버튼 3개 *@
+                @if (showActions)
+                {
+                    <div class="dm2Row3">
+                        <form method="post" action="/DailyMission2/AwardPopupHide" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="days" value="1" />
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <button type="submit" class="dm2PopupBtn dm2Ghost">다음에 할래요</button>
+                        </form>
+
+                        <form method="post" action="/DailyMission2/AwardPopupHide" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="days" value="3" />
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <button type="submit" class="dm2PopupBtn dm2Ghost">3일 숨기기</button>
+                        </form>
+
+                        <form method="post" action="/DailyMission2/AwardPopupHide" style="margin:0;">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="days" value="7" />
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <button type="submit" class="dm2PopupBtn dm2Ghost">7일 숨기기</button>
+                        </form>
+                    </div>
+                }
+
+                <button type="button" class="dm2PopupBtn dm2Ghost" onclick="dm2CloseOkPopup()">닫기</button>
+            </div>
+
+            @if (autoCloseSeconds > 0)
+            {
+                <div class="dm2PopupHint">
+                    <span id="dm2OkCountdown">@autoCloseSeconds</span>초 후 자동으로 닫혀요.
+                </div>
+            }
+        </div>
+    </div>
+
+    <script>
+        let dm2OkTimer = null;
+        let dm2OkRemain = null;
+
+        function dm2CloseOkPopup() {
+            const bg = document.getElementById('dm2OkPopupBg');
+            if (bg) bg.style.display = 'none';
+            if (dm2OkTimer) { clearInterval(dm2OkTimer); dm2OkTimer = null; }
+            document.body.style.overflow = 'auto';
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const bg = document.getElementById('dm2OkPopupBg');
+            if (!bg) return;
+
+            document.body.style.overflow = 'hidden';
+
+            const cdEl = document.getElementById('dm2OkCountdown');
+            if (!cdEl) return;
+
+            dm2OkRemain = parseInt(cdEl.innerText || "0", 10);
+            if (isNaN(dm2OkRemain) || dm2OkRemain < 1) return;
+
+            dm2OkTimer = setInterval(function () {
+                dm2OkRemain -= 1;
+                cdEl.innerText = String(dm2OkRemain);
+                if (dm2OkRemain <= 0) dm2CloseOkPopup();
+            }, 1000);
+
+            bg.addEventListener('click', function (e) {
+                if (e.target === bg) dm2CloseOkPopup();
+            });
+        });
+    </script>
+}

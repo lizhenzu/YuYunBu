@@ -1,0 +1,803 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using Microsoft.Extensions.Configuration;
+@using System.Data;
+@using System.Data.SqlClient;
+@using System.Collections.Generic;
+@using System.Linq;
+
+@inject IConfiguration Configuration
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+@model GiftBoxVM
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+@{
+    Layout = null;
+
+    string N(int v) => v.ToString("N0");
+
+    string StatusKo(string s) => (s ?? "").ToUpperInvariant() switch
+    {
+        "DRAFT" => "선택 중(재선택 가능)",
+        "PURCHASED" => "구매 완료(변경 불가)",
+        "CANCELED_BY_RESELECT" => "재선택으로 변경됨",
+        "CANCELED_BY_UPGRADE" => "상위 점수 도달로 자동 변경",
+        "HIDDEN" => "숨김",
+        _ => s ?? "-"
+    };
+
+    // (선택) 상태별 배지 클래스
+    string StatusBadgeClass(string s) => (s ?? "").ToUpperInvariant() switch
+    {
+        "PURCHASED" => "purchased",
+        "CANCELED_BY_RESELECT" => "canceled",
+        "CANCELED_BY_UPGRADE" => "canceled",
+        "HIDDEN" => "hidden",
+        _ => ""
+    };
+
+    // ✅ [버그 수정 핵심]
+    // CreditCostSnapshot은 "선물가격"이 아니라 "그 시점에 소멸 처리할 잔여 credit(=AvailableCredit)"이 저장됨.
+    // credit은 dbo.StudentPointMilestoneCredit의 누적합으로 계산되므로, 단순히 credit/5000*100 같은 계산은 오답이 될 수 있음.
+    // 해결: StudentPointMilestoneCredit를 읽어서 누적 credit → milestone point로 역매핑한다.
+    var milestoneCumCredits = new List<(int MilestonePoint, int CumCredit)>();
+
+    try
+    {
+        var connStr = Configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrWhiteSpace(connStr))
+        {
+            using var conn = new SqlConnection(connStr);
+            await conn.OpenAsync();
+
+            using var cmd = new SqlCommand(@"
+SELECT MilestonePoint, Credit
+FROM dbo.StudentPointMilestoneCredit WITH (NOLOCK)
+WHERE IsActive=1
+ORDER BY MilestonePoint ASC;", conn);
+
+            using var r = await cmd.ExecuteReaderAsync();
+            int cum = 0;
+
+            while (await r.ReadAsync())
+            {
+                var mp = r.GetInt32(0);
+                var c = r.GetInt32(1);
+
+                cum += c;
+                milestoneCumCredits.Add((mp, cum));
+            }
+        }
+    }
+    catch
+    {
+        // 테이블 접근 실패 시에도 페이지는 뜨게(표시만 fallback)
+        milestoneCumCredits = new List<(int MilestonePoint, int CumCredit)>();
+    }
+
+    int ToMilestonePointFromCredit(int credit)
+    {
+        if (credit <= 0) return 0;
+
+        // ✅ 정상 루트: 누적 credit과 정확히 매칭되는 milestone을 찾는다.
+        // (보통 선택 시점의 AvailableCredit = 해당 milestone까지 누적 earned 이라 exact match가 많음)
+        if (milestoneCumCredits.Count > 0)
+        {
+            // 1) exact match 우선
+            var exact = milestoneCumCredits.FirstOrDefault(x => x.CumCredit == credit);
+            if (exact.MilestonePoint > 0) return exact.MilestonePoint;
+
+            // 2) exact가 아니면: credit 이하 중 가장 큰 milestone(가장 근접한 하위 마일스톤)
+            var below = milestoneCumCredits
+                .Where(x => x.CumCredit <= credit)
+                .OrderByDescending(x => x.CumCredit)
+                .FirstOrDefault();
+
+            if (below.MilestonePoint > 0) return below.MilestonePoint;
+
+            return 0;
+        }
+
+        // ✅ fallback (DB 조회 실패 등)
+        // 너무 공격적으로 잘못 표시되는 것보단 0이 낫다.
+        return 0;
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>내 선물함</title>
+
+    <style>
+        :root {
+            --bg: #f6f7fb;
+            --card: #ffffff;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: rgba(2,6,23,.10);
+            --shadow: 0 18px 42px rgba(2,6,23,.10);
+            --shadow2: 0 10px 26px rgba(2,6,23,.08);
+            --r: 22px;
+            --pri1: #22c55e;
+            --pri2: #3b82f6;
+            --warn1: #f97316;
+            --warn2: #fb7185;
+        }
+
+        * { box-sizing: border-box }
+
+        body {
+            margin: 0;
+            font-family: "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 600px at 12% 0%, rgba(167,139,250,.14), transparent 60%),
+                radial-gradient(1000px 550px at 88% 8%, rgba(34,197,94,.12), transparent 60%),
+                radial-gradient(900px 600px at 50% 100%, rgba(59,130,246,.10), transparent 60%),
+                linear-gradient(180deg, var(--bg), #fff);
+            min-height: 100vh;
+        }
+
+        .wrap { max-width: 1100px; margin: 0 auto; padding: 18px 14px 28px }
+
+        header {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.90);
+            backdrop-filter: blur(10px);
+            border-radius: calc(var(--r) + 6px);
+            box-shadow: var(--shadow);
+            padding: 16px;
+        }
+
+        .hTop {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap
+        }
+
+        .title {
+            font-weight: 900;
+            font-size: 18px;
+            letter-spacing: -.3px;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title .badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 900;
+            background: linear-gradient(135deg,var(--pri1),var(--pri2));
+            box-shadow: var(--shadow2);
+        }
+
+        .sub {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.5;
+            font-size: 13px
+        }
+
+        .btnRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            color: var(--ink);
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(2,6,23,.06);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn.primary {
+            border: 0;
+            color: #fff;
+            background: linear-gradient(135deg,var(--pri1),var(--pri2));
+            box-shadow: 0 16px 34px rgba(34,197,94,.18), 0 14px 30px rgba(59,130,246,.16);
+        }
+               .btn.secondary {
+                border: 0;
+                background: linear-gradient(135deg, rgba(59,130,246,.95), rgba(99,102,241,.95));
+                color: #fff;
+            }
+        
+        .btn.danger{
+            border:0;
+            background: linear-gradient(135deg, rgba(239,68,68,.95), rgba(244,63,94,.95));
+            color:#fff;
+            box-shadow: 0 16px 34px rgba(239,68,68,.18), 0 14px 30px rgba(244,63,94,.16);
+        }
+.grid {
+            display: grid;
+            grid-template-columns: repeat(12,1fr);
+            gap: 12px;
+            margin-top: 14px
+        }
+
+        .card {
+            grid-column: span 12;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            backdrop-filter: blur(10px);
+            border-radius: var(--r);
+            box-shadow: var(--shadow2);
+            padding: 14px;
+            overflow: hidden;
+        }
+
+        .cardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+        .cardTitle { margin: 0; font-weight: 900; font-size: 15px; letter-spacing: -.2px }
+
+        .pill {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: 999px;
+            padding: 8px 10px;
+            font-size: 12px;
+            color: var(--muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 16px rgba(2,6,23,.05);
+            white-space: nowrap;
+        }
+        .pill i {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: linear-gradient(135deg,var(--pri1),var(--pri2));
+            display: inline-block
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(12,1fr);
+            gap: 12px;
+            margin-top: 12px
+        }
+
+        .stat {
+            grid-column: span 6;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: rgba(255,255,255,.86);
+            padding: 12px;
+            box-shadow: 0 10px 22px rgba(2,6,23,.06);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        @@media (min-width: 780px) { .stat { grid-column: span 3; } }
+
+        .k { font-size: 12px; color: var(--muted); font-weight: 900; display:flex; align-items:center; gap:6px; }
+        .k .dot{ width:8px; height:8px; border-radius:99px; background: linear-gradient(135deg,var(--pri1),var(--pri2)); display:inline-block; }
+        .v { font-size: 20px; font-weight: 1000; letter-spacing: -.4px }
+
+        .currentBox {
+            display:flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            padding: 12px;
+            border-radius: 18px;
+            border: 1px dashed rgba(59,130,246,.35);
+            background: rgba(59,130,246,.06);
+        }
+
+        .currentLeft { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+        .currentImg {
+            width: 56px; height: 56px; border-radius: 16px;
+            object-fit: cover;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+        .currentName { margin:0; font-weight:1000; }
+        .currentMeta { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+        .miniPill {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.9);
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 900;
+        }
+        .miniPill b{ color: var(--ink); }
+
+        .miniBtn {
+            border: 0;
+            border-radius: 14px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 1000;
+            cursor: pointer;
+            text-decoration: none;
+            display:inline-flex; align-items:center; gap:8px;
+            box-shadow: 0 12px 26px rgba(2,6,23,.10);
+        }
+        .miniBtn.primary{
+            color:#fff;
+            background: linear-gradient(135deg,var(--pri1),var(--pri2));
+        }
+        .miniBtn.ghost{
+            background: rgba(255,255,255,.92);
+            color: var(--ink);
+            border: 1px solid var(--line);
+        }
+
+        .giftGrid { display:grid; grid-template-columns: repeat(12,1fr); gap:12px; }
+        .giftCard {
+            grid-column: span 12;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: var(--r);
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+            display:flex;
+            gap: 12px;
+            padding: 12px;
+            align-items: center;
+        }
+        @@media (min-width: 780px) { .giftCard { grid-column: span 6; } }
+        @@media (min-width: 1020px) { .giftCard { grid-column: span 4; } }
+
+        .gImg{
+            width: 64px; height: 64px; border-radius: 18px;
+            object-fit: cover;
+            border: 1px solid var(--line);
+            background: #fff;
+            flex: 0 0 auto;
+        }
+        .gMain{ min-width:0; flex:1; }
+        .gName{ margin:0; font-weight:1000; }
+        .gDesc{ margin:6px 0 0; color: var(--muted); font-size: 12px; line-height:1.4; }
+        .gRight{ display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
+        .pricePill{
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 1000;
+            background: rgba(34,197,94,.10);
+            border: 1px solid rgba(34,197,94,.25);
+        }
+
+        .hGrid{ display:grid; grid-template-columns: repeat(12,1fr); gap:12px; margin-top:12px; }
+        .hCard{
+            grid-column: span 12;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: var(--r);
+            box-shadow: var(--shadow2);
+            overflow:hidden;
+            padding: 12px;
+        }
+        .hTopRow{ display:flex; gap:12px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; }
+        .hImg{
+            width: 64px; height: 64px; border-radius: 18px;
+            object-fit: cover;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+        .hMain{ flex:1; min-width: 200px; }
+        .hName{ margin:0; font-weight:1000; }
+
+        .sBadge{
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 1000;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+        }
+        .sBadge.purchased{
+            color:#0b5;
+            border-color: rgba(34,197,94,.35);
+            background: rgba(34,197,94,.10);
+        }
+        .sBadge.canceled{
+            color:#f97316;
+            border-color: rgba(249,115,22,.35);
+            background: rgba(249,115,22,.10);
+        }
+        .sBadge.hidden{
+            color:#64748b;
+            border-color: rgba(100,116,139,.35);
+            background: rgba(100,116,139,.10);
+        }
+
+        .hMetaRow{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+        .hPill{
+            border:1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 900;
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            box-shadow: 0 8px 16px rgba(2,6,23,.05);
+        }
+        .hPill b{ color: var(--ink); }
+
+        .footer{
+            margin-top: 18px;
+            text-align:center;
+            color: rgba(100,116,139,.9);
+            font-size: 12px;
+            padding: 12px 0 6px;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <div class="hTop">
+            <div>
+                <h1 class="title">
+                    <span class="badge">🎁</span>
+                    내 선물함
+                </h1>
+                <p class="sub">통합 포인트 달성으로 모은 credit으로 선물을 선택하고, 구매 완료까지 확인할 수 있어요.</p>
+            </div>
+
+            <div class="btnRow">
+                    <a class="btn" href="/">🏠 Home</a>
+                    <a class="btn" href="/StudentPointDashboard4/Index">🌰 @ConstatsCommon.myDoToRi</a>
+@*      @if (isSuperAdmin || isAdmin)
+                        {
+                            <a class="btn secondary" href="/StudentPointDashboard4/AdminPurchaseList">🛠️ 관리자</a>
+                        }
+ *@            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="k"><span class="dot"></span>통합 포인트</div>
+                <div class="v">@N(Model?.IntegratedTotal ?? 0)</div>
+            </div>
+            <div class="stat">
+                <div class="k"><span class="dot"></span>사용완료 포인트</div>
+                <div class="v">@N(Model?.SpentMilestone ?? 0)</div>
+            </div>
+           <div class="stat">
+    <div class="k"><span class="dot"></span>사용가능 포인트</div>
+    <div class="v">@N((Model?.IntegratedTotal ?? 0) - (Model?.SpentMilestone ?? 0))</div>
+</div>
+
+                @if (isSuperAdmin || isAdmin)
+                {
+                    <div class="stat">
+                        <div class="k"><span class="dot"></span>획득 credit</div>
+                        <div class="v">@N(Model?.EarnedCredit ?? 0)</div>
+                    </div>
+                    <div class="stat">
+                        <div class="k"><span class="dot"></span>잔여 credit</div>
+                        <div class="v">@N(Model?.AvailableCredit ?? 0)</div>
+                    </div>
+                }
+        </div>
+    </header>
+
+    @{
+        bool isStaffView = (bool)(ViewBag.IsStaff ?? false);
+        var teamGiftRows = ViewBag.TeamGiftRows as List<BulletinBoard.Services.Abstract.AdminPurchaseRowVM>
+                           ?? new List<BulletinBoard.Services.Abstract.AdminPurchaseRowVM>();
+    }
+
+    @* ── 탭 버튼 (Admin/SuperAdmin에게만 가족팀 탭 표시) ── *@
+    @if (isStaffView)
+    {
+        <div style="display:flex;gap:0;margin-bottom:18px;border-radius:14px;overflow:hidden;border:1px solid var(--line);width:fit-content;box-shadow:0 4px 14px rgba(2,6,23,.06);">
+            <button id="tabBtnPersonal" onclick="switchTab('personal')"
+                    style="padding:10px 20px;border:none;cursor:pointer;font-weight:900;font-size:13px;font-family:inherit;background:linear-gradient(135deg,var(--pri1),var(--pri2));color:#fff;transition:all .15s;">
+                🌰 개인 선물함
+            </button>
+            <button id="tabBtnTeam" onclick="switchTab('team')"
+                    style="padding:10px 20px;border:none;cursor:pointer;font-weight:900;font-size:13px;font-family:inherit;background:rgba(255,255,255,.92);color:var(--muted);border-left:1px solid var(--line);transition:all .15s;">
+                🏠 가족팀 선물함
+            </button>
+        </div>
+    }
+
+    @* ── 개인 선물 탭 ── *@
+    <div id="tabPersonal">
+    <div class="grid">
+
+        <!-- 현재 선택 (DRAFT) -->
+        <section class="card">
+            <div class="cardHead">
+                <h2 class="cardTitle">현재 선택</h2>
+                <span class="pill"><i></i>DRAFT는 구매 전 상태</span>
+            </div>
+
+            @if (Model.CurrentDraft == null)
+            {
+                <p class="sub" style="margin:10px 0 0;">현재 선택된 선물이 없습니다. 선물 선택 페이지에서 골라주세요.</p>
+            }
+            else
+            {
+                var d = Model.CurrentDraft;
+                var dImg = (d.ImageUrl ?? "").Trim();
+                if (string.IsNullOrWhiteSpace(dImg)) { dImg = "/images/gift-placeholder.png"; }
+
+                <div class="currentBox" style="margin-top:12px;">
+                    <div class="currentLeft">
+                        <img class="currentImg" src="@dImg" alt="@d.ProductName" />
+                        <div>
+                            <p class="currentName">@d.ProductName</p>
+                            <div class="currentMeta">
+                                <span class="miniPill">상태: <b>@StatusKo(d.Status)</b></span>
+                                <span class="miniPill">선택일: <b>@d.CreatedAt.ToString("yyyy-MM-dd HH:mm")</b></span>
+
+                                @if (@d.Milestone > 0)
+                                {
+                                    <span class="miniPill">마일스톤: <b>@d.Milestone</b></span>
+                                }
+                                    @if (isSuperAdmin || isAdmin)
+                                {
+                                <span class="miniPill">소멸 credit: <b>@N(d.CreditCostSnapshot)</b></span>
+                                }
+                            </div>
+                        </div>
+                    </div>              
+                </div>
+
+ 
+
+                <div class="btnRow" style="margin-top:12px;">
+                    <form method="post" action="@Url.Action("CancelGift", "StudentPointDashboard2")"
+                          onsubmit="return confirm('선물을 취소하면 완전히 삭제됩니다. 정말 취소할까요?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="orderId" value="@d.OrderId" />
+                        <button type="submit" class="btn danger">🗑️ 선택 취소(삭제)</button>
+                    </form>
+                </div>
+
+@*                 <p class="sub" style="margin:10px 0 0;">
+                    ※ 재선택하면 기존 선택(DRAFT/취소류)은 DB에서 삭제됩니다. (요구사항 반영)
+                </p>
+ *@            }
+        </section>
+
+        <!-- 지금 가능한 선물 -->
+        <section class="card">
+            <div class="cardHead">
+                <h2 class="cardTitle">지금 가능한 선물</h2>
+                <span class="pill"><i></i>잔여 credit 기준</span>
+                @{
+                    var giftCount = Model.AffordableGifts?.Count ?? 0;
+                    var priceList2 = Model.AffordableGifts?.Where(x => x.UnitPrice > 0).ToList();
+                }
+                <span class="pill" style="background:rgba(59,130,246,.10);border-color:rgba(59,130,246,.22);color:#1d4ed8;">
+                    📦 @giftCount 종
+                </span>
+                @if ((isAdmin || isSuperAdmin) && priceList2 != null && priceList2.Any())
+                {
+                    <span class="pill" style="background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.22);color:#065f46;">
+                        💰 최저 @(priceList2.Min(x => x.UnitPrice).ToString("N0"))원
+                    </span>
+                    <span class="pill" style="background:rgba(245,158,11,.10);border-color:rgba(245,158,11,.22);color:#92400e;">
+                        💰 최고 @(priceList2.Max(x => x.UnitPrice).ToString("N0"))원
+                    </span>
+                }
+            </div>
+
+            @if (Model.AffordableGifts == null || Model.AffordableGifts.Count == 0)
+            {
+                <p class="sub" style="margin:10px 0 0;">현재 잔여 credit으로 선택 가능한 선물이 없습니다.</p>
+            }
+            else
+            {
+                <div class="giftGrid" style="margin-top:12px;">
+                    @foreach (var g in Model.AffordableGifts)
+                    {
+                        var img = (g.ImageUrl ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(img)) { img = "/images/gift-placeholder.png"; }
+
+                        <div class="giftCard">
+                            <img class="gImg" src="@img" alt="@g.ProductName" />
+                            <div class="gMain">
+                                <p class="gName">@g.ProductName</p>
+                                @if (!string.IsNullOrWhiteSpace(g.ProductDescription))
+                                {
+                                    <p class="gDesc">@g.ProductDescription</p>
+                                }
+                            </div>
+                            <div class="gRight">
+                                @if(isSuperAdmin || isAdmin)
+                                {
+                                <span class="pricePill">💳 @N(g.UnitPrice) credit</span>
+                                }
+
+                                <form method="post" action="/StudentPointDashboard4/SelectGift">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="productId" value="@g.ProductID" />
+                                    <button type="submit" class="miniBtn primary">선택</button>
+                                </form>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+
+        <!-- 이력 -->
+        <section class="card">
+            <div class="cardHead">
+                <h2 class="cardTitle">선물 선택 이력</h2>
+                <span class="pill"><i></i>최근 50건</span>
+            </div>
+
+            @if (Model.History == null || Model.History.Count == 0)
+            {
+                <p class="sub" style="margin:10px 0 0;">이력이 아직 없어요.</p>
+            }
+            else
+            {
+                <div class="hGrid">
+                    @foreach (var h in Model.History)
+                    {
+                        var img = (h.ImageUrl ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(img)) { img = "/images/gift-placeholder.png"; }
+
+                        var badgeClass = StatusBadgeClass(h.Status);
+                        var milestonePoint = ToMilestonePointFromCredit(h.CreditCostSnapshot);
+
+                        <article class="hCard">
+                            <div class="hTopRow">
+                                <img class="hImg" src="@img" alt="@h.ProductName" />
+
+                                <div class="hMain">
+                                    <p class="hName">@h.ProductName</p>
+                                </div>
+
+                                <span class="sBadge @badgeClass">@StatusKo(h.Status)</span>
+                            </div>
+
+                            <div class="hMetaRow">
+                                <span class="hPill">🕒 <b>@h.CreatedAt.ToString("yyyy-MM-dd HH:mm")</b></span>
+
+                                <span class="hPill">
+                                    🎯 시상<b>@h.Milestone</b>포인트
+                                </span>
+
+                                @if (isSuperAdmin || isAdmin)
+                                {
+                                    <span class="hPill">💳 소멸 credit <b>@N(h.CreditCostSnapshot)</b></span>
+                                }
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+
+    </div>
+    </div><!-- /tabPersonal -->
+
+    @* ── 가족팀 선물 탭 (Admin/SuperAdmin 전용, 읽기 전용) ── *@
+    @if (isStaffView)
+    {
+        <div id="tabTeam" style="display:none;">
+            @if (!teamGiftRows.Any())
+            {
+                <div style="padding:40px;text-align:center;color:var(--muted);font-size:14px;">
+                    🏠 아직 지급된 가족팀 선물이 없습니다.
+                </div>
+            }
+            else
+            {
+                <!-- 리스트 형식 -->
+                <div style="border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.92);box-shadow:0 4px 14px rgba(2,6,23,.06);">
+                    @foreach (var t in teamGiftRows.OrderByDescending(x => x.CreatedAt))
+                    {
+                        <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(2,6,23,.06);">
+                            <!-- 선물 썸네일 (50px) -->
+                            <div style="flex-shrink:0;width:50px;height:50px;border-radius:10px;
+                                        background-image:url('/images/AwardItem/@(t.ProductID).jpg');
+                                        background-size:cover;background-position:center;
+                                        background-color:#f0fdf4;
+                                        display:flex;align-items:center;justify-content:center;font-size:20px;
+                                        border:1px solid rgba(2,6,23,.08);">🎁</div>
+
+                            <!-- 정보 -->
+                            <div style="flex:1;min-width:0;">
+                                <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:3px;">
+                                    <span style="font-weight:900;font-size:14px;">@t.ProductName</span>
+                                    @if (t.MileStoneVal > 0)
+                                    {
+                                        <span style="padding:2px 7px;background:rgba(245,158,11,.12);color:#b45309;border-radius:999px;font-size:11px;font-weight:900;border:1px solid rgba(245,158,11,.25);">🏆 @t.MileStoneVal.ToString("N0")점</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(t.Memo))
+                                    {
+                                        <span style="padding:2px 7px;background:rgba(124,58,237,.10);color:#7c3aed;border-radius:999px;font-size:11px;font-weight:900;border:1px solid rgba(124,58,237,.20);">🏠 @t.Memo</span>
+                                    }
+                                </div>
+                                <div style="font-size:12px;color:var(--muted);">
+                                    @(t.UserFullName ?? t.UserName) &nbsp;·&nbsp; 🕒 @t.CreatedAt.ToString("yy.MM.dd")
+                                </div>
+                            </div>
+
+                            <!-- 상태 -->
+                            <div style="flex-shrink:0;">
+                                <span style="padding:4px 10px;background:rgba(34,197,94,.12);color:#15803d;border-radius:999px;font-size:11px;font-weight:900;border:1px solid rgba(34,197,94,.20);">✅ 시상완료</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <div class="footer">
+       © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+    </div>
+</div>
+
+@if (isStaffView)
+{
+    <script>
+    function switchTab(tab) {
+        var personal = document.getElementById('tabPersonal');
+        var team     = document.getElementById('tabTeam');
+        var btnP     = document.getElementById('tabBtnPersonal');
+        var btnT     = document.getElementById('tabBtnTeam');
+
+        if (tab === 'personal') {
+            personal.style.display = '';
+            team.style.display     = 'none';
+            btnP.style.background  = 'linear-gradient(135deg,var(--pri1),var(--pri2))';
+            btnP.style.color       = '#fff';
+            btnT.style.background  = 'rgba(255,255,255,.92)';
+            btnT.style.color       = 'var(--muted)';
+        } else {
+            personal.style.display = 'none';
+            team.style.display     = '';
+            btnT.style.background  = 'linear-gradient(135deg,#7c3aed,#a855f7)';
+            btnT.style.color       = '#fff';
+            btnP.style.background  = 'rgba(255,255,255,.92)';
+            btnP.style.color       = 'var(--muted)';
+        }
+    }
+    </script>
+}
+</body>
+</html>

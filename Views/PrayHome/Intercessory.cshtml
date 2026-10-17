@@ -1,0 +1,427 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var urlHome     = "/";
+    var urlWorship  = "/PrayHome/Branch";
+
+    var urlMissionLetter1 = "https://blog.naver.com/PostView.naver?blogId=hoanioh&Redirect=View&logNo=223987996791&categoryNo=1&isAfterWrite=true&isMrblogPost=false&isHappyBeanLeverage=true&contentLength=67210";
+    var urlMissionLetter2 = "https://blog.naver.com/hoanioh/224123028707";
+    var urlMissionLetter3 = "https://blog.naver.com/hoanioh/224190433257";
+    var urlMissionLetter4 = "https://blog.naver.com/hoanioh/224357640825";
+    var urlPrayerLetter   = "/HTML/OhyouHan/오요한선교사기도편지.html";
+}
+
+@{
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>중보기도 — @ChurchName</title>
+<style>
+:root {
+  --cream:   #fdf8ef;
+  --cream2:  #fef3e2;
+  --card:    #ffffff;
+  --amber:   #e07832;
+  --amber2:  #f4a84a;
+  --gold:    #f9c84a;
+  --rose:    #e8856a;
+  --brown:   #6b3d28;
+  --brown2:  #9c5a3a;
+  --text:    #3b2212;
+  --muted:   #8c6248;
+  --border:  #f0d9c4;
+  --shadow:  0 4px 24px rgba(160,90,40,.10);
+  --shadow2: 0 8px 36px rgba(160,90,40,.14);
+  --r:       18px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 20px;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 2px 12px rgba(160,90,40,.08);
+}
+.topbar-brand {
+  font-size: 13px; font-weight: 800;
+  color: var(--brown);
+  display: flex; align-items: center; gap: 7px;
+}
+.topbar-brand::before {
+  content: '';
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--amber);
+}
+.topbar-nav { display: flex; gap: 8px; }
+.nav-btn {
+  background: var(--cream2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--brown);
+  font-size: 12.5px; font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.nav-btn:hover { background: #fce8d0; transform: translateY(-1px); }
+.nav-btn.home { background: var(--amber); color: #fff; border-color: var(--amber); }
+.nav-btn.home:hover { background: var(--rose); border-color: var(--rose); }
+
+/* ── HERO ── */
+.hero {
+  background: linear-gradient(160deg, #fff8ee 0%, #fdecd6 50%, #fde4cc 100%);
+  padding: 52px 20px 44px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 300px;
+  background: radial-gradient(ellipse, rgba(244,168,74,.18), transparent 70%);
+  pointer-events: none;
+}
+.hero-icon {
+  font-size: 52px;
+  line-height: 1;
+  margin-bottom: 16px;
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(224,120,50,.25));
+}
+.hero h1 {
+  font-size: clamp(26px, 5.5vw, 42px);
+  font-weight: 900;
+  color: var(--brown);
+  letter-spacing: -.5px;
+  line-height: 1.2;
+  margin-bottom: 14px;
+  text-wrap: balance;
+}
+.hero h1 em {
+  font-style: normal;
+  color: var(--amber);
+}
+.hero-sub {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 400px;
+  margin: 0 auto 24px;
+}
+.hero-chips {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  justify-content: center;
+}
+.hero-chip {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px; font-weight: 700;
+  color: var(--brown2);
+  box-shadow: 0 2px 8px rgba(160,90,40,.08);
+}
+
+/* ── WRAP ── */
+.wrap {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 16px 60px;
+}
+
+/* ── SECTION LABEL ── */
+.sec-label {
+  display: flex; align-items: center; gap: 10px;
+  margin: 40px 0 18px;
+}
+.sec-label-bar {
+  width: 4px; height: 22px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, var(--amber), var(--rose));
+  flex-shrink: 0;
+}
+.sec-label h2 {
+  font-size: 17px; font-weight: 900;
+  color: var(--brown);
+}
+.sec-label-count {
+  margin-left: auto;
+  font-size: 12px; font-weight: 700;
+  color: var(--muted);
+  background: var(--cream2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+/* ── PRAYER VERSE ── */
+.verse-box {
+  background: linear-gradient(135deg, #fff8ee, #fdecd6);
+  border: 1.5px solid #f5d8b8;
+  border-radius: var(--r);
+  padding: 22px 24px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  margin-top: 28px;
+}
+.verse-icon { font-size: 28px; margin-bottom: 10px; }
+.verse-text {
+  font-size: 15px; line-height: 1.85;
+  color: var(--brown);
+  font-weight: 500;
+}
+.verse-ref {
+  margin-top: 10px;
+  font-size: 12.5px; color: var(--muted); font-weight: 700;
+}
+
+/* ── LETTER LIST ── */
+.letter-list {
+  display: flex; flex-direction: column; gap: 14px;
+}
+.letter-card {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 20px;
+  display: flex; align-items: center; gap: 16px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform .16s, box-shadow .16s, border-color .16s;
+  text-decoration: none;
+  color: inherit;
+}
+.letter-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow2);
+  border-color: #f0c090;
+}
+.letter-num {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--amber2), var(--rose));
+  color: #fff;
+  font-size: 15px; font-weight: 900;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(224,120,50,.28);
+}
+.letter-info { flex: 1; min-width: 0; }
+.letter-title {
+  font-size: 15px; font-weight: 800;
+  color: var(--brown);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.letter-desc {
+  font-size: 12.5px; color: var(--muted); margin-top: 3px;
+}
+.letter-arrow {
+  color: var(--amber);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ── PRAYER CARD (mission focus) ── */
+.mission-card {
+  background: linear-gradient(135deg, #fff4e8, #fde8d4);
+  border: 1.5px solid #f5d0b0;
+  border-radius: var(--r);
+  padding: 24px 22px;
+  box-shadow: var(--shadow);
+  display: flex; gap: 18px; align-items: flex-start;
+}
+.mission-icon-wrap {
+  width: 56px; height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--amber), var(--rose));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  box-shadow: 0 6px 18px rgba(224,120,50,.28);
+  flex-shrink: 0;
+}
+.mission-body { flex: 1; }
+.mission-title {
+  font-size: 17px; font-weight: 900;
+  color: var(--brown); margin-bottom: 6px;
+}
+.mission-sub {
+  font-size: 13.5px; color: var(--muted); line-height: 1.6; margin-bottom: 14px;
+}
+.mission-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--amber);
+  color: #fff;
+  border: none; border-radius: 12px;
+  padding: 9px 18px;
+  font-size: 13px; font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(224,120,50,.30);
+  transition: background .15s, transform .15s;
+  text-decoration: none;
+}
+.mission-btn:hover { background: var(--rose); transform: translateY(-1px); }
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center;
+  margin-top: 48px;
+  padding: 24px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12.5px; font-weight: 600;
+}
+.footer-heart { color: var(--rose); }
+
+/* ── RESPONSIVE ── */
+@@media (max-width: 520px) {
+  .mission-card { flex-direction: column; }
+  .letter-card { padding: 14px 16px; gap: 12px; }
+}
+</style>
+</head>
+
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-brand">중보기도 · @ChurchName</div>
+  <nav class="topbar-nav">
+    <button class="nav-btn home" onclick="location.href='@urlHome'">🏠 홈</button>
+    <button class="nav-btn" onclick="location.href='@urlWorship'">🎵 예배콘텐츠</button>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <span class="hero-icon">🙏</span>
+  <h1>마음을 모아<br><em>함께 기도해요</em></h1>
+  <p class="hero-sub">
+    교회와 목사님, 선교사님을 위해<br>
+    한 마음으로 중보기도하는 공간이에요
+  </p>
+  <div class="hero-chips">
+    <span class="hero-chip">⛪ 교회</span>
+    <span class="hero-chip">👨‍✝️ 목사님</span>
+    <span class="hero-chip">🌍 선교사님</span>
+    <span class="hero-chip">❤️ 중보기도</span>
+  </div>
+</section>
+
+<div class="wrap">
+
+  <!-- 말씀 -->
+  <div class="verse-box">
+    <div class="verse-icon">✝️</div>
+    <div class="verse-text">
+      "그러므로 내가 첫째로 권하노니 모든 사람을 위하여<br>
+      간구와 기도와 도고와 감사를 하되"
+    </div>
+    <div class="verse-ref">디모데전서 2:1</div>
+  </div>
+
+  <!-- 선교사 소개 -->
+  <div class="sec-label" style="margin-top:36px;">
+    <div class="sec-label-bar"></div>
+    <h2>오요한 선교사님</h2>
+  </div>
+
+  <div class="mission-card">
+    <div class="mission-icon-wrap">🌍</div>
+    <div class="mission-body">
+      <div class="mission-title">오요한 선교사님을 위해 기도해요</div>
+      <div class="mission-sub">
+        선교지의 소식과 기도 제목을 함께 나눠요.<br>
+        선교사님의 사역과 가정, 건강을 위해 중보기도해주세요.
+      </div>
+      <a class="mission-btn" href="@urlPrayerLetter" target="_blank">📖 기도편지 보기</a>
+    </div>
+  </div>
+
+  <!-- 선교편지 목록 -->
+  <div class="sec-label">
+    <div class="sec-label-bar"></div>
+    <h2>선교편지 · 기도편지</h2>
+    <span class="sec-label-count">4편</span>
+  </div>
+
+  <div class="letter-list">
+
+    <a class="letter-card" href="@urlMissionLetter4" target="_blank">
+      <div class="letter-num">4</div>
+      <div class="letter-info">
+        <div class="letter-title">선교편지 — 2026년 7월의 오렌지</div>
+        <div class="letter-desc">오요한 선교사님 · 최신 편지</div>
+      </div>
+      <span class="letter-arrow">→</span>
+    </a>
+
+    <a class="letter-card" href="@urlMissionLetter3" target="_blank">
+      <div class="letter-num">3</div>
+      <div class="letter-info">
+        <div class="letter-title">선교편지 — 2026년 2월의 오렌지</div>
+        <div class="letter-desc">오요한 선교사님 · 겨울 소식</div>
+      </div>
+      <span class="letter-arrow">→</span>
+    </a>
+
+    <a class="letter-card" href="@urlMissionLetter2" target="_blank">
+      <div class="letter-num">2</div>
+      <div class="letter-info">
+        <div class="letter-title">선교편지 — 2025년 12월의 오렌지</div>
+        <div class="letter-desc">오요한 선교사님 · 연말 소식</div>
+      </div>
+      <span class="letter-arrow">→</span>
+    </a>
+
+    <a class="letter-card" href="@urlMissionLetter1" target="_blank">
+      <div class="letter-num">1</div>
+      <div class="letter-info">
+        <div class="letter-title">선교편지 — 2025년 8월의 오렌지</div>
+        <div class="letter-desc">오요한 선교사님 · 여름 소식</div>
+      </div>
+      <span class="letter-arrow">→</span>
+    </a>
+
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <span class="footer-heart">♥</span>
+  &nbsp;@DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName · 중보기도&nbsp;
+  <span class="footer-heart">♥</span>
+</footer>
+
+</body>
+</html>

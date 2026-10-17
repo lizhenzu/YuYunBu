@@ -1,0 +1,450 @@
+﻿@model BulletinBoard.ViewModels.Attendance.AttendanceMonthlyStatsVM
+@{
+    Layout = null; // ✅ 독립 페이지
+
+    // 상단 요약 수치 계산
+    var totalAll = (Model?.ClassMonthlyTotals?.Sum(x => x.TotalCount)) ?? 0;
+    var sundayCount = (Model?.WeeklyTotals?.Count) ?? 0;
+    var avgWeekly = sundayCount > 0 ? Math.Round(totalAll / (double)sundayCount, 1) : 0;
+
+    // 제목
+    var title = $"출석 통계 · {Model.Year}년 {Model.Month}월";
+
+    // ✅ 요약/상세 URL
+    var detailUrl = $"/Attendance/StatisticsDetail?year={Model.Year}&month={Model.Month}";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@title</title>
+
+    <style>
+        :root {
+            --bg: #f6fbf8;
+            --card: #ffffff;
+            --ink: #123029;
+            --muted: #5a6b66;
+            --line: #dfeee8;
+            --primary: #1F6F5B;
+            --shadow: 0 10px 30px rgba(18,48,41,.08);
+            --radius: 18px;
+            --gold: #FFD700;
+            --silver: #C0C0C0;
+            --bronze: #CD7F32;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 18px 14px 60px;
+        }
+
+        /* ✅ 상단 네비 버튼 */
+        .top-actions{
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            align-items:center;
+            justify-content:flex-end;
+            margin-bottom: 10px;
+        }
+        .nav-btn{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:10px 14px;
+            border-radius:14px;
+            border:1px solid var(--line);
+            background:#fff;
+            color:var(--ink);
+            font-size:13px;
+            font-weight:800;
+            text-decoration:none;
+            box-shadow: 0 8px 20px rgba(18,48,41,.08);
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+            white-space:nowrap;
+        }
+        .nav-btn:hover{
+            transform: translateY(-1px);
+            box-shadow: 0 12px 28px rgba(18,48,41,.12);
+            border-color: rgba(31,111,91,.30);
+            background: rgba(31,111,91,.06);
+        }
+        .nav-btn.primary{
+            background: var(--primary);
+            border-color: var(--primary);
+            color:#fff;
+        }
+        .nav-btn.primary:hover{
+            background:#185c4c;
+            border-color:#185c4c;
+        }
+
+        /* Header */
+        .page-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .page-title {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: -0.3px;
+        }
+
+        .page-sub {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        /* Section */
+        .section { margin-top: 16px; }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 0 10px;
+            font-size: 16px;
+            letter-spacing: -0.2px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .card-pad { padding: 16px; }
+
+        /* Month cards (1~12) */
+        .month-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+            gap: 10px;
+        }
+
+        .month-card {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 8px;
+            border-radius: 14px;
+            text-decoration: none;
+            border: 2px solid transparent;
+            background: #f0f7f4;
+            color: var(--ink);
+            font-weight: 700;
+            font-size: 13px;
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+        }
+
+        .month-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(18,48,41,.10);
+        }
+
+        .month-card.active {
+            background: rgba(31,111,91,.12);
+            border-color: rgba(31,111,91,.35);
+            color: var(--primary);
+        }
+
+        /* CTA */
+        .cta-row{
+            display:flex;
+            justify-content:flex-end;
+            margin-top: 10px;
+        }
+
+        .btn-detail{
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            padding:10px 14px;
+            border-radius:14px;
+            background: var(--primary);
+            color:#fff;
+            text-decoration:none;
+            font-weight:900;
+            box-shadow: 0 10px 30px rgba(18,48,41,.10);
+            border:1px solid rgba(31,111,91,.25);
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .btn-detail:hover{
+            transform: translateY(-1px);
+            box-shadow: 0 14px 34px rgba(18,48,41,.14);
+        }
+
+        /* Top 3 cards */
+        .top3-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .rank-card {
+            position: relative;
+            overflow: hidden;
+            padding: 16px 16px 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
+            background: var(--card);
+            box-shadow: var(--shadow);
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 900;
+            letter-spacing: -0.2px;
+            font-size: 14px;
+        }
+
+        .rank-badge .medal {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            color: #111;
+            background: #f3f3f3;
+            border: 1px solid rgba(0,0,0,.06);
+        }
+
+        .rank-card.gold .rank-badge .medal {
+            background: rgba(255,215,0,.25);
+            border-color: rgba(255,215,0,.35);
+        }
+
+        .rank-card.silver .rank-badge .medal {
+            background: rgba(192,192,192,.22);
+            border-color: rgba(192,192,192,.35);
+        }
+
+        .rank-card.bronze .rank-badge .medal {
+            background: rgba(205,127,50,.18);
+            border-color: rgba(205,127,50,.35);
+        }
+
+        .rank-main {
+            margin-top: 10px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .rank-class {
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: -0.3px;
+        }
+
+        .rank-meta {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .rank-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: #f5fbf8;
+            border: 1px solid var(--line);
+            font-weight: 900;
+            font-size: 13px;
+            white-space: nowrap;
+            text-decoration:none;
+            color: var(--primary);
+        }
+
+        /* Summary cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .summary-card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px 18px 16px;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 34px rgba(18,48,41,.12);
+        }
+
+        .summary-top {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .summary-top .icon { font-size: 20px; line-height: 1; }
+        .summary-top .value {
+            font-size: 28px;
+            font-weight: 950;
+            letter-spacing: -0.5px;
+        }
+
+        .summary-label {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 900;
+        }
+
+        .muted { color: var(--muted); }
+        .sp-10 { height: 10px; }
+
+        @@media (max-width: 480px) {
+            .page-title { font-size: 20px; }
+            .rank-class { font-size: 17px; }
+            .summary-top .value { font-size: 26px; }
+            .top-actions{ justify-content:flex-start; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/att-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+
+<body>
+<div class="wrap">
+
+    <!-- ✅ 상단 버튼 영역 추가 -->
+    <div class="top-actions" aria-label="상단 이동">
+        <a class="nav-btn" href="/">@BulletinBoard.Common.ConstatsCommon.ToHome</a>
+        <a class="nav-btn primary" href="/Attendance/AdminTrend3Weeks">최근 출석 현황</a>
+    </div>
+
+    <header class="page-head">
+        <div>
+            <h1 class="page-title">@title</h1>
+            <div class="page-sub">월 카드를 눌러 월별 통계를 바꿀 수 있어요.</div>
+        </div>
+        <div class="muted" style="font-weight:800;font-size:13px;">
+            기준: @Model.Year-@Model.Month.ToString("00")
+        </div>
+    </header>
+
+    <!-- ✅ 월 카드 -->
+    <section class="section">
+        <h2 class="section-title">월 선택</h2>
+        <div class="card card-pad">
+            <div class="month-grid">
+                @foreach (var m in Model.MonthCards)
+                {
+                    var url = $"/Attendance/Statistics?year={m.Year}&month={m.Month}";
+                    <a class="month-card @(m.IsSelected ? "active" : "")" href="@url">@m.Label</a>
+                }
+            </div>
+
+            <!-- ✅ 상세 보기 버튼 -->
+            <div class="cta-row">
+                <a class="btn-detail" href="@detailUrl">상세 보기 →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ✅ Top 3 -->
+    <section class="section">
+        <h2 class="section-title">이번 달 출석 TOP 3</h2>
+
+        @if (Model.TopRanks == null || !Model.TopRanks.Any())
+        {
+            <div class="card card-pad muted">표시할 데이터가 없습니다.</div>
+        }
+        else
+        {
+            <div class="top3-grid">
+                @foreach (var t in Model.TopRanks)
+                {
+                    var cls = t.Rank == 1 ? "gold" : (t.Rank == 2 ? "silver" : "bronze");
+                    var medal = t.Rank == 1 ? "🥇" : (t.Rank == 2 ? "🥈" : "🥉");
+                    <div class="rank-card @cls">
+                        <div class="rank-badge">
+                           <span>@(t.Rank)위</span>
+                        </div>
+
+                        <div class="rank-main">
+                            <div>
+                                <div class="rank-class">@t.ClassName</div>
+                                <div class="rank-meta">@($"{t.TotalCount}명 · {t.Ratio}%")</div>
+                            </div>
+                            <a class="rank-pill" href="@detailUrl">상세 보기</a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- ✅ 이번 달 출석 요약 -->
+    <section class="section">
+        <h2 class="section-title">이번 달 출석 요약</h2>
+
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-top">
+                    
+                    <span class="value">@totalAll</span>
+                </div>
+                <div class="summary-label">총 출석</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-top">
+                    
+                    <span class="value">@sundayCount</span>
+                </div>
+                <div class="summary-label">주일 수</div>
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-top">
+                    
+                    <span class="value">@avgWeekly</span>
+                </div>
+                <div class="summary-label">평균 출석 (주별)</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="sp-10"></div>
+    <div class="card card-pad muted" style="font-weight:800;">
+        차트(막대/라인)는 <a href="@detailUrl" style="color:var(--primary); font-weight:900; text-decoration:none;">상세 보기 →</a>에서 확인할 수 있어요.
+    </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,528 @@
+@model BulletinBoard.Models.UpcomingBirthdayListVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+
+@*  ══════════════════════════════════════════════════════════════
+    생일 선물 관리(관리자) — 한 사람이 한 줄.  흐름은 ① 선택 → ② 구매 → ③ 전달.
+    줄 오른쪽에 진행 점 세 개와 '다음 할 일' 버튼 하나만 크게 둔다.  되돌리기·별도 처리는 '더보기' 안.
+    Bone(호텔 인쇄물) 스킨.  POST 주소 · filter · 확인창은 예전 그대로.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var today   = DateHelper.GetKoreaToday();
+    var now     = DateHelper.GetKoreaNow();
+    var allRows = Model?.Rows ?? new List<BulletinBoard.Models.UpcomingBirthdayRowVM>();
+    int withinDays = Model?.WithinDays ?? 30;
+    string dateText = now.ToString("yyyy.MM.dd") + " " + now.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    var filter = (Context?.Request?.Query["filter"].ToString() ?? "pending").Trim().ToLowerInvariant();
+    string[] validFilters = { "all", "skipped", "nopick", "pending", "sent" };
+    if (!System.Array.Exists(validFilters, f => f == filter)) filter = "pending";
+
+    // ── 수 ──
+    int cAll     = allRows.Count;
+    int cSkipped = allRows.Count(r => r.IsSkipped && !r.IsSent);
+    int cNoPick  = allRows.Count(r => !r.IsSkipped && !r.HasPickedGift && !r.IsSent);
+    int cPending = allRows.Count(r => !r.IsSkipped && !r.IsSent);
+    int cWait    = allRows.Count(r => !r.IsSkipped && !r.IsSent && r.HasPickedGift);   // 골랐고 구매·전달 대기
+    int cSent    = allRows.Count(r => r.IsSent);
+
+    // ── 거르기 ──
+    IEnumerable<BulletinBoard.Models.UpcomingBirthdayRowVM> q = filter switch
+    {
+        "all"     => allRows,
+        "skipped" => allRows.Where(r => r.IsSkipped && !r.IsSent),
+        "nopick"  => allRows.Where(r => !r.IsSkipped && !r.HasPickedGift && !r.IsSent),
+        "sent"    => allRows.Where(r => r.IsSent),
+        _         => allRows.Where(r => !r.IsSkipped && !r.IsSent),
+    };
+    var rows = q.OrderBy(r => r.DDay).ThenBy(r => r.User?.FullName).ToList();
+
+    // 전체 보기일 때는 대기 → 완료 → 별도 순으로 나눠 보여 준다
+    var groups = new List<(string Title, List<BulletinBoard.Models.UpcomingBirthdayRowVM> Rows)>();
+    if (filter == "all")
+    {
+        groups.Add(("처리 대기", rows.Where(r => !r.IsSkipped && !r.IsSent).ToList()));
+        groups.Add(("전달 완료", rows.Where(r => r.IsSent).ToList()));
+        groups.Add(("별도 처리", rows.Where(r => r.IsSkipped && !r.IsSent).ToList()));
+        groups = groups.Where(g => g.Rows.Count > 0).ToList();
+    }
+    else
+    {
+        string t = filter switch { "skipped" => "별도 처리", "nopick" => "선물 안 고름", "sent" => "전달 완료", _ => "처리 대기" };
+        groups.Add((t, rows));
+    }
+
+    string DdayText(int d) => d == 0 ? "D0" : d > 0 ? $"D{d}" : $"{-d}일 전";
+    string Url(int days, string f) => $"/Present/AdminUpcomingBirthdays?withinDays={days}&filter={f}";
+    var dayOptions = new[] { 7, 14, 30, 60 };
+    var filterTabs = new[]
+    {
+        (Key: "pending", Label: "대기",     Count: cPending),
+        (Key: "nopick",  Label: "안 고름",  Count: cNoPick),
+        (Key: "sent",    Label: "완료",     Count: cSent),
+        (Key: "skipped", Label: "별도",     Count: cSkipped),
+        (Key: "all",     Label: "전체",     Count: cAll),
+    };
+    int seq = 0;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>생일 선물 관리 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap">
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    /* ── DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 ── */
+    body { margin: 0; background: #FFFFFF; }
+    .qz { max-width: 920px; --warn: #B4531F; background: #FFFFFF; padding-bottom: 0; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: #374151; }
+    .qz .qzBody { background: #FFFFFF; }
+    .qz form { margin: 0; }
+    .qz .qzBar { border-bottom-color: #EEF0F3; }
+    .qz .qzStepNo { letter-spacing: 0; font-size: 12px; font-weight: 400; color: #9CA3AF; }
+    .qz .qzStepNo em { color: #111827; }
+    .qz .qzDate { letter-spacing: 0; font-size: 12px; color: #9CA3AF; }
+
+    /* ── 머리 ── */
+    .qz .brK  { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; margin: 20px 0 0; }
+    .qz .brH1 { margin-top: 6px; font-family: inherit; font-weight: 800; font-size: 24px; line-height: 1.35; letter-spacing: -.02em; color: #111827; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .qz .brH1 b { font-weight: 800; background: none; padding: 0; }
+    .qz .brH1 small { font-family: inherit; font-weight: 400; font-size: 12.5px; color: #6B7280; letter-spacing: 0; }
+
+    .qz .stats { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 18px; padding-top: 14px; border: 0; border-top: 1px solid #EEF0F3; background: none; }
+    .qz .stats div { padding: 0; border-right: 0; text-align: center; }
+    .qz .stats div + div { border-left: 1px solid #EEF0F3; }
+    .qz .stats b { display: block; font-family: inherit; font-weight: 300; font-size: 22px; color: #111827; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .qz .stats b.acc { color: #2F80ED; }
+    .qz .stats b.warn { color: var(--warn); }
+    .qz .stats b.dim { color: #9CA3AF; }
+    .qz .stats span { font-size: 11.5px; letter-spacing: 0; color: #9CA3AF; display: block; margin-top: 3px; white-space: nowrap; }
+
+    /* ── 도구줄 ── */
+    .qz .tools { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin: 16px 0 0; }
+    .qz .seg { display: flex; flex-wrap: wrap; gap: 6px; border: 0; }
+    .qz .seg a { font-size: 12.5px; letter-spacing: 0; padding: 7px 12px; background: #F4F6F9; color: #6B7280; border: 0; border-radius: 999px; text-decoration: none; white-space: nowrap; }
+    .qz .seg a:last-child { border-right: 0; }
+    .qz .seg a.on { background: #2F80ED; color: #fff; }
+    .qz .seg a:hover:not(.on) { color: #2F80ED; }
+    .qz .seg a b { font-family: inherit; font-weight: 400; font-size: 12.5px; margin-left: 5px; opacity: .75; }
+    .qz .note { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #EAF2FD; font-size: 12px; color: #2B5FA8; line-height: 1.6; word-break: keep-all; }
+    .qz .note em { font-style: normal; color: #2B5FA8; font-weight: 700; }
+
+    /* ── 묶음 머리 ── */
+    .qz .sec { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 0 0; padding: 16px 0 4px; border-top: 1px solid #EEF0F3; font-size: 16px; font-weight: 800; letter-spacing: 0; color: #111827; }
+    .qz .sec span { letter-spacing: 0; font-weight: 600; font-size: 11.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+    .qz .sec span:first-child { font-size: 16px; font-weight: 800; color: #111827; }
+
+    /* ── 한 줄 ── */
+    .qz .row { display: flex; gap: 12px; padding: 14px 0; border-top: 0; border-bottom: 1px solid #EEF0F3; }
+    .qz .row:last-of-type { border-bottom: 1px solid #EEF0F3; }
+    .qz .row.done { opacity: .85; }
+    .qz .row.done:hover { opacity: 1; }
+    .qz .dd { width: 46px; flex: 0 0 auto; }
+    .qz .dd b { display: block; font-family: inherit; font-weight: 300; font-size: 20px; color: #2F80ED; line-height: 1.1; white-space: nowrap; }
+    .qz .dd b u { text-decoration: none; font-size: inherit; font-weight: 300; letter-spacing: 0; color: inherit; margin-right: 0; }
+    .qz .dd b.hot { color: var(--warn); }
+    .qz .dd b.past { color: #9CA3AF; font-size: 13px; font-weight: 400; padding-top: 4px; }
+    .qz .dd span { font-family: inherit; font-size: 11px; color: #9CA3AF; letter-spacing: 0; display: block; margin-top: 3px; white-space: nowrap; }
+    .qz .av { width: 40px; height: 40px; border-radius: 50%; background: #EAF2FD; border: 0; flex: 0 0 auto; object-fit: cover; display: block; }
+    .qz .body { flex: 1 1 auto; min-width: 0; }
+    .qz .top { display: flex; gap: 12px; align-items: flex-start; }
+    .qz .tx { flex: 1 1 auto; min-width: 0; }
+    .qz .nm { font-family: inherit; font-size: 14.5px; font-weight: 700; color: #111827; line-height: 1.3; word-break: keep-all; }
+    .qz .nm i { font-style: normal; font-family: inherit; font-weight: 400; font-size: 11px; color: #9CA3AF; margin-left: 6px; }
+    .qz .mt { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; line-height: 1.7; display: flex; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+    .qz .mt > span + span::before { content: "·"; color: #D1D5DB; margin: 0 6px; }
+    .qz .memo { margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: #F4F6F9; font-size: 12px; line-height: 1.6; color: #6B7280; white-space: pre-wrap; }
+
+    /* 선물 줄 */
+    .qz .gift { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 0; border-top: 0; }
+    .qz .gift img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; background: #F4F6F9; border: 0; flex: 0 0 auto; display: block; cursor: zoom-in; }
+    .qz .gift .gn { font-size: 12.5px; font-weight: 500; color: #374151; line-height: 1.35; word-break: keep-all; }
+    .qz .gift .gn i { font-style: normal; font-family: inherit; font-weight: 400; font-size: 11px; color: #9CA3AF; margin-left: 5px; letter-spacing: 0; }
+    .qz .gift .gd { font-size: 11.5px; color: #9CA3AF; margin-top: 2px; display: flex; gap: 6px; align-items: baseline; line-height: 1.5; }
+    .qz .gift .gd span { min-width: 0; word-break: break-word; }
+    .qz .gift .gd button { font: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0; border: 0; background: #F4F6F9; border-radius: 999px; color: #6B7280; padding: 2px 9px; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
+    .qz .gift .gd button:hover { color: #2F80ED; }
+    .copy-src { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+    .qz .gift .none { font-size: 12px; color: var(--warn); }
+    .qz .gift .none a { color: #2F80ED; font-weight: 700; text-decoration: none; border-bottom: 0; margin-left: 8px; }
+
+    /* 진행 점 + 다음 할 일 */
+    .qz .act { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; min-width: 140px; }
+    .qz .steps { display: flex; align-items: center; }
+    .qz .steps span { font-size: 11px; letter-spacing: 0; color: #9CA3AF; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .qz .steps span::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 0; background: #E8ECF2; display: inline-block; }
+    .qz .steps span.on { color: #2F80ED; font-weight: 700; }
+    .qz .steps span.on::before { background: #2F80ED; }
+    .qz .steps span.skip { color: #9CA3AF; }
+    .qz .steps span.skip::before { background: #E8ECF2; }
+    .qz .steps i { width: 12px; height: 1px; background: #E8ECF2; margin: 0 5px; }
+    .qz .btn { display: inline-block; border: 0; background: #2F80ED; color: #fff; padding: 9px 16px; border-radius: 999px; font-family: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: 0; text-decoration: none; white-space: nowrap; cursor: pointer; }
+    .qz .btn:hover { background: #2F80ED; color: #fff; filter: brightness(.96); }
+    .qz .btn.acc { background: #EAF2FD; color: #2F80ED; }
+    .qz .btn.acc:hover { background: #DCEAFB; color: #2F80ED; filter: none; }
+    .qz .btn.line { background: #FFFFFF; color: #6B7280; border: 0; }
+    .qz .btn.line:hover { background: #FFFFFF; color: #2F80ED; filter: none; }
+    .qz .btn.warn { background: #FBEFE7; color: #B4531F; }
+    .qz .btn.warn:hover { background: #F7E3D5; color: #B4531F; filter: none; }
+    .qz .btn.sm { padding: 8px 13px; font-size: 12px; }
+    .qz .more { font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: 0; color: #2F80ED; background: none; border: 0; cursor: pointer; padding: 0; }
+    .qz .more:hover { color: #2B5FA8; }
+    .qz .sub { display: flex; gap: 7px; justify-content: flex-start; flex-wrap: wrap; margin-top: 12px; padding: 12px 14px; border-top: 0; border-radius: 12px; background: #F4F6F9; }
+    .qz .sub[hidden] { display: none; }
+    .qz .tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0; padding: 5px 11px; border: 0; border-radius: 999px; background: #F4F6F9; color: #9CA3AF; white-space: nowrap; }
+    .qz .tag.on { background: #EAF2FD; color: #2F80ED; }
+    .qz .tag.off { background: #F4F6F9; color: #6B7280; }
+    .qz .empty { padding: 30px 0; text-align: center; font-size: 13px; color: #9CA3AF; border-top: 1px solid #EEF0F3; border-bottom: 1px solid #EEF0F3; }
+
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid #EEF0F3; display: flex; justify-content: space-between; gap: 14px; font-size: 11.5px; color: #9CA3AF; letter-spacing: 0; }
+    .qz .brFoot a { color: #6B7280; text-decoration: none; margin-left: 14px; }
+    .qz .brFoot a:hover { color: #2F80ED; }
+
+    /* 알림 · 사진 크게 */
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none; background: #111827; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 12.5px; letter-spacing: 0; transition: opacity .18s, transform .18s; z-index: 9999; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .mask { display: none; position: fixed; inset: 0; background: rgba(17,24,39,.6); z-index: 9000; align-items: center; justify-content: center; padding: 16px; }
+    .mask.show { display: flex; }
+    .imgBox { position: relative; background: #FFFFFF; border: 0; border-radius: 16px; padding: 12px; max-width: 560px; width: 100%; box-shadow: 0 20px 50px rgba(17,24,39,.35); }
+    .imgBox img { display: block; width: 100%; max-height: 72vh; object-fit: contain; background: #F4F6F9; border-radius: 12px; }
+    .imgBox .cap { margin-top: 10px; font-size: 13px; font-weight: 700; text-align: center; color: #111827; }
+    .imgBox button { position: absolute; top: 18px; right: 18px; border: 0; border-radius: 999px; background: #111827; color: #fff; font: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer; }
+
+    @@media (max-width: 640px) {
+        .qz .stats b { font-size: 18px; }
+        .qz .stats span { font-size: 10.5px; }
+        .qz .seg a { padding: 6px 10px; font-size: 11.5px; }
+        .qz .row { flex-wrap: wrap; gap: 10px; }
+        .qz .dd { width: 46px; }
+        .qz .top { flex-wrap: wrap; }
+        .qz .act { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; min-width: 0; margin-top: 4px; }
+        .qz .act .more { order: 3; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>생일 선물 관리</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">잠실새내 유년부 입니다.</div>
+        <div class="brH1"><b>생일 선물 관리</b><small>@(withinDays)일 이내 생일자 @(cAll)명 · 선택, 구매, 전달 순서로 처리해요</small></div>
+
+        <div class="stats">
+            <div><b class="warn">@cNoPick</b><span>선물 안 고름</span></div>
+            <div><b class="acc">@cWait</b><span>구매 · 전달 대기</span></div>
+            <div><b>@cSent</b><span>전달 완료</span></div>
+            <div><b class="dim">@cSkipped</b><span>별도 처리</span></div>
+        </div>
+
+        <div class="tools">
+            <div class="seg">
+                @foreach (var d in dayOptions)
+                {
+                    <a href="@Url(d, filter)" class="@(d == withinDays ? "on" : "")">@(d)일</a>
+                }
+            </div>
+            <div class="seg">
+                @foreach (var t in filterTabs)
+                {
+                    <a href="@Url(withinDays, t.Key)" class="@(t.Key == filter ? "on" : "")">@t.Label<b>@t.Count</b></a>
+                }
+            </div>
+        </div>
+        <div class="note">선물을 사고 나면 꼭 <em>구매 완료</em>를 눌러 주세요. 그 뒤로는 학생이 선물을 바꿀 수 없어요.</div>
+
+        @if (rows.Count == 0)
+        {
+            <div class="empty" style="margin-top:22px">이 조건에 맞는 생일자가 없어요.</div>
+        }
+
+        @foreach (var g in groups)
+        {
+            <div class="sec"><span>@g.Title</span><span>D-day 순 · @(g.Rows.Count)명</span></div>
+
+            @foreach (var r in g.Rows)
+            {
+                seq++;
+                var u = r.User;
+                string avatar = string.IsNullOrWhiteSpace(u?.ProfilePicturePath) ? "/images/icon/people/people_01.webp" : u.ProfilePicturePath;
+                string giftSrc = r.ProductId.HasValue && r.ProductId.Value > 0 ? $"/images/AwardItem/{r.ProductId.Value}.jpg" : "/images/common/no-image.jpg";
+                int bm = u?.bMonth ?? 0, bd = u?.bDay ?? 0;
+                string birthText = (bm >= 1 && bm <= 12 && bd >= 1) ? $"{bm}월 {bd}일" : "";
+                string dateLine  = r.NextBirthdayDate == default ? "" : r.NextBirthdayDate.ToString("M.d") + " " + r.NextBirthdayDate.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+                bool hot  = r.DDay >= 0 && r.DDay <= 3;
+                bool past = r.DDay < 0;
+                bool done = r.IsSent || r.IsSkipped;
+
+                // 다음 할 일 하나
+                //   안 골랐음 → 대신 고르기 / 골랐음 → 구매 완료 / 구매함 → 전달 완료 / 끝 → 표식
+                string next = r.IsSkipped ? "skipped" : r.IsSent ? "sent" : !r.HasPickedGift ? "pick" : !r.IsPurchased ? "purchase" : "deliver";
+                string pickUrl = string.IsNullOrWhiteSpace(u?.UserId) ? "" : $"/Present/Birth?userid={Uri.EscapeDataString(u.UserId)}";
+
+                <div class="row @(done ? "done" : "")" data-pid="@(u?.PersonId ?? 0)">
+                    <div class="dd">
+                        <b class="@(hot ? "hot" : "") @(past ? "past" : "")">
+                            @if (!past) { <u>D</u> }
+                            @(past ? DdayText(r.DDay) : r.DDay.ToString())
+                        </b>
+                        <span>@dateLine</span>
+                    </div>
+                    <img class="av" src="@avatar" alt="" onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp';" />
+                    <div class="body">
+                        <div class="top">
+                            <div class="tx">
+                                <div class="nm">@(u?.FullName ?? "(이름 없음)")<i>#@seq</i></div>
+                                <div class="mt">
+                                    @if (u?.ClassYear > 0) { <span>@($"{u.ClassYear}학년 {u.ClassBan}반")</span> }
+                                    @if (!string.IsNullOrWhiteSpace(u?.PhoneNumber)) { <span>@u.PhoneNumber</span> }
+                                    @if (birthText != "") { <span>생일 @birthText</span> }
+                                    @if (r.PurchasedAt.HasValue) { <span>구매 @r.PurchasedAt.Value.ToString("M/d HH:mm")</span> }
+                                    @if (r.SentAt.HasValue) { <span>전달 @r.SentAt.Value.ToString("M/d HH:mm")</span> }
+                                </div>
+
+                                @if (r.HasPickedGift)
+                                {
+                                    <div class="gift">
+                                        <img src="@giftSrc" alt="@(r.ProductName ?? "선물")" class="js-zoom"
+                                             data-title="@((r.ProductName ?? "선물") + (r.ProductId.HasValue ? $" #{r.ProductId}" : ""))"
+                                             onerror="this.onerror=null;this.src='/images/common/no-image.jpg';this.dataset.nozoom='1';" />
+                                        <div style="min-width:0">
+                                            <div class="gn">@r.ProductName<i>@(r.ProductId.HasValue ? $"#{r.ProductId}" : "")@(string.IsNullOrWhiteSpace(r.SourceType) ? "" : $" · {r.SourceType}")</i></div>
+                                            @if (!string.IsNullOrWhiteSpace(r.ProductDescription))
+                                            {
+                                                <div class="gd">
+                                                    <span>@r.ProductDescription</span>
+                                                    <textarea class="copy-src" aria-hidden="true" tabindex="-1">@r.ProductDescription</textarea>
+                                                    <button type="button" onclick="copyText(this)" title="복사">복사</button>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else if (!r.IsSkipped)
+                                {
+                                    <div class="gift">
+                                        <span class="none">
+                                            아직 선물을 안 골랐어요
+                                            @if (pickUrl != "") { <a href="@pickUrl">대신 고르기 →</a> }
+                                        </span>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(r.Memo))
+                                {
+                                    <div class="memo">@r.Memo</div>
+                                }
+                            </div>
+
+                            <div class="act">
+                                <div class="steps">
+                                    <span class="@(r.IsSkipped ? "skip" : r.HasPickedGift ? "on" : "")">선택</span><i></i>
+                                    <span class="@(r.IsSkipped ? "skip" : r.IsPurchased ? "on" : "")">구매</span><i></i>
+                                    <span class="@(r.IsSkipped ? "skip" : r.IsSent ? "on" : "")">전달</span>
+                                </div>
+
+                                @switch (next)
+                                {
+                                    case "pick":
+                                        if (pickUrl != "") { <a class="btn acc" href="@pickUrl">대신 고르기 →</a> }
+                                        else { <span class="tag">아이디 없음</span> }
+                                        break;
+                                    case "purchase":
+                                        <form method="post" action="/Present/AdminBirthPickSetPurchased">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="pickId" value="@(r.PickId ?? 0)" />
+                                            <input type="hidden" name="purchased" value="true" />
+                                            <input type="hidden" name="filter" value="@filter" />
+                                            <input type="hidden" name="withinDays" value="@withinDays" />
+                                            <button type="submit" class="btn" onclick="return confirm('구매 완료로 처리하면 이 학생은 더 이상 선물을 바꿀 수 없어요. 계속할까요?');">구매 완료</button>
+                                        </form>
+                                        break;
+                                    case "deliver":
+                                        <form method="post" action="/Present/AdminBirthPickSetSent">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="pickId" value="@(r.PickId ?? 0)" />
+                                            <input type="hidden" name="sent" value="true" />
+                                            <input type="hidden" name="filter" value="@filter" />
+                                            <input type="hidden" name="withinDays" value="@withinDays" />
+                                            <button type="submit" class="btn">전달 완료</button>
+                                        </form>
+                                        break;
+                                    case "sent":
+                                        <span class="tag on">전달 완료</span>
+                                        break;
+                                    case "skipped":
+                                        <span class="tag off">별도 처리</span>
+                                        break;
+                                }
+
+                                <button type="button" class="more" data-more>더보기</button>
+                            </div>
+                        </div>
+
+                        @* 더보기 : 되돌리기 · 건너뛰기 · 별도 처리 *@
+                        <div class="sub" hidden>
+                            @if (next == "purchase" && r.PickId.HasValue)
+                            {
+                                <form method="post" action="/Present/AdminBirthPickSetSent">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="pickId" value="@r.PickId" />
+                                    <input type="hidden" name="sent" value="true" />
+                                    <input type="hidden" name="filter" value="@filter" />
+                                    <input type="hidden" name="withinDays" value="@withinDays" />
+                                    <button type="submit" class="btn line sm" onclick="return confirm('구매 표시 없이 바로 전달 완료로 할까요?');">전달 완료로 바로</button>
+                                </form>
+                            }
+                            @if (r.IsPurchased && !r.IsSent && r.PickId.HasValue)
+                            {
+                                <form method="post" action="/Present/AdminBirthPickSetPurchased">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="pickId" value="@r.PickId" />
+                                    <input type="hidden" name="purchased" value="false" />
+                                    <input type="hidden" name="filter" value="@filter" />
+                                    <input type="hidden" name="withinDays" value="@withinDays" />
+                                    <button type="submit" class="btn warn sm" onclick="return confirm('구매 완료를 취소할까요? 학생이 다시 선물을 바꿀 수 있게 돼요.');">구매 취소</button>
+                                </form>
+                            }
+                            @if (r.IsSent && r.PickId.HasValue)
+                            {
+                                <form method="post" action="/Present/AdminBirthPickSetSent">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="pickId" value="@r.PickId" />
+                                    <input type="hidden" name="sent" value="false" />
+                                    <input type="hidden" name="filter" value="@filter" />
+                                    <input type="hidden" name="withinDays" value="@withinDays" />
+                                    <button type="submit" class="btn warn sm" onclick="return confirm('전달 완료를 취소할까요?');">전달 취소</button>
+                                </form>
+                                @if (r.IsPurchased)
+                                {
+                                    <form method="post" action="/Present/AdminBirthPickSetPurchased">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="pickId" value="@r.PickId" />
+                                        <input type="hidden" name="purchased" value="false" />
+                                        <input type="hidden" name="filter" value="@filter" />
+                                        <input type="hidden" name="withinDays" value="@withinDays" />
+                                        <button type="submit" class="btn warn sm" onclick="return confirm('구매 완료를 취소할까요?');">구매 취소</button>
+                                    </form>
+                                }
+                            }
+                            @if (!r.IsSkipped && !r.IsSent)
+                            {
+                                <form method="post" action="/Present/AdminBirthdaySetSkip">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="personId" value="@(u?.PersonId ?? 0)" />
+                                    <input type="hidden" name="isSkipped" value="true" />
+                                    <input type="hidden" name="filter" value="@filter" />
+                                    <input type="hidden" name="withinDays" value="@withinDays" />
+                                    <button type="submit" class="btn warn sm" onclick="return confirm('이 학생을 별도 처리(선물 대상 제외)로 표시할까요?');">별도 처리</button>
+                                </form>
+                            }
+                            @if (r.IsSkipped && !r.IsSent)
+                            {
+                                <form method="post" action="/Present/AdminBirthdaySetSkip">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="personId" value="@(u?.PersonId ?? 0)" />
+                                    <input type="hidden" name="isSkipped" value="false" />
+                                    <input type="hidden" name="filter" value="@filter" />
+                                    <input type="hidden" name="withinDays" value="@withinDays" />
+                                    <button type="submit" class="btn line sm">별도 처리 되돌리기</button>
+                                </form>
+                            }
+                            @if (r.HasPickedGift && !r.IsPurchased && !r.IsSent && pickUrl != "")
+                            {
+                                <a class="btn line sm" href="@pickUrl">선물 바꾸기 →</a>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+
+        <div class="brFoot">
+            <span>© BULLETIN BOARD · BIRTHDAY GIFTS</span>
+            <span><a href="/Birthdays">생일 달력 →</a><a href="/ApplyEvent/Branch">다가오는 생일 →</a><a href="/">홈으로 →</a></span>
+        </div>
+
+    </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="imgMask" class="mask" aria-hidden="true">
+    <div class="imgBox" role="dialog" aria-modal="true">
+        <button type="button" onclick="closeImage()">닫기</button>
+        <img id="imgBig" src="" alt="" />
+        <div class="cap" id="imgCap"></div>
+    </div>
+</div>
+
+<script>
+    // 더보기 접기/펼치기
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-more]');
+        if (!btn) return;
+        var row = btn.closest('.row');
+        var sub = row && row.querySelector('.sub');
+        if (!sub) return;
+        var open = sub.hasAttribute('hidden');
+        if (open) { sub.removeAttribute('hidden'); btn.textContent = '접기'; }
+        else      { sub.setAttribute('hidden', ''); btn.textContent = '더보기'; }
+    });
+
+    // 알림
+    var _tt = null;
+    function showToast(msg) {
+        var t = document.getElementById('toast');
+        t.textContent = msg || '완료';
+        t.classList.add('show');
+        clearTimeout(_tt);
+        _tt = setTimeout(function () { t.classList.remove('show'); }, 1500);
+    }
+
+    // 설명 복사
+    async function copyText(btn) {
+        try {
+            var wrap = btn.closest('.gd');
+            var ta = wrap && wrap.querySelector('.copy-src');
+            var text = ta ? ta.value : '';
+            if (!text) return;
+            if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+            else { ta.focus(); ta.select(); document.execCommand('copy'); }
+            var old = btn.textContent; btn.textContent = '완료';
+            setTimeout(function () { btn.textContent = old; }, 900);
+            showToast('복사했어요');
+        } catch (e) { showToast('복사하지 못했어요'); }
+    }
+
+    // 사진 크게
+    var imgMask = document.getElementById('imgMask');
+    document.addEventListener('click', function (e) {
+        var img = e.target.closest('.js-zoom');
+        if (!img || img.dataset.nozoom === '1') return;
+        document.getElementById('imgBig').src = img.src;
+        document.getElementById('imgCap').textContent = img.dataset.title || '';
+        imgMask.classList.add('show');
+        imgMask.setAttribute('aria-hidden', 'false');
+    });
+    function closeImage() {
+        imgMask.classList.remove('show');
+        imgMask.setAttribute('aria-hidden', 'true');
+        document.getElementById('imgBig').src = '';
+    }
+    imgMask.addEventListener('click', function (e) { if (e.target === imgMask) closeImage(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeImage(); });
+</script>
+</body>
+</html>

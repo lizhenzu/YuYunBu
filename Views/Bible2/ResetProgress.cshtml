@@ -1,0 +1,148 @@
+@using BulletinBoard.Helpers
+@*  ══════════════════════════════════════════════════════════════
+    완독 기록 처리 (관리자) — Bone 스킨
+    · 확인 화면 → 한 번 더 확인 창 → POST /Bible2/ResetProgress (처리 후 서버가 참여자 현황으로 보낸다)
+    · 축하는 금색, 되돌릴 수 없는 삭제만 붉은 흙색
+    이전 화면은 ResetProgress_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    ViewData["Title"]   = "완독 기록 처리";
+    ViewData["Page"]    = "participants";
+    ViewData["B2NoTop"] = true;
+
+    var fullName    = ViewBag.FullName    as string ?? "";
+    var userId      = ViewBag.UserId      as string ?? "";
+    var readCount   = (int)(ViewBag.ReadCount   ?? 0);
+    var totalVerses = (int)(ViewBag.TotalVerses ?? 0);
+    var readVerses  = (int)(ViewBag.ReadVerses  ?? 0);
+    int nextCount   = readCount + 1;
+    double pct      = totalVerses > 0 ? Math.Round(readVerses * 100.0 / totalVerses, 1) : 0;
+    string pctCss   = pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+}
+
+<style>
+    .page-body { padding: 0 !important; }
+    .b2x a { text-decoration: none; color: inherit; }
+    .b2x .dk { background: var(--b2-head); color: var(--b2-headtx); padding: 0 18px 26px; }
+    .b2x .dkIn, .b2x .in { max-width: 560px; margin: 0 auto; }
+    .b2x .crumb { height: 56px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--b2-headdim); }
+    .b2x .crumb .f { flex: 1; min-width: 0; }
+    .b2x .crumb a:hover { color: var(--b2-headk); }
+    .b2x .crumb b { font-weight: 400; color: var(--b2-headk); }
+    .b2x .crumb .hbw { color: var(--b2-headtx); border-color: #3A3C40 !important; }
+    .b2x .k { font-size: 10px; font-weight: 600; letter-spacing: .24em; color: var(--b2-headk); margin-top: 8px; }
+    .b2x .T { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 28px; line-height: 1.4; margin: 8px 0 0; color: var(--b2-headtx); }
+    .b2x .T em { font-style: normal; color: #D9C29B; }
+    .b2x .who { font-size: 13px; color: var(--b2-headdim); margin-top: 6px; }
+
+    .b2x .in { padding: 0 18px 40px; color: var(--b2-tx); }
+    .b2x .big { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 26px 0 20px; border-bottom: 1px solid var(--b2-rule); }
+    .b2x .big div { text-align: center; font-size: 11.5px; color: var(--b2-dim); }
+    .b2x .big b { display: block; font-family: "Inter", sans-serif; font-weight: 200; font-size: 50px; line-height: 1; color: var(--b2-tx); margin-bottom: 4px; }
+    .b2x .big .to b { color: var(--b2-acc); }
+    .b2x .big i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; color: var(--b2-acc); }
+
+    .b2x .rows div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--b2-line); font-size: 13.5px; }
+    .b2x .rows span { color: var(--b2-dim); }
+    .b2x .rows b { font-weight: 400; font-family: "Inter", "Gothic A1", sans-serif; font-variant-numeric: tabular-nums; }
+    .b2x .pgl { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--b2-dim); margin-top: 14px; }
+    .b2x .pg { height: 3px; background: var(--b2-rule); margin-top: 6px; }
+    .b2x .pg i { display: block; height: 3px; background: var(--b2-acc); width: 0; transition: width 1s ease; }
+
+    .b2x .warn { margin-top: 22px; border-left: 2px solid #B4531F; padding: 4px 0 4px 14px; font-size: 13px; line-height: 1.9; color: var(--b2-dim2); }
+    .b2x .warn b { color: #B4531F; font-weight: 600; }
+    .b2x .warn ol { margin: 4px 0 6px; padding-left: 18px; }
+
+    .b2x .btn { display: block; width: 100%; margin-top: 22px; background: #B4531F; color: #fff; border: 0; padding: 15px; font-family: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+    .b2x .btn:hover { background: #9A4418; }
+    .b2x .back { display: block; text-align: center; margin-top: 12px; font-size: 12.5px; color: var(--b2-dim); }
+    .b2x .back:hover { color: var(--b2-acc); }
+
+    /* 한 번 더 확인 */
+    .b2x-modal { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); align-items: center; justify-content: center; padding: 20px; }
+    .b2x-modal.open { display: flex; }
+    .b2x-modal .box { width: 100%; max-width: 360px; background: var(--b2-bg); color: var(--b2-tx); padding: 24px 20px 18px; }
+    .b2x-modal .mt { font-family: "Noto Serif KR", serif; font-size: 19px; }
+    .b2x-modal p { font-size: 13.5px; color: var(--b2-dim2); line-height: 1.85; margin: 8px 0 0; }
+    .b2x-modal p b { color: #B4531F; font-weight: 600; }
+    .b2x-modal .mb { display: flex; gap: 6px; margin-top: 20px; }
+    .b2x-modal .mb button { flex: 1; padding: 12px 0; font-family: inherit; font-size: 13.5px; cursor: pointer; border: 1px solid var(--b2-rule); background: var(--b2-card); color: var(--b2-tx); }
+    .b2x-modal .mb button.r { background: #B4531F; border-color: #B4531F; color: #fff; font-weight: 600; }
+    .b2x-modal .mb button:disabled { opacity: .6; cursor: progress; }
+</style>
+
+<div class="b2x">
+    <header class="dk">
+        <div class="dkIn">
+            <div class="crumb">
+                <button type="button" class="b2hb hbw" onclick="toggleSidebar()" aria-label="메뉴 열기"><i></i><i></i><i></i></button>
+                <span class="f"><a href="/Bible2/Participants">참여자 현황</a> › <b>완독 기록 처리</b></span>
+            </div>
+            <div class="k">BIBLE COMPLETE</div>
+            <h1 class="T">성경 완독을<br><em>축하합니다</em></h1>
+            <div class="who">@(fullName)님 · 관리자 처리 화면</div>
+        </div>
+    </header>
+
+    <div class="in">
+        <div class="big">
+            <div>지금<b>@readCount</b>독</div>
+            <i aria-hidden="true">→</i>
+            <div class="to">처리 후<b>@nextCount</b>독</div>
+        </div>
+
+        <div class="rows">
+            <div><span>이름</span><b>@fullName</b></div>
+            <div><span>읽은 절</span><b>@readVerses.ToString("N0") / @totalVerses.ToString("N0")절</b></div>
+        </div>
+        <div class="pgl"><span>현재 진도</span><span>@(pct)%</span></div>
+        <div class="pg"><i id="progFill" data-pct="@pctCss"></i></div>
+
+        <div class="warn">
+            <b>누르면 이렇게 처리돼요</b>
+            <ol>
+                <li>성경 읽기 기록을 모두 지워요</li>
+                <li>완독 횟수를 @(readCount)독 → <b>@(nextCount)독</b>으로 올려요</li>
+                <li>처음부터 다시 읽을 수 있어요</li>
+            </ol>
+            <b>되돌릴 수 없어요.</b>
+        </div>
+
+        <button type="button" class="btn" id="btnReset" onclick="openConfirm()">읽기 기록 지우고 @(nextCount)독으로 등록</button>
+        <a class="back" href="/Bible2/Participants">취소하고 참여자 현황으로</a>
+    </div>
+</div>
+
+<div class="b2x-modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="cfTitle" onclick="if(event.target===this)closeConfirm()">
+    <div class="box">
+        <div class="mt" id="cfTitle">정말 처리할까요?</div>
+        <p>@(fullName)님의 읽기 기록이 <b>모두 지워지고</b><br>완독 횟수가 <b>@(nextCount)독</b>으로 기록돼요.<br>되돌릴 수 없어요.</p>
+        <div class="mb">
+            <button type="button" onclick="closeConfirm()">취소</button>
+            <button type="button" class="r" id="btnConfirm" onclick="submitReset()">처리하기</button>
+        </div>
+    </div>
+</div>
+
+<form id="resetForm" method="post" action="/Bible2/ResetProgress" style="display:none">
+    <input type="hidden" name="userId" value="@userId" />
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+<script>
+function openConfirm()  { document.getElementById('confirmModal').classList.add('open'); }
+function closeConfirm() { document.getElementById('confirmModal').classList.remove('open'); }
+function submitReset() {
+    var btn = document.getElementById('btnConfirm');
+    btn.disabled = true;
+    btn.textContent = '처리 중…';
+    document.getElementById('resetForm').submit();
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeConfirm(); });
+window.addEventListener('DOMContentLoaded', function () {
+    var fill = document.getElementById('progFill');
+    if (fill) setTimeout(function () { fill.style.width = (fill.dataset.pct || '0') + '%'; }, 120);
+});
+</script>
+}

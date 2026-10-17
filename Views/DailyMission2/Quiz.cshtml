@@ -1,0 +1,1018 @@
+﻿@using System
+@using System.Globalization
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using BulletinBoard.Models.DailyMission2
+<link rel="stylesheet" href="/css/mission2/missionButtons.css" />
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var toast = (ViewBag.Toast ?? "").ToString();
+    bool canAct = Model.IsActionable;
+
+    // ✅ 팝업(정답/오답/실패 모두 여기에)
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+ 
+
+    // ✅ 네비(공용)용 상태 세팅
+    ViewBag.DM2Page = "quiz";
+    ViewBag.DM2Done = Model.DayStatus?.QuizDone ?? false;
+
+    // 퀴즈수정 버튼 — superadmin 과 basic 에게만 보여 준다.
+    //   · 역할이 SuperAdmin 이거나
+    //   · 로그인 아이디가 superadmin / basic 이면 표시
+    //  (아이디까지 보는 이유: 이 DB 에 역할이 제대로 붙어 있지 않은 계정이 있어서)
+    var _quizUser     = await AuthService.GetSignedUser(User);
+    var _quizSignedIn = await AuthService.IsSignedIn(User);
+    bool canEditQuiz  = false;
+    if (_quizSignedIn && _quizUser != null)
+    {
+        var _uname = _quizUser.UserName ?? "";
+        canEditQuiz = string.Equals(_uname, "superadmin", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(_uname, "basic",      StringComparison.OrdinalIgnoreCase)
+                   || await AuthService.IsInRole(_quizUser, nameof(Roles.SuperAdmin));
+    }
+}
+
+@functions {
+    string S(object v) => (v == null) ? "" : v.ToString();
+    int I(object v) { try { return v == null ? 0 : Convert.ToInt32(v); } catch { return 0; } }
+    bool B(object v) { try { return v == null ? false : Convert.ToBoolean(v); } catch { return false; } }
+}
+<style>
+    .box {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+    }
+
+    .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .title {
+        font-size: 20px;
+        /* font-weight: 950; */
+    }
+
+    .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+        /* font-weight: 950; */
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* 눌러서 퀴즈 관리로 갈 수 있는 칩 (superadmin · basic 전용) */
+    .chipLink {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: background .16s, border-color .16s, box-shadow .16s;
+    }
+
+        .chipLink:hover {
+            background: #fff;
+            border-color: #94A3B8;
+            box-shadow: 0 2px 8px rgba(15,23,42,.10);
+        }
+
+        .chipLink:focus-visible {
+            outline: 2px solid #2563EB;
+            outline-offset: 2px;
+        }
+
+    .toast {
+        background: rgba(15,23,42,.86);
+        color: white;
+        padding: 10px 12px;
+        border-radius: 14px;
+        /* font-weight: 900; */
+        margin: 12px 0;
+    }
+
+    .card {
+        margin-top: 14px;
+        /*        border: 1px solid rgba(226,232,240,.95); */
+        border-radius: 18px;
+        /*     background: rgba(255,255,255,.92);
+            padding: 14px;
+            box-shadow: 0 10px 22px rgba(15,23,42,.10); */
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        /* font-weight: 950; */
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        white-space: nowrap;
+    }
+
+    /* ✅ Word/Recite/Pray와 동일한 Primary 버튼 + Disabled 스타일 */
+    .btnPrimary {
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+        border-color: rgba(34,197,94,.18);
+    }
+
+        .btnPrimary:disabled,
+        .btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+    .warn {
+        color: #b45309;
+        /* font-weight: 900; */
+        margin-top: 10px;
+        line-height: 1.35;
+    }
+
+    .lockBar {
+        margin-top: 12px;
+        border: 1px dashed rgba(148,163,184,.65);
+        background: rgba(241,245,249,.70);
+        border-radius: 16px;
+        padding: 10px 12px;
+        /* font-weight: 900; */
+        color: rgba(15,23,42,.86);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lockIcon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15,23,42,.08);
+        border: 1px solid rgba(226,232,240,.95);
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+
+    .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+    }
+
+    .mini {
+        font-size: 13px;
+        color: rgba(71,85,105,.92);
+        /* font-weight: 900; */
+    }
+
+    .badgeDone {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        /* font-weight: 950; */
+        font-size: 12.5px;
+        border: 1px solid rgba(34,197,94,.28);
+        background: rgba(34,197,94,.12);
+        color: rgba(20,83,45,.96);
+    }
+
+    .sectionTitle {
+        /* font-weight: 950; */
+        font-size: 15px;
+        margin: 0;
+    }
+
+    .block {
+        margin-top: 12px;
+        border-top: 1px solid rgba(226,232,240,.95);
+        padding-top: 12px;
+    }
+
+    .contentTitle {
+        /* font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; */
+        font-weight: 950; 
+        font-size: 18px;
+        margin: 0;
+    }
+
+    .contentSub {
+        margin-top: 6px;
+        /* font-weight: 900; */
+        color: rgba(71,85,105,.95);
+        line-height: 1.35;
+    }
+
+    .textBox {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+        /* font-weight: 850; */
+        color: rgba(15,23,42,.92);
+        line-height: 1.55;
+        white-space: pre-line;
+        word-break: break-word;
+    }
+
+    .toggleTitle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+        .toggleTitle:hover {
+            color: rgba(34,197,94,.95);
+        }
+
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+    }
+
+    .optLabel {
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(248,250,252,.92);
+        /* font-weight: 900; */
+        cursor: pointer;
+        transition: transform .05s ease, border-color .15s ease;
+        word-break: break-word;
+    }
+
+        .optLabel:hover {
+            transform: translateY(-1px);
+            border-color: rgba(34,197,94,.28);
+        }
+
+        .optLabel input {
+            margin-right: 8px;
+            transform: scale(1.1);
+        }
+
+        .optLabel.picked {
+            border-color: rgba(34,197,94,.55);
+            box-shadow: 0 0 0 4px rgba(34,197,94,.12);
+            background: rgba(34,197,94,.08);
+        }
+
+            .optLabel.picked::after {
+                content: "✅ 내가 고른 답";
+                float: right;
+                font-size: 12px;
+                /* font-weight: 950; */
+                opacity: .9;
+            }
+
+    .inputText {
+        width: 100%;
+        padding: 12px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.95);
+        /* ont-weight: 900; */
+        font-size: 16px;
+        outline: none;
+        box-sizing: border-box;
+    }
+
+        .inputText:focus {
+            border-color: rgba(34,197,94,.45);
+            box-shadow: 0 0 0 4px rgba(34,197,94,.10);
+        }
+
+    .hintBox {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 16px;
+        border: 1px dashed rgba(148,163,184,.70);
+        background: rgba(241,245,249,.75);
+        color: rgba(15,23,42,.86);
+        /* font-weight: 900; */
+        line-height: 1.45;
+    }
+
+    /* ✅ 섹션별 색상 구분 */
+    :root {
+        --sec-word: rgba(59,130,246,.10);
+        --sec-guide: rgba(16,185,129,.10);
+        --sec-bg: rgba(245,158,11,.12);
+        --sec-quiz: rgba(139,92,246,.10);
+        --sec-answer: rgba(34,197,94,.10);
+        --sec-hint: rgba(100,116,139,.10);
+        --sec-bd: rgba(15,23,42,.10);
+    }
+
+    .secBox {
+        margin-top: 12px;
+        border: 1px solid var(--sec-bd);
+        border-radius: 18px;
+        overflow: hidden;
+        background: rgba(255,255,255,.92);
+        box-shadow: 0 10px 22px rgba(15,23,42,.08);
+    }
+
+    .secHead {
+        padding: 10px 12px;
+        /* font-weight: 950; */
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid rgba(226,232,240,.95);
+    }
+
+    .secBody {
+        padding: 12px;
+        background: rgba(255,255,255,.92);
+    }
+
+    .secTag {
+        font-size: 12px;
+        /* font-weight: 950; */
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(15,23,42,.10);
+        background: rgba(255,255,255,.75);
+        color: rgba(15,23,42,.78);
+        white-space: nowrap;
+    }
+
+    .secWord .secHead {
+        background: var(--sec-word);
+    }
+
+    .secGuide .secHead {
+        background: var(--sec-guide);
+    }
+
+    .secBg .secHead {
+        background: var(--sec-bg);
+    }
+
+    .secQuiz .secHead {
+        background: var(--sec-quiz);
+    }
+
+    .secAnswer .secHead {
+        background: var(--sec-answer);
+    }
+
+    .secHint .secHead {
+        background: var(--sec-hint);
+    }
+
+    .secHead.toggleTitle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+        .secHead.toggleTitle:hover {
+            filter: brightness(0.985);
+        }
+
+    .secBox .textBox {
+        margin-top: 0;
+        background: rgba(255,255,255,.96);
+    }
+
+    @* 모바일 여백은 공용 레이아웃(_Layout_Mission2_New)에서 한 번에 다룹니다.
+       말씀·기도·퀴즈·암송이 같은 규칙을 쓰도록 그쪽으로 옮겼습니다. *@
+</style>
+
+<div class="box">
+    <div class="top">
+        <div class="title">🧩 오늘의 퀴즈 🧩</div>
+        @* 날짜 칩 — superadmin · basic 에게만 퀴즈 관리(/Question)로 가는 통로가 된다.
+           그 밖의 사용자에게는 예전처럼 그냥 표시만 되고 눌리지 않는다. *@
+        @if (canEditQuiz)
+        {
+            <a class="chip chipLink" href="/Question" title="퀴즈 관리로 이동">
+                @if (!canAct)
+                {
+                    <span title="수행 불가 날짜">🔒</span>
+                }
+                <span>@d</span>
+            </a>
+        }
+        else
+        {
+            <div class="chip">
+                @if (!canAct)
+                {
+                    <span title="수행 불가 날짜">🔒</span>
+                }
+                <span>@d</span>
+            </div>
+        }
+    </div>
+
+
+    @if (!canAct)
+    {
+        <div class="lockBar">
+            <div class="lockIcon">🔒</div>
+            <div>
+                <div style="font-weight:950;">다른 날짜 미션을 보고 있어요.</div>
+                <div class="mini">이 날짜는 수행이 불가능합니다. (오늘/어제/그저께만 가능)</div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="toast">@toast</div>
+    }
+
+    <div class="card">
+        @* await Html.PartialAsync("~/Views/DailyMission2/Partials/_QuizWordSection.cshtml", Model) *@
+
+
+
+
+        @functions {
+
+
+            // synopsis 우선, 없으면 BibleSummary
+            string GetWordGuide(dynamic wr)
+            {
+                try
+                {
+                    var syn = S(wr?.synopsis);
+                    if (!string.IsNullOrWhiteSpace(syn)) return syn;
+
+                    var sum = S(wr?.BibleSummary);
+                    return sum ?? "";
+                }
+                catch { return ""; }
+            }
+
+            string GetWordGuideTitle(dynamic wr)
+            {
+                try
+                {
+                    var syn = S(wr?.synopsis);
+                    if (!string.IsNullOrWhiteSpace(syn)) return "오늘의 말씀 요약 [AI]";
+                    return "오늘의 말씀 가이드 [하나바이블]";
+                }
+                catch { return "오늘의 말씀"; }
+            }
+        }
+
+        @{
+            dynamic wordRow = ViewBag.TodayWordToReadRow;
+        }
+
+        @* ✅ (컬러구분) "📖 오늘의 말씀" *@
+        <div class="secBox secWord" style="margin-top:0;">
+            <div class="secHead">
+                <div>📖 오늘의 말씀</div>
+                <span class="secTag">말씀</span>
+            </div>
+
+            <div class="secBody">
+                @if (wordRow != null && !string.IsNullOrWhiteSpace(S(wordRow?.BibleSubject)))
+                {
+                    var guideTitle = GetWordGuideTitle(wordRow);
+                    var guideText = GetWordGuide(wordRow);
+
+                    <h3 class="contentTitle">@Html.Raw(Html.Encode(S(wordRow?.BibleSubject)))</h3>
+
+                    <div class="contentSub">
+                        @Html.Raw(Html.Encode(S(wordRow?.BibleText)))
+                        @I(wordRow?.FromJang)장 @I(wordRow?.FromZul)절 ~ @I(wordRow?.ToJang)장 @I(wordRow?.ToZul)절
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(guideText))
+                    {
+                        <div class="secBox secGuide">
+                            <div class="secHead toggleTitle" onclick="toggleBlock(this)">
+                                <div>▶ @guideTitle</div>
+                                <span class="secTag">요약</span>
+                            </div>
+                            <div class="secBody toggleBody" style="display:none;">
+                                <div class="textBox">
+                                    @Html.Raw(Html.Encode(guideText))
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="mini">
+                        (말씀 정보가 없어요) 컨트롤러에서 <b>ViewBag.TodayWordToReadRow</b> 를 같이 주입하면 여기 표시됩니다.
+                    </div>
+                }
+            </div>
+        </div>
+
+
+
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        @* await Html.PartialAsync("~/Views/DailyMission2/Partials/_QuizMainSection.cshtml", Model) *@
+
+
+
+
+
+
+        @{
+
+
+            DailyMission2QuizContent q = ViewBag.TodayQuestionRow as DailyMission2QuizContent;
+
+            int tryCnt = 0;
+            bool isCorrect = false;
+            try { tryCnt = I(ViewBag.QuizTryCnt); } catch { tryCnt = 0; }
+            try { isCorrect = B(ViewBag.QuizCorrect); } catch { isCorrect = false; }
+
+            int qid = q?.QuestionId ?? 0;
+
+            string rawType = (q?.QuestionType ?? "").Trim().ToLowerInvariant();
+            string qType;
+            if (rawType == "o" || rawType == "a" || rawType == "s") qType = rawType;
+            else qType = (q?.HasChoices ?? false) ? "o" : "s";
+
+            string qTypeLabel =
+            (qType == "a") ? "O/X 퀴즈" :
+            (qType == "o") ? "4지선다 객관식" :
+            (qType == "s") ? "주관식(빈칸/단답)" :
+            "퀴즈";
+
+            // 제출 후 내가 고른 답 표시용
+            string lastAnswerQ = (ViewBag.LastAnswerQ ?? "").ToString();
+            int lastAnswerQid = 0;
+            try { lastAnswerQid = I(ViewBag.LastAnswerQid); } catch { lastAnswerQid = 0; }
+
+            bool showPicked = (lastAnswerQid == 0 || lastAnswerQid == qid) && !string.IsNullOrWhiteSpace(lastAnswerQ);
+
+            // ✅ GET 화면에서는 ViewBag(tryCnt/isCorrect)가 비어 있을 수 있음
+            //    그래서 “미션 완료 여부”는 DayStatus.QuizDone을 우선 기준으로 삼습니다.
+            bool doneByStatus = Model.DayStatus?.QuizDone ?? false;
+            bool finished = doneByStatus || isCorrect || tryCnt >= 2;
+        }
+
+        @* ✅ 아래부터 퀴즈 영역 *@
+        @if (q == null || string.IsNullOrWhiteSpace(q.QuestionQ))
+        {
+            <div class="secBox secQuiz">
+                <div class="secHead">
+                    <div>🧩 오늘의 퀴즈</div>
+                    <span class="secTag">없음</span>
+                </div>
+                <div class="secBody">
+                    <div class="warn">이 날짜(@d)에 해당하는 퀴즈가 없어요.</div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="secBox secQuiz">
+                <div class="secHead">
+                    <div>🧩 오늘의 퀴즈</div>
+                    <span class="secTag">@qTypeLabel</span>
+                </div>
+
+                <div class="secBody">
+
+                    <!-- 1) 상단 요약 줄 -->
+                    <div class="quizTopRow">
+                        <div class="quizTry">
+                            @if (doneByStatus || isCorrect)
+                            {
+                                <span class="badgeDone">✅ 완료</span>
+                            }
+                            else if (tryCnt >= 2)
+                            {
+                                <span class="mini"><b>오늘 종료</b> (2/2)</span>
+                            }
+                            else
+                            {
+                                <span class="mini">도전 <b>@tryCnt</b>/2</span>
+                            }
+                        </div>
+
+                        <!-- 힌트 토글 버튼(있을 때만) — 📚 배경 버튼은 노출하지 않는다 -->
+                        <div class="quizToggles">
+                            @if (!string.IsNullOrWhiteSpace(q.AnswerGuide))
+                            {
+                                <button type="button"
+                                        class="miniBtn"
+                                        onclick="toggleExclusive('hintBox')"
+                                        aria-controls="hintBox"
+                                        aria-expanded="false">
+                                    ▶ 🧠 힌트
+                                </button>
+                            }
+                        </div>
+                    </div>
+
+                    @* 2) 배경 : 버튼을 없앴으므로 내용도 내보내지 않는다 *@
+
+                    <!-- 2-1) 힌트(접힘) : 버튼과 가깝게 -->
+                    @if (!string.IsNullOrWhiteSpace(q.AnswerGuide))
+                    {
+                        <div id="hintBox" class="foldBox" style="display:none;">@Html.Raw(Html.Encode(q.AnswerGuide))</div>
+                    }
+
+                    <!-- 3) 문제 -->
+                    <div class="quizQ formatted-text">@Html.Raw(Html.Encode(q.QuestionQ))</div>
+
+                    <!-- 4) 답변 폼 -->
+                    <form method="post" action="/DailyMission2/AnswerQuestion" id="quizForm" class="quizForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="date" value="@d" />
+                        <input type="hidden" name="questionId" value="@qid" />
+                        <input type="hidden" name="answerQ" id="answerQ" value="" />
+
+                        @if (qType == "o")
+                        {
+                            <div class="options">
+                                @if (!string.IsNullOrWhiteSpace(q.Question1))
+                                {
+                                    var picked = finished && showPicked && lastAnswerQ == "1";
+                                    <label class="opt @(picked ? "picked" : "")">
+                                        <input type="radio" name="AnswerRadio" value="1" @(picked ? "checked" : "") />
+                                        @Html.Raw(Html.Encode(q.Question1))
+                                    </label>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(q.Question2))
+                                {
+                                    var picked = finished && showPicked && lastAnswerQ == "2";
+                                    <label class="opt @(picked ? "picked" : "")">
+                                        <input type="radio" name="AnswerRadio" value="2" @(picked ? "checked" : "") />
+                                        @Html.Raw(Html.Encode(q.Question2))
+                                    </label>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(q.Question3))
+                                {
+                                    var picked = finished && showPicked && lastAnswerQ == "3";
+                                    <label class="opt @(picked ? "picked" : "")">
+                                        <input type="radio" name="AnswerRadio" value="3" @(picked ? "checked" : "") />
+                                        @Html.Raw(Html.Encode(q.Question3))
+                                    </label>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(q.Question4))
+                                {
+                                    var picked = finished && showPicked && lastAnswerQ == "4";
+                                    <label class="opt @(picked ? "picked" : "")">
+                                        <input type="radio" name="AnswerRadio" value="4" @(picked ? "checked" : "") />
+                                        @Html.Raw(Html.Encode(q.Question4))
+                                    </label>
+                                }
+                            </div>
+                        }
+                        else if (qType == "a")
+                        {
+                            <div class="options ox">
+                                @{
+                                    var pickO = finished && showPicked && lastAnswerQ == "o";
+                                    var pickX = finished && showPicked && lastAnswerQ == "x";
+                                }
+                                <label class="opt @(pickO ? "picked" : "")">
+                                    <input type="radio" name="AnswerRadio" value="o" @(pickO ? "checked" : "") /> O
+                                </label>
+                                <label class="opt @(pickX ? "picked" : "")">
+                                    <input type="radio" name="AnswerRadio" value="x" @(pickX ? "checked" : "") /> X
+                                </label>
+                            </div>
+                        }
+                        else
+                        {
+                            var prev = (finished && showPicked) ? lastAnswerQ : "";
+                            <input id="AnswerText" class="inputText" type="text" placeholder="정답 입력" value="@prev" />
+                            <div class="mini muted">💡 주관식은 띄어쓰기를 제거해서 채점할 수 있어요.</div>
+                        }
+
+                        <!-- 5) 버튼 -->
+                        <div class="quizBtns">
+                            <button class="missionBtn @(finished ? "isDone" : "")" id="btnSubmit" type="button" @((canAct && !finished) ? "" : "disabled")>
+                                @(finished ? "✅ 제출 완료됨" : "제출 합니다")
+                            </button>
+                        </div>
+
+                        @* 퀴즈수정 — 이 날짜의 퀴즈(QuestionData.Id)를 그대로 편집 화면으로 넘긴다 *@
+                        @if (canEditQuiz && qid > 0)
+                        {
+                            <div class="quizAdminRow">
+                                <a class="quizEditBtn" href="/Question/ModifyQuiz?Id=@qid"
+                                   title="@d 퀴즈를 수정합니다 (Id @qid)">✏️ 퀴즈수정</a>
+                            </div>
+                        }
+
+                        <!-- 6) 상태 메시지(한 줄) -->
+                        <div class="quizMsg">
+                            @if (!canAct)
+                            {
+                                <span class="warn">🔒 오늘/어제/그저께만 수행 가능</span>
+                            }
+                            else if (doneByStatus || isCorrect)
+                            {
+                              @*   <span class="ok">✅ 이미 완료했어요</span> *@
+                            }
+                            else if (tryCnt >= 2)
+                            {
+                                <span class="warn">🙂 오늘은 2번 도전했어요. 내일 다시!</span>
+                            }
+                        </div>
+                    </form>
+                </div>
+            </div>
+            @await Html.PartialAsync("~/Views/DailyMission2/Partials/_Dm2Nav.cshtml", Model)
+
+            <style>
+                /* 퀴즈수정 — 관리자 전용, 제출 버튼보다 눈에 덜 띄게 */
+                .quizAdminRow {
+                    display: flex;
+                    justify-content: center;
+                    margin-top: 10px;
+                }
+
+                .quizEditBtn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 6px;
+                    height: 36px;
+                    padding: 0 16px;
+                    border-radius: 999px;
+                    background: #F1F5F9;
+                    border: 1px solid #CBD5E1;
+                    color: #475569;
+                    font-size: 13px;
+                    font-weight: 700;
+                    text-decoration: none;
+                    transition: .16s;
+                }
+
+                    .quizEditBtn:hover {
+                        background: #E2E8F0;
+                        border-color: #94A3B8;
+                        color: #1E293B;
+                    }
+
+                .quizTopRow {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 10px;
+                    margin-bottom: 6px;
+                }
+
+                .quizToggles {
+                    display: flex;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                }
+
+                .miniBtn {
+                    border: 1px solid rgba(0,0,0,.12);
+                    background: #f8fafc;
+                    border-radius: 10px;
+                    padding: 6px 10px;
+                    font-size: 12px;
+                    cursor: pointer;
+                }
+
+                    .miniBtn:hover {
+                        background: #e0f2fe;
+                    }
+
+                .quizQ {
+                    margin: 10px 0 12px 0;
+                    padding: 14px;
+                    border: 2px solid #6366f1;
+                    border-radius: 14px;
+                    background: #ffffff;
+                    line-height: 1.6;
+                    /* font-weight: 600; */
+                }
+
+                .formatted-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+                .foldBox {
+                    margin: 6px 0 10px 0;
+                    padding: 12px 14px;
+                    border-radius: 12px;
+                    line-height: 1.6;
+                }
+
+                #bgBox {
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    border: 1px solid #38bdf8;
+                    background: #f0f9ff;
+                    color: #075985;
+                }
+
+                #hintBox {
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    border: 1px solid #facc15;
+                    background: #fffbeb;
+                    color: #92400e;
+                }
+
+                .options {
+                    display: grid;
+                    gap: 8px;
+                    margin-top: 6px;
+                }
+
+                    .options.ox {
+                        grid-template-columns: 1fr 1fr;
+                    }
+
+                .opt {
+                    display: flex;
+                    gap: 10px;
+                    align-items: flex-start;
+                    padding: 10px 12px;
+                    border: 1px solid rgba(0,0,0,.10);
+                    border-radius: 14px;
+                    background: #fff;
+                }
+
+                    .opt input {
+                        margin-top: 3px;
+                    }
+
+                    .opt.picked {
+                        outline: 2px solid rgba(34,197,94,.35);
+                        background: rgba(34,197,94,.06);
+                    }
+
+                .quizBtns {
+                    display: flex;
+                    gap: 10px;
+                    flex-wrap: wrap;
+                    margin-top: 12px;
+                }
+
+                .quizMsg {
+                    margin-top: 10px;
+                }
+
+                .muted {
+                    opacity: .75;
+                }
+
+                .ok {
+                    color: #166534;
+                    /* font-weight: 700; */
+                }
+
+                .warn {
+                    color: #9a3412;
+                    /* font-weight: 700; */
+                }
+            </style>
+
+            <script>
+                (function () {
+                    const qtype = "@qType";
+
+                    function getSelectedRadioValue(name) {
+                        const els = document.getElementsByName(name);
+                        for (let i = 0; i < els.length; i++) if (els[i].checked) return els[i].value;
+                        return "";
+                    }
+
+                    function setBtnState(id, isOpen) {
+                        const btn = document.querySelector(`[aria-controls="${id}"]`);
+                        if (!btn) return;
+
+                        btn.setAttribute("aria-expanded", isOpen.toString());
+
+                        const base =
+                            (id === "bgBox") ? "📚 배경" :
+                            (id === "hintBox") ? "🧠 힌트" :
+                            "";
+
+                        btn.innerText = (isOpen) ? `▼ ${base}` : `▶ ${base}`;
+                    }
+
+                    // ✅ 배타 토글: 하나 열면 다른 하나는 자동으로 닫힘
+                    window.toggleExclusive = function (id) {
+                        const ids = ["bgBox", "hintBox"];
+
+                        // 존재하는 박스만 대상으로
+                        const existing = ids.filter(x => document.getElementById(x));
+
+                        // 목표 박스
+                        const target = document.getElementById(id);
+                        if (!target) return;
+
+                        const targetIsOpen = (target.style.display !== "none" && target.style.display !== "");
+
+                        // 1) 일단 전부 닫기
+                        existing.forEach(x => {
+                            const el = document.getElementById(x);
+                            if (el) el.style.display = "none";
+                            setBtnState(x, false);
+                        });
+
+                        // 2) 방금 누른게 "닫혀있던 상태"였으면 열기 (열려있던 거면 닫힌 채 유지)
+                        if (!targetIsOpen) {
+                            target.style.display = "block";
+                            setBtnState(id, true);
+                        }
+                    }
+
+                    document.addEventListener('DOMContentLoaded', function () {
+                        const btn = document.getElementById('btnSubmit');
+                        if (!btn) return;
+
+                        btn.addEventListener('click', function () {
+                            let answer = "";
+
+                            if (qtype === "s") answer = (document.getElementById('AnswerText')?.value || "").trim();
+                            else answer = getSelectedRadioValue("AnswerRadio");
+
+                            if (!answer) { alert("답을 입력(선택)해 주세요!"); return; }
+
+                            if (qtype === "s") answer = answer.replace(/\s+/g, "");
+
+                            document.getElementById('answerQ').value = answer;
+                            document.getElementById('quizForm').submit();
+                        });
+                    });
+                })();
+            </script>
+        }
+
+
+
+
+    </div>
+</div>
+@{
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+
+@* ✅ 팝업(공용 Partial 재사용) *@
+@await Html.PartialAsync("~/Views/DailyMission2/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+<script>
+    // ✅ 공용 토글: secHead / sectionTitle 둘 다 지원
+    function toggleBlock(titleEl) {
+        const body = titleEl.nextElementSibling;
+        if (!body) return;
+
+        const isOpen = body.style.display !== 'none';
+        if (isOpen) {
+            body.style.display = 'none';
+            // 헤더 내부 텍스트에 ▶/▼가 있으면 자연스럽게만 변경
+            if (titleEl.innerText.indexOf('▼') >= 0) titleEl.innerText = titleEl.innerText.replace('▼', '▶');
+        } else {
+            body.style.display = 'block';
+            if (titleEl.innerText.indexOf('▶') >= 0) titleEl.innerText = titleEl.innerText.replace('▶', '▼');
+        }
+    }
+</script>

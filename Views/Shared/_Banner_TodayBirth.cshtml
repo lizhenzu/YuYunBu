@@ -1,0 +1,369 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    // ✅ 오늘 생일자: ViewBag.BirthDayList7 (UpcomingBirthdayRowVM)
+    var birthdayList = ViewBag.BirthDayList7 as IEnumerable<BulletinBoard.Models.UpcomingBirthdayRowVM>;
+
+    // ✅ 오늘 생일자 존재 여부 (DDay == 0)
+    bool hasTodayBirthday = birthdayList != null
+        && birthdayList.Any(x => x.DDay == 0 && x.User != null);
+}
+
+<style>
+    /* 오늘의 생일자 카드 — DailyMission4 밝은 흰색 버전 (홈 카드 톤) — 색은 직접 지정한다 */
+    .today-birthday-wrapper { margin: 1rem 0 1.4rem; }
+
+    .today-birthday-banner {
+        position: relative;
+        border-radius: 20px;
+        padding: 18px 18px 6px;
+        background: #FFFFFF;
+        border: 1px solid #EEF0F3;
+        box-shadow: 0 6px 20px rgba(17, 24, 39, .05);
+        font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+        color: #374151;
+    }
+
+    .today-birthday-header { margin-bottom: 14px; }
+    .today-birthday-titlebox { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+
+    .today-birthday-label {
+        display: inline-flex; align-items: center;
+        padding: 4px 12px; border-radius: 999px;
+        background: #EAF2FD; color: #2B5FA8;
+        font-size: 12px; font-weight: 700;
+    }
+    .today-birthday-title { font-size: 21px; font-weight: 800; color: #111827; letter-spacing: -.01em; line-height: 1.3; }
+    .today-birthday-sub { font-size: 13px; line-height: 1.7; color: #6B7280; word-break: keep-all; }
+
+    /* 생일자 목록 — 카드 대신 얇은 줄로 나눈다 */
+    .today-birthday-list { display: block; }
+    .today-birthday-card {
+        position: relative;
+        display: flex; flex-direction: column; gap: 12px;
+        padding: 14px 0 16px;
+        border-top: 1px solid #EEF0F3;
+        background: none; box-shadow: none; border-radius: 0;
+    }
+
+    .today-birthday-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .today-birthday-avatar {
+        width: 52px; height: 52px; flex-shrink: 0;
+        border-radius: 50%; background: #EAF2FD;
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .today-birthday-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .today-birthday-avatar-initial { font-size: 1.3rem; font-weight: 800; color: #2B5FA8; }
+
+    .today-birthday-basic { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    .today-birthday-name-line { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+    .today-birthday-name { font-size: 16px; font-weight: 800; color: #111827; min-width: 0; }
+    .today-birthday-meta { font-size: 12.5px; color: #9CA3AF; }
+    .today-birthday-message { margin-top: 1px; font-size: 13px; font-weight: 700; color: #2F80ED; }
+
+    /* 생일수정 — 이름 옆 작은 알약 */
+    .birth-edit-btn {
+        display: inline-flex; align-items: center; flex-shrink: 0;
+        padding: 2px 10px; border-radius: 999px;
+        background: #F4F6F9; color: #6B7280;
+        font-size: 11px; font-weight: 700; text-decoration: none; white-space: nowrap;
+    }
+    .birth-edit-btn:hover { color: #2F80ED; }
+
+    /* 하단 : 상태 · 선물 · 버튼 */
+    .today-birthday-bottom { display: flex; flex-direction: column; gap: 10px; }
+    .today-status-row { display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 6px; }
+    .today-status-pill {
+        display: inline-flex; align-items: center;
+        padding: 4px 11px; border-radius: 999px;
+        font-size: 12px; font-weight: 700; white-space: nowrap;
+        background: #F4F6F9; color: #6B7280;
+    }
+    .pill-ok   { background: #EAF2FD; color: #2B5FA8; }
+    .pill-warn { background: #FBEFE7; color: #B4531F; }
+
+    .today-gift-action-row { display: flex; }
+    .today-gift-mini {
+        display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0;
+        padding: 10px 12px; border-radius: 12px; background: #F4F6F9;
+    }
+    .gift-zoom-btn { padding: 0; border: 0; background: transparent; cursor: pointer; line-height: 0; flex-shrink: 0; border-radius: 10px; }
+    .gift-zoom-btn:focus-visible { outline: 2px solid #2F80ED; outline-offset: 2px; }
+    .today-gift-mini img { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; background: #fff; flex-shrink: 0; display: block; }
+    .today-gift-mini .txt { font-size: 12px; color: #9CA3AF; line-height: 1.5; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+    .gift-name { white-space: normal; word-break: break-word; overflow-wrap: anywhere; line-height: 1.45; }
+    .today-gift-mini .gift-name:first-child { font-size: 13px; font-weight: 700; color: #111827; }
+
+    .today-birthday-actions { display: flex; }
+    .birthday-gift-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 11px 22px; border-radius: 999px;
+        background: #2F80ED; color: #fff;
+        font-size: 14px; font-weight: 800; text-decoration: none; white-space: nowrap;
+    }
+    .birthday-gift-btn:hover { background: #1F6FDB; }
+    .birthday-gift-btn.again { background: #F4F6F9; color: #6B7280; font-weight: 700; }
+    .birthday-gift-btn.again:hover { color: #2F80ED; background: #F4F6F9; }
+    .today-birthday-bottom .today-status-row:has(.today-birthday-actions) { display: block; }
+    .today-birthday-bottom .birthday-gift-btn { width: 100%; }
+
+    /* 선물 사진 크게 보기 */
+    .gift-modal { position: fixed; inset: 0; display: none; z-index: 9999; }
+    .gift-modal.is-open { display: block; }
+    .gift-modal__overlay { position: absolute; inset: 0; background: rgba(17, 24, 39, .55); }
+    .gift-modal__panel { position: relative; width: min(560px, calc(100% - 28px)); margin: 7vh auto 0; background: #FFFFFF; border-radius: 16px; overflow: hidden; }
+    .gift-modal__close { position: absolute; right: 12px; top: 12px; border: 0; padding: 6px 14px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 12.5px; font-weight: 700; cursor: pointer; z-index: 1; }
+    .gift-modal__body { padding: 14px; display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .gift-modal__img { width: 100%; height: min(52vh, 420px); object-fit: contain; background: #F4F6F9; border-radius: 12px; }
+    .gift-modal__meta { padding: 4px 4px 6px; }
+    .gift-modal__title { font-size: 16px; font-weight: 800; color: #111827; margin-bottom: 6px; }
+    .gift-modal__line { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid #EEF0F3; font-size: 14px; }
+    .gift-modal__line:first-of-type { border-top: 0; }
+    .gift-modal__line .k { width: 64px; flex: none; color: #9CA3AF; }
+    .gift-modal__line .v { flex: 1; color: #111827; font-weight: 700; word-break: break-word; }
+
+    @@media (max-width: 420px) {
+        .today-birthday-banner { padding: 16px 14px 4px; border-radius: 18px; }
+        .today-birthday-title { font-size: 19px; }
+    }
+</style>
+@if (hasTodayBirthday)
+{
+    @* 설정(숨기기 쿠키)과 상관없이 오늘 생일자가 있으면 항상 보인다 *@
+    <div class="today-birthday-wrapper">
+        <div class="today-birthday-banner">
+            <div class="today-birthday-header">
+                <div class="today-birthday-titlebox">
+                    <div class="today-birthday-label">
+                        <span>오늘의 생일자</span>
+                    </div>
+                    <div class="today-birthday-title">
+                        <span>생일을 축하합니다!</span>
+                    </div>
+                    <div class="today-birthday-sub">
+                        오늘 유년부 가족 중 생일을 맞은 친구예요.
+                        따뜻한 축하 한마디 꼭 건네주세요.
+                    </div>
+                </div>
+            </div>
+
+            <div class="today-birthday-list">
+                @foreach (var row in birthdayList)
+                {
+                    var user = row.User;
+                    if (user == null) { continue; }
+                    if (row.DDay != 0) { continue; }
+
+                    var displayName = string.IsNullOrWhiteSpace(user.FullName) ? (user.UserName ?? "") : user.FullName;
+                    var initial = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1);
+
+                    bool picked = row.HasPickedGift;
+                    bool sent = row.IsSent;
+
+                    var giftImg = (picked && row.ProductId.HasValue && row.ProductId.Value > 0)
+                    ? $"/images/AwardItem/{row.ProductId.Value}.jpg"
+                    : "";
+
+                    <article class="today-birthday-card">
+                        <!-- ✅ 상단 row -->
+                        <div class="today-birthday-top">
+                            <div class="today-birthday-avatar">
+                                @if (!string.IsNullOrEmpty(user.ProfilePicturePath))
+                                {
+                                    <img src="@user.ProfilePicturePath"
+                                         alt="@displayName 프로필 사진"
+                                         loading="lazy"
+                                         onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                                }
+                                else
+                                {
+                                    <span class="today-birthday-avatar-initial">@initial</span>
+                                }
+                            </div>
+
+                            <div class="today-birthday-basic">
+                                <div class="today-birthday-name-line">
+                                    <div class="today-birthday-name">@displayName 님</div>
+                                    <a class="birth-edit-btn"
+                                       href="/humanResource/confirmbirth?UserId=@user.UserId"
+                                       aria-label="생일 정보 수정하러 가기">
+                                        생일수정
+                                    </a>
+                                </div>
+                                <div class="today-birthday-meta">
+                                    @if (user.ClassYear > 0)
+                                    {
+                                        @:@user.ClassYear 학년
+                                    }
+                                    @if (user.ClassBan > 0)
+                                    {
+                                        @: · @user.ClassBan 반
+                                    }
+                                    @if (user.bMonth > 0 && user.bDay > 0)
+                                    {
+                                        @: · @user.bMonth/@user.bDay 생일
+                                    }
+                                </div>
+
+                                <div class="today-birthday-message">
+                                    <span>생일 축하해요!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (user.RoleCode == "T1001")
+                        {
+                            <!-- ✅ 하단 영역 -->
+                            <div class="today-birthday-bottom">
+
+                                <!-- ✅ 상태 pill — 홈 카드에서는 숨김 (2026-10-03) -->
+                                <div class="today-status-row" hidden style="display:none">
+                                    <span class="today-status-pill @(picked ? "pill-ok" : "pill-warn")">
+                                        선물 @(picked ? "선택완료" : "미선택")
+                                    </span>
+
+                                    <span class="today-status-pill @((picked && sent) ? "pill-ok" : "pill-warn")">
+                                        발송 @(picked ? (sent ? "발송완료" : "미발송") : "대기")
+                                    </span>
+                                </div>
+                                @* "생일 선물 선택" 버튼은 홈 카드에서 뺐다 (2026-10-03). "선물 바꾸기"도 2026-10-06 뺐다 — 고른 선물만 보인다. *@
+                                <!-- ✅ 선물 미니 + 버튼을 같은 줄에 -->
+                                @if (picked || user.RoleCode == "T1001")
+                                {
+                                    <div class="today-gift-action-row">
+                                        @if (picked)
+                                        {
+                                            
+                                            var desc = row.ProductDescription ?? "";
+                                            var shortDesc = desc.Length > 10
+                                                ? desc.Substring(0, 10) + "..."
+                                                : desc;
+ 
+                                            <div class="today-gift-mini">
+                                                <button type="button"
+                                                        class="gift-zoom-btn"
+                                                        data-img="@giftImg"
+                                                        data-product-id="@(row.ProductId?.ToString() ?? "")"
+                                                        data-product-name="@row.ProductName"
+                                                        data-product-description="@row.ProductDescription"
+                                                        aria-label="선물 이미지 크게 보기">
+                                                    <img src="@giftImg" alt="선택 선물"
+                                                         loading="lazy"
+                                                         onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                                                </button>
+
+                                                <div class="txt">
+                                                    <div class="gift-name">@row.ProductName (@row.ProductId)</div>
+                                                    <div class="gift-name">@row.ProductDescription</div>
+                                                    @if (row.SentAt.HasValue)
+                                                    {
+@*                                                         <div class="gift-date">처리: @row.SentAt.Value.ToString("MM/dd HH:mm")</div>
+ *@                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                 
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ✅ Gift Zoom Modal (한 번만) -->
+<div id="giftZoomModal" class="gift-modal" aria-hidden="true">
+    <div class="gift-modal__overlay" data-close="1"></div>
+
+    <div class="gift-modal__panel" role="dialog" aria-modal="true" aria-labelledby="giftModalTitle">
+        <button type="button" class="gift-modal__close" aria-label="닫기" data-close="1">닫기</button>
+
+        <div class="gift-modal__body">
+            <img id="giftModalImg" class="gift-modal__img" src="/images/common/no-image.jpg" alt="선물 큰 이미지" />
+
+            <div class="gift-modal__meta">
+                <div id="giftModalTitle" class="gift-modal__title">선물 정보</div>
+                <div class="gift-modal__line">
+                    <span class="k">Id</span>
+                    <span class="v" id="giftModalProductId">-</span>
+                </div>
+                <div class="gift-modal__line">
+                    <span class="k">이름</span>
+                    <span class="v" id="giftModalProductName">-</span>
+                </div>
+                <div class="gift-modal__line">
+                    <span class="k">설명</span>
+                    <span class="v" id="giftModalProductDescription">-</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const modal = document.getElementById('giftZoomModal');
+        const imgEl = document.getElementById('giftModalImg');
+        const pidEl = document.getElementById('giftModalProductId');
+        const pnameEl = document.getElementById('giftModalProductName');
+        const pdescEl = document.getElementById('giftModalProductDescription');
+
+        function onEsc(e) {
+            if (e.key === 'Escape') closeModal();
+        }
+
+        function openModal(payload) {
+            modal.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+
+            imgEl.src = payload.img || '/images/common/no-image.jpg';
+            imgEl.onerror = function () {
+                this.onerror = null;
+                this.src = '/images/common/no-image.jpg';
+            };
+
+            pidEl.textContent = payload.productId ? payload.productId : '-';
+            pnameEl.textContent = payload.productName ? payload.productName : '-';
+            pdescEl.textContent = payload.productDescription     ? payload.productDescription    : '-';
+            document.addEventListener('keydown', onEsc);
+        }
+
+        function closeModal() {
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            document.removeEventListener('keydown', onEsc);
+        }
+
+        // 이벤트 위임: 이미지 클릭
+        document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.gift-zoom-btn');
+            if (btn) {
+                openModal({
+                    img: btn.dataset.img,
+                    productId: btn.dataset.productId,
+                    productName: btn.dataset.productName,
+    productDescription: btn.dataset.productDescription
+                });
+                return;
+            }
+
+            // 닫기(오버레이/닫기버튼)
+            if (e.target && e.target.dataset && e.target.dataset.close === "1") {
+                closeModal();
+            }
+        });
+    })();
+</script>

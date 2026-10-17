@@ -1,0 +1,540 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+}
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>안드로이드 설치 가이드</title>
+    <meta name="description" content="PWA 자동 설치가 안 될 때 안드로이드(Chrome)에서 수동으로 설치하는 방법 안내" />
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: rgba(255,255,255,0.08);
+            --text: rgba(255,255,255,0.92);
+            --muted: rgba(255,255,255,0.70);
+            --line: rgba(255,255,255,0.14);
+            --shadow: 0 12px 30px rgba(0,0,0,0.30);
+            --radius: 18px;
+            --radius2: 14px;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--text);
+            background: radial-gradient(900px 500px at 15% 10%, rgba(125,211,252,0.22), transparent 55%), radial-gradient(800px 500px at 85% 20%, rgba(167,243,208,0.18), transparent 60%), radial-gradient(900px 700px at 55% 95%, rgba(251,191,36,0.12), transparent 60%), var(--bg);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 22px 16px 56px;
+        }
+
+        header {
+            padding: 18px 4px 12px;
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .title {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg, rgba(125,211,252,0.26), rgba(167,243,208,0.20));
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            flex: 0 0 auto;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: -0.2px;
+            line-height: 1.25;
+        }
+
+        .subtitle {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .quick {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .chip {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--line);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.18);
+            font-size: 13px;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+        }
+
+            .chip strong {
+                color: var(--text);
+                font-weight: 650;
+            }
+
+            .chip:active {
+                transform: translateY(1px);
+            }
+
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 14px;
+        }
+        @@media (max-width: 900px) {
+            .grid
+
+        {
+            grid-template-columns: 1fr;
+        }
+
+        .quick {
+            justify-content: flex-start;
+        }
+
+        }
+
+        .card {
+            background: linear-gradient(180deg, var(--card), rgba(255,255,255,0.05));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+            .card .hd {
+                padding: 16px 16px 10px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                background: rgba(255,255,255,0.02);
+            }
+
+            .card h2 {
+                margin: 0;
+                font-size: 16px;
+                letter-spacing: -0.2px;
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+
+        .pill {
+            font-size: 12px;
+            color: var(--muted);
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,0.05);
+            white-space: nowrap;
+        }
+
+        .bd {
+            padding: 14px 16px 16px;
+        }
+
+        .steps {
+            display: grid;
+            gap: 10px;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .num {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: rgba(125,211,252,0.16);
+            border: 1px solid rgba(125,211,252,0.26);
+            font-weight: 750;
+            flex: 0 0 auto;
+        }
+
+        .txt .t {
+            font-weight: 700;
+            margin: 1px 0 3px;
+            letter-spacing: -0.2px;
+        }
+
+        .txt .d {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .callout {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(251,191,36,0.25);
+            background: rgba(251,191,36,0.10);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .ok {
+            border-color: rgba(52,211,153,0.28);
+            background: rgba(52,211,153,0.10);
+        }
+
+        .danger {
+            border-color: rgba(251,113,133,0.32);
+            background: rgba(251,113,133,0.10);
+        }
+
+        .list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .item {
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.05);
+        }
+
+            .item .k {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+                font-weight: 750;
+                letter-spacing: -0.2px;
+            }
+
+            .item .s {
+                margin: 6px 0 0;
+                color: var(--muted);
+                font-size: 13px;
+                line-height: 1.55;
+            }
+
+        code, pre {
+            font-family: var(--mono);
+            font-size: 12.5px;
+        }
+
+        .codebox {
+            margin-top: 10px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.30);
+            overflow: hidden;
+        }
+
+            .codebox .top {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 10px 12px;
+                border-bottom: 1px solid rgba(255,255,255,0.10);
+                background: rgba(255,255,255,0.04);
+            }
+
+                .codebox .top .label {
+                    color: var(--muted);
+                    font-size: 12px;
+                }
+
+        .btn {
+            appearance: none;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.06);
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+            .btn:active {
+                transform: translateY(1px);
+            }
+
+        pre {
+            margin: 0;
+            padding: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        footer {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 12.5px;
+            line-height: 1.6;
+            padding: 0 4px;
+        }
+
+        .small {
+            color: var(--muted);
+            font-size: 12.5px;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255,255,255,0.10);
+            margin: 10px 0 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div class="title">
+                <div class="badge" aria-hidden="true">📲</div>
+                <div>
+                    <h1>안드로이드 설치 가이드</h1>
+                    <div class="subtitle">
+                        자동으로 “설치”가 안 보일 때, <b>Chrome</b>에서 직접 설치하는 방법을 카드형으로 안내합니다.
+                    </div>
+                </div>
+            </div>
+
+            <div class="quick">
+                <div class="chip" onclick="scrollToId('install')"><span>🚀</span><strong>설치</strong><span class="small">바로가기</span></div>
+                <div class="chip" onclick="scrollToId('check')"><span>✅</span><strong>체크</strong><span class="small">안될 때</span></div>
+                <div class="chip" onclick="scrollToId('advanced')"><span>🛠️</span><strong>고급</strong><span class="small">점검</span></div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <section class="card" id="install">
+                <div class="hd">
+                    <h2>🚀 설치하기 (수동)</h2>
+                    <span class="pill">약 30초</span>
+                </div>
+                <div class="bd">
+                    <div class="steps">
+                        <div class="step">
+                            <div class="num">1</div>
+                            <div class="txt">
+                                <div class="t">Chrome 앱으로 접속</div>
+                                <p class="d">반드시 <b>Google Chrome</b>에서 홈페이지 주소를 열어주세요. (삼성 인터넷/카카오 브라우저는 설치 메뉴가 없을 수 있어요)</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="num">2</div>
+                            <div class="txt">
+                                <div class="t">오른쪽 위 점 3개(⋮) 메뉴</div>
+                                <p class="d">Chrome 화면 오른쪽 위의 <b>⋮</b> 버튼을 눌러 메뉴를 열어주세요.</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="num">3</div>
+                            <div class="txt">
+                                <div class="t">“홈 화면에 추가” 또는 “앱 설치” 선택</div>
+                                <p class="d">메뉴에 <b>홈 화면에 추가</b> 또는 <b>앱 설치</b>가 보이면 눌러주세요. (표시 문구는 기기/버전에 따라 달라요)</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="num">4</div>
+                            <div class="txt">
+                                <div class="t">“추가/설치” 확인</div>
+                                <p class="d">확인 창이 뜨면 <b>추가</b> 또는 <b>설치</b>를 눌러 완료합니다. 바탕화면에 아이콘이 생기면 성공! 🎉</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="callout ok" style="margin-top:14px;">
+                        ✅ 설치 후에는 주소를 다시 입력할 필요 없이, <b>바탕화면 아이콘</b>을 눌러 바로 실행할 수 있어요.
+                    </div>
+                </div>
+            </section>
+
+            <aside class="card" id="check">
+                <div class="hd">
+                    <h2>✅ 설치가 안 될 때 체크</h2>
+                    <span class="pill">먼저 확인</span>
+                </div>
+                <div class="bd">
+                    <div class="list">
+                        <div class="item">
+                            <div class="k">🌐 Chrome으로 열었나요?</div>
+                            <p class="s">다른 브라우저는 “설치” 메뉴가 숨겨질 수 있어요.</p>
+                        </div>
+                        <div class="item">
+                            <div class="k">🔒 주소에 자물쇠(HTTPS)가 있나요?</div>
+                            <p class="s">PWA는 보통 <b>HTTPS</b>에서 정상 동작합니다. 주소창에 자물쇠가 있는지 확인해 주세요.</p>
+                        </div>
+                        <div class="item">
+                            <div class="k">📶 인터넷이 안정적인가요?</div>
+                            <p class="s">네트워크가 불안정하면 설치 메뉴가 뜨지 않을 수 있어요.</p>
+                        </div>
+                        <div class="item">
+                            <div class="k">📦 이미 설치된 앱이 있나요?</div>
+                            <p class="s">이미 설치되어 있으면 “설치” 대신 “열기”처럼 보일 수 있어요. 바탕화면/앱 목록에서 확인해 주세요.</p>
+                        </div>
+                    </div>
+
+                    <div class="callout danger">
+                        ⚠️ 그래도 메뉴가 안 보이면 아래 <b>고급 점검</b>을 따라 해보세요.
+                    </div>
+                </div>
+            </aside>
+
+            <section class="card" id="advanced" style="grid-column: 1 / -1;">
+                <div class="hd">
+                    <h2>🛠️ 고급 점검 (그래도 안 될 때)</h2>
+                    <span class="pill">선택 사항</span>
+                </div>
+                <div class="bd">
+                    <div class="steps">
+                        <div class="step">
+                            <div class="num">A</div>
+                            <div class="txt">
+                                <div class="t">Chrome 캐시 삭제</div>
+                                <p class="d">휴대폰 <b>설정 → 앱 → Chrome → 저장공간 → 캐시 삭제</b> 후 다시 접속해서 설치를 시도해 보세요.</p>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="num">B</div>
+                            <div class="txt">
+                                <div class="t">서비스 워커(Service Worker) 점검</div>
+                                <p class="d">기존 서비스워커가 꼬이면 설치가 안 되는 경우가 있어요. 아래 주소로 들어가 <b>Unregister</b> 후 새로고침하세요.</p>
+
+                                <div class="codebox">
+                                    <div class="top">
+                                        <div class="label">Chrome 주소창에 입력</div>
+                                        <button class="btn" onclick="copyText('chrome://inspect/#service-workers')">복사</button>
+                                    </div>
+                                    <pre id="code1">chrome://inspect/#service-workers</pre>
+                                </div>
+
+                                <div class="callout" style="margin-top:10px;">
+                                    📌 들어간 뒤: 대상 사이트가 보이면 <b>Unregister</b> → 다시 홈페이지로 돌아가 <b>새로고침</b> → 설치 재시도
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="step">
+                            <div class="num">C</div>
+                            <div class="txt">
+                                <div class="t">앱이 설치되었는데 “바로가기”처럼 보일 때</div>
+                                <p class="d">홈 화면 아이콘을 길게 눌러 “앱 정보”에서 확인하거나, 앱 서랍(전체 앱 목록)에서 아이콘이 있는지 확인해 주세요.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="callout ok" style="margin-top:12px;">
+                        ✅ 안내문 배포용 한 줄: <b>“Chrome으로 접속 → ⋮ 메뉴 → 홈 화면에 추가(또는 앱 설치)”</b>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <div>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+        </footer>
+    </div>
+
+    <script>
+        function scrollToId(id){
+          const el = document.getElementById(id);
+          if(!el) return;
+          el.scrollIntoView({behavior:'smooth', block:'start'});
+        }
+        async function copyText(text){
+          try{
+            await navigator.clipboard.writeText(text);
+            toast('복사했어요 ✅');
+          }catch(e){
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            toast('복사했어요 ✅');
+          }
+        }
+        function toast(msg){
+          const t = document.createElement('div');
+          t.textContent = msg;
+          t.style.position = 'fixed';
+          t.style.left = '50%';
+          t.style.bottom = '18px';
+          t.style.transform = 'translateX(-50%)';
+          t.style.padding = '10px 12px';
+          t.style.borderRadius = '999px';
+          t.style.background = 'rgba(0,0,0,0.72)';
+          t.style.border = '1px solid rgba(255,255,255,0.18)';
+          t.style.color = 'rgba(255,255,255,0.92)';
+          t.style.fontSize = '13px';
+          t.style.zIndex = '9999';
+          t.style.boxShadow = '0 10px 22px rgba(0,0,0,0.25)';
+          document.body.appendChild(t);
+          setTimeout(()=>{ t.style.opacity = '0'; t.style.transition='opacity .25s ease'; }, 900);
+          setTimeout(()=>{ t.remove(); }, 1250);
+        }
+    </script>
+</body>
+</html>

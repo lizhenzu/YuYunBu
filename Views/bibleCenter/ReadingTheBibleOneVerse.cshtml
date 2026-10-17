@@ -1,0 +1,326 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.eBible2>
+
+@{
+    Layout = null;
+
+    eBible2 eBibleBaseFirs = ViewBag.eBibleBaseFirst as eBible2;
+    eBible2 eBibleBaseLast = ViewBag.eBibleBaseLast as eBible2;
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString());
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    string readDoneStrng = string.Empty;
+    decimal _TestamentReading_ProgressRate = 0;
+
+    TestamentReading _TestamentReading = ViewBag.TestamentReading as TestamentReading;
+    if (_TestamentReading != null)
+    {
+        _TestamentReading_ProgressRate = Math.Round(_TestamentReading.ProgressRate, 2);
+    }
+
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>성경 통독</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            color: #333;
+        }
+
+        header1 {
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            background-color: #6ca6cd;
+            text-align: center;
+            padding: 40px 20px;
+            font-weight: 700;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+              header {
+            background: linear-gradient(135deg, #4caf50, #81c784);
+            padding: 40px 20px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+
+        .progress-section {
+            background-color: #e9f0f7;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .progress-label {
+            margin-top: 10px;
+            font-size: 1rem;
+        }
+
+        .progress-bar-container {
+            width: 80%;
+            background-color: #d0e3f0;
+            border-radius: 20px;
+            margin: 8px auto;
+            height: 18px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            text-align: right;
+            line-height: 18px;
+            padding-right: 10px;
+            color: white;
+            font-size: 0.8rem;
+            border-radius: 20px 0 0 20px;
+        }
+
+        .bar-total {
+            background-color: #4a90e2;
+            width: @_TestamentReading_ProgressRate%;
+        }
+
+        .bar-current {
+            background-color: #7dc57d;
+            width: @_TestamentReading_ProgressRate%;
+        }
+
+        .content {
+            padding: 20px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 1.3rem;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .bible-info {
+            text-align: center;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        .verse-box {
+            margin-bottom: 25px;
+        }
+
+        .verse {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            text-align: left;
+        }
+
+            .verse:nth-child(odd) {
+                background-color: #ffffff;
+            }
+
+            .verse:nth-child(even) {
+                background-color: #e2edf5;
+            }
+
+        .group-box {
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            background-color: #ffffff;
+            position: relative;
+        }
+
+        .group-title {
+            position: absolute;
+            top: -12px;
+            left: 15px;
+            background-color: #ffffff;
+            padding: 0 8px;
+            font-weight: bold;
+            color: #444;
+            font-size: 0.9rem;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 15px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .bible-box {
+            border: 2px solid #c9dff0;
+            background-color: #f6fbff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.05);
+        }
+
+        /* 상큼한 라임옐로우 */
+        @@media (max-width: 600px) {
+            .button-group {
+                align-items: center;
+            }
+        }
+    </style>
+    <style>
+
+        .btn {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease-in-out;
+        }
+
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 14px 28px rgba(0, 0, 0, 0.25);
+            }
+
+            .btn:active {
+                transform: translateY(0);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+            }
+
+        .btn30 {
+            background: #dcedc8;
+            color: #558b2f;
+        }
+
+
+
+          .btn1 {
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+      transition: all 0.2s ease-in-out;
+    }
+    .btn1:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+    }
+    .btn1:active {
+      transform: translateY(0);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.06);
+    }
+
+        .btn26 {
+            background: #ffe0b2;
+            color: #ef6c00;
+        }
+    </style>
+    <link rel="stylesheet" href="/css/ProcessBar.css">
+     
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+
+
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+  
+</head>
+<body>
+
+    <header>
+        <h3>안녕하세요</h3>
+        <h1>🍃성경통독공간 입니다.🍃</h1>
+        <h5>@UserFullName 님</h5>
+    </header>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+    <div class="progress-section">
+        <div class="progress-label">전체 진행률: <strong>@($"{@ViewBag.TotalProgressRate}%")</strong></div>
+        <div class="progress-bar-container">
+            <div class="progress-bar bar-total">@($"{@ViewBag.TotalProgressRate}%")</div>
+        </div>
+        <div class="progress-label">@ViewBag.BibleText 말씀 진행률: <strong>@($"{@_TestamentReading_ProgressRate}%")</strong></div>
+        <div class="progress-bar-container">
+            <div class="progress-bar bar-current">@($"{@_TestamentReading_ProgressRate}%")</div>
+        </div>
+    </div>
+    
+    <div class="content">
+        <div class="bible-box">
+            <div class="title">읽을 성경 말씀</div>
+            <div class="bible-info">@ViewBag.BibleSerialJangZul</div>
+
+            <div class="verse-box">
+                @foreach (var item in Model)
+                {
+                    if (item.readDone == "t")
+                    {
+                        readDoneStrng = "(읽음😄)";
+                    }
+                    else
+                    {
+                        readDoneStrng = string.Empty;
+                    }
+                    <div class="verse">@item.zul @item.BibleData @readDoneStrng</div>
+                }
+            </div>
+        </div>
+        @{
+            string basPath = $"/bibleCenter/ReadingTheBibleOneVerse?BibleBookSerialId={@ViewBag.BibleBookSerialId}";
+        }
+ 
+        <div class="group-box">
+            <div class="group-title">한번에 보기 줄 수 설정</div>
+             <div class="button-bar no-select">
+                <div class="colorBaseMintPastel buttonCommon " onclick="location.href='@basPath&PagesForView=1'">1줄</div>
+                <div class="colorBaseMintPastel buttonCommon " onclick="location.href='@basPath&PagesForView=3'">3줄</div>
+                <div class="colorBaseMintPastel buttonCommon " onclick="location.href='@basPath&PagesForView=5'">5줄</div>
+                <div class="colorBaseMintPastel buttonCommon " onclick="location.href='@basPath&PagesForView=7'">7줄</div>
+            </div>
+        </div>
+        <div class="group-box">
+            <div class="group-title">언어설정</div>
+               <div class="button-bar no-select">
+                <div class="colorBaseDeepTeal buttonCommon " onclick="location.href='@basPath&LangCD=al'">한/영</div>
+                <div class="colorBaseForestGreen buttonCommon " onclick="location.href='@basPath&LangCD=ko'">한글</div>
+                <div class="colorBaseMediumGreen buttonCommon " onclick="location.href='@basPath&LangCD=en'">영어</div>
+            </div>
+        </div>
+
+        <div class="group-box">
+            <div class="group-title">말씀 탐색</div>
+              <div class="button-bar no-select">
+                <div class="colorBaseMossGreen buttonCommon " onclick="location.href='@basPath&MoveDirection=P'">이전</div>
+                <div class="colorBaseSoftLavender buttonCommon " onclick="sendToServer('@Html.Raw(@eBibleBaseFirs.BibleText)', @eBibleBaseFirs.Jang,@eBibleBaseFirs.zul,@eBibleBaseLast.Jang,@eBibleBaseLast.zul, '@UserId' )">읽음표시</div>
+                <div class="colorBaseAmber buttonCommon " onclick="location.href='@basPath&MoveDirection=N'">다음</div>
+            </div>
+        </div>
+    </div>
+    @await Html.PartialAsync("_PublishNavigationButton_Home_Old_New_Board")
+</body>
+</html>

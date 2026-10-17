@@ -1,0 +1,371 @@
+﻿@model BulletinBoard.ViewModels.Birthday.BirthdayEditVM
+@{
+    Layout = null;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>생일 수정 - @Model.FullName</title>
+    <style>
+        :root {
+            --bg: #f6f8fc;
+            --panel: #ffffff;
+            --ink: #111827;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --shadow: 0 12px 30px rgba(17, 24, 39, .10);
+            --shadow2: 0 18px 44px rgba(17, 24, 39, .12);
+            --r: 18px;
+            --r2: 14px;
+            --primary: #2563eb;
+            --primary2: #4f46e5;
+            --warn: #ef4444;
+            --sans: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            --mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--ink);
+            background: linear-gradient(180deg, #f9fafb, var(--bg));
+        }
+
+        .wrap {
+            width: min(980px, 92vw);
+            margin: 0 auto;
+            padding: 18px 0 44px;
+        }
+
+        .card {
+            border-radius: var(--r);
+            border: 1px solid var(--line);
+            background: #fff;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .top {
+            padding: 14px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: -0.2px;
+        }
+
+        .sub {
+            margin: 6px 0 0;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.35;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: #ffffff;
+            color: var(--ink);
+            padding: 10px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 800;
+            box-shadow: 0 8px 18px rgba(17,24,39,.06);
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(17,24,39,.10);
+            border-color: #d1d5db;
+            background: #f9fafb;
+        }
+
+        .btn.primary {
+            border: 0;
+            color: #fff;
+            background: linear-gradient(90deg, var(--primary), var(--primary2));
+            box-shadow: 0 12px 26px rgba(37,99,235,.20);
+        }
+
+        .btn.primary:hover {
+            background: linear-gradient(90deg, #1d4ed8, #4338ca);
+        }
+
+        .btn.danger {
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #b91c1c;
+            box-shadow: none;
+        }
+
+        .btn.danger:hover {
+            border-color: #fca5a5;
+            background: #ffe4e6;
+            box-shadow: none;
+        }
+
+        .body {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 14px;
+            padding: 14px;
+            min-width: 0; /* ✅ overflow 방지 */
+        }
+
+        /* ✅ 모바일에서 1컬럼으로 전환 (오타 수정 완료) */
+        @@media (max-width: 860px) {
+            .body { grid-template-columns: 1fr; }
+        }
+
+        .leftBox, .rightBox {
+            border-radius: var(--r);
+            border: 1px solid var(--line);
+            background: #ffffff;
+            padding: 14px;
+            min-width: 0; /* ✅ overflow 방지 */
+        }
+
+        .profile {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 86px;
+            height: 86px;
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: #fff;
+            flex: 0 0 auto;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .name {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: -0.2px;
+        }
+
+        .meta {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .hr {
+            height: 1px;
+            background: var(--line);
+            margin: 12px 0;
+        }
+
+        .badgeRow {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+            font-weight: 900;
+            font-size: 12px;
+            color: #374151;
+        }
+
+        .badge b { font-family: var(--mono); color: var(--ink); }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        label {
+            font-size: 12px;
+            font-weight: 900;
+            color: #374151;
+        }
+
+        input, select {
+            padding: 12px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: #fff;
+            font-weight: 800;
+            color: var(--ink);
+            width: 100%;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: rgba(37,99,235,.55);
+            box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+        }
+
+        .readonly {
+            background: #f9fafb;
+            color: #111827;
+        }
+
+        .note {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .actionsRow {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        /* ✅ 모바일에서 버튼이 꽉 차게 */
+        @@media (max-width: 480px) {
+            .actionsRow .btn { flex: 1 1 auto; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <div class="top">
+            <div>
+                <p class="title">📝 생일 정보 수정</p>
+                <p class="sub">저장은 PersonMaster_2026에 <b>생일 관련 컬럼만</b> UPDATE 됩니다.</p>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn" type="button" onclick="history.back()">← 돌아가기</button>
+                <button class="btn" type="button" onclick="location.href='/Birthdays/Year'">📅 연간</button>
+            </div>
+        </div>
+
+        <form method="post" action="/Birthdays/Edit">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="PersonId" value="@Model.PersonId" />
+
+            <div class="body">
+                <div class="leftBox">
+                    <div class="profile">
+                        <div class="avatar"><img src="@Model.ProfileImageUrl" alt="profile" /></div>
+                        <div style="min-width:0;">
+                            <p class="name">@Model.FullName</p>
+                            <div class="meta">
+                                @if (!string.IsNullOrWhiteSpace(Model.UserName))
+                                {
+                                    <span class="badge">UserName: <b>@Model.UserName</b></span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="hr"></div>
+
+                    <div class="field">
+                        <label>연락처(보기 전용)</label>
+                        <input class="readonly" value="@($"{Model.PhoneNumber} {(!string.IsNullOrWhiteSpace(Model.PhoneNumber2) ? "· " + Model.PhoneNumber2 : "")}")" readonly />
+                    </div>
+                    <div class="field">
+                        <label>주소(보기 전용)</label>
+                        <input class="readonly" value="@Model.HomeAaddress" readonly />
+                    </div>
+                    <div class="field">
+                        <label>학교(보기 전용)</label>
+                        <input class="readonly" value="@Model.School" readonly />
+                    </div>
+
+                    <p class="note">
+                        ✅ 이 화면에서는 “생일 관련 값만” 수정합니다.<br />
+                        (이름/성별/연락처/주소/학교 등은 변경하지 않습니다)
+                    </p>
+                </div>
+
+                <div class="rightBox">
+                    <div class="badgeRow">
+                        <span class="badge">PersonId: <b>@Model.PersonId</b></span>
+                        <span class="badge">현재 생일: <b>@Model.BMonth</b>월 <b>@Model.BDay</b>일</span>
+                        <span class="badge">공개: <b>@(string.IsNullOrWhiteSpace(Model.PublishYN) ? "Y" : Model.PublishYN)</b></span>
+                    </div>
+
+                    <div class="field">
+                        <label>출생년도(선택)</label>
+                        <input type="number" name="BYear" value="@(Model.BYear ?? 0)" min="0" max="2100" />
+                    </div>
+
+                    <div class="field">
+                        <label>생일 월(필수)</label>
+                        <select name="BMonth" required>
+                            @for (int m = 1; m <= 12; m++)
+                            {
+                                <option value="@m" selected="@(Model.BMonth == m)">@m</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>생일 일(필수)</label>
+                        <select name="BDay" required>
+                            @for (int d = 1; d <= 31; d++)
+                            {
+                                <option value="@d" selected="@(Model.BDay == d)">@d</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>plusMins(선택)</label>
+                        <input name="PlusMins" value="@Model.PlusMins" maxlength="1" placeholder="예: Y/N 또는 0/1 등" />
+                    </div>
+
+                    <div class="field">
+                        <label>생일 공개 여부</label>
+                        <select name="PublishYN">
+                            <option value="Y" selected="@(Model.PublishYN == "Y")">Y (공개)</option>
+                            <option value="N" selected="@(Model.PublishYN == "N")">N (비공개)</option>
+                        </select>
+                    </div>
+
+                    <div class="actionsRow">
+                        <button class="btn primary" type="submit">저장</button>
+                        <button class="btn danger" type="button" onclick="history.back()">취소</button>
+                    </div>
+
+                    <p class="note">
+                        저장 시 실행 SQL:<br />
+                        <b>UPDATE PersonMaster_2026</b> SET <b>bYear,bMonth,bDay,plusMins,birthDay_PublishYN,updateDT</b> WHERE <b>PersonId</b>
+                    </p>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,93 @@
+@model BulletinBoard.Models.Prayer365.Prayer365ParticipantsVM
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    기도 참여자 — 관리자 전용 (Basic · SuperAdmin 아이디) — 2026-10-17 시안 확정
+    · "오늘 기도 했어요"를 한 번이라도 누른 회원 · 사람마다 마지막으로 누른 시각
+    · 정렬: 최근 기도순 · 기도한 날 많은순 · 오래 쉰 순
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string[] wk = { "일", "월", "화", "수", "목", "금", "토" };
+    string S(string s) => "/Prayer365/Participants" + (s == "recent" ? "" : "?sort=" + s);
+    string When(BulletinBoard.Models.Prayer365.Prayer365Participant p)
+        => p.DaysAgo == 0 ? "오늘 " + p.LastAt.ToString("HH:mm")
+         : p.DaysAgo == 1 ? "어제 " + p.LastAt.ToString("HH:mm")
+         : $"{p.LastAt.Month}월 {p.LastAt.Day}일 {p.LastAt:HH:mm}";
+    string Ago(BulletinBoard.Models.Prayer365.Prayer365Participant p)
+        => p.DaysAgo == 0 ? $"{p.LastAt.Month}월 {p.LastAt.Day}일 {wk[(int)p.LastAt.DayOfWeek]}" : $"{p.DaysAgo}일 전";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>기도 참여자</title>
+    <partial name="_Prayer365Style" />
+    <style>
+        .h1 { margin: 6px 0 2px; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--tx); }
+        .sb { font-size: 12px; color: var(--dim); }
+        .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+        .tiles .t { padding: 10px 6px; border-radius: 10px; background: var(--mark); text-align: center; }
+        .tiles .t b { display: block; font-size: 19px; font-weight: 800; color: var(--tx); font-variant-numeric: tabular-nums; }
+        .tiles .t.hl b { color: var(--acc); }
+        .tiles .t span { font-size: 11px; color: var(--dim2); }
+        .flt { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0 6px; }
+        .li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--rule); }
+        .av { width: 36px; height: 36px; border-radius: 50%; background: var(--soft); color: var(--acc); display: grid; place-items: center; font-size: 13px; font-weight: 800; text-transform: uppercase; }
+        .li .n { font-size: 14px; font-weight: 800; color: var(--tx); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .li .n small { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--dim); }
+        .li .m { margin-top: 1px; font-size: 11.5px; color: var(--dim2); }
+        .li .w { text-align: right; font-size: 12.5px; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .li .w small { display: block; margin-top: 1px; font-size: 11px; font-weight: 400; color: var(--dim); }
+        .li .w.today { color: var(--ok); }
+        .li .w.old { color: var(--warn); }
+        .none { margin-top: 24px; text-align: center; padding: 28px 20px; border-radius: 14px; background: var(--mark); color: var(--dim2); font-size: 14px; line-height: 1.8; }
+        @@media (max-width: 380px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    </style>
+</head>
+<body>
+<div class="pz">
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Prayer365">자녀를 위한 365</a><span class="sep">›</span><span>참여자</span></span>
+        <span>관리자</span>
+    </div>
+
+    <div class="kk">PARTICIPANTS</div>
+    <h1 class="h1">기도 참여자</h1>
+    <div class="sb">"오늘 기도 했어요"를 한 번이라도 누른 회원이에요 · Basic · SuperAdmin 만 볼 수 있어요</div>
+
+    <div class="tiles">
+        <div class="t hl"><b>@(Model.Total)명</b><span>전체 참여자</span></div>
+        <div class="t"><b>@(Model.Today)명</b><span>오늘 기도</span></div>
+        <div class="t"><b>@(Model.Resting)명</b><span>3일 넘게 쉼</span></div>
+        <div class="t"><b>@(Model.AvgRate)%</b><span>평균 기도율</span></div>
+    </div>
+
+    <div class="flt">
+        <a class="nb @(Model.Sort == "recent" ? "on" : "")" href="@S("recent")">최근 기도순</a>
+        <a class="nb @(Model.Sort == "days" ? "on" : "")" href="@S("days")">기도한 날 많은순</a>
+        <a class="nb @(Model.Sort == "rest" ? "on" : "")" href="@S("rest")">오래 쉰 순</a>
+    </div>
+
+    @if (Model.Total == 0)
+    {
+        <div class="none">아직 기도한 사람이 없어요.<br />"오늘 기도 했어요"를 누르면 여기에 나타나요.</div>
+    }
+
+    @foreach (var p in Model.Items)
+    {
+        <div class="li">
+            <div class="av">@(p.UserName.Length > 0 ? p.UserName.Substring(0, 1) : "?")</div>
+            <div>
+                <div class="n">@p.UserName<small>기도한 날 @(p.PrayedDays)일</small></div>
+                <div class="m">연속 @(p.Streak)일 · 기도율 @(p.RatePct >= 0 ? p.RatePct + "%" : "–")</div>
+            </div>
+            <div class="w @(p.DaysAgo == 0 ? "today" : p.DaysAgo > 3 ? "old" : "")">@When(p)<small>@Ago(p)</small></div>
+        </div>
+    }
+</div>
+</body>
+</html>

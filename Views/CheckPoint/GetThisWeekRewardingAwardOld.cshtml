@@ -1,0 +1,397 @@
+﻿@model IEnumerable<BulletinBoard.Models.PointAwardUser>
+@using System.Text.Encodings.Web
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>도전 성경 시상</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #a5d6a7;
+            color: #1b5e20;
+            text-align: center;
+            padding: 30px 10px;
+            border-bottom: 3px solid #81c784;
+        }
+
+            header h1 {
+                font-size: 1.8em;
+                margin-bottom: 10px;
+            }
+
+            header p {
+                font-size: 1.1em;
+                margin: 5px 0;
+            }
+
+        main {
+            flex: 1;
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .grid1 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 5px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* 200px → 250px 로 확대 */
+            gap: 16px; /* 5px → 16px 로 확대 */
+        }
+
+        .card {
+            max-width: 500px; /* ✅ 최대 500px */
+            margin: 0 auto; /* ✅ 가운데 정렬 */
+            background: #fff;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            transition: transform 0.2s;
+            padding: 24px;
+        }
+
+            .card:hover {
+                transform: scale(1.02);
+            }
+
+        .profile-section {
+            display: flex;
+            align-items: center;
+            flex-direction: column;
+        }
+
+
+
+            .profile-section .info {
+                flex: 1; /* ✅ 오른쪽 영역을 모두 차지하게 함 */
+                text-align: center; /* ✅ 내부 텍스트를 가운데 정렬 */
+            }
+
+        .imgTag {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            margin-right: 16px;
+            object-fit: cover;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+
+
+        .info {
+            font-size: 34px;
+            line-height: 1.5;
+            text-align: center; /* ✅ 추가 */
+        }
+
+            .info strong {
+                display: block;
+                font-size: 46px;
+                color: #222;
+            }
+
+        .product-img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 16px;
+            margin-top: 12px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+            .button-group button {
+                flex: 1 1 45%;
+                padding: 8px 12px;
+                background-color: #81c784;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                font-size: 0.9em;
+                cursor: pointer;
+                transition: background-color 0.2s;
+            }
+
+                .button-group button:hover {
+                    background-color: #66bb6a;
+                }
+
+        footer {
+            background-color: #eeeeee;
+            text-align: center;
+            padding: 15px;
+            font-size: 14px;
+            color: #555;
+            border-top: 1px solid #ccc;
+        }
+
+    </style>
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+
+
+    <script defer src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        /* confetti 캔버스가 클릭을 막지 않도록 */
+        canvas.confetti-canvas {
+            pointer-events: none !important;
+        }
+    </style>
+
+</head>
+<body>
+
+    <header>
+        <h1>@ConstatsCommon.MainKeyTitle</h1>
+        <h3>안녕하세요.</h3>
+        <h2>시상 대상자 입니다.</h2>
+        <h5>도전에 감사 드려요!</h5>
+    </header>
+
+    <br />
+    @await Html.PartialAsync("_Publish_Notice_Who_ReceiveAward")
+
+    <main>
+        @{
+            var user = await AuthService.GetSignedUser(User);
+            var isSignedIn = await AuthService.IsSignedIn(User);
+            var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+            var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+            var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+        }
+        <div class="grid">
+            @{
+                int index = 1;
+            }
+            <!-- 반복 카드 시작 (예시 하나만 보여줍니다, 동일한 방식으로 5명 작성됨) -->
+            @foreach (var item in Model)
+            {
+                // 필터링: Admin, Basic은 가격이 0 이하인 항목은 보이지 않음
+                if (!isSuperAdmin && item.UnitPrice <= 0)
+                {
+                    continue;
+                }
+                string YearBan = string.Empty;
+                string RoleString = string.Empty;
+
+                string dateString = $"{@item.maxclickDate.Month}월 {@item.maxclickDate.Day}일";
+
+                RoleString = @item.RoleNM;
+
+                if (@item.ClassYear > 0)
+                {
+                    YearBan = $"{@item.ClassYear}학년 {@item.ClassBan}반";
+                }
+                else
+                {
+                }
+                <div class="card">
+                    <div class="profile-section">
+                        <img class="imgTag" src="@item.ProfilePicturePath" onclick="ManageUserInfo('@item.UserId')">
+                        <div class="info">
+                            <strong>@item.FullName <span style=" font-size: 20px;">@RoleString</span> </strong>
+                        </div>
+                        @if (!string.IsNullOrEmpty(YearBan))
+                        {
+                            <div class="info">
+                                <strong style="font-size: 20px;">@YearBan</strong>
+                            </div>
+                        }
+
+                        @{
+                            // nullable 안전 처리
+                            var totalVal = item?.Total;      // (도전성경 포인트 + 추가 포인트)
+                            var dcVal = item?.DC_Total;   // (도전성경 포인트)
+
+                            bool hasTotal = totalVal.HasValue;
+                            bool hasDc = dcVal.HasValue;
+
+                            // 비교 결과
+                            bool bothHasValue = hasTotal && hasDc;
+                            bool isEqual = bothHasValue && totalVal.Value == dcVal.Value;
+
+                            // 표시 규칙
+                            bool showBoth = bothHasValue && !isEqual;           // 서로 다르면 둘 다
+                            bool showOnlyDC = hasDc && (!hasTotal || isEqual);    // 같거나 Total이 없으면 DC만
+                            bool showOnlyTotal = hasTotal && !hasDc;                 // DC가 없고 Total만 있으면 Total만
+
+                            string F<T>(T? v) where T : struct, IFormattable
+                            => v.HasValue ? v.Value.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) : "-";
+                        }
+
+                        @if (showBoth)
+                        {
+                            <!-- Total: 도전성경 포인트 + 추가 포인트 -->
+                            <div class="info">
+                                <strong>@F(totalVal)<span style="font-size:20px;">점</span></strong>
+                                <div style="font-size:13px;color:#777;">도전성경 포인트 + 추가 포인트</div>
+                            </div>
+
+                            <!-- DC_Total: 도전성경 포인트 -->
+                            <div class="info">
+                                <strong>@F(dcVal)<span style="font-size:20px;">점</span></strong>
+                                <div style="font-size:13px;color:#777;">도전성경 포인트</div>
+                            </div>
+                        }
+                        else if (showOnlyDC)
+                        {
+                            <!-- 같을 때(또는 Total이 없을 때)는 DC_Total만 표시 -->
+                            <div class="info">
+                                <strong>@F(dcVal)<span style="font-size:20px;">점</span></strong>
+                                <div style="font-size:13px;color:#777;">도전성경 포인트</div>
+                            </div>
+                        }
+                        else if (showOnlyTotal)
+                        {
+                            <!-- DC가 없고 Total만 있을 때의 보완 처리 -->
+                            <div class="info">
+                                <strong>@F(totalVal)<span style="font-size:20px;">점</span></strong>
+                                <div style="font-size:13px;color:#777;">도전성경 포인트 + 추가 포인트</div>
+                            </div>
+                        }
+
+
+                    </div>
+                    @if (string.IsNullOrEmpty(item.ProductName))
+                    {
+                        <img class="product-img" src="/images/AwardItem/1000.png" alt="상품 이미지" style="display:block; margin:12px auto; max-width:70%;">
+                        <div class="profile-section">
+                            <div class="info" style="font-size: 15px; color:#A50034">
+                                선물 선택하지 않음 ^^
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <img class="product-img" src="/images/AwardItem/@(@item.ProductID).jpg" alt="상품 이미지" style="display:block; margin:12px auto; max-width:70%;">
+                        <div class="profile-section">
+                            <div class="info" style=" color:#006633">
+                                @item.ProductName (@item.ProductID)
+                            </div>
+                        </div>
+                    }
+                    <div class="button-group">
+                        @if (!string.IsNullOrEmpty(item.ProductName))
+                        {
+                            @if (isSuperAdmin || isAdmin)
+                            {
+                                if (!string.IsNullOrEmpty(@ViewBag.viewOption) && @ViewBag.viewOption == "v")
+                                {
+                                }
+                                else
+                                {
+                                    <button onclick="showPopup('@item.ProductID','@Html.Raw(JavaScriptEncoder.Default.Encode(item.ProductName))', '@Html.Raw(JavaScriptEncoder.Default.Encode(item.ProductDescription))','@Html.Raw(JavaScriptEncoder.Default.Encode(item.PointRequirement))', '@item.UnitPrice', '/images/AwardItem/@(@item.ProductID).jpg')">  📦 상품보기</button>
+                                }
+                            }
+                            @*                            <button>🎁 선물선택</button>*@
+                        }
+                        @if (isSuperAdmin || isAdmin)
+                        {
+                            if (!string.IsNullOrEmpty(@ViewBag.viewOption) && @ViewBag.viewOption == "v")
+                            {
+
+                            }
+                            else
+                            {
+                                <button onclick="location.href='/CheckPoint/ManagePoint?UserId=@item.UserId'">💯 점수관리</button>
+                            }
+                        }
+                        <button onclick="location.href='/Home/NaviMonth?userName=@item.UserName'">📝 수행내역</button>
+                    </div>
+                </div>
+                index++;
+            }
+            <!-- 카드 2~5 생략 (같은 구조로 반복) -->
+
+        </div>
+    </main>
+
+    <div class="button-bar no-select">
+        <div class="buttonCommon colorBaseHome" onclick="location.href='/'">홈으로</div>
+        <div class="buttonCommon colorBaseBrightBlue" onclick="window.location.href='/Admin/IndexPoint'">포인트</div>
+        <div class="buttonCommon colorBaseSoftTeal" onclick="window.location.href='/Home/MissionMainBoard'">@ConstatsCommon.MainKeyTitle</div>
+    </div>
+
+
+    <div id="productPopup" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+    background:white; border-radius:10px; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.3); z-index:9999; width:300px; text-align:center;">
+        <img id="popupImage" src="" alt="상품 이미지" style="width:100%; border-radius:12px;" />
+        <h3 id="popupName" style="margin:10px 0 5px;"></h3>
+        <h4 id="pointRequirement" style="margin:10px 0 5px;"></h4>
+        <p id="popupDesc" style="font-size:14px; color:#555;"></p>
+        <p id="popupPrice" style="font-weight:bold; margin-top:5px;"></p>
+        <button onclick="closePopup()" style="margin-top:10px; padding:6px 12px; background:#81c784; color:white; border:none; border-radius:6px;">닫기</button>
+    </div>
+    <div id="popupOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); z-index:9998;" onclick="closePopup()"></div>
+
+
+
+    <footer>
+        @{
+            string churchString = $"{@ChurchName} {@DepartmentName}.";
+        }
+        &copy; 2024 @churchString All Rights Reserved.
+    </footer>
+    <script>
+        function showPopup(nameId, name, desc, pointRequirement, price, imgPath) {
+            document.getElementById('popupImage').src = imgPath;
+            //document.getElementById('popupName').innerText = name;
+            document.getElementById('popupName').innerText = `${name} (${nameId})`;
+            //document.getElementById('popupNameId').innerText = '상품코드 : ' + nameId;
+            document.getElementById('popupDesc').innerText = desc;
+            document.getElementById('pointRequirement').innerText = pointRequirement;
+            document.getElementById('popupPrice').innerText = price ? Number(price).toLocaleString() + "원" : "";
+            document.getElementById('productPopup').style.display = 'block';
+            document.getElementById('popupOverlay').style.display = 'block';
+        }
+
+        function closePopup() {
+            document.getElementById('productPopup').style.display = 'none';
+            document.getElementById('popupOverlay').style.display = 'none';
+        }
+    </script>
+    <script src="/js/PartyPopper.js"></script>
+</body>
+</html>

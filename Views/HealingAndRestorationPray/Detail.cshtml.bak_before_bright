@@ -1,0 +1,164 @@
+﻿@model BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray
+@using BulletinBoard.Helpers
+@*  ══════════════════════════════════════════════════════════════
+    치유와 회복 기도문 한 편 보기 — Bone 스킨 (오늘의 기도 화면과 같은 먹색 + 금색)
+    이전 화면은 Detail_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    DateTime kNow = ViewBag.TodayKst is DateTime _k ? _k : DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dayStr = $"{dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // ── 공유 미리보기 — 이 기도문 제목이 보이게 ─────────────
+    string ogDomain = (ViewBag.Domain as string ?? "").TrimEnd('/');
+    string ogUrl    = $"{ogDomain}/HealingAndRestorationPray/Detail?PrayId={Model.PrayId}";
+    string ogImage  = $"{ogDomain}/images/og/healing-restoration-pray.png";
+    string ogTitle  = "치유와 회복을 위한 기도문";
+    string ogDesc   = string.IsNullOrWhiteSpace(Model.Title) ? "아픈 이를 위해 함께 기도해요" : Model.Title;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16181C" />
+    <title>@Model.Title · 치유와 회복을 위한 기도문</title>
+    <meta name="description" content="@ogDesc" />
+
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="@ogTitle" />
+    <meta property="og:title"       content="@ogTitle" />
+    <meta property="og:description" content="@ogDesc" />
+    <meta property="og:url"         content="@ogUrl" />
+    <meta property="og:image"       content="@ogImage" />
+    <meta property="og:image:secure_url" content="@ogImage" />
+    <meta property="og:image:type"  content="image/png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="@ogTitle" />
+    <meta property="og:locale"      content="ko_KR" />
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="@ogTitle" />
+    <meta name="twitter:description" content="@ogDesc" />
+    <meta name="twitter:image"       content="@ogImage" />
+
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    :root { --fs: 1; }
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .epFs { display: flex; border: 1px solid var(--rule); }
+    .qz .epFs button { font-family: "Noto Serif KR", serif; background: none; border: 0; color: var(--dim); padding: 3px 8px; cursor: pointer; line-height: 1.4; }
+    .qz .epFs button:nth-child(1) { font-size: 11px; }
+    .qz .epFs button:nth-child(2) { font-size: 13px; }
+    .qz .epFs button:nth-child(3) { font-size: 15px; }
+    .qz .epFs button.on { background: var(--tx); color: var(--bg); }
+
+    .qz .epHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 30px var(--pad) 26px; }
+    .qz .epK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .epH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.45; margin: 12px 0 0; color: var(--bg); word-break: keep-all; text-wrap: balance; }
+    .qz .epRule { width: 26px; height: 1px; background: #C9AE82; margin-top: 16px; }
+    .qz .epMeta { font-family: "Inter", sans-serif; font-size: 11px; color: #9A9690; margin-top: 12px; }
+
+    .qz .epBody { font-family: "Noto Serif KR", serif; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: #2A2C30; margin: 26px 0 0; white-space: pre-line; word-break: keep-all; }
+    .qz .epBody .nm { color: inherit; font-weight: 500; background: linear-gradient(transparent 60%, var(--mark) 60%); padding: 0 2px; }
+    .qz .epQuote { border-left: 2px solid var(--acc); padding: 2px 0 2px 14px; margin-top: 24px; }
+    .qz .epVr { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--acc); }
+    .qz .epVt { font-family: "Noto Serif KR", serif; font-size: calc(13.5px * var(--fs)); line-height: 1.9; color: var(--dim2); margin: 8px 0 0; word-break: keep-all; }
+
+    .qz .epBless { margin-top: 28px; text-align: center; font-family: "Noto Serif KR", serif; font-size: 13px; color: var(--acc); }
+
+    .qz .epNav { display: flex; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 26px; }
+    .qz .epNav a { flex: 1; text-align: center; padding: 14px 0; font-size: 12.5px; color: var(--dim2); text-decoration: none; border-right: 1px solid var(--rule); }
+    .qz .epNav a:last-child { border-right: 0; }
+    .qz .epNav a:hover { color: var(--acc); }
+
+    @@media print { .qzBar, .epNav { display: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">홈</a><span class="qzHomeSep">·</span><a class="qzHome" href="/HealingAndRestorationPray/Index">오늘의 기도</a>
+            </div>
+            <div class="epFs" role="group" aria-label="기도문 글자 크기">
+                <button type="button" id="pfsS" onclick="setPFs('s')" aria-label="작게">가</button>
+                <button type="button" id="pfsM" onclick="setPFs('m')" aria-label="보통">가</button>
+                <button type="button" id="pfsL" onclick="setPFs('l')" aria-label="크게">가</button>
+            </div>
+        </div>
+
+        <header class="epHead">
+            <div class="epK">치유와 회복을 위한 기도문</div>
+            <h1 class="epH1">@Model.Title</h1>
+            <div class="epRule"></div>
+            <div class="epMeta">@kNow.ToString("yyyy.MM.dd") · @dayStr</div>
+        </header>
+
+        <article>
+            <p class="epBody">@PrayTextHelper.MarkNames(Model.PrayText)</p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.BibleText) || !string.IsNullOrWhiteSpace(Model.BibleRef))
+            {
+                <div class="epQuote">
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleRef))
+                    {
+                        <div class="epVr">@Model.BibleRef</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleText))
+                    {
+                        <p class="epVt">@Model.BibleText</p>
+                    }
+                </div>
+            }
+        </article>
+
+        @if (isSuper)
+        {
+            <div class="epBless">오늘도 평안하시길</div>
+        }
+
+        <nav class="epNav">
+            <a href="/HealingAndRestorationPray/Index">오늘의 기도</a>
+            @if (isSuper)
+            {
+                @* 목록·수정은 관리자 전용 *@
+                <a href="/HealingAndRestorationPray/List">목록</a>
+                <a href="/HealingAndRestorationPray/Edit?PrayId=@Model.PrayId">수정</a>
+            }
+            else
+            {
+                <a href="/">홈</a>
+            }
+        </nav>
+
+    </div>
+</div>
+
+<script>
+/* 기도문 글자 크기 — 다른 기도문 화면과 같은 저장 키 */
+(function () {
+    var MAP = { s: 0.90, m: 1, l: 1.18 };
+    window.setPFs = function (k, silent) {
+        if (!MAP[k]) k = 'm';
+        document.documentElement.style.setProperty('--fs', MAP[k]);
+        ['S', 'M', 'L'].forEach(function (x) {
+            var b = document.getElementById('pfs' + x);
+            if (b) b.classList.toggle('on', x.toLowerCase() === k);
+        });
+        if (!silent) { try { localStorage.setItem('ppFs', k); } catch (e) { } }
+    };
+    var saved = 'm';
+    try { saved = localStorage.getItem('ppFs') || 'm'; } catch (e) { }
+    setPFs(saved, true);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,86 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model MissionContents_2
+@{
+	string backgroundColor = "white";
+
+
+	@if (@Model.MissionCount > 0)
+	{
+		backgroundColor = "#F5F5F5";
+	}
+
+
+	int maxLimit = 9;
+
+	var todayDate = DateHelper.GetTodayDateDayString(maxLimit);
+	TodayCollectQuestion todayCollectQuestion = ViewBag.todayCollectQuestion as TodayCollectQuestion;
+	string formattedModResult = $"/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_{todayDate}.png";
+
+}
+
+  
+<div class="mission-card">
+
+	<div class="quiz-container">
+		@if (@todayCollectQuestion.questionProcessStatus.Result == "f")
+		{
+			if (@todayCollectQuestion.questionProcessStatus.TryCnt > 1)
+			{
+
+				<img src="@Model.BackGround" alt="Quiz" style="display: block; filter: blur(2.5px);">
+				<img style=" border:none; box-shadow: none;width: 120px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none;"
+					 src="/images/ICON/stamp/mission-failed.webp"
+					 alt="Mission Completed">
+			}
+			else
+			{
+				<img src="@Model.BackGround" alt="Quiz">
+			}
+		}
+		else @if (@Model.MissionCount > 0)
+		{
+			<img src="@Model.BackGround" alt="Quiz" style="display: block; filter: blur(2.5px);">
+			<img style=" border:none; box-shadow: none;width: 120px; height: 120px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border: none;"
+				 src="@formattedModResult"
+				 alt="Mission Completed">
+		}
+		else
+		{
+			<img src="@Model.BackGround" alt="Quiz">
+		}
+
+	</div>
+
+	<div class="mission-title">@Model.missionTitle</div>
+
+	<div class="mission-desc">@Model.missionDesc</div>
+	@if (@todayCollectQuestion.questionProcessStatus.Result == "f")
+	{
+		if (@todayCollectQuestion.questionProcessStatus.TryCnt > 1)
+		{
+			<div class="mission-desc" style="color:orangered;">미션 수행 실패</div>
+		}
+		else
+		{
+			<div class="mission-desc" style="color:orangered;">퀴즈 풀기 1차 실패(재도전 가능)</div>
+		}
+	}
+
+	@if (@Model.MissionCount > 0 || (@todayCollectQuestion.questionProcessStatus.Result == "f" && @todayCollectQuestion.questionProcessStatus.TryCnt > 1))
+	{
+		<div class="buttonCommon  colorBasePaleSilver " style="padding : 20px;" onclick="location.href='/DailyMission/@Model.MissionURL'">퀴즈 풀기(다시 보기)</div>
+	}
+	else
+	{
+		<div class="buttonCommon  @Model.missionButtonClass" style="padding : 20px;"  onclick="location.href='/DailyMission/@Model.MissionURL'">퀴즈 풀기</div>
+	}
+
+</div>
+

@@ -1,0 +1,1274 @@
+﻿@model BulletinBoard.Models.RhapsodyOfRealityComposite
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@using System.Text
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"preach_{todayDate}.webp";
+    string formattedModResultDataOG = $"{ViewBag.Domain}/images/preach/{formattedModResultData}";
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    bool methodTEXT = false;
+    if (ViewBag.methodTEXT != null && ViewBag.methodTEXT == "TEXT")
+    {
+        methodTEXT = true;
+    }
+}
+
+@{
+    int Year = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(0, 4));
+    int Month = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(5, 2));
+    int Day = int.Parse(Model.RhapsodyOfRealitysData.ExposeDate.Substring(8, 2));
+    string DateString = $"{Year}년 {Month}월 {Day}일 {Model.RhapsodyOfRealitysData.WeekDayKor}요일";
+
+    var videoId = Model?.RhapsodyOfRealitysData?.YouTuBuURL ?? "";
+    var endMin = Model?.RhapsodyOfRealitysData?.EndMinute ?? 0;
+    var endSec = Model?.RhapsodyOfRealitysData?.EndSecond ?? 0;
+    var total = endMin * 60 + endSec;
+    var hasRange = (endMin > 0 || endSec > 0);
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && (await AuthService.IsInRole(user, nameof(Roles.SuperAdmin)) || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));   // 2026-10-05: "Basic" 계정도 SuperAdmin 과 동일
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+@{
+    var sb = new StringBuilder();
+
+    var titleText = (Model?.RhapsodyOfRealitysData?.WordTitle ?? "").Trim();
+    var phraseForCopy = Model?.RhapsodyOfRealitysData?.WordPhrase ?? "";
+    var prayerText = (Model?.RhapsodyOfRealitysData?.WordPray ?? "").Trim();
+    var refList = Model?.eBibleDatas ?? Enumerable.Empty<eBibles>();
+
+    var phraseLines = phraseForCopy
+        .Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Select(x => x.Trim())
+        .ToList();
+
+    sb.AppendLine($"📅 {DateString}");
+    sb.AppendLine();
+    sb.AppendLine(titleText);
+    sb.AppendLine();
+    sb.AppendLine("📖오늘의 말씀");
+
+    if (phraseLines.Any())
+    {
+        sb.AppendLine(phraseLines[0]);
+
+        for (int i = 1; i < phraseLines.Count; i++)
+        {
+            sb.AppendLine();
+            sb.AppendLine(phraseLines[i]);
+        }
+    }
+
+    if (!string.IsNullOrWhiteSpace(prayerText))
+    {
+        sb.AppendLine();
+        sb.AppendLine("🙏기도");
+        sb.AppendLine(prayerText);
+    }
+
+    if (refList.Any())
+    {
+        sb.AppendLine();
+        sb.AppendLine("📝 참고 성경");
+        sb.AppendLine();
+
+        foreach (var va in refList)
+        {
+            if (va == null) { continue; }
+
+            var janZul = (va.JanZulString ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(janZul))
+            {
+                sb.AppendLine(janZul);
+            }
+
+            if (va.eBibleDatas != null && va.eBibleDatas.Any())
+            {
+                foreach (var v in va.eBibleDatas)
+                {
+                    if (v == null) { continue; }
+
+                    sb.AppendLine($"{v.zul}절");
+                    sb.AppendLine((v.BibleData ?? "").Trim());
+                    sb.AppendLine();
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(va.BibleText))
+            {
+                sb.AppendLine(va.BibleText.Trim());
+                sb.AppendLine();
+            }
+        }
+    }
+
+    if (isSuperAdmin)
+    {
+        sb.AppendLine("https://www.jamsilkids.com/RhapsodyOfReality/DetailWords");
+    }
+
+    var textCopyContent = sb.ToString().Trim();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ChurchName · @DepartmentName</title>
+    <meta property="og:title" content="@ChurchName · @DepartmentName" />
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다." />
+    <meta property="og:image" content="@formattedModResultDataOG" />
+    <meta property="og:url" content="@ViewBag.FullURL" />
+    <meta property="og:type" content="website" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;1,400&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/bibleOneByOne.css" />
+    <link rel="stylesheet" href="/css/ProcessBar.css" />
+    <link rel="stylesheet" href="/css/ButtonBase7.css" />
+    <link rel="stylesheet" href="/css/ColorBase7.css" />
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+    <script src="/js/bibleOneByOne.js"></script>
+
+    <style>
+        :root {
+            --bg: #0a0c14;
+            --bg2: #10121e;
+            --bg3: #181c2e;
+            --card-bg: #141828;
+            --card-bg-h: #1a1f35;
+            --glass: rgba(255,255,255,0.045);
+            --glass-h: rgba(255,255,255,0.08);
+            --border: rgba(255,255,255,0.11);
+            --border-h: rgba(255,255,255,0.22);
+            --text: #f0ecff;
+            --text2: #ccc6ee;
+            --text3: #9490b4;
+            --gold: #f0c460;
+            --gold-dim: rgba(240,196,96,0.18);
+            --gold-glow: rgba(240,196,96,0.30);
+            --blue: #7aa8ff;
+            --blue-dim: rgba(122,168,255,0.14);
+            --purple: #a87dff;
+            --purple-dim: rgba(168,125,255,0.13);
+            --green: #4ade80;
+            --r: 16px;
+            --r2: 24px;
+            --shadow: 0 8px 32px rgba(0,0,0,0.50), inset 0 1px 0 rgba(255,255,255,0.07);
+            --shadow2: 0 20px 60px rgba(0,0,0,0.60);
+            --font-serif: 'Noto Serif KR', 'Georgia', serif;
+            --font-sans: 'Noto Sans KR', 'system-ui', sans-serif;
+            --font-display: 'Playfair Display', 'Noto Serif KR', serif;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-weight: 400;
+            background-color: var(--bg);
+            background-image: radial-gradient(ellipse 70% 50% at 15% 0%, rgba(91,141,238,0.13) 0%, transparent 55%), radial-gradient(ellipse 55% 45% at 88% 15%, rgba(139,92,246,0.11) 0%, transparent 55%), radial-gradient(ellipse 40% 35% at 50% 100%, rgba(232,184,75,0.07) 0%, transparent 60%);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .top-nav {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            height: 56px;
+            background: rgba(10,12,20,0.82);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-home-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.09);
+            color: #d8d4f0;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all .18s;
+        }
+
+            .nav-home-btn:hover {
+                background: rgba(255,255,255,0.16);
+                color: #fff;
+                border-color: rgba(255,255,255,0.28);
+            }
+
+        .nav-date-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 13px;
+            border-radius: 999px;
+            background: var(--gold-dim);
+            border: 1px solid rgba(232,184,75,0.30);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--gold);
+            letter-spacing: .04em;
+        }
+
+        .nav-admin-btn {
+            padding: 6px 13px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: rgba(255,255,255,0.08);
+            color: #ccc8e8;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .18s;
+        }
+
+            .nav-admin-btn:hover {
+                background: rgba(255,255,255,0.16);
+                color: #fff;
+            }
+
+            .nav-admin-btn.accent {
+                background: rgba(232,184,75,0.12);
+                border-color: rgba(232,184,75,0.30);
+                color: var(--gold);
+            }
+
+                .nav-admin-btn.accent:hover {
+                    background: rgba(232,184,75,0.22);
+                }
+
+        .shell {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 32px 18px 140px;
+        }
+
+        .hero-section {
+            margin-bottom: 28px;
+            padding: 36px 40px 32px;
+            border-radius: var(--r2);
+            background: #13172a;
+            border: 1px solid var(--border);
+            border-top: 1px solid rgba(255,255,255,0.16);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .hero-section::before {
+                content: '';
+                position: absolute;
+                top: -80px;
+                right: -60px;
+                width: 280px;
+                height: 280px;
+                background: radial-gradient(circle, rgba(232,184,75,0.14) 0%, transparent 65%);
+                pointer-events: none;
+            }
+
+            .hero-section::after {
+                content: '';
+                position: absolute;
+                bottom: -60px;
+                left: -40px;
+                width: 220px;
+                height: 220px;
+                background: radial-gradient(circle, rgba(91,141,238,0.12) 0%, transparent 65%);
+                pointer-events: none;
+            }
+
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--gold);
+            margin-bottom: 14px;
+        }
+
+            .hero-eyebrow::before {
+                content: '✦';
+                font-size: 10px;
+                opacity: .7;
+            }
+
+        .copy-date-line {
+            display: none;
+            font-size: 18px;
+            font-weight: 700;
+            color: #f8d88b;
+            margin: 0 0 18px;
+            font-family: var(--font-sans);
+        }
+
+        .hero-title {
+            font-family: var(--font-serif);
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 700;
+            line-height: 1.3;
+            color: #f5f2ff;
+            margin: 0 0 10px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+        }
+
+        .hero-divider {
+            width: 48px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--gold), transparent);
+            border-radius: 2px;
+            margin-top: 14px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 22px;
+            align-items: start;
+        }
+
+        .col-left {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .col-right {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .g-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-top: 1px solid rgba(255,255,255,0.15);
+            border-radius: var(--r2);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .g-card-hd {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .g-card-hd-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            background: var(--glass-h);
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+            .section-icon.gold {
+                background: var(--gold-dim);
+                border-color: rgba(232,184,75,0.25);
+            }
+
+            .section-icon.blue {
+                background: var(--blue-dim);
+                border-color: rgba(91,141,238,0.25);
+            }
+
+            .section-icon.purple {
+                background: var(--purple-dim);
+                border-color: rgba(139,92,246,0.25);
+            }
+
+        .g-card-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: .01em;
+        }
+
+        .g-card-meta {
+            font-size: 12px;
+            color: var(--text3);
+            font-weight: 500;
+        }
+
+        .g-card-bd {
+            padding: 22px 20px;
+        }
+
+        .player-wrap {
+            position: relative;
+            padding-top: 56.25%;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid var(--border);
+        }
+
+            .player-wrap iframe {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                border: none;
+            }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .pc-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.09);
+            color: #d8d4f0;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+            .pc-btn:hover {
+                background: rgba(255,255,255,0.16);
+                color: #fff;
+                border-color: rgba(255,255,255,0.28);
+            }
+
+            .pc-btn.primary {
+                background: linear-gradient(135deg, rgba(91,141,238,0.45), rgba(139,92,246,0.38));
+                border-color: rgba(122,168,255,0.50);
+                color: #daeaff;
+                font-weight: 700;
+            }
+
+                .pc-btn.primary:hover {
+                    background: linear-gradient(135deg, rgba(91,141,238,0.60), rgba(139,92,246,0.52));
+                    color: #fff;
+                }
+
+        .loop-hint {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text3);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .loop-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: loopPulse 2s ease-in-out infinite;
+        }
+
+        @@keyframes loopPulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: .5;
+                transform: scale(.75);
+            }
+        }
+
+        .scripture-item {
+            position: relative;
+            padding: 16px 18px 16px 22px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.10);
+            font-family: var(--font-serif);
+            font-size: 16.5px;
+            line-height: 1.9;
+            color: #e8e4ff;
+            font-weight: 400;
+            transition: background .18s, border-color .18s;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+        }
+
+            .scripture-item::before {
+                content: '';
+                position: absolute;
+                left: 0;
+                top: 10px;
+                bottom: 10px;
+                width: 3px;
+                border-radius: 2px;
+                background: linear-gradient(180deg, var(--gold), rgba(240,196,96,0.30));
+            }
+
+            .scripture-item:hover {
+                background: rgba(240,196,96,0.07);
+                border-color: rgba(240,196,96,0.28);
+            }
+
+        .scripture-plain {
+            font-family: var(--font-serif);
+            font-size: 17px;
+            line-height: 1.95;
+            color: #e0dcf8;
+            font-weight: 400;
+            margin: 0 0 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .prayer-card {
+            position: relative;
+            overflow: hidden;
+            background: #161a30;
+            border: 1px solid rgba(168,125,255,0.28);
+            border-top: 1px solid rgba(255,255,255,0.13);
+            border-radius: var(--r2);
+            box-shadow: var(--shadow);
+        }
+
+            .prayer-card::after {
+                content: '';
+                position: absolute;
+                top: -50px;
+                right: -50px;
+                width: 200px;
+                height: 200px;
+                background: radial-gradient(circle, rgba(240,196,96,0.10) 0%, transparent 65%);
+                pointer-events: none;
+            }
+
+        .prayer-card-hd {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(168,125,255,0.22);
+            background: rgba(168,125,255,0.07);
+        }
+
+        .prayer-cross {
+            font-size: 16px;
+            color: var(--gold);
+            opacity: .85;
+            letter-spacing: 0;
+        }
+
+        .prayer-text {
+            font-family: var(--font-serif);
+            font-size: 16.5px;
+            line-height: 2.0;
+            color: #ddd8f8;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+            white-space: pre-line;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+        }
+
+        .ref-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ref-acc {
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.11);
+            overflow: hidden;
+            background: rgba(255,255,255,0.03);
+            transition: border-color .2s;
+        }
+
+            .ref-acc:hover {
+                border-color: rgba(122,168,255,0.35);
+            }
+
+            .ref-acc[open] {
+                border-color: rgba(122,168,255,0.40);
+                background: rgba(122,168,255,0.05);
+            }
+
+            .ref-acc summary {
+                list-style: none;
+                cursor: pointer;
+                padding: 12px 14px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 13px;
+                font-weight: 700;
+                color: #a0c4ff;
+                user-select: text !important;
+                -webkit-user-select: text !important;
+                transition: background .15s;
+            }
+
+                .ref-acc summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                .ref-acc summary::before {
+                    content: '›';
+                    font-size: 18px;
+                    line-height: 1;
+                    color: var(--text3);
+                    transition: transform .2s;
+                    flex-shrink: 0;
+                }
+
+            .ref-acc[open] summary::before {
+                transform: rotate(90deg);
+                color: #a0c4ff;
+            }
+
+            .ref-acc summary:hover {
+                background: rgba(255,255,255,0.04);
+            }
+
+        .ref-acc-bd {
+            padding: 0 12px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ref-verse {
+            display: flex;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.09);
+            font-size: 14px;
+            line-height: 1.78;
+            font-family: var(--font-serif);
+            font-weight: 400;
+            color: #d8d3f4;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .ref-verse-num {
+            font-size: 11px;
+            font-weight: 800;
+            color: #7aa8ff;
+            min-width: 22px;
+            margin-top: 3px;
+            flex-shrink: 0;
+            font-family: var(--font-sans);
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .ref-verse-text {
+            flex: 1;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(18px);
+            transition: opacity .55s ease, transform .55s ease;
+        }
+
+            .reveal.in {
+                opacity: 1;
+                transform: none;
+            }
+
+        .actionbar {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 14px;
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(10,12,20,0.90);
+            border: 1px solid var(--border);
+            border-top: 1px solid rgba(255,255,255,0.10);
+            border-radius: 18px;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 2px 0 rgba(255,255,255,0.04) inset;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .ab-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 16px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.10);
+            color: #d8d4f0;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all .18s;
+            white-space: nowrap;
+        }
+
+            .ab-btn:hover {
+                background: rgba(255,255,255,0.18);
+                color: #fff;
+                border-color: rgba(255,255,255,0.30);
+            }
+
+            .ab-btn.gold-btn {
+                background: linear-gradient(135deg, rgba(232,184,75,0.22), rgba(232,184,75,0.12));
+                border-color: rgba(232,184,75,0.35);
+                color: var(--gold);
+            }
+
+                .ab-btn.gold-btn:hover {
+                    background: linear-gradient(135deg, rgba(232,184,75,0.32), rgba(232,184,75,0.20));
+                }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            place-items: center;
+            background: rgba(0,0,0,0.5);
+            z-index: 9999;
+        }
+
+        .loading-box {
+            background: var(--bg3);
+            color: var(--text);
+            padding: 16px 22px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: var(--shadow2);
+        }
+
+        #processingBox {
+            display: none;
+        }
+
+        .copy-scope {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .no-copy,
+        .no-copy * {
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            -webkit-touch-callout: none !important;
+        }
+
+        .text-copy-source {
+            position: absolute;
+            left: -99999px;
+            top: -99999px;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        body.text-mode .hero-eyebrow,
+        body.text-mode .hero-divider {
+            display: none;
+        }
+
+        body.text-mode .copy-date-line {
+            display: block;
+        }
+
+        body.text-mode .hero-title {
+            margin: 0;
+        }
+
+        body.text-mode .hero-section {
+            padding-top: 24px;
+            padding-bottom: 24px;
+        }
+
+        body.text-mode .main-grid {
+            grid-template-columns: 1fr;
+        }
+
+        @@media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @@media (max-width: 640px) {
+            .shell {
+                padding: 20px 12px 130px;
+            }
+
+            .hero-section {
+                padding: 24px 20px 20px;
+            }
+
+            .g-card-bd {
+                padding: 16px 14px;
+            }
+
+            .scripture-item {
+                font-size: 15px;
+                padding: 14px 14px 14px 18px;
+            }
+
+            .prayer-text {
+                font-size: 15px;
+            }
+
+            .top-nav {
+                padding: 0 12px;
+            }
+
+            .nav-date-pill {
+                font-size: 11px;
+            }
+
+            .loop-hint {
+                display: none;
+            }
+        }
+
+        @@media (max-width: 420px) {
+            .hero-title {
+                font-size: 1.3rem;
+            }
+
+            .player-controls {
+                gap: 6px;
+            }
+
+            .pc-btn {
+                padding: 7px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body class="@(methodTEXT ? "text-mode" : "")">
+    <div id="loadingOverlay" class="loading-overlay"><div class="loading-box">⏳ 처리 중입니다…</div></div>
+    <div id="processingBox">📖 처리 중입니다... 잠시만 기다려 주세요.</div>
+
+    <nav class="top-nav no-copy">
+        <div class="nav-left">
+            <a href="/" class="nav-home-btn">🏠 홈</a>
+            <div class="nav-date-pill">📅 @DateString</div>
+        </div>
+        <div class="nav-right">
+            @if (isSuperAdmin || isAdmin)
+            {
+                <a href="/RhapsodyOfReality/DetailWords?Id=@Model?.RhapsodyOfRealitysData?.Id&methodTEXT=TEXT"
+                   class="nav-admin-btn">📰 평문</a>
+            }
+            @if (isSuperAdmin)
+            {
+                <a href="/RhapsodyOfReality/ModifyView?Id=@Model?.RhapsodyOfRealitysData?.Id"
+                   class="nav-admin-btn">✏️ 수정</a>
+                <a href="/RhapsodyOfReality/DetailList"
+                   class="nav-admin-btn accent">📂 목록</a>
+            }
+        </div>
+    </nav>
+
+    <div class="shell copy-scope" id="copyScope">
+
+        <header class="hero-section reveal">
+            @if (methodTEXT)
+            {
+                <div class="copy-date-line">📅 @DateString</div>
+            }
+            else
+            {
+                <div class="hero-eyebrow">오늘의 말씀</div>
+            }
+
+            <h1 class="hero-title">@Model?.RhapsodyOfRealitysData?.WordTitle</h1>
+
+            @if (!methodTEXT)
+            {
+                <div class="hero-divider"></div>
+            }
+        </header>
+
+        <div class="main-grid">
+
+            <div class="col-left">
+
+                @if (!methodTEXT && !string.IsNullOrEmpty(videoId))
+                {
+                    <article class="g-card reveal no-copy">
+                        <div class="g-card-hd">
+                            <div class="g-card-hd-left">
+                                <div class="section-icon blue">🎥</div>
+                                <span class="g-card-title">설교 영상</span>
+                            </div>
+                            @if (isSuperAdmin && hasRange)
+                            {
+                                <span class="g-card-meta">구간: 0:00 ~ @endMin:@endSec.ToString("D2")</span>
+                            }
+                        </div>
+                        <div class="g-card-bd">
+                            <div class="player-wrap">
+                                @if (isSuperAdmin && hasRange)
+                                {
+                                    <iframe id="ytplayer"
+                                            src="https://www.youtube.com/embed/@videoId?start=0&end=@total&enablejsapi=1"
+                                            title="설교영상"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowfullscreen></iframe>
+                                }
+                                else
+                                {
+                                    <iframe id="ytplayer"
+                                            src="https://www.youtube.com/embed/@videoId?enablejsapi=1"
+                                            title="설교영상"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowfullscreen></iframe>
+                                }
+                            </div>
+                            <div class="player-controls">
+                                <button type="button" class="pc-btn primary" onclick="ytPlay()">▶ 재생</button>
+                                <button type="button" class="pc-btn" onclick="ytPause()">⏸ 일시정지</button>
+                                <button type="button" class="pc-btn" onclick="ytReplay()">↺ 처음부터</button>
+                                <span class="loop-hint"><span class="loop-dot"></span>무한 반복 중</span>
+                            </div>
+                        </div>
+                    </article>
+                }
+
+                <article class="g-card reveal">
+                    <div class="g-card-hd">
+                        <div class="g-card-hd-left">
+                            <div class="section-icon gold no-copy">📖</div>
+                            <span class="g-card-title">오늘의 말씀</span>
+                        </div>
+                    </div>
+                    <div class="g-card-bd">
+                        @{
+                            var phrase = Model?.RhapsodyOfRealitysData?.WordPhrase ?? "";
+                            var lines = phrase.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                            foreach (var ln in lines)
+                            {
+                                if (!string.IsNullOrWhiteSpace(ln))
+                                {
+                                    if (methodTEXT)
+                                    {
+                                        <p class="scripture-plain">@ln</p>
+                                    }
+                                    else
+                                    {
+                                        <div class="scripture-item">@ln</div>
+                                    }
+                                }
+                            }
+                        }
+                    </div>
+                </article>
+
+                <article class="prayer-card reveal">
+                    <div class="prayer-card-hd">
+                        <div class="section-icon purple no-copy">🙏</div>
+                        <span class="g-card-title">기도</span>
+                        <span class="prayer-cross no-copy" style="margin-left:4px; font-size:16px;">✝</span>
+                    </div>
+                    <div class="g-card-bd">
+                        <p class="prayer-text">@Model?.RhapsodyOfRealitysData?.WordPray</p>
+                    </div>
+                </article>
+
+            </div>
+
+            <aside class="col-right">
+                <article class="g-card reveal">
+                    <div class="g-card-hd">
+                        <div class="g-card-hd-left">
+                            <div class="section-icon blue no-copy">📝</div>
+                            <span class="g-card-title">참고 성경</span>
+                        </div>
+                    </div>
+                    <div class="g-card-bd">
+                        <div class="ref-list">
+                            @foreach (var va in Model?.eBibleDatas ?? Enumerable.Empty<eBibles>())
+                            {
+                                <details class="ref-acc" @(methodTEXT ? "open" : "")>
+                                    <summary>@va.JanZulString</summary>
+                                    <div class="ref-acc-bd">
+                                        @if (!string.IsNullOrEmpty(va.BibleText) && va.eBibleDatas != null)
+                                        {
+                                            foreach (var v in va.eBibleDatas)
+                                            {
+                                                <div class="ref-verse">
+                                                    <span class="ref-verse-num">@v.zul</span>
+                                                    <span class="ref-verse-text">@v.BibleData</span>
+                                                </div>
+                                            }
+                                        }
+                                        else if (!string.IsNullOrEmpty(va.BibleText))
+                                        {
+                                            <div class="ref-verse">
+                                                <span class="ref-verse-text">@va.BibleText</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </details>
+                            }
+                        </div>
+
+                        @if (isSuperAdmin)
+                        {
+                            <div class="no-copy" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+                                <span style="font-size:11px; color:var(--text3); word-break:break-all;">
+                                    https://www.jamsilkids.com/RhapsodyOfReality/DetailWords
+                                </span>
+                            </div>
+                        }
+                    </div>
+                </article>
+            </aside>
+
+        </div>
+    </div>
+
+    <textarea id="textCopySource" class="text-copy-source">@textCopyContent</textarea>
+
+    @if (!methodTEXT)
+    {
+        <div class="actionbar no-copy">
+            <a class="ab-btn" href="/">🏠 홈</a>
+            @if (isSuperAdmin)
+            {
+                <a class="ab-btn gold-btn" href="/RhapsodyOfReality/DetailList">📂 QT 목록</a>
+                <a class="ab-btn" href="/RhapsodyOfReality/ModifyView?Id=@Model?.RhapsodyOfRealitysData?.Id">✏️ 수정</a>
+            }
+            @if (isSuperAdmin || isAdmin)
+            {
+                <a class="ab-btn" href="/BibleBulk/BibleMissingList">📖 성경</a>
+                <a class="ab-btn" href="/RhapsodyOfReality/DetailWords?Id=@Model?.RhapsodyOfRealitysData?.Id&methodTEXT=TEXT">📰 평문</a>
+            }
+        </div>
+    }
+
+    <script>
+        var player = null;
+        var playerReady = false;
+        var actionQueue = [];
+        var ytLastEnded = 0;
+
+        function createYTPlayer() {
+            var el = document.getElementById('ytplayer');
+            if (!el || !window.YT || !YT.Player) return;
+
+            player = new YT.Player('ytplayer', {
+                events: {
+                    'onReady': function () {
+                        playerReady = true;
+                        while (actionQueue.length) {
+                            try { actionQueue.shift()(); } catch (e) { }
+                        }
+                    },
+                    'onStateChange': function (e) {
+                        if (e.data === YT.PlayerState.ENDED) {
+                            var now = Date.now();
+                            if (now - ytLastEnded < 3000) return;
+                            ytLastEnded = now;
+
+                            var vid = '@videoId';
+                            setTimeout(function () {
+                                try {
+                                    player.loadVideoById({ videoId: vid, startSeconds: 0 });
+                                } catch (ex) { }
+                            }, 400);
+                        }
+                    }
+                }
+            });
+        }
+
+        (function initYT() {
+            if (window.YT && YT.Player) {
+                createYTPlayer();
+            } else {
+                window.onYouTubeIframeAPIReady = function () {
+                    createYTPlayer();
+                };
+            }
+        })();
+
+        function doWhenReady(fn) {
+            if (playerReady && player) {
+                fn();
+            } else {
+                actionQueue.push(fn);
+            }
+        }
+
+        function ytPlay() { doWhenReady(function () { player.playVideo(); }); }
+        function ytPause() { doWhenReady(function () { player.pauseVideo(); }); }
+        function ytReplay() { doWhenReady(function () { player.seekTo(0); player.playVideo(); }); }
+    </script>
+
+    <script>
+        (function () {
+            var obs = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    if (e.isIntersecting) {
+                        e.target.classList.add('in');
+                        obs.unobserve(e.target);
+                    }
+                });
+            }, { threshold: 0.07 });
+
+            document.querySelectorAll('.reveal').forEach(function (el, i) {
+                el.style.transitionDelay = (i * 60) + 'ms';
+                obs.observe(el);
+            });
+        })();
+    </script>
+
+    <script>
+        function normalizeCopyText(text) {
+            return (text || '')
+                .replace(/\r/g, '')
+                .replace(/[ \t]+\n/g, '\n')
+                .replace(/\n[ \t]+\n/g, '\n\n')
+                .replace(/\n{4,}/g, '\n\n\n')
+                .trim();
+        }
+
+        function getTextModeCopyText() {
+            var el = document.getElementById('textCopySource');
+            if (!el) return '';
+            return normalizeCopyText(el.value || '');
+        }
+
+        document.addEventListener('copy', function (e) {
+            var isTextMode = @Html.Raw(methodTEXT ? "true" : "false");
+            if (!isTextMode) return;
+
+            var cleanText = getTextModeCopyText();
+            if (!cleanText) return;
+
+            if (e.clipboardData) {
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', cleanText);
+            } else if (window.clipboardData) {
+                e.preventDefault();
+                window.clipboardData.setData('Text', cleanText);
+            }
+        });
+
+        (function forceSelectableTextMode() {
+            var isTextMode = @Html.Raw(methodTEXT ? "true" : "false");
+            if (!isTextMode) return;
+
+            var scope = document.getElementById('copyScope');
+            if (!scope) return;
+
+            scope.querySelectorAll('.scripture-plain, .prayer-text, .ref-acc summary, .ref-verse, .ref-verse-num, .ref-verse-text, .hero-title, .copy-date-line, .g-card-title')
+                .forEach(function (el) {
+                    el.style.userSelect = 'text';
+                    el.style.webkitUserSelect = 'text';
+                });
+        })();
+    </script>
+</body>
+</html>

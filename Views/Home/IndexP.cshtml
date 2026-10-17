@@ -1,0 +1,1635 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>우리 반 믿음 포털</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        :root {
+            --primary: #2f8f6a; /* 메인 깊은 그린(티리안 그린 느낌) */
+            --primary-soft: #d9f3ea; /* 아주 연한 민트/그린 */
+            --secondary: #ffc85c; /* 포인트용 따뜻한 옐로우 */
+            --bg: #eefaf5; /* 전체 배경: 힐링 느낌 연초록 톤 */
+            --card-bg: #ffffff;
+            --text-main: #243528; /* 살짝 녹색이 도는 진한 텍스트 */
+            --text-soft: #5c715f;
+            --accent-pink: #ff7fa5; /* 포인트 분홍 (너무 튀지 않게만 유지) */
+            --accent-green: #34b38a; /* 버튼용 산뜻한 그린 */
+            --radius-lg: 18px;
+            --shadow-soft: 0 8px 18px rgba(15, 35, 20, 0.08);
+        }
+
+
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Pretendard", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(180deg, #e6f6f0 0%, #ffffff 45%, #f9fff5 100%);
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        header {
+            background: radial-gradient(circle at top left, #5bbf8c 0, #2f8f6a 40%, #5bbf8c 100%);
+            color: #fff;
+            padding: 1.5rem 1.2rem 1.8rem;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            box-shadow: 0 4px 14px rgba(8, 38, 20, 0.25);
+        }
+
+
+        .header-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            gap: 1.2rem;
+        }
+
+        .logo-circle {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            flex-shrink: 0;
+        }
+
+        .header-text h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            margin-bottom: 0.2rem;
+        }
+
+        .header-text p {
+            font-size: 0.9rem;
+            opacity: 0.95;
+        }
+
+        .tagline {
+            margin-top: 0.4rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.7rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+            font-size: 0.78rem;
+        }
+
+        .main-wrapper {
+            max-width: 1100px;
+            margin: 1.5rem auto 3rem;
+            padding: 0 1rem 1rem;
+        }
+
+        /* Quick nav */
+        .quick-nav-wrapper {
+            margin-bottom: 1.5rem;
+        }
+
+        .quick-nav-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            color: var(--text-soft);
+        }
+
+        .quick-nav {
+            display: flex;
+            gap: 0.4rem;
+            overflow-x: auto;
+            padding: 0.5rem 0.1rem 0.3rem;
+            scrollbar-width: thin;
+        }
+
+            .quick-nav::-webkit-scrollbar {
+                height: 5px;
+            }
+
+            .quick-nav::-webkit-scrollbar-thumb {
+                background: rgba(0, 0, 0, 0.15);
+                border-radius: 999px;
+            }
+
+        .quick-nav-btn {
+            flex: 0 0 auto;
+            padding: 0.45rem 0.75rem;
+            font-size: 0.78rem;
+            border-radius: 999px;
+            border: none;
+            background: #ffffff;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+            .quick-nav-btn span.emoji {
+                font-size: 1rem;
+            }
+
+            .quick-nav-btn:hover {
+                background: var(--primary-soft);
+            }
+
+        /* Sections & cards */
+        section {
+            margin-bottom: 1.8rem;
+        }
+
+        .section-label {
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-soft);
+            margin-bottom: 0.15rem;
+        }
+
+        h2.section-title {
+            font-size: 1.15rem;
+            margin-bottom: 0.6rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        h2 .title-tag {
+            font-size: 0.75rem;
+            padding: 0.1rem 0.6rem;
+            border-radius: 999px;
+            background: var(--primary-soft);
+            color: #1f2933;
+        }
+
+        .section-description {
+            font-size: 0.85rem;
+            color: var(--text-soft);
+            margin-bottom: 0.75rem;
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 0.85rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 0.9rem 0.95rem 0.95rem;
+            box-shadow: var(--shadow-soft);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.8), transparent 55%);
+                opacity: 0.7;
+                pointer-events: none;
+            }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 13px;
+            background: linear-gradient(135deg, #d9f3ea, #b8e4ce);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+
+        .card-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+        }
+
+        .card-text {
+            font-size: 0.83rem;
+            color: var(--text-soft);
+            margin-bottom: 0.6rem;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-bottom: 0.55rem;
+        }
+
+        .badge {
+            font-size: 0.73rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 999px;
+            background: #e4f3eb; /* 연한 그린 */
+            color: #355343;
+        }
+
+            .badge.badge-hero {
+                background: #ffe9f1;
+                color: #c14c7b;
+            }
+
+        .card-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .btn {
+            border-radius: 999px;
+            border: none;
+            font-size: 0.78rem;
+            padding: 0.35rem 0.65rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: #f3f4ff;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(99, 115, 255, 0.4);
+        }
+
+        .btn-soft-green {
+            background: var(--accent-green);
+            color: #fff;
+        }
+
+
+        .btn-soft-pink {
+            background: var(--accent-pink);
+            color: #fff;
+        }
+
+        .btn span.emoji {
+            font-size: 1rem;
+        }
+
+        .notice-highlight,
+        .board-highlight {
+            background: #fff4d9; /* 따뜻한 하이라이트 배경 */
+            border-left: 6px solid #ffb347; /* 강조 표시 */
+            padding: 0.7rem 1rem;
+            margin: 0.5rem 0 0.8rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #1f4633;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .my-message-highlight {
+            background: #fff4d9; /* 따뜻한 하이라이트 배경 */
+            border-left: 6px solid #ffb347; /* 강조 표시 */
+            padding: 0.8rem 1rem;
+            margin: 0.8rem 0 1rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #7a4b00; /* 눈에 띄는 강조 텍스트 */
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+        }
+
+        footer {
+            margin-top: 2rem;
+            padding: 1.5rem 1rem 2rem;
+            background: #e9f5ef; /* 연한 힐링 그린 */
+            border-top: 1px solid #cde5d8;
+            font-size: 0.8rem;
+            color: var(--text-soft);
+        }
+
+        .footer-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .footer-shortcuts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-top: 0.3rem;
+        }
+
+        .footer-chip {
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            border: 1px dashed rgba(102, 126, 255, 0.5);
+            font-size: 0.75rem;
+            cursor: pointer;
+        }
+
+        .top-btn {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            border-radius: 999px;
+            border: none;
+            padding: 0.45rem 0.7rem;
+            font-size: 0.8rem;
+            background: #ffffff;
+            box-shadow: var(--shadow-soft);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+            opacity: 0.95;
+        }
+
+        @@media (min-width: 768px) {
+            header
+
+        {
+            padding: 1.6rem 1.5rem 1.9rem;
+        }
+
+        .header-text h1 {
+            font-size: 1.9rem;
+        }
+
+        .header-text p {
+            font-size: 1rem;
+        }
+
+        .main-wrapper {
+            padding: 0 1.5rem 2rem;
+        }
+
+        }
+    </style>
+
+    <style>
+        .mission-status-box {
+            background: #e6f6f0; /* 힐링 초록 배경 */
+            border: 1px solid #cde7db;
+            padding: 1rem;
+            border-radius: 14px;
+            margin: 0.8rem 0 1.2rem;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.04);
+        }
+
+        .mission-item {
+            padding: 0.45rem 0.7rem;
+            margin-bottom: 0.4rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+            .mission-item:last-child {
+                margin-bottom: 0;
+            }
+
+            /* 완료 */
+            .mission-item.done {
+                background: #d0f3db; /* 부드러운 초록 */
+                color: #236b3d;
+                border-left: 6px solid #2f8f6a;
+            }
+
+            /* 미완료 */
+            .mission-item.not-done {
+                background: #fff3e6; /* 연한 오렌지 */
+                color: #a15a0a;
+                border-left: 6px solid #ffb347;
+            }
+
+    </style>
+
+    <style>
+
+        .bible-progress-box {
+            background: #e6f6f0; /* 힐링 초록 배경 */
+            border: 1px solid #cde7db;
+            padding: 0.9rem 1rem;
+            border-radius: 14px;
+            margin: 0.8rem 0 1.2rem;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+            font-size: 0.9rem;
+            color: #264735;
+        }
+
+        .bible-progress-header {
+            margin-bottom: 0.6rem;
+            font-weight: 700;
+        }
+
+        .bible-progress-bar-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .bible-progress-bar {
+            flex: 1;
+            height: 10px;
+            border-radius: 999px;
+            background: #d5e8dd;
+            overflow: hidden;
+        }
+
+        .bible-progress-fill {
+            height: 100%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #34b38a, #2f8f6a);
+            transition: width 0.4s ease;
+        }
+
+        .bible-progress-percent {
+            min-width: 2.5rem;
+            text-align: right;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #246247;
+        }
+
+    </style>
+
+    <style>
+
+        .profile-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 3px solid rgba(255, 255, 255, 0.85);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+            flex-shrink: 0;
+        }
+
+            .profile-avatar img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+    </style>
+
+    <style>
+        .card-header-text {
+            display: flex;
+            gap: 0.15rem;
+        }
+
+        .mission-status-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.55rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+            /* 완료 (말씀 읽기) */
+            .mission-status-badge.done {
+                background: #d0f3db;
+                color: #236b3d;
+                border: 1px solid #2f8f6a;
+            }
+
+            /* 미완료 (퀴즈/암송/기도) */
+            .mission-status-badge.not-done {
+                background: #fff3e6;
+                color: #a15a0a;
+                border: 1px solid #ffb347;
+            }
+
+    </style>
+
+    <style>
+        @@media (max-width: 640px) {
+            /* header 전체를 세로 정렬 */
+            .header-inner
+
+        {
+            flex-direction: column;
+            text-align: center;
+            gap: 1rem;
+        }
+
+        /* 프로필 박스를 세로 3단처럼 */
+        .profile-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.35rem;
+            width: 100%;
+        }
+
+        .profile-avatar {
+            width: 70px;
+            height: 70px;
+        }
+
+        .profile-caption {
+            font-size: 0.75rem;
+            margin-top: 0.2rem;
+            opacity: 0.9;
+        }
+
+        }
+    </style>
+</head>
+<body>
+    <header id="top">
+        <div class="header-inner">
+            <!-- 왼쪽: 동그란 로고 -->
+            <div class="logo-circle" aria-hidden="true">🌈</div>
+
+            <!-- 가운데: 제목 + 설명 + 태그라인 -->
+            <div class="header-text">
+                <h1>안녕하세요.</h1>
+                <p>말씀 읽고, 찬양하고, 함께 기도하는 잠실새내 주일학교 전용 홈페이지예요.</p>
+                <div class="tagline">
+                    ✨ <span>@ConstatsCommon.MainKeyTitle · 기도 · 찬양 · 스토리 한 곳에 모였어요</span>
+                </div>
+            </div>
+
+
+
+            <div class="profile-box">
+                <div class="profile-avatar">
+                    <img src="https://bit2001-001-site4.dtempurl.com/images/profile/687aec6f-3453-4849-9afe-da5691abf62c.png" alt="대표 프로필" />
+                </div>
+                <div class="profile-caption">(위 사진을 클릭해서 로그인할 수 있어요~)</div>
+            </div>
+        </div>
+    </header>
+
+
+    <main class="main-wrapper">
+        <!-- 빠른 이동 -->
+        <div class="quick-nav-wrapper">
+            <div class="quick-nav-title">🔍 한 번에 가기</div>
+            <div class="quick-nav">
+                <button class="quick-nav-btn" onclick="location.hash='#messages'">
+                    <span class="emoji">📬</span><span>나에게 온 메세지</span>
+                </button>
+                <!-- <button class="quick-nav-btn" onclick="location.hash='#notice-board'">
+                  <span class="emoji">📢</span><span>공지 & 게시판</span>
+                </button> -->
+                <button class="quick-nav-btn" onclick="location.hash='#challenge'">
+                    <span class="emoji">🔥</span><span>@ConstatsCommon.MainKeyTitle</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#bible66'">
+                    <span class="emoji">📚</span><span>66권 완독</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#album'">
+                    <span class="emoji">📸</span><span>앨범</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#prayer-click'">
+                    <span class="emoji">🙏</span><span>기도 똑딱이</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#event'">
+                    <span class="emoji">🎉</span><span>이벤트</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#praise'">
+                    <span class="emoji">🎵</span><span>찬양</span>
+                </button>
+                <button class="quick-nav-btn" onclick="location.hash='#etc'">
+                    <span class="emoji">⭐</span><span>기타 & 바로가기</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 1. 나에게 온 메세지 -->
+        <section id="messages">
+            <h2 class="section-title">📬 나에게 온 메세지 <span class="title-tag">My Message</span></h2>
+            <p class="section-description">선생님과 친구들이 나에게 보내 준 소중한 메세지를 모아 두었어요.</p>
+            <div class="my-message-highlight">
+                ⭐ 최근 메시지 : 하나님은 오늘도 너와 함께 하신단다! 🌿
+            </div>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💌</div>
+                        <div class="card-title">메세지함 열기</div>
+                    </div>
+                    <p class="card-text">
+                        축복 메세지, 공지 메세지, 응원 한마디까지!
+                        나에게 도착한 메세지를 한 곳에서 확인해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- TODO: 실제 URL로 변경하세요. 예) /Messages/My -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📬</span><span>나에게 온 메세지 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 공지 & 게시판 -->
+        <section id="notice-board">
+            <h2 class="section-title">📢 공지사항 & 게시판 <span class="title-tag">Notice · Board</span></h2>
+            <p class="section-description">중요한 안내와 우리 반 이야기들을 모아 두는 공간이에요.</p>
+            <div class="notice-highlight">📢 최신 공지 : 이번 주 공과 준비물이 안내되었습니다!</div>
+            <div class="board-highlight">💬 최신 글 : 아이들이 좋아한 활동 BEST 3</div>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📢</div>
+                        <div class="card-title">공지사항</div>
+                    </div>
+                    <p class="card-text">
+                        예배 안내, 행사, 준비물 등 중요한 소식은 여기에서 꼭 확인해 주세요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Notices -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">👀</span><span>공지사항 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💬</div>
+                        <div class="card-title">게시판</div>
+                    </div>
+                    <p class="card-text">
+                        느낀 점, 감사한 일, 나누고 싶은 이야기를 자유롭게 올려요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Board -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📖</span><span>게시판 들어가기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. @ConstatsCommon.MainKeyTitle -->
+        <section id="challenge">
+            <h2 class="section-title">🔥 @ConstatsCommon.MainKeyTitle<span class="title-tag">Challenge Bible</span></h2>
+
+            <p class="section-description">
+                말씀을 읽고, 퀴즈를 풀고, 암송하고, 기도하면서
+                재미있게 말씀에 도전해요!
+            </p>
+
+            <div class="card-grid">
+                <!-- 주 기능 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📖</div>
+                        <div class="card-header-text">
+                            <div class="card-title">말씀 읽기</div>
+                            <div class="mission-status-badge done">미션 완료 ✅</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        오늘의 말씀을 천천히 읽어 보아요.
+                        소리 내어 읽으면 더 좋아요!
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Challenge/Read -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📚</span><span>말씀 읽으러 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🧠</div>
+                        <div class="card-header-text">
+                            <div class="card-title">퀴즈 풀기</div>
+                            <div class="mission-status-badge not-done">미션 미완료 ⏳</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        방금 읽은 말씀으로 재미있는 퀴즈에 도전해 보아요!
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Challenge/Quiz -->
+                        <button class="btn btn-soft-green" onclick="location.href='#';">
+                            <span class="emoji">❓</span><span>퀴즈 도전</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🗣️</div>
+                        <div class="card-header-text">
+                            <div class="card-title">암송하기</div>
+                            <div class="mission-status-badge not-done">미션 미완료 ⏳</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        오늘 외울 말씀을 보고, 가리고, 말해 보면서 암송해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Challenge/Memorize -->
+                        <button class="btn btn-soft-pink" onclick="location.href='#';">
+                            <span class="emoji">🎯</span><span>암송 시작</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🙏</div>
+                        <div class="card-header-text">
+                            <div class="card-title">기도하기</div>
+                            <div class="mission-status-badge not-done">미션 미완료 ⏳</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        말씀을 생각하며, 오늘 하루를 하나님께 맡기고 기도해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Challenge/Pray -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">💌</span><span>기도하러 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 서브 기능 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏅</div>
+                        <div class="card-header-text">
+                            <div class="card-title">미션 시상 & 참여정보</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        어떤 친구들이 미션을 열심히 했는지 확인하고,
+                        시상과 선물도 한눈에 볼 수 있어요.
+                    </p>
+                    <div class="badge-row">
+                        <span class="badge badge-hero">💎 미션 왕</span>
+                        <span class="badge">참여자 목록</span>
+                        <span class="badge">선물 목록</span>
+                    </div>
+                    <div class="card-actions">
+                        <!-- /Challenge/Ranking -->
+                        <button class="btn btn-outline" onclick="location.href='#';">
+                            <span class="emoji">🔍</span><span>참여자 목록</span>
+                        </button>
+                        <!-- /Challenge/Rewards -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🎁</span><span>선물 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎥</div>
+                        <div class="card-header-text">
+                            <div class="card-title">사용법 & 관련 영상</div>
+                        </div>
+                    </div>
+                    <p class="card-text">
+                        @ConstatsCommon.MainKeyTitle 을 어떻게 사용하는지,
+                        동영상으로 쉽게 알려 드려요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Challenge/Guide -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">▶️</span><span>사용법 영상</span>
+                        </button>
+                        <!-- /Challenge/Videos -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🎬</span><span>관련 영상 모음</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- 4. 도전 성경 66권 완독 -->
+        <section id="bible66">
+            <h2 class="section-title">📚 도전 성경 66권 완독 <span class="title-tag">Bible Reading 66</span></h2>
+            <p class="section-description">
+                성경 66권을 찬찬히 끝까지 읽어 보고 싶은 친구들을 위한 공간이에요.
+            </p>
+            <div class="bible-progress-box">
+                <div class="bible-progress-header">
+                    📚 지금까지 <strong>30%</strong> (20권 / 66권) 완독했어요!
+                </div>
+                <div class="bible-progress-bar-wrap">
+                    <div class="bible-progress-bar">
+                        <div class="bible-progress-fill" style="width: 30%;"></div>
+                    </div>
+                    <div class="bible-progress-percent">30%</div>
+                </div>
+            </div>
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📖</div>
+                        <div class="card-title">성경읽기</div>
+                    </div>
+                    <p class="card-text">
+                        오늘 읽을 분량을 확인하고,
+                        읽은 곳을 표시해 두면 좋아요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Bible66/Read -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📚</span><span>성경 읽으러 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👨‍👩‍👧‍👦</div>
+                        <div class="card-title">참여자 목록</div>
+                    </div>
+                    <p class="card-text">
+                        66권 완독에 도전하고 있는 친구들을 볼 수 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Bible66/Participants -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🔎</span><span>참여자 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📝</div>
+                        <div class="card-title">성경노트</div>
+                    </div>
+                    <p class="card-text">
+                        읽으면서 느낀 점, 궁금한 점을
+                        간단히 메모해 두는 공간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Bible66/Notes -->
+                        <button class="btn btn-soft-green" onclick="location.href='#';">
+                            <span class="emoji">✏️</span><span>성경노트 쓰기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏆</div>
+                        <div class="card-title">완독자 목록</div>
+                    </div>
+                    <p class="card-text">
+                        66권 완독을 끝까지 해낸 친구들을
+                        칭찬하고 축하해 주세요!
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Bible66/Finishers -->
+                        <button class="btn btn-soft-pink" onclick="location.href='#';">
+                            <span class="emoji">🎉</span><span>완독자 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="daily-sermon">
+            <h2 class="section-title">🌅 매일 아침 설교 <span class="title-tag">Morning Message</span></h2>
+            <p class="section-description">하루를 시작하기 전에 짧은 말씀을 듣고 마음을 정리해요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎧</div>
+                        <div class="card-title">말씀 듣기</div>
+                    </div>
+                    <p class="card-text">
+                        짧은 설교나 묵상 음성을 듣고
+                        오늘 하루를 하나님께 맡겨요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Sermon/Morning -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">▶️</span><span>매일 말씀 듣기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. 앨범 -->
+        <section id="album">
+            <h2 class="section-title">📸 앨범 <span class="title-tag">Album</span></h2>
+            <p class="section-description">예배, 행사, 캠프에서 찍은 사진을 예쁘게 모아 두었어요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🖼️</div>
+                        <div class="card-title">앨범으로 이동하기</div>
+                    </div>
+                    <p class="card-text">
+                        우리 반 추억이 가득 담긴 사진들을
+                        날짜별로, 행사별로 볼 수 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Album -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📸</span><span>앨범 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⬇️</div>
+                        <div class="card-title">나의 사진 다운 받기</div>
+                    </div>
+                    <p class="card-text">
+                        내 사진을 골라서 집에서도 볼 수 있게
+                        컴퓨터나 핸드폰에 저장해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Album/MyPhotos -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">💾</span><span>내 사진 다운로드</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. 공과 개선방 -->
+        <section id="lesson-feedback">
+            <h2 class="section-title">📘 공과 개선방 <span class="title-tag">Lesson Feedback</span></h2>
+            <p class="section-description">공과 시간에 좋았던 점, 더 재미있었으면 하는 점을 모으는 곳이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🛠️</div>
+                        <div class="card-title">공과 개선방 이동</div>
+                    </div>
+                    <p class="card-text">
+                        선생님과 함께 공과를 더 즐겁게 만들기 위해
+                        아이디어를 나누어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Feedback -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🚪</span><span>개선방 들어가기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 7. 매일아침설교 -->
+        <!-- 8. 기도 똑딱이 -->
+        <section id="prayer-click">
+            <h2 class="section-title">🙏 기도 똑딱이 <span class="title-tag">Prayer Click</span></h2>
+            <p class="section-description">우리 반 아이들을 위해 하나씩 눌러 가며 기도하는 공간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👧</div>
+                        <div class="card-title">우리 반 아이 기도하러 가기</div>
+                    </div>
+                    <p class="card-text">
+                        이름을 눌러서 한 명 한 명
+                        축복하며 기도해 주세요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/ClassKids -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🧒</span><span>아이들 이름 보러 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💝</div>
+                        <div class="card-title">축복기도문</div>
+                    </div>
+                    <p class="card-text">
+                        아이들을 위해 함께 읽을 수 있는
+                        짧은 축복 기도문이 준비되어 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/BlessingText -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📜</span><span>축복기도문 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">ℹ️</div>
+                        <div class="card-title">설명서 보기</div>
+                    </div>
+                    <p class="card-text">
+                        기도 똑딱이를 어떻게 사용하는지
+                        간단한 사용법을 안내해 드려요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/Guide -->
+                        <button class="btn btn-outline" onclick="location.href='#';">
+                            <span class="emoji">📘</span><span>사용법 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 9. 가정 기도 공간 -->
+        <section id="family-prayer">
+            <h2 class="section-title">🏡 가정 기도 공간 <span class="title-tag">Family Prayer</span></h2>
+            <p class="section-description">엄마·아빠와 함께 드리는 따뜻한 가정 기도 시간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👩</div>
+                        <div class="card-title">아내를 위한 기도</div>
+                    </div>
+                    <p class="card-text">
+                        아내를 위해 감사와 축복을 담아
+                        기도할 수 있는 내용이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/ForWife -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">💐</span><span>기도문 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👨</div>
+                        <div class="card-title">남편을 위한 기도</div>
+                    </div>
+                    <p class="card-text">
+                        남편을 위해 힘과 지혜를 구하는
+                        기도문이 준비되어 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/ForHusband -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🧍</span><span>기도문 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🕊️</div>
+                        <div class="card-title">오늘의 다짐기도</div>
+                    </div>
+                    <p class="card-text">
+                        오늘 하루를 어떻게 살고 싶은지
+                        가족이 함께 다짐하며 기도해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Prayer/TodayResolution -->
+                        <button class="btn btn-soft-green" onclick="location.href='#';">
+                            <span class="emoji">✏️</span><span>다짐 적으러 가기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 10. 기도 공간 (중보) -->
+        <section id="intercede">
+            <h2 class="section-title">🌏 기도 공간 (중보) <span class="title-tag">Intercession</span></h2>
+            <p class="section-description">교회와 목사님, 선교사님을 위해 함께 기도하는 공간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⛪</div>
+                        <div class="card-title">오요한 목사님을 위한 기도</div>
+                    </div>
+                    <p class="card-text">
+                        목사님을 위해 건강과 성령의 충만함을
+                        함께 기도해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Intercede/Pastor -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🙏</span><span>기도하러 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📬</div>
+                        <div class="card-title">선교편지 · 기도편지</div>
+                    </div>
+                    <p class="card-text">
+                        선교사님 소식과 기도 제목을 읽고
+                        함께 중보 기도해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Intercede/MissionLetter -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🌍</span><span>선교편지 보기</span>
+                        </button>
+                        <!-- /Intercede/PrayerLetter -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">💌</span><span>기도편지 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 11. 이벤트 -->
+        <section id="event">
+            <h2 class="section-title">🎉 이벤트 <span class="title-tag">Event & Birthday</span></h2>
+            <p class="section-description">다가오는 행사와 생일 친구들을 한눈에 볼 수 있어요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📅</div>
+                        <div class="card-title">다가오는 행사 보기</div>
+                    </div>
+                    <p class="card-text">
+                        성경학교, 야유회, 특별주일 등
+                        중요한 행사를 확인해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Event/Upcoming -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🔔</span><span>행사 일정 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎂</div>
+                        <div class="card-title">생일 친구 목록</div>
+                    </div>
+                    <p class="card-text">
+                        이번 달과 오늘 생일인 친구들을 확인하고
+                        축하해 주세요!
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Event/BirthdayMonth -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📆</span><span>이번 달 생일자</span>
+                        </button>
+                        <!-- /Event/BirthdayToday -->
+                        <button class="btn btn-soft-pink" onclick="location.href='#';">
+                            <span class="emoji">⭐</span><span>오늘 생일자</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 12. 생활영어 -->
+        <section id="english">
+            <h2 class="section-title">🗣️ 생활영어 <span class="title-tag">Daily English</span></h2>
+            <p class="section-description">말씀과 함께 쉽게 외울 수 있는 생활 영어를 배워요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏠</div>
+                        <div class="card-title">메인 이동</div>
+                    </div>
+                    <p class="card-text">
+                        오늘 배울 생활 영어 표현을 한눈에 모아 놓은 메인 페이지예요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/Main -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">▶️</span><span>생활영어 메인</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🧒</div>
+                        <div class="card-title">어린이 영어</div>
+                    </div>
+                    <p class="card-text">
+                        초등학생 눈높이에 맞춘 짧고 쉬운 영어 표현을 배워요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/Kids -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📘</span><span>어린이 영어 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📗</div>
+                        <div class="card-title">일반 영어</div>
+                    </div>
+                    <p class="card-text">
+                        부모님도 함께 볼 수 있는
+                        조금 더 긴 영어 표현이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /English/General -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📗</span><span>일반 영어 보기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 13. 찬양 공간 -->
+        <section id="praise">
+            <h2 class="section-title">🎵 찬양 공간 <span class="title-tag">Praise</span></h2>
+            <p class="section-description">찬양과 찬송가, CCM을 함께 듣고 따라 부르는 공간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏠</div>
+                        <div class="card-title">찬양 홈</div>
+                    </div>
+                    <p class="card-text">
+                        오늘의 찬양, 추천 찬양을 모아 놓은
+                        찬양 메인 공간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Praise/Home -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🎶</span><span>찬양 홈 가기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎤</div>
+                        <div class="card-title">찬양 & 찬송가</div>
+                    </div>
+                    <p class="card-text">
+                        어린이 찬양과 찬송가를 함께 듣고
+                        가사를 보며 따라 불러요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Praise/Songs -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📖</span><span>찬양 모음</span>
+                        </button>
+                        <!-- /Praise/Hymns -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📜</span><span>찬송가 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎧</div>
+                        <div class="card-title">CCM</div>
+                    </div>
+                    <p class="card-text">
+                        은혜로운 CCM을 들으며
+                        조용히 묵상하는 시간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Praise/CCM -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🎼</span><span>CCM 듣기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 14. 주일공과 & 12.생활운동 -->
+        <section id="sunday-lesson">
+            <h2 class="section-title">📗 주일공과<span class="title-tag">Sunday Lesson</span></h2>
+            <p class="section-description">주일 공과와 총회교육개발원의 자료를 볼 수 있어요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📘</div>
+                        <div class="card-title">주일공과</div>
+                    </div>
+                    <p class="card-text">
+                        이번 주 공과 내용과 활동을
+                        미리 확인해 보아요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Sunday -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📖</span><span>주일공과 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🏛️</div>
+                        <div class="card-title">총회교육개발원</div>
+                    </div>
+                    <p class="card-text">
+                        공과와 관련된 공식 자료 링크를
+                        모아 둔 공간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Official -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🔗</span><span>공식 자료 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+
+            </div>
+        </section>
+
+        <!-- 15. 대화공간 -->
+        <section id="chat">
+
+            <h2 class="section-title">💬 대화공간 <span class="title-tag">Chat</span></h2>
+            <p class="section-description">선생님과 아이들이 함께 나누는 소통 공간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💭</div>
+                        <div class="card-title">대화공간 이동</div>
+                    </div>
+                    <p class="card-text">
+                        공과 이야기, 은혜 나눔, 궁금한 점을
+                        편하게 남겨 보아요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Chat -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">💬</span><span>대화하러 가기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 16. 주소록 -->
+        <section id="address">
+
+            <h2 class="section-title">📇 주소록 <span class="title-tag">Contacts</span></h2>
+            <p class="section-description">반별, 이름별로 우리 반 친구들과 선생님 연락처를 정리해 두었어요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🔍</div>
+                        <div class="card-title">이름으로 찾기</div>
+                    </div>
+                    <p class="card-text">
+                        친구 이름을 검색해서 연락처를
+                        쉽게 찾을 수 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Address/Search -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🧒</span><span>이름 검색</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">👨‍👩‍👧‍👧</div>
+                        <div class="card-title">반별 주소록</div>
+                    </div>
+                    <p class="card-text">
+                        각 반별로 정리된 주소록을
+                        한눈에 볼 수 있어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Address/ClassList -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">📋</span><span>반별 주소록</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 17. 주일학교 스토리 -->
+        <section id="story">
+
+            <h2 class="section-title">🎬 주일학교 스토리 <span class="title-tag">Story</span></h2>
+            <p class="section-description">성경 이야기와 간증, 특별 영상들을 보는 공간이에요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📺</div>
+                        <div class="card-title">영상보기</div>
+                    </div>
+                    <p class="card-text">
+                        아이들이 이해하기 쉬운 스토리 영상으로
+                        말씀을 더 재미있게 만나 보아요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Story/Videos -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">▶️</span><span>영상 보러 가기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 18. 기타 공간 & 핫플레이스 -->
+        <section id="etc">
+            <h2 class="section-title">⭐ 기타 공간 & 핫플레이스 <span class="title-tag">ETC · Hot</span></h2>
+            <p class="section-description">다른 재미있는 링크와 추천 공간들을 모아 두었어요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🧭</div>
+                        <div class="card-title">기타 공간</div>
+                    </div>
+                    <p class="card-text">
+                        특별 자료, 외부 사이트, 유용한 링크들을
+                        모아 두는 곳이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Etc/Main -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">🚀</span><span>기타 공간 이동</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📌</div>
+                        <div class="card-title">핫플레이스</div>
+                    </div>
+                    <p class="card-text">
+                        요즘 우리 반에서 인기 있는 컨텐츠를
+                        모아 보여주는 공간이에요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Etc/Hot -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🔥</span><span>핫플레이스 보기</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💪</div>
+                        <div class="card-title">생활운동</div>
+                    </div>
+                    <p class="card-text">
+                        말씀대로 살아보기 위한
+                        작은 실천들을 모아 놓았어요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Life12 -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🚶</span><span>생활운동 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚡</div>
+                        <div class="card-title">유용한기능</div>
+                    </div>
+                    <p class="card-text">
+                        핸드폰에 바로가기 설치해 보세요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Lesson/Life12 -->
+                        <button class="btn" onclick="location.href='#';">
+                            <span class="emoji">🚶</span><span>설치가이드 보기</span>
+                        </button>
+                    </div>
+                </div>
+
+
+            </div>
+        </section>
+
+        <!-- 19. 개선사항 접수 -->
+        <section id="feedback">
+            <h2 class="section-title">📝 개선사항 접수 <span class="title-tag">Feedback</span></h2>
+            <p class="section-description">홈페이지와 프로그램에 대한 의견을 자유롭게 남겨 주세요.</p>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💡</div>
+                        <div class="card-title">개선 의견 보내기</div>
+                    </div>
+                    <p class="card-text">
+                        “이런 기능이 있었으면 좋겠어요!”
+                        “이 부분이 어려웠어요” 같은 의견을 환영해요.
+                    </p>
+                    <div class="card-actions">
+                        <!-- /Feedback -->
+                        <button class="btn btn-primary" onclick="location.href='#';">
+                            <span class="emoji">📮</span><span>개선사항 쓰기</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+
+    </main>
+
+    <footer>
+        <div class="footer-inner">
+            <div>© 우리 반 믿음 포털 · 초등부 어린이들을 위한 말씀 & 기도 & 찬양 공간</div>
+            <div class="footer-shortcuts">
+                <div class="footer-chip" onclick="location.hash='#top'">⬆️ 맨 위로</div>
+                <div class="footer-chip" onclick="location.hash='#challenge'">🔥 @ConstatsCommon.MainKeyTitle</div>
+                <div class="footer-chip" onclick="location.hash='#bible66'">📚 66권 완독</div>
+                <div class="footer-chip" onclick="location.hash='#album'">📸 앨범</div>
+                <div class="footer-chip" onclick="location.hash='#prayer-click'">🙏 기도 똑딱이</div>
+            </div>
+        </div>
+    </footer>
+
+    <button class="top-btn" onclick="location.hash='#top'">
+        ⬆️ <span>TOP</span>
+    </button>
+</body>
+</html>

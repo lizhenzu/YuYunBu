@@ -1,0 +1,195 @@
+﻿@using System.Globalization
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.DailyMission2.UserDailyPointsVM
+
+@*  ══════════════════════════════════════════════════════════════
+    일자별 포인트 — Bone 스킨
+
+    이번 달 1일 ~ 오늘까지 하루하루를 표로 본다.
+    미션별 점수(말씀2 · 퀴즈1 · 기도2 · 암송1)를 숫자 그대로 보여 주고,
+    맨 아래에 합계 행을 붙인다.
+    네 가지를 다 한 날은 줄 전체에 옅은 브라스를 깐다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = "_Layout_Mission3";
+    ViewData["Title"] = "일자별 포인트";
+
+    var today = DateHelper.GetKoreaNow().Date;
+
+    var rows = (Model.Rows ?? new List<BulletinBoard.Models.DailyMission2.UserDailyPointRow>())
+               .OrderByDescending(x => x.DateBy)
+               .ToList();
+
+    // 이 기간에 지난 날 · 그중 점수가 있는 날
+    int elapsed = (int)((Model.ToDate.Date - Model.FromDate.Date).TotalDays) + 1;
+    if (elapsed < 1) { elapsed = 1; }
+    int actedDays = rows.Count(x => x.TotalPoint > 0);
+
+    var fullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+    var who = !string.IsNullOrWhiteSpace(fullName) ? fullName : (Model.UserName ?? "");
+    var initial = string.IsNullOrWhiteSpace(who) ? "·" : who.Substring(0, 1);
+
+    string DayLink(DateTime d) => $"/DailyMission4?date={d:yyyy-MM-dd}";
+}
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;800&display=swap">
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+    body { background: #FFFFFF; }
+    .qz.pt4 { --pBlue: #2F80ED; --pSoft: #EAF2FD; --pInk: #111827; --pTx: #374151; --pDim: #9CA3AF; --pDim2: #6B7280; --pLine: #EEF0F3; --pGrey: #F4F6F9;
+              background: #FFFFFF; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: var(--pTx); }
+    .qz.pt4 .qzBody { background: #FFFFFF; }
+    .qz.pt4 .qzBar { border-bottom-color: var(--pLine); }
+    .qz.pt4 .qzProg { display: none; }
+
+    .qz .dpK { margin-top: 20px; font-size: 12px; font-weight: 800; color: var(--pBlue); letter-spacing: .02em; }
+    .qz .dpSeg { display: flex; gap: 22px; margin-top: 14px; border-bottom: 1px solid var(--pLine); }
+    .qz .dpSeg a { padding: 10px 0 11px; text-decoration: none; font-size: 15px; font-weight: 700; color: var(--pDim); margin-bottom: -1px; border-bottom: 2.5px solid transparent; -webkit-tap-highlight-color: transparent; }
+    .qz .dpSeg a.on { color: var(--pInk); border-bottom-color: var(--pBlue); }
+
+    /* 사람 */
+    .qz .dpWho { display: flex; align-items: center; gap: 13px; margin-top: 20px; padding-bottom: 0; border-bottom: 0; }
+    .qz .dpAv { width: 48px; height: 48px; border-radius: 50%; background: var(--pSoft); flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+                font-family: inherit; font-size: 18px; font-weight: 800; color: var(--pBlue); box-shadow: none; margin: 0; }
+    .qz .dpWhoTx { min-width: 0; }
+    .qz .dpWhoN { font-family: inherit; font-size: 22px; font-weight: 800; line-height: 1.3; letter-spacing: -.02em; color: var(--pInk); }
+    .qz .dpWhoS { margin-top: 2px; font-size: 12.5px; color: var(--pDim2); letter-spacing: 0; }
+
+    /* 총점 */
+    .qz .dpTot { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; padding: 18px 0 0; border-bottom: 0; }
+    .qz .dpTotL { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--pDim); margin-bottom: 3px; }
+    .qz .dpTotN { font-family: inherit; font-weight: 300; font-size: 36px; line-height: 1.05; letter-spacing: 0; color: var(--pInk); font-variant-numeric: tabular-nums; }
+    .qz .dpTotN u { text-decoration: none; font-size: 14px; font-weight: 400; color: var(--pDim2); margin-left: 3px; }
+    .qz .dpTotR { text-align: right; flex: 0 0 auto; white-space: nowrap; }
+    .qz .dpTotRV { font-family: inherit; font-weight: 300; font-size: 22px; color: var(--pBlue); font-variant-numeric: tabular-nums; }
+
+    .qz.pt4 .qzLabel { margin: 26px 0 0 !important; padding-top: 16px; border-top: 1px solid var(--pLine); font-size: 16px; font-weight: 800; letter-spacing: 0; color: var(--pInk); }
+
+    /* 표 */
+    .qz .dpTable { width: 100%; border-collapse: collapse; margin-top: 12px; font-variant-numeric: tabular-nums; }
+    .qz .dpTable th { font-size: 11.5px; font-weight: 400; letter-spacing: 0; color: var(--pDim); padding: 0 0 9px; text-align: center; border-bottom: 1px solid var(--pLine); }
+    .qz .dpTable th.l { text-align: left; }
+    .qz .dpTable td { padding: 12px 0; text-align: center; border-bottom: 1px solid var(--pLine); font-family: inherit; font-size: 14px; font-weight: 300; color: var(--pTx); }
+    .qz .dpTable td.l { text-align: left; font-size: 12px; color: var(--pDim2); }
+    .qz .dpTable td.l a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+    .qz .dpTable td.l b { font-weight: 800; color: var(--pInk); font-size: 15px; margin-right: 4px; }
+    .qz .dpTable td.l a:hover b { color: var(--pBlue); }
+    .qz .dpTable td.z { color: #D1D5DB; }
+    .qz .dpTable td.sum { color: var(--pBlue); font-weight: 700; font-size: 14px; }
+    .qz .dpTable tr.full td { background: var(--pSoft); border-bottom-color: transparent; }
+    .qz .dpTable tr.full td:first-child { border-radius: 10px 0 0 10px; padding-left: 8px; }
+    .qz .dpTable tr.full td:last-child { border-radius: 0 10px 10px 0; padding-right: 4px; }
+    .qz .dpTable tfoot td { border-bottom: 0; border-top: 2px solid var(--pInk); padding-top: 12px; font-weight: 700; color: var(--pInk); }
+    .qz .dpTable tfoot td.l { font-family: inherit; font-size: 13px; letter-spacing: 0; color: var(--pInk); font-weight: 700; }
+    .qz .dpTable tfoot td.sum { color: var(--pBlue); }
+
+    @@media (max-width: 560px) {
+        .qz .dpTable td { font-size: 13.5px; padding: 11px 0; }
+    }
+</style>
+
+<div class="qz pt4">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">@Model.FromDate.ToString("yyyy.MM")</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="dpK">@ConstatsCommon.MainKeyTitle</div>
+        <div class="dpSeg">
+            <a href="/DailyMission4/UserMonthlyPoints?userName=@Uri.EscapeDataString(Model.UserName ?? "")">월별</a>
+            <a class="on" href="/DailyMission4/UserDailyPoints?userName=@Uri.EscapeDataString(Model.UserName ?? "")">일자별</a>
+        </div>
+
+        @* ── 사람 ── *@
+        <div class="dpWho">
+            <div class="dpAv">@initial</div>
+            <div class="dpWhoTx">
+                <div class="dpWhoN">@(who)님</div>
+                <div class="dpWhoS">
+                    @Model.FromDate.ToString("M월 d일", new CultureInfo("ko-KR"))
+                    ~ @Model.ToDate.ToString("M월 d일", new CultureInfo("ko-KR")) · 일일 수행 현황
+                </div>
+            </div>
+        </div>
+
+        @* ── 총점 ── *@
+        <div class="dpTot">
+            <div>
+                <div class="dpTotL">이 기간 총점</div>
+                <div class="dpTotN">@Model.SumTotal.ToString("N0")<u>점</u></div>
+            </div>
+            <div class="dpTotR">
+                <div class="dpTotL">수행한 날</div>
+                <div class="dpTotRV">@actedDays / @elapsed</div>
+            </div>
+        </div>
+
+        @* ── 날짜별 표 ── *@
+        <div class="qzLabel">날짜별</div>
+
+        @if (rows.Count == 0)
+        {
+            <div class="qzEmpty">아직 기록이 없어요</div>
+        }
+        else
+        {
+            <table class="dpTable">
+                <thead>
+                    <tr>
+                        <th class="l">날짜</th>
+                        <th>말씀</th>
+                        <th>퀴즈</th>
+                        <th>기도</th>
+                        <th>암송</th>
+                        <th>합계</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in rows)
+                    {
+                        // 네 가지를 다 한 날은 줄 전체에 연한 파랑을 깐다.
+                        bool full = r.WordPoint > 0 && r.QuizPoint > 0 && r.PrayPoint > 0 && r.RecitePoint > 0;
+                        var dow = r.DateBy.ToString("ddd", new CultureInfo("ko-KR"));
+
+                        <tr class="@(full ? "full" : "")">
+                            <td class="l">
+                                <a href="@DayLink(r.DateBy)" title="@r.DateBy.ToString("yyyy-MM-dd") 미션으로 이동">
+                                    <b>@r.DateBy.Day</b>@dow
+                                </a>
+                            </td>
+                            <td class="@(r.WordPoint   == 0 ? "z" : "")">@(r.WordPoint   == 0 ? "–" : r.WordPoint.ToString())</td>
+                            <td class="@(r.QuizPoint   == 0 ? "z" : "")">@(r.QuizPoint   == 0 ? "–" : r.QuizPoint.ToString())</td>
+                            <td class="@(r.PrayPoint   == 0 ? "z" : "")">@(r.PrayPoint   == 0 ? "–" : r.PrayPoint.ToString())</td>
+                            <td class="@(r.RecitePoint == 0 ? "z" : "")">@(r.RecitePoint == 0 ? "–" : r.RecitePoint.ToString())</td>
+                            <td class="@(r.TotalPoint  == 0 ? "z" : "sum")">@r.TotalPoint</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="l">합계</td>
+                        <td>@Model.SumWord</td>
+                        <td>@Model.SumQuiz</td>
+                        <td>@Model.SumPray</td>
+                        <td>@Model.SumRecite</td>
+                        <td class="sum">@Model.SumTotal</td>
+                    </tr>
+                </tfoot>
+            </table>
+        }
+    </div>
+</div>

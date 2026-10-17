@@ -1,0 +1,229 @@
+﻿@model IEnumerable<BulletinBoard.Models.PointByUserName>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+
+        .award-image {
+            width: 85%;
+            max-width: 800px;
+            margin: 20px auto;
+            border: 5px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .section {
+            max-width: 800px;
+            margin: 1px 0;
+            /*
+                    border-radius: 10px;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);*/
+            padding: 10px;
+        }
+
+            .section h2 {
+                text-align: center;
+                margin-bottom: 10px;
+                font-size: 24px;
+                color: #007BFF;
+            }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .card {
+            width: 150px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+            .card:hover {
+                transform: scale(1.05);
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            .card img {
+                width: 100%;
+                height: auto;
+            }
+
+            .card .info {
+                padding: 8px;
+                display: flex;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+                .card .info .row {
+                    display: flex;
+                    justify-content: space-between;
+                    margin: 2px 0;
+                }
+
+                    .card .info .row span {
+                        font-size: 14px;
+                        color: #666;
+                    }
+
+                    .card .info .row .label {
+                        text-align: left;
+                        /* flex: 1;*/
+                    }
+
+                    .card .info .row .center {
+                        text-align: center;
+                        flex: 1;
+                        font-weight: bold;
+                    }
+
+                    .card .info .row .right {
+                        text-align: right;
+                        flex: 1;
+                    }
+
+                .card .info button {
+                    margin-top: 10px;
+                    padding: 5px 10px;
+                    background-color: #007BFF;
+                    border: none;
+                    color: #fff;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                }
+
+                    .card .info button:hover {
+                        background-color: #0056b3;
+                    }
+
+        .footer {
+            margin-top: 20px;
+            padding: 8px;
+        }
+
+            .footer button {
+                padding: 10px 20px;
+                background-color: #28a745;
+                border: none;
+                color: #fff;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+                .footer button:hover {
+                    background-color: #218838;
+                    transform: translateY(-3px);
+                }
+    </style>
+</head>
+<body>
+    <h1>챔피언!!! 영광의 얼굴들</h1>
+    <div style="text-align: center;">
+        <h3 style="color: #555; font-size: 20px; font-weight: bold; margin-top: 20px;">1,000포인트에 도달하는 얼굴들이에요.</h3>
+    </div>
+
+    <img src="/images/home/champion/horizontal/champion_horizontal_00.webp" alt="Award Image" class="award-image">
+    <div class="section">
+        <div class="container">
+            @if (!Model.Any())
+            {
+                <div class="card">
+                    <img class="profile-picture" src="@ConstatsCommon.representFaceImage" alt="" >
+                    <div class="card-title">아직 대상자 없어요.</div>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in Model)
+                {                    
+                    string YearBan = string.Empty;
+                    string dateString = $"{@item.maxclickDate.Month}월{@item.maxclickDate.Day}일";
+
+                    if (@item.ClassYear > 0)
+                    {
+                        YearBan = $"{@item.ClassYear}학년{@item.ClassBan}반";
+                    }
+                    else
+                    {
+                        YearBan = $"교사";
+                    }
+
+
+                    if (item.DC_Total >= 900 || item.AwardLevel1000Value > 0)
+                    {
+                        <div class="card">
+                            <img src="@item.ProfilePicturePath" alt="Profile Picture" onclick="ManageUserInfo('@item.UserId')">
+                            <div class="info">
+                                <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@item.LastName @item.FirstName</span></div>
+                                <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@YearBan</span></div>
+                                <div class="row"><span class="label">현재의 점수:</span><span class="right">@item.DC_Total 점</span></div>
+                                @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+                                {
+                                    <div class="row"><span class="label">보상한 점수:</span><span class="right">@item.AwardLevel 점</span></div>
+                                    <div class="row"><span class="label">활동한 일자:</span><span class="right">@dateString</span></div>
+                                    <button onclick="location.href='/CheckPoint/ManagePoint?UserId=@item.UserId'">점수관리</button>
+                                }
+
+                            </div>
+                        </div>
+                    }
+                }
+            }
+        </div>
+    </div>
+
+    <div class="footer">
+        <button onclick="window.location.href='/'">Home</button>
+        <button onclick="window.location.href='/Admin/IndexPoint'">Point</button>
+    </div>
+</body>
+</html>
+<script>
+
+
+    function ManageUserInfo(UserId) {
+
+        window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+    }
+
+</script>

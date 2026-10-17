@@ -1,0 +1,117 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model NavigationButtoInfo
+
+@{
+
+ 	int maxLimit = 9;
+
+	var todayDate = DateHelper.GetTodayDateDayString(maxLimit);
+    TodayCollectQuestion todayCollectQuestion = ViewBag.todayCollectQuestion as TodayCollectQuestion;
+
+    string missioncompleted = $"/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_{todayDate}.png";
+    string backgroundColor = $"#000000";
+
+
+}
+
+<div id="BBB" class=" button color_TealLime ">
+
+
+    <div id="F" class="column" onclick="redirectToPage('/Home/MissionMainBoard')">
+        <img src="/images/ICON/home/toGoHome002.webp" class="icon" style="width: 50px; height: 50px;">
+        <h4 style="margin-bottom : 0px">미션홈</h4>
+        <h4 style="margin-bottom : 0px">&nbsp;</h4>
+    </div>
+
+
+    @if (Model.Title != "말씀")
+    {
+        <div id="D" class="column" onclick="redirectToPage('/DailyMission/TodayWordToRead')">
+            @if ((Model.TodayCheckCompositeDataData.TodayWordToReadCountToMe + Model.TodayCheckCompositeDataData.TodayWordToReadCountToParent) > 0)
+            {
+                <img src="@missioncompleted" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px;color : @backgroundColor;">말씀</h4>
+                <h5 style="margin-bottom : 0px;color : @backgroundColor;">완료</h5>
+            }
+            else
+            {
+                <img src="/images/ICON/bible/toGoWord002.webp" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px">말씀</h4>
+                <h5 style="margin-bottom : 0px">진행</h5>
+            }
+        </div>
+    }
+    @if (Model.Title != "퀴즈")
+    {
+        <div id="D" class="column" onclick="redirectToPage('/DailyMission/TodayQuestion')">
+            @if (@todayCollectQuestion.questionProcessStatus.Result == "f" && @todayCollectQuestion.questionProcessStatus.TryCnt > 1)
+            {
+                <img src="@missioncompleted" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px;color : @backgroundColor;">퀴즈</h4>
+                <h5 style="margin-bottom : 0px;color : @backgroundColor;">실패</h5>
+
+            }
+            else if (Model.TodayCheckCompositeDataData.QuestionCount > 0)
+            {
+                <img src="@missioncompleted" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px;color : @backgroundColor;">퀴즈</h4>
+                <h5 style="margin-bottom : 0px;color : @backgroundColor;">완료</h5>
+            }
+            else
+            {
+                <img src="/images/ICON/quiz/toGoQuiz001.webp" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px">퀴즈</h4>
+                <h5 style="margin-bottom : 0px">진행</h5>
+            }
+        </div>
+    }
+    @if (Model.Title != "기도")
+    {
+        <div id="E" class="column" onclick="redirectToPage('/DailyMission/TodayPray')">
+            @if ((Model.TodayCheckCompositeDataData.PrayPhraseCountToFriend + Model.TodayCheckCompositeDataData.PrayPhraseCountToMe + Model.TodayCheckCompositeDataData.PrayPhraseCountToParent) > 0)
+            {
+                <img src="@missioncompleted" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px;color : @backgroundColor;">기도</h4>
+                <h5 style="margin-bottom : 0px;color : @backgroundColor;">완료</h5>
+            }
+            else
+            {
+                <img src="/images/ICON/pray/toGoPary001.webp" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px">기도</h4>
+                <h5 style="margin-bottom : 0px">진행</h5>
+            }
+        </div>
+    }
+    @if (Model.Title != "암송")
+    {
+        <div id="F" class="column" onclick="redirectToPage('/DailyMission/WeeklyWordToRead')">
+            @if (Model.TodayCheckCompositeDataData.WeeklyWordToReadCount > 0)
+            {
+                <img src="@missioncompleted" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px;color : @backgroundColor;">암송</h4>
+                <h5 style="margin-bottom : 0px;color : @backgroundColor;">완료</h5>
+            }
+            else
+            {
+                <img src="/images/ICON/bible/toGoRecite001.webp" class="icon" style="width: 50px; height: 50px;">
+                <h4 style="margin-bottom : 0px">암송</h4>
+                <h5 style="margin-bottom : 0px">진행</h5>
+            }
+        </div>
+    }
+    @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+    {
+        <div id="F" class="column" onclick="redirectToPage('/DailyMission/DeleteClickHistory')">
+            <img src="/images/ICON/doExec/doMission03.webp" class="icon" style="width: 50px; height: 50px;">
+            <h4 style="margin-bottom : 0px">삭제</h4>
+            <h4 style="margin-bottom : 0px">&nbsp;</h4>
+        </div>
+    }
+</div> 

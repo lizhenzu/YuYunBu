@@ -1,0 +1,654 @@
+﻿@using BulletinBoard.ViewModels.Worldview.Admin
+@model List<WorldviewSubmitRankUserRowVM>
+
+@{
+    Layout = null;
+    int rank = 0;
+    int? lessonNo = ViewBag.LessonNo as int?;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>세계관 공과 계정별 누적 순위</title>
+
+    <style>
+        :root {
+            --bg: #0b1220;
+            --panel: rgba(255,255,255,.08);
+            --panel2: rgba(255,255,255,.10);
+            --stroke: rgba(255,255,255,.14);
+            --stroke2: rgba(255,255,255,.10);
+            --text: rgba(255,255,255,.92);
+            --muted: rgba(255,255,255,.68);
+            --muted2: rgba(255,255,255,.55);
+            --shadow: 0 18px 50px rgba(0,0,0,.35);
+            --shadow2: 0 10px 24px rgba(0,0,0,.28);
+            --radius: 18px;
+            --radius2: 14px;
+            --chipbg: rgba(255,255,255,.10);
+            --chipfg: rgba(255,255,255,.88);
+            --accent1: #60a5fa;
+            --accent2: #a78bfa;
+            --accent3: #34d399;
+        }
+
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background: radial-gradient(1200px 600px at 20% -10%, rgba(96,165,250,.28), transparent 55%), radial-gradient(900px 500px at 85% 0%, rgba(167,139,250,.22), transparent 55%), radial-gradient(800px 500px at 50% 120%, rgba(52,211,153,.16), transparent 55%), var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+            letter-spacing: -0.2px;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 22px 16px 48px;
+        }
+
+        .hero {
+            border: 1px solid var(--stroke2);
+            background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+            box-shadow: var(--shadow);
+            border-radius: calc(var(--radius) + 6px);
+            padding: 18px 18px 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(500px 220px at 10% 15%, rgba(96,165,250,.30), transparent 60%), radial-gradient(440px 220px at 88% 22%, rgba(167,139,250,.26), transparent 60%), radial-gradient(440px 220px at 50% 120%, rgba(52,211,153,.18), transparent 60%);
+                filter: blur(2px);
+                opacity: .9;
+                pointer-events: none;
+            }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .titleRow {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 260px;
+        }
+
+        .title {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            font-weight: 1000;
+            font-size: 20px;
+            line-height: 1.15;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-weight: 700;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--stroke2);
+            background: rgba(0,0,0,.18);
+            backdrop-filter: blur(10px);
+        }
+
+            .field label {
+                color: var(--muted);
+                font-weight: 900;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+        .input {
+            width: 140px;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.06);
+            color: var(--text);
+            font-weight: 900;
+            outline: none;
+        }
+
+            .input::placeholder {
+                color: rgba(255,255,255,.45);
+            }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.10);
+            color: var(--text);
+            font-weight: 1000;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform .08s ease, background .12s ease, border-color .12s ease;
+            user-select: none;
+        }
+
+            .btn:hover {
+                background: rgba(255,255,255,.14);
+                border-color: rgba(255,255,255,.22);
+                transform: translateY(-1px);
+            }
+
+        .btnPrimary {
+            border-color: rgba(96,165,250,.45);
+            background: linear-gradient(135deg, rgba(96,165,250,.22), rgba(167,139,250,.18));
+        }
+
+            .btnPrimary:hover {
+                border-color: rgba(96,165,250,.65);
+                background: linear-gradient(135deg, rgba(96,165,250,.28), rgba(167,139,250,.22));
+            }
+
+        /* ✅ 상단 네비 버튼 살짝 구분 (선택) */
+        .btnNav {
+            border-color: rgba(52,211,153,.28);
+            background: rgba(52,211,153,.10);
+        }
+
+            .btnNav:hover {
+                border-color: rgba(52,211,153,.45);
+                background: rgba(52,211,153,.14);
+            }
+
+        .panel {
+            margin-top: 14px;
+            border-radius: var(--radius);
+            border: 1px solid var(--stroke2);
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+        }
+
+        .tableWrap {
+            overflow: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 900px;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            text-align: left;
+            font-size: 12px;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            color: rgba(255,255,255,.70);
+            background: rgba(0,0,0,.28);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,.12);
+            padding: 12px 12px;
+            font-weight: 1000;
+        }
+
+        tbody td {
+            padding: 14px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            font-size: 14px;
+            color: rgba(255,255,255,.92);
+            white-space: nowrap;
+        }
+
+        tbody tr {
+            transition: background .12s ease;
+        }
+
+            tbody tr:hover {
+                background: rgba(255,255,255,.04);
+            }
+
+        .rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            font-weight: 1000;
+        }
+
+        .name {
+            font-weight: 1000;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-weight: 1000;
+            font-size: 12px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.06);
+            color: rgba(255,255,255,.90);
+        }
+
+        .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            font-weight: 900;
+            color: rgba(255,255,255,.88);
+        }
+
+        .total {
+            font-weight: 1100;
+            color: rgba(255,255,255,.98);
+        }
+
+        .empty {
+            padding: 22px 16px 24px;
+        }
+
+        .emptyBox {
+            border: 1px dashed rgba(255,255,255,.20);
+            background: rgba(0,0,0,.16);
+            border-radius: 18px;
+            padding: 18px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .emptyIcon {
+            width: 42px;
+            height: 42px;
+            border-radius: 16px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.14);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex: 0 0 auto;
+        }
+
+        .emptyTitle {
+            font-weight: 1100;
+            margin: 0;
+            font-size: 14px;
+        }
+
+        .emptyDesc {
+            margin: 4px 0 0;
+            color: rgba(255,255,255,.70);
+            font-weight: 800;
+            font-size: 12.5px;
+            line-height: 1.45;
+        }
+
+        .mobileList {
+            display: none;
+            padding: 12px;
+        }
+
+        .mCard {
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(0,0,0,.18);
+            border-radius: 18px;
+            padding: 14px 14px 12px;
+            margin-bottom: 10px;
+        }
+
+        .mTop {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .mLeft {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .mName {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+            .mName strong {
+                font-size: 14px;
+                font-weight: 1100;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+        .mGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .mItem {
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.06);
+            border-radius: 14px;
+            padding: 10px 10px;
+        }
+
+        .mLabel {
+            color: rgba(255,255,255,.65);
+            font-weight: 1000;
+            font-size: 11px;
+            letter-spacing: .3px;
+            text-transform: uppercase;
+        }
+
+        .mVal {
+            margin-top: 4px;
+            font-weight: 1100;
+            font-variant-numeric: tabular-nums;
+        }
+
+        @@media (max-width: 860px) {
+            table {
+                min-width: 820px;
+            }
+
+            .input {
+                width: 120px;
+            }
+        }
+
+        /* ✅ 오타 수정: @@edia -> @@media */
+        @@media (max-width: 720px) {
+            .page {
+                padding: 14px 12px 34px;
+                max-width: 680px;
+            }
+
+            .hero {
+                padding: 14px 14px 12px;
+                border-radius: 18px;
+            }
+
+            .title {
+                font-size: 18px;
+            }
+
+            .subtitle {
+                font-size: 13px;
+                line-height: 1.5;
+            }
+
+            .actions {
+                width: 100%;
+                justify-content: stretch;
+                gap: 8px;
+            }
+
+            .field {
+                width: 100%;
+                padding: 10px 12px;
+            }
+
+            .input {
+                width: 100%;
+                font-size: 15px;
+                padding: 11px 12px;
+                border-radius: 12px;
+            }
+
+            .btn {
+                flex: 1 1 100%;
+                justify-content: center;
+                font-size: 14px;
+                padding: 12px 12px;
+                border-radius: 14px;
+            }
+
+            .tableWrap {
+                display: none;
+            }
+
+            .mobileList {
+                display: block;
+                padding: 12px;
+            }
+
+            .mCard {
+                padding: 14px 14px 12px;
+                border-radius: 18px;
+            }
+
+            .rank {
+                min-width: 34px;
+                height: 34px;
+                font-size: 14px;
+            }
+
+            .mName strong {
+                font-size: 15px;
+            }
+
+            .pill {
+                font-size: 12.5px;
+                padding: 7px 10px;
+            }
+
+            .mGrid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .mItem {
+                padding: 11px 11px;
+                border-radius: 14px;
+            }
+
+            .mLabel {
+                font-size: 11px;
+            }
+
+            .mVal {
+                font-size: 15px;
+                margin-top: 4px;
+            }
+
+            .mItem[style*="grid-column"] {
+                grid-column: 1 / -1 !important;
+            }
+        }
+
+        @@media (max-width: 390px) {
+            .mGrid {
+                grid-template-columns: 1fr;
+            }
+
+            .pill {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="hero">
+            <div class="heroInner">
+                <div class="titleRow">
+                    <div class="title">🏁 세계관 공과 계정별 누적 순위</div>
+                    <div class="subtitle">
+                        총점(누적) 기준으로 정렬되며, 동점일 때는 <b>마지막 제출 시간이 빠른 순</b>으로 표시합니다.
+                    </div>
+                </div>
+
+                <form class="actions" method="get" action="/WorldviewAdmin/SubmitRank">
+                    <!-- ✅ 상단 추가 버튼 2개 -->
+                    <a class="btn btnNav" href="/">🏠 홈으로</a>
+                    <a class="btn btnNav" href="/Worldview/Intro">🧭 미션홈</a>
+
+                    <div class="field">
+                        <label>레슨번호</label>
+                        <input class="input" type="number" name="lessonNo" min="1"
+                               value="@(lessonNo?.ToString() ?? "")" placeholder="전체" />
+                    </div>
+
+                    <button class="btn btnPrimary" type="submit">🔎 조회</button>
+                    <a class="btn" href="/WorldviewAdmin/SubmitRank">↺ 전체</a>
+                    <a class="btn" href="/WorldviewAdmin/SubmitHistory@(lessonNo.HasValue ? $"?lessonNo={lessonNo}" : "")">🧾 제출기록</a>
+                </form>
+            </div>
+        </div>
+
+        <div class="panel">
+            @if (Model == null || Model.Count == 0)
+            {
+                <div class="empty">
+                    <div class="emptyBox">
+                        <div class="emptyIcon">🧾</div>
+                        <div>
+                            <p class="emptyTitle">아직 집계할 제출 데이터가 없어요.</p>
+                            <p class="emptyDesc">
+                                레슨 번호를 바꾸어 조회하거나, 학생들이 제출하면 여기에서 바로 순위를 확인할 수 있어요.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="tableWrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:84px;">Rank</th>
+                                <th>Name</th>
+                                <th style="width:120px; text-align:right;">제출수</th>
+                                <th style="width:120px; text-align:right;">기본</th>
+                                <th style="width:120px; text-align:right;">보너스</th>
+                                <th style="width:140px; text-align:right;">총합</th>
+                                <th style="width:190px;">Last</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model)
+                            {
+                                rank++;
+                                <tr>
+                                    <td><span class="rank">@rank</span></td>
+                                    <td>
+                                        <div class="name">
+                                            <span>@(string.IsNullOrWhiteSpace(row.UserName) ? "(이름없음)" : row.UserName)</span>
+                                        </div>
+                                    </td>
+                                    <td class="num">@row.SubmitCount</td>
+                                    <td class="num">@row.BaseSum</td>
+                                    <td class="num">@row.BonusSum</td>
+                                    <td class="num total">@row.TotalSum</td>
+                                    <td style="color: rgba(255,255,255,.72); font-weight:900;">
+                                        @(row.LastSubmittedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mobileList">
+                    @{
+                        rank = 0;
+                    }
+                    @foreach (var row in Model)
+                    {
+                        rank++;
+                        <div class="mCard">
+                            <div class="mTop">
+                                <div class="mLeft">
+                                    <span class="rank">@rank</span>
+                                    <div class="mName">
+                                        <strong>@(string.IsNullOrWhiteSpace(row.UserName) ? "(이름없음)" : row.UserName)</strong>
+                                    </div>
+                                </div>
+                                <span class="pill">Total: @row.TotalSum</span>
+                            </div>
+
+                            <div class="mGrid">
+                                <div class="mItem">
+                                    <div class="mLabel">Submits</div>
+                                    <div class="mVal">@row.SubmitCount</div>
+                                </div>
+                                <div class="mItem">
+                                    <div class="mLabel">BaseSum</div>
+                                    <div class="mVal">@row.BaseSum</div>
+                                </div>
+                                <div class="mItem">
+                                    <div class="mLabel">BonusSum</div>
+                                    <div class="mVal">@row.BonusSum</div>
+                                </div>
+                                <div class="mItem" style="grid-column: 1 / -1;">
+                                    <div class="mLabel">Last</div>
+                                    <div class="mVal">@((row.LastSubmittedAt?.ToString("yyyy-MM-dd HH:mm")) ?? "-")</div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</body>
+</html>

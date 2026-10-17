@@ -1,0 +1,220 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Globalization
+@model BulletinBoard.Controllers.DevotionPointsController.StatusPageVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 포인트 현황·순위 — 월 합계 · 최근 12개월 · 반별 합계 · 개인 순위 (예전 Dashboard + Participants)
+    ViewData["PointTab"] = "status";
+    ViewData["PointYm"] = Model.Ym;
+
+    string YmOf(DateTime m) => m.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+    string Url(string ym, int cy) => $"/DevotionPoints/Status?ym={ym}" + (cy > 0 ? $"&classYear={cy}" : "");
+    bool isThisMonth = Model.Month == Model.ThisMonth;
+    string Nm(string s) => string.IsNullOrWhiteSpace(s) ? "이름 없음" : s.Trim();
+    string Cls(int y, int b) => y > 0 ? $"{y}학년 {b}반" : "반 없음";
+
+    var rows = Model.Rows;
+    int kids = rows.Count;
+    int total = rows.Sum(r => r.Points);
+    int got = rows.Count(r => r.Points > 0);
+    int max = rows.Select(r => r.Points).DefaultIfEmpty(0).Max();
+    string avg = kids == 0 ? "0" : (total / (double)kids).ToString("0.#", CultureInfo.InvariantCulture);
+
+    // 반별 합계 — 합계 순
+    var classes = rows.GroupBy(r => new { r.ClassYear, r.ClassBan })
+        .Select(g => new { g.Key.ClassYear, g.Key.ClassBan, Count = g.Count(), Sum = g.Sum(x => x.Points) })
+        .OrderByDescending(c => c.Sum).ThenBy(c => c.ClassYear).ThenBy(c => c.ClassBan).ToList();
+    var classesOn = classes.Where(c => c.Sum > 0).ToList();
+    int classMax = Math.Max(1, classes.Select(c => c.Sum).DefaultIfEmpty(0).Max());
+
+    // 개인 순위 — 같은 점수는 같은 등수 (1, 2, 2, 2, 5)
+    var ranked = rows.Where(r => r.Points > 0).OrderByDescending(r => r.Points).ThenBy(r => r.ClassYear).ThenBy(r => r.ClassBan).ThenBy(r => r.FullName).ToList();
+    var zeros = rows.Where(r => r.Points <= 0).OrderBy(r => r.ClassYear).ThenBy(r => r.ClassBan).ThenBy(r => r.FullName).ToList();
+
+    var trend = Model.Trend;
+    int trendMax = Math.Max(1, trend.Select(t => t.TotalPoints).DefaultIfEmpty(0).Max());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>포인트 현황 · @Model.Month.ToString("M월")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 20px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .mn { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+        .mn a, .mn span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-size: 26px; font-weight: 300; color: #2F80ED; }
+        .mn a:hover { color: #1F6FDB; }
+        .mn span.off { color: #D1D5DB; }
+        .mn h1 { margin: 0; text-align: center; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #111827; }
+        .mn h1 small { display: block; margin-top: 2px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .st { display: flex; gap: 26px; margin-top: 8px; flex-wrap: wrap; }
+        .st div { font-size: 11.5px; color: #9CA3AF; }
+        .st b { display: block; margin-top: 2px; font-weight: 300; font-size: 28px; line-height: 1.2; color: #111827; font-variant-numeric: tabular-nums; }
+        .st b small { font-size: 14px; color: #9CA3AF; }
+        .st .k b { color: #2F80ED; }
+
+        .seg { display: flex; gap: 6px; margin-top: 14px; overflow-x: auto; scrollbar-width: none; }
+        .seg::-webkit-scrollbar { display: none; }
+        .seg a { flex: none; padding: 8px 16px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-size: 13px; white-space: nowrap; }
+        .seg a:hover { color: #2F80ED; }
+        .seg a.on { background: #2F80ED; color: #fff; font-weight: 800; }
+
+        .blk { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+        .bT { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 16px; font-weight: 800; color: #111827; }
+        .bT small { font-size: 12px; font-weight: 400; color: #9CA3AF; }
+
+        /* 최근 12개월 */
+        .trend { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; margin-top: 12px; }
+        .trend a { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 3px; height: 112px; font-variant-numeric: tabular-nums; }
+        .trend em { font-style: normal; font-size: 10px; color: #6B7280; text-align: center; }
+        .trend i { display: block; background: #CFE0FA; border-radius: 4px 4px 0 0; min-height: 2px; }
+        .trend span { font-size: 10px; color: #9CA3AF; text-align: center; padding-top: 3px; border-top: 2px solid transparent; }
+        .trend a:hover i { background: #8DB5F3; }
+        .trend a.on i { background: #2F80ED; }
+        .trend a.on span { color: #2F80ED; font-weight: 800; border-top-color: #2F80ED; }
+
+        /* 반별 합계 */
+        .cr { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #EEF0F3; font-size: 14px; color: #111827; }
+        .cr .c { width: 84px; flex: none; font-weight: 700; }
+        .cr .br { flex: 1; height: 6px; border-radius: 999px; background: #F4F6F9; overflow: hidden; }
+        .cr .br i { display: block; height: 6px; border-radius: 999px; background: #2F80ED; }
+        .cr .n { width: 74px; flex: none; text-align: right; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 800; }
+        .cr .n small { color: #9CA3AF; font-weight: 400; font-size: 11.5px; }
+        .cr.z { color: #9CA3AF; font-size: 13px; }
+
+        /* 개인 순위 */
+        .rk { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #EEF0F3; }
+        .rk .r { width: 28px; flex: none; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+        .rk .r.top { font-weight: 800; color: #2F80ED; }
+        .rk .nm { flex: 1; min-width: 0; font-size: 15px; font-weight: 700; color: #111827; }
+        .rk .nm small { font-size: 11.5px; color: #9CA3AF; font-weight: 400; margin-left: 6px; }
+        .rk .nm.noname { color: #B4531F; font-weight: 400; }
+        .rk .p { font-size: 18px; font-weight: 300; color: #111827; font-variant-numeric: tabular-nums; }
+        details.zero { margin-top: 10px; border-radius: 12px; background: #F4F6F9; }
+        details.zero summary { display: flex; justify-content: space-between; padding: 12px 14px; font-size: 13px; color: #6B7280; cursor: pointer; list-style: none; }
+        details.zero summary::-webkit-details-marker { display: none; }
+        details.zero summary::after { content: "펼쳐 보기"; color: #2F80ED; font-weight: 700; }
+        details.zero[open] summary::after { content: "접기"; }
+        .zl { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 14px 14px; }
+        .zl span { font-size: 12.5px; padding: 4px 11px; border-radius: 999px; background: #fff; color: #6B7280; }
+        .zl span small { color: #9CA3AF; margin-left: 4px; font-size: 11px; }
+        .none { padding: 26px 0; text-align: center; font-size: 13.5px; color: #9CA3AF; }
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .ft a { color: #2F80ED; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><span><a href="/Admin/TeacherOnly">‹ 교사 대시보드</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">@ConstatsCommon.HolyWordAndRead</div>
+        <div class="mn">
+            <a href="@Url(YmOf(Model.Month.AddMonths(-1)), Model.ClassYear)" aria-label="지난달">‹</a>
+            <h1>@Model.Month.ToString("yyyy년 M월")<small>현황 · 순위</small></h1>
+            @if (isThisMonth) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Url(YmOf(Model.Month.AddMonths(1)), Model.ClassYear)" aria-label="다음 달">›</a> }
+        </div>
+        <div class="st">
+            <div class="k">합계<b>@total</b></div>
+            <div>받은 아이<b>@got<small> / @kids</small></b></div>
+            <div>평균<b>@avg</b></div>
+            <div>최고<b>@max</b></div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <nav class="seg" aria-label="학년">
+            <a href="@Url(Model.Ym, 0)" class="@(Model.ClassYear == 0 ? "on" : "")">전체</a>
+            @foreach (var y in Model.ClassYears)
+            {
+                <a href="@Url(Model.Ym, y)" class="@(Model.ClassYear == y ? "on" : "")">@(y)학년</a>
+            }
+        </nav>
+
+        <section class="blk">
+            <div class="bT">최근 12개월 합계<small>막대를 누르면 그 달로</small></div>
+            @if (trend.Count == 0)
+            {
+                <div class="none">기록이 없어요.</div>
+            }
+            else
+            {
+                <div class="trend">
+                    @foreach (var t in trend)
+                    {
+                        var h = (int)Math.Round(t.TotalPoints * 84.0 / trendMax);
+                        var m = t.Ym.Length >= 7 ? int.Parse(t.Ym.Substring(5, 2)) : 0;
+                        <a href="@Url(t.Ym, Model.ClassYear)" class="@(t.Ym == Model.Ym ? "on" : "")" aria-label="@(m)월 @(t.TotalPoints)점">
+                            <em>@t.TotalPoints</em><i style="height:@(Math.Max(2, h))px"></i><span>@m</span>
+                        </a>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="blk">
+            <div class="bT">반별 합계<small>합계 순</small></div>
+            @foreach (var c in classesOn)
+            {
+                <div class="cr">
+                    <span class="c">@Cls(c.ClassYear, c.ClassBan)</span>
+                    <span class="br"><i style="width:@(Math.Round(c.Sum * 100.0 / classMax))%"></i></span>
+                    <span class="n">@c.Sum <small>/ @(c.Count)명</small></span>
+                </div>
+            }
+            @if (classes.Count > classesOn.Count)
+            {
+                <div class="cr z"><span class="c" style="width:auto;flex:1">@(classesOn.Count == 0 ? $"모든 반 ({classes.Count}개)" : $"나머지 {classes.Count - classesOn.Count}개 반")</span><span class="n">0</span></div>
+            }
+            @if (classes.Count == 0) { <div class="none">반 정보가 없어요.</div> }
+        </section>
+
+        <section class="blk">
+            <div class="bT">개인 순위<small>점수 받은 아이만 · 같은 점수는 같은 등수</small></div>
+            @if (ranked.Count == 0)
+            {
+                <div class="none">이 달에 점수를 받은 아이가 없어요.</div>
+            }
+            @{ int rank = 0, prev = -1; }
+            @for (int i = 0; i < ranked.Count; i++)
+            {
+                var r = ranked[i];
+                if (r.Points != prev) { rank = i + 1; prev = r.Points; }
+                <div class="rk">
+                    <span class="r @(rank <= 3 ? "top" : "")">@rank</span>
+                    <span class="nm @(string.IsNullOrWhiteSpace(r.FullName) ? "noname" : "")">@Nm(r.FullName)<small>@Cls(r.ClassYear, r.ClassBan)</small></span>
+                    <span class="p">@r.Points</span>
+                </div>
+            }
+            @if (zeros.Count > 0)
+            {
+                <details class="zero">
+                    <summary><span>@(isThisMonth ? "이번 달" : "이 달") 0점 · @(zeros.Count)명</span></summary>
+                    <div class="zl">
+                        @foreach (var z in zeros)
+                        {
+                            <span>@Nm(z.FullName)<small>@Cls(z.ClassYear, z.ClassBan)</small></span>
+                        }
+                    </div>
+                </details>
+            }
+        </section>
+
+        <div class="ft"><span>점수는 아이마다 한 달 총점이에요. 기록이 없는 아이는 0점이에요.</span><a href="/DevotionPoints/Home?ym=@Model.Ym">점수 입력</a></div>
+    </main>
+
+    @await Html.PartialAsync("_PointTabs")
+</body>
+</html>

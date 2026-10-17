@@ -1,0 +1,478 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.UserInfosPray>
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    UserInfo _UserInfos = ViewBag.UserInfos as UserInfo;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>기도 공간</title>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Nanum+Gothic&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Nanum Gothic', sans-serif;
+            background-color: #FAFDFB;
+            background-image: url('https://www.transparenttextures.com/patterns/leaf.png');
+            color: #2E7D32;
+        }
+
+        header {
+            background-color: #E8F5E9;
+            text-align: center;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+            header h2, header h3 {
+                margin: 16px 0;
+            }
+
+        .button-bar {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px;
+            background: #D9F0DC;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+            .button-bar button {
+                flex: 1;
+                margin: 0 5px;
+                padding: 10px;
+                border: none;
+                border-radius: 20px;
+                font-weight: bold;
+                background: linear-gradient(to bottom, #A3D9A5, #81C784);
+                color: black;
+                box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
+                transition: transform 0.1s, background-color 0.3s;
+            }
+
+                .button-bar button:active {
+                    transform: scale(0.95);
+                }
+
+        #card-container {
+            position: relative;
+        }
+
+        .card {
+            background: #EDF7ED;
+            margin: 14px;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+            .card img {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                object-fit: cover;
+                border: 2px solid #A3D9A5;
+            }
+
+        .card-info {
+            flex: 1;
+        }
+
+            .card-info div {
+                margin-bottom: 4px;
+                color: #2E3C40;
+            }
+
+        .pray-button {
+            padding: 8px 12px;
+            background-color: #AED581;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+            .pray-button:disabled {
+                background-color: #ccc;
+                cursor: default;
+            }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: none;
+            z-index: 99;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 14px;
+            color: black;
+            background: #A3D9A5;
+            padding: 20px 10px;
+            margin-top: 30px;
+        }
+    </style>
+
+    <style>
+        <style >
+        .name-entry {
+            display: grid;
+            grid-template-columns: 1fr 120px;
+            gap: 8px;
+            padding: 12px 14px;
+            margin: 12px 14px 0;
+            background: #EAF7ED;
+            border: 1px solid rgba(0,0,0,.06);
+            border-radius: 14px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.06);
+        }
+
+        .name-entry input[type="text"] {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #A3D9A5;
+            outline: none;
+            font-size: 16px;
+            background: #fff;
+        }
+
+        .name-entry button {
+            padding: 10px 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            background: linear-gradient(to bottom, #A3D9A5, #81C784);
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
+            cursor: pointer;
+        }
+    </style>
+
+ <style>
+  /* 섹션(카드) — 더 넉넉한 상하 여백 + 부드러운 배경 */
+  .section {
+      max-width: 840px;
+      margin: 36px auto 40px;              /* 위·아래 공백 넉넉히 */
+      padding: 28px 22px;
+      border-radius: 18px;
+      background: linear-gradient(
+          180deg,
+          rgba(234, 247, 237, 0.85) 0%,
+          rgba(234, 247, 237, 0.72) 100%
+      );                                   /* 은은한 그린 톤 */
+      border: 1px solid rgba(46,125,50,.10);
+      box-shadow: 0 10px 26px rgba(0,0,0,.06);
+  }
+
+  .section-title {
+      margin: 0 0 16px;
+      font-size: 18px;
+      font-weight: 800;
+      color: #256B2C;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;             /* 제목도 중앙 정렬 */
+      text-align: center;
+  }
+  .section-title .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #2E7D32;
+      box-shadow: 0 0 0 4px rgba(46,125,50,.12);
+  }
+
+  /* 중앙 정렬 래퍼: 입력 + 버튼을 가운데 작게 모으기 */
+  .name-entry-wrap {
+      display: flex;
+      justify-content: center;
+  }
+
+  /* 실제 입력행: 폭을 좁게 제한 */
+  .name-entry {
+      width: min(420px, 92%);              /* 너무 길지 않게 */
+      display: grid;
+      grid-template-columns: 1fr 120px;    /* 입력 : 버튼 */
+      gap: 10px;
+      margin: 6px auto 0;
+  }
+
+  .name-entry input[type="text"] {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1.5px solid #A3D9A5;
+      background: #fff;
+      font-size: 15px;
+      outline: none;
+      transition: box-shadow .2s, border-color .2s;
+  }
+  .name-entry input[type="text"]:focus {
+      border-color: #6FCF74;
+      box-shadow: 0 0 0 4px rgba(111,207,116,.18);
+  }
+
+  .name-entry button {
+      padding: 10px 12px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 14px;
+      background: linear-gradient(to bottom, #A3D9A5, #81C784);
+      color: #0F2E12;
+      box-shadow: 0 4px 10px rgba(0,0,0,.10);
+      cursor: pointer;
+      transition: transform .06s ease, box-shadow .2s ease, opacity .2s;
+      white-space: nowrap;
+  }
+  .name-entry button:active { transform: scale(.98); }
+  .name-entry button:hover { box-shadow: 0 6px 14px rgba(0,0,0,.12); }
+
+  .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(0,0,0,.08), transparent);
+      margin: 18px auto 0;
+      width: min(560px, 92%);
+  }
+
+  /* 모바일: 버튼 아래로 떨어지게 */
+  @@media (max-width: 520px) {
+      .section { margin: 28px 12px 32px; padding: 22px 16px; }
+      .name-entry { grid-template-columns: 1fr; width: min(360px, 100%); }
+  }
+
+        .name-guide {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #555;
+            font-style: italic;
+        }
+
+            .name-guide strong {
+                color: #2E7D32;
+                font-weight: 600;
+            }
+
+</style>
+
+    <link rel="stylesheet" href="/css/ProcessBar.css">
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+    <script>
+
+        async function clickMission(PersonPraying, PrayerRecipient) {
+            let result = await confirmMessage(true, ['기도 대상자를 위해서 기도 하셨을가요 ?']);
+
+            const data = { personPraying: PersonPraying, prayerRecipient: PrayerRecipient };
+
+            if (result === 'y') {
+                doProcess(data, 'CreatePrayHistory');
+                DoneBit();
+            }
+        }
+
+        async function DoneBit(PersonPraying, PrayerRecipient) {
+
+            const button = document.getElementById("buttonID");
+            button.disabled = true;
+            button.textContent = '기도 완료됨';
+
+            const toast = document.getElementById('toast');
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 5000);
+
+            const bless = document.createElement('div');
+            bless.textContent = '✨ 기도 감사합니다 ✨';
+            bless.style.position = 'absolute';
+            bless.style.left = '50%';
+            bless.style.transform = 'translateX(-50%)';
+            bless.style.top = '-30px';
+            bless.style.color = '#2E7D32';
+            bless.style.fontWeight = 'bold';
+            bless.style.animation = 'floatUp 1.5s ease-out';
+            button.closest('.card').appendChild(bless);
+            setTimeout(() => bless.remove(), 1500);
+        }
+    </script>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+    <header>
+        <h3>안녕하세요</h3>
+        <h4>@UserFullName 님</h4>
+        <h2>기도똑딱이 공간 입니다</h2>
+        <h1>나의 기도 대상자</h1>
+    </header>
+
+    <div class="button-bar">
+        <button onclick="location.href='/'">홈으로</button>
+        <button onclick="location.href='/BessingChild/DetailWords'">기도집</button>
+        <button onclick="location.href='/bibleCenter/MyDashboard'">@ConstatsCommon.ReadBibleAllTitle</button>
+    </div>
+
+    <section class="section" aria-labelledby="name-entry-title">
+        <h3 class="section-title" id="name-entry-title">
+            <span class="dot" aria-hidden="true"></span>
+            기도 대상자 이름 직접 입력하기
+        </h3>
+
+        <div class="name-entry-wrap">
+            <div class="name-entry">
+                <input type="text"
+                       id="forWhomName"
+                       list="pray-names"
+                       placeholder="기도문을 만들 이름을 입력하세요 (자동완성 지원)" />
+                <button type="button" onclick="goMakePrayerByName()">기도문 만들기</button>
+            </div>
+        </div>
+
+        <!-- 👇 안내 문구 추가 -->
+        <div class="name-guide">
+            이름은 다음과 같이 입력해주세요: <strong>예) 홍길동</strong> 또는 <strong>홍길동님</strong>
+        </div>
+
+        <!-- 자동완성용 datalist -->
+        <datalist id="pray-names">
+            @foreach (var it in Model)
+            {
+                <option value="@it.FullName"></option>
+            }
+        </datalist>
+
+        <div class="section-divider" role="presentation"></div>
+    </section>
+
+
+    <div id="card-container">
+
+        @foreach (var item in Model)
+        {
+            <div class="card">
+                <img src="@item.ProfilePicturePath" alt="프로필" />
+                <div class="card-info">
+                    <div><strong>@item.FullName</strong></div>
+                    <div>기도한 날짜:  @item.WhenPray.ToString("yyyy년MM월dd일")</div>
+                    <div>경과일: @SharedComm.GetDateDifferenceInDays(DateHelper.GetKoreaNow(), item.WhenPray) 일</div>
+                    <div>기도 횟수: @item.PrayCount 회</div>
+                    <button class="pray-button" onclick="clickMission('@_UserInfos.UserId', '@item.UserId')" id="buttonID">기도 완료</button>
+                    <button class="pray-button"
+                            onclick="location.href='/BessingChild/DetailWords?forWhom=@item.FullName'">
+                        기도문 만들기
+                    </button>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <div class="toast" id="toast">🙏 기도 완료로 저장되었습니다!</div>
+
+    <footer>
+        @{
+            string churchString = $"{@ChurchName} {@DepartmentName}.";
+        }
+        &copy; 2024 @churchString All Rights Reserved.
+
+    </footer>
+
+@*    <script>
+        document.querySelectorAll('.pray-button').forEach(button => {
+            button.addEventListener('click', () => {
+                button.disabled = true;
+                button.textContent = '기도 완료됨';
+
+                const toast = document.getElementById('toast');
+                toast.style.display = 'block';
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 5000);
+
+                const bless = document.createElement('div');
+                bless.textContent = '✨ 기도 감사합니다 ✨';
+                bless.style.position = 'absolute';
+                bless.style.left = '50%';
+                bless.style.transform = 'translateX(-50%)';
+                bless.style.top = '-30px';
+                bless.style.color = '#2E7D32';
+                bless.style.fontWeight = 'bold';
+                bless.style.animation = 'floatUp 1.5s ease-out';
+                button.closest('.card').appendChild(bless);
+                setTimeout(() => bless.remove(), 1500);
+            });
+        });
+    </script>*@
+    <style>
+        @@keyframes floatUp {
+            from {
+                opacity: 1;
+                top: 0px;
+            }
+
+            to {
+                opacity: 0;
+                top: -30px;
+            }
+        }
+    </style>
+
+   
+        <script>
+            function goMakePrayerByName() {
+                const el = document.getElementById('forWhomName');
+                const name = (el?.value || '').trim();
+                if (!name) {
+                    alert('이름을 입력해 주세요.');
+                    el?.focus();
+                    return;
+                }
+                // 이름을 쿼리로 넘겨 DetailWords.cshtml 호출
+                location.href = `/BessingChild/DetailWords?forWhom=${encodeURIComponent(name)}`;
+            }
+
+        // 입력창에서 Enter로도 실행되도록
+        document.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById('forWhomName');
+            if (el) {
+                el.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        goMakePrayerByName();
+                    }
+                });
+            }
+        });
+ 
+
+    </script>
+</body>
+</html>

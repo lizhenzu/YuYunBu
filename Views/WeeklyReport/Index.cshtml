@@ -1,0 +1,171 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@model BulletinBoard.Models.TodayCollectWeeklyWordToRead
+
+@inject IAuthService AuthService
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    // 예전 이미지 폴더 규칙 (예: 20240901) — 이미지 경로에만 쓰인다
+    string WeeklyString = $"20240{Model.WeeklyWordToReadData.WeekTitle_DW}0{Model.WeeklyWordToReadData.WeekTitle_GUA}";
+    var d = Model.WeeklyWordToReadData;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@d.BibleTitle · 주일공과</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .hdP { margin-top: 12px; font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.7; color: var(--headdim); }
+        .hdP::before { content: "“"; color: var(--headk); }
+        .hdP::after { content: "”"; color: var(--headk); }
+
+        .bc { display: flex; align-items: center; gap: 16px; padding: 18px 2px; border-bottom: 1px solid var(--line); transition: background .15s; }
+        .bc:hover { background: var(--card); }
+        .bcNo { flex: none; width: 34px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 24px; color: var(--acc); }
+        .bcTx { flex: 1; min-width: 0; }
+        .bcK { display: block; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--dim); }
+        .bcR { display: block; margin-top: 3px; font-family: "Noto Serif KR", serif; font-size: 19px; }
+        .bcGo { flex: none; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--dim); }
+        .bc:hover .bcGo { color: var(--acc); }
+
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+        .chips button, .chips a { font-family: inherit; font-size: 14px; padding: 9px 14px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); cursor: pointer; }
+        .chips button:hover, .chips a:hover { border-color: var(--acc); color: var(--acc); }
+
+        .step { margin-top: 14px; padding: 16px 18px; background: var(--card); border: 1px solid var(--rule); border-left: 2px solid var(--acc); font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.85; word-break: keep-all; }
+        .step p { margin: 0 0 8px; }
+        .step ul { margin: 6px 0 10px; padding-left: 18px; }
+        .step .k { font-family: "Gothic A1", sans-serif; font-size: 11.5px; font-weight: 600; letter-spacing: .12em; color: var(--acc); margin: 10px 0 4px; }
+        .thumb { width: 120px; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--rule); background: var(--mark); cursor: zoom-in; display: block; margin-top: 10px; }
+        .hint { font-size: 12.5px; color: var(--dim); margin-top: 8px; }
+
+        #imageModal { display: none; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; padding: 16px; background: rgba(12,13,15,.9); }
+        #imageModal img { max-width: 94vw; max-height: 84vh; display: block; }
+        #imageModal button { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; background: none; border: 1px solid #3A3C40; color: #F2EFEA; font-size: 18px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="/WeeklyWordToRead/WeeklyWordToReadDetailList">공과 목록</a></span>
+            </div>
+            <div class="hdK">@(d.WeekTitle_DW)단원 · LESSON @d.WeekTitle_GUA</div>
+            <h1 class="hdT">@d.BibleTitle</h1>
+            @if (!string.IsNullOrWhiteSpace(d.OnePoint))
+            {
+                <p class="hdP">@d.OnePoint</p>
+            }
+        </div>
+    </header>
+
+    <main class="sh">
+        <section class="sec">
+            <div class="secH"><div><div class="secK">SCRIPTURE</div><div class="secT">외울말씀 · 읽을말씀</div></div></div>
+            <a class="bc" href="/DailyMission/BibleSheet?option=WeekeBiblesDataToRecite">
+                <span class="bcNo">✎</span>
+                <span class="bcTx"><span class="bcK">외울말씀</span><span class="bcR">@Model.WeekeBiblesDataToRecite.JanZulString</span></span>
+                <span class="bcGo">→</span>
+            </a>
+            <a class="bc" href="/DailyMission/BibleSheet?option=WeekeBiblesDataToRead">
+                <span class="bcNo">01</span>
+                <span class="bcTx"><span class="bcK">읽을말씀</span><span class="bcR">@Model.WeekeBiblesDataToRead.JanZulString</span></span>
+                <span class="bcGo">→</span>
+            </a>
+        </section>
+
+        <section class="sec">
+            <div class="secH"><div><div class="secK">STUDY</div><div class="secT">성경 공부 자료</div></div></div>
+            <div class="step">
+                <div class="k" style="margin-top:0">구조적 성경 접근</div>
+                <div class="chips" style="margin-top:6px"><button type="button" onclick="openPopup('/html/BibileStudy/John_8_1-11_Summary.html')">배경 · 핵심내용 · 의의</button></div>
+                <div class="k">등장인물</div>
+                <div class="chips" style="margin-top:6px">
+                    <button type="button" onclick="openPopup('/html/people/Pharisees1.html')">바리새인</button>
+                    <button type="button" onclick="openPopup('/html/people/Scribes.html')">서기관</button>
+                    <button type="button" onclick="openPopup('/html/Rabbi.html')">랍비</button>
+                </div>
+                <div class="k">성경탐험</div>
+                <div class="chips" style="margin-top:6px">
+                    <button type="button" onclick="openPopup('/html/location/Mount_Gerizim_Introduction.html')">그리심산</button>
+                    <button type="button" onclick="openPopup('/html/location/Mount_of_Olives_Introduction.html')">올리브산</button>
+                </div>
+                <div class="k">관련 이미지</div>
+                <img src="/images/Photo/@WeeklyString/Stone.png" alt="관련 이미지" class="thumb" onclick="openModal(this)">
+            </div>
+            <div class="chips">
+                @if (!string.IsNullOrWhiteSpace(d.YoJulSongURL)) { <a href="@d.YoJulSongURL">요절송 · @d.YoJulSongText</a> }
+                @if (!string.IsNullOrWhiteSpace(d.CharcaterMovingURL)) { <a href="@d.CharcaterMovingURL">성품카드 · @d.CharcaterMovingURLText</a> }
+            </div>
+        </section>
+
+        <section class="sec">
+            <div class="secH"><div><div class="secK">FLOW</div><div class="secT">수업 흐름</div></div></div>
+
+            <div class="step">
+                <div class="k" style="margin-top:0">01 · WELCOME</div>
+                <p>@d.WelcomeA</p>
+                @if (!string.IsNullOrEmpty(d.WelcomeB)) { <ul><li>@d.WelcomeB</li></ul> }
+                <img src="/images/Photo/@WeeklyString/welcome.png" alt="Welcome" class="thumb" onclick="openModal(this)">
+            </div>
+
+            <div class="step">
+                <div class="k" style="margin-top:0">02 · ADVENTURE</div>
+                <p>@d.Adventure</p>
+                <img src="/GongGwa/@WeeklyString/Adventure.png" alt="Adventure" class="thumb" onclick="openModal(this)">
+            </div>
+
+            <div class="step">
+                <div class="k" style="margin-top:0">03 · VALUE</div>
+                <p>@d.ValueData1</p>
+                <p>@d.ValueData2</p>
+                <img src="/GongGwa/@WeeklyString/Value.png" alt="Value" class="thumb" onclick="openModal(this)">
+                <p style="margin-top:10px">@d.ValueData3</p>
+            </div>
+
+            <div class="step">
+                <div class="k" style="margin-top:0">04 · ENCOURAGE</div>
+                <div class="k">학습 요점</div>
+                <ul><li>@d.EncourageStudyPoint1</li><li>@d.EncourageStudyPoint2</li></ul>
+                <div class="k">이번 주 미션</div>
+                <ul><li>@d.ThisWeekMission</li></ul>
+                <img src="/GongGwa/@WeeklyString/Encourage.png" alt="Encourage" class="thumb" onclick="openModal(this)">
+                <div class="k">이번 주 실천 사항</div>
+                <ul><li>성경읽기</li><li>기도하기</li><li>말씀암송</li><li>이번 주 미션</li></ul>
+            </div>
+            <div class="hint">사진을 누르면 크게 볼 수 있어요.</div>
+        </section>
+
+        <div class="ft">
+            <a href="/WeeklyWordToRead/WeeklyWordToReadDetailList">← 공과 목록</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </div>
+    </main>
+
+    <div id="imageModal" onclick="if(event.target===this)closeModal()">
+        <button type="button" onclick="closeModal()" aria-label="닫기">✕</button>
+        <img alt="크게 보기" id="imgExt">
+    </div>
+
+    <script>
+        function openModal(img) {
+            document.getElementById('imgExt').src = img.src; // 누른 사진을 크게
+            document.getElementById('imageModal').style.display = 'flex';
+        }
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+        function openPopup(url) {
+            window.open(url, 'Popup', 'width=600,height=400,left=200,top=200');
+        }
+    </script>
+</body>
+</html>

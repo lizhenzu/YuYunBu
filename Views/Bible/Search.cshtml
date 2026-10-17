@@ -1,0 +1,370 @@
+@model BibleReadingThrough.Models.SearchViewModel
+@{ ViewData["Title"] = "성경 검색"; ViewData["Page"] = "search"; ViewData["SearchQ"] = Model.Query; }
+
+<style>
+/* ── 검색 헤더 ── */
+.search-hero { text-align:center; padding:28px 0 20px; }
+.search-hero-title { font-size:1.6rem; font-weight:900; margin-bottom:6px; color:var(--text); }
+.search-hero-sub   { font-size:.9rem; color:var(--text2); margin-bottom:22px; }
+
+/* ── 검색 박스 ── */
+.search-box-wrap {
+    max-width:640px; margin:0 auto 20px;
+    display:flex; gap:10px; align-items:center;
+}
+.search-input {
+    flex:1; padding:13px 20px; border-radius:50px;
+    border:2px solid var(--border); background:var(--card-bg); color:var(--text);
+    font-size:1rem; outline:none; transition:border-color .2s, box-shadow .2s;
+}
+.search-input:focus {
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(99,102,241,.15);
+}
+.search-btn {
+    padding:12px 26px; border-radius:50px; background:var(--primary);
+    color:#fff; border:none; font-weight:800; font-size:.95rem;
+    cursor:pointer; transition:filter .15s, transform .15s; white-space:nowrap;
+}
+.search-btn:hover  { filter:brightness(1.1); transform:scale(1.03); }
+.search-btn:active { transform:scale(.97); }
+
+/* ── 결과 헤더 바 ── */
+.result-bar {
+    max-width:640px; margin:0 auto 14px;
+    display:flex; align-items:center; gap:8px;
+    font-size:.88rem; color:var(--text2); flex-wrap:wrap;
+}
+.result-cnt-badge {
+    background:var(--primary); color:#fff;
+    padding:2px 10px; border-radius:999px;
+    font-size:.8rem; font-weight:800;
+}
+
+/* ── 결과 목록 ── */
+.search-results {
+    max-width:640px; margin:0 auto;
+    display:flex; flex-direction:column; gap:10px;
+}
+.sr-card {
+    background:var(--card-bg); border:1px solid var(--border); border-radius:16px;
+    padding:14px 18px; text-decoration:none; display:block;
+    transition:border-color .18s, transform .18s, box-shadow .18s;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
+}
+.sr-card:hover {
+    border-color:var(--primary); transform:translateY(-2px);
+    box-shadow:0 6px 20px rgba(0,0,0,.10);
+}
+.sr-card-ref {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:.8rem; font-weight:800; color:var(--primary);
+    background:color-mix(in srgb, var(--primary) 12%, transparent);
+    padding:3px 10px; border-radius:999px; margin-bottom:8px;
+}
+.sr-num {
+    display:inline-flex; align-items:center; justify-content:center;
+    min-width:20px; height:20px; border-radius:50%;
+    background:var(--primary); color:#fff;
+    font-size:.72rem; font-weight:900; flex-shrink:0;
+}
+.sr-card-text {
+    font-size:.97rem; color:var(--text); line-height:1.75; word-break:keep-all;
+}
+.sr-card-text mark {
+    background:#fef08a; color:#713f12;
+    border-radius:3px; padding:0 2px; font-weight:700;
+}
+[data-theme="dark"] .sr-card-text mark { background:#713f12; color:#fef08a; }
+
+/* ── 무한스크롤 로딩 ── */
+#scrollSentinel { height:1px; }
+#loadMoreSpinner {
+    display:none; text-align:center;
+    padding:20px 0; max-width:640px; margin:0 auto;
+}
+.load-spinner {
+    display:inline-block;
+    width:32px; height:32px; border-radius:50%;
+    border:4px solid var(--border); border-top-color:var(--primary);
+    animation:spinS .7s linear infinite;
+}
+@@keyframes spinS { to { transform:rotate(360deg); } }
+.load-end-msg {
+    display:none; text-align:center;
+    padding:18px 0; color:var(--text2); font-size:.85rem;
+    max-width:640px; margin:0 auto;
+}
+
+/* ── 빈 상태 ── */
+.search-empty { text-align:center; padding:60px 20px; max-width:400px; margin:0 auto; }
+.search-empty-icon  { font-size:3.5rem; margin-bottom:14px; }
+.search-empty-title { font-size:1.1rem; font-weight:800; margin-bottom:8px; color:var(--text); }
+.search-empty-sub   { font-size:.88rem; color:var(--text2); line-height:1.6; }
+
+/* ── 키워드 태그 ── */
+.keyword-tags { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:18px; }
+.keyword-tag {
+    padding:6px 14px; border-radius:999px;
+    background:var(--bg2); border:1px solid var(--border);
+    color:var(--text2); font-size:.83rem; font-weight:700;
+    cursor:pointer; transition:all .15s; text-decoration:none;
+}
+.keyword-tag:hover { background:var(--primary); color:#fff; border-color:var(--primary); }
+
+/* ── 인기 검색어 순위 ── */
+.rank-wrap {
+    max-width:640px; margin:0 auto 24px;
+    background:var(--card-bg); border:1px solid var(--border);
+    border-radius:18px; overflow:hidden;
+}
+.rank-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 18px 10px;
+    border-bottom:1px solid var(--border);
+}
+.rank-head-title {
+    font-size:.92rem; font-weight:800; color:var(--text);
+    display:flex; align-items:center; gap:6px;
+}
+.rank-head-time {
+    font-size:.75rem; color:var(--text3);
+}
+.rank-list {
+    list-style:none; margin:0; padding:0;
+}
+.rank-item {
+    display:flex; align-items:center; gap:10px;
+    padding:9px 18px;
+    border-bottom:1px solid var(--border);
+    transition:background .15s;
+}
+.rank-item:last-child { border-bottom:none; }
+.rank-item:hover      { background:color-mix(in srgb,var(--primary) 6%,transparent); }
+.rank-item.rank-active { background:color-mix(in srgb,var(--primary) 10%,transparent); }
+
+/* 순위 번호 */
+.rank-no {
+    min-width:22px; text-align:center;
+    font-size:.82rem; font-weight:900; color:var(--text3);
+    flex-shrink:0;
+}
+.rank-no.top1 { color:#ef4444; font-size:.92rem; }
+.rank-no.top2 { color:#f97316; font-size:.88rem; }
+.rank-no.top3 { color:#eab308; font-size:.85rem; }
+
+/* 키워드 링크 */
+.rank-kw {
+    flex:1; font-size:.93rem; font-weight:700; color:var(--text);
+    text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    transition:color .15s;
+}
+.rank-kw:hover       { color:var(--primary); }
+.rank-active .rank-kw { color:var(--primary); }
+
+/* 검색 횟수 배지 */
+.rank-cnt {
+    font-size:.75rem; font-weight:700;
+    color:var(--primary);
+    background:color-mix(in srgb,var(--primary) 12%,transparent);
+    padding:2px 8px; border-radius:999px; white-space:nowrap; flex-shrink:0;
+}
+
+/* 날짜 */
+.rank-date {
+    font-size:.75rem; color:var(--text3); white-space:nowrap; flex-shrink:0; min-width:52px; text-align:right;
+}
+
+/* ── 반응형 ── */
+@@media (max-width:600px) {
+    .search-hero-title { font-size:1.3rem; }
+    .search-hero { padding:18px 0 14px; }
+    .search-box-wrap { gap:8px; }
+    .search-input { padding:11px 16px; font-size:.93rem; }
+    .search-btn { padding:11px 18px; font-size:.88rem; }
+    .sr-card { padding:12px 14px; border-radius:13px; }
+    .rank-date { display:none; }
+}
+</style>
+
+<!-- 검색 헤더 -->
+<div class="search-hero">
+    <div class="search-hero-title">🔍 성경 검색</div>
+    <div class="search-hero-sub">말씀 속 단어나 구절을 검색하세요</div>
+    <form method="get" class="search-box-wrap">
+        <input name="q" value="@Model.Query"
+               placeholder="예: 사랑, 믿음, 은혜, 기도..."
+               class="search-input" autocomplete="off" autofocus />
+        <button type="submit" class="search-btn">검색</button>
+    </form>
+</div>
+
+@if (Model.Rankings.Any())
+{
+    <div class="rank-wrap">
+        <div class="rank-head">
+            <div class="rank-head-title">🔥 인기 검색어</div>
+            <div class="rank-head-time">
+                @{
+                    var lastAt = Model.Rankings.Max(r => r.LastSearchedAt);
+                }
+                @lastAt.ToString("MM.dd HH:mm") 기준
+            </div>
+        </div>
+        <ul class="rank-list">
+            @foreach (var r in Model.Rankings)
+            {
+                var isActive = string.Equals(r.Query, Model.Query, StringComparison.OrdinalIgnoreCase);
+                var noClass  = r.Rank == 1 ? "rank-no top1" : r.Rank == 2 ? "rank-no top2" : r.Rank == 3 ? "rank-no top3" : "rank-no";
+                <li class="rank-item @(isActive ? "rank-active" : "")">
+                    <span class="@noClass">@r.Rank</span>
+                    <a href="?q=@Uri.EscapeDataString(r.Query)" class="rank-kw">@r.Query</a>
+                    <span class="rank-cnt">@r.Count 회</span>
+                    <span class="rank-date">@r.LastSearchedAt.ToString("MM.dd")</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.Query))
+{
+    <!-- 결과 헤더 -->
+    <div class="result-bar">
+        <span>"<strong style="color:var(--text)">@Model.Query</strong>" 검색 결과</span>
+        <span class="result-cnt-badge" id="cntBadge">총 @Model.TotalCount 개</span>
+    </div>
+
+    @if (!Model.Results.Any())
+    {
+        <div class="search-empty">
+            <div class="search-empty-icon">🔍</div>
+            <div class="search-empty-title">검색 결과가 없습니다</div>
+            <div class="search-empty-sub">
+                "<strong>@Model.Query</strong>"에 해당하는 말씀을 찾지 못했습니다.<br>
+                다른 단어로 검색해보세요.
+            </div>
+            <div class="keyword-tags">
+                @foreach (var kw in new[]{"사랑","믿음","구원","은혜","기도","평안","소망","감사"})
+                { <a href="?q=@kw" class="keyword-tag">@kw</a> }
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- 첫 페이지 결과 -->
+        <div class="search-results" id="resultList">
+            @for (int i = 0; i < Model.Results.Count; i++)
+            {
+                var v  = Model.Results[i];
+                var hl = v.BibleData?.Replace(Model.Query, $"<mark>{Model.Query}</mark>") ?? "";
+                <a href="/Bible/Read?bookName=@Uri.EscapeDataString(v.BibleText ?? "")&jang=@v.Jang"
+                   class="sr-card">
+                    <div class="sr-card-ref">
+                        <span class="sr-num">@(i + 1)</span>
+                        📖 @v.BibleText @v.Jang:@v.Zul
+                    </div>
+                    <div class="sr-card-text">@Html.Raw(hl)</div>
+                </a>
+            }
+        </div>
+
+        <!-- 스크롤 센티널 + 로딩 스피너 -->
+        <div id="loadMoreSpinner"><div class="load-spinner"></div></div>
+        <div class="load-end-msg" id="loadEndMsg">📖 모든 결과를 불러왔습니다</div>
+        <div id="scrollSentinel"></div>
+    }
+}
+else
+{
+    <div class="search-empty">
+        <div class="search-empty-icon">📖</div>
+        <div class="search-empty-title">성경 말씀을 검색하세요</div>
+        <div class="search-empty-sub">단어나 구절을 입력하면<br>관련 말씀을 찾아드립니다.</div>
+        <div class="keyword-tags">
+            @foreach (var kw in new[]{"사랑","믿음","구원","은혜","기도","평안","소망","감사"})
+            { <a href="?q=@kw" class="keyword-tag">@kw</a> }
+        </div>
+    </div>
+}
+
+@section Scripts {
+@if (!string.IsNullOrEmpty(Model.Query) && Model.Results.Any())
+{
+<script>
+(function () {
+    const QUERY    = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Query));
+    const PAGE     = 20;
+    let   offset   = @Model.Results.Count;   // 이미 로드된 개수
+    let   hasMore  = @Html.Raw(Model.HasMore.ToString().ToLower());
+    let   loading  = false;
+
+    const list     = document.getElementById('resultList');
+    const spinner  = document.getElementById('loadMoreSpinner');
+    const endMsg   = document.getElementById('loadEndMsg');
+    const sentinel = document.getElementById('scrollSentinel');
+
+    // 처음부터 다 로드됐으면 observer 불필요
+    if (!hasMore) { endMsg.style.display = 'block'; return; }
+
+    function escapeHtml(str) {
+        return (str ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function highlight(text, q) {
+        if (!text) return '';
+        // q를 정규식 특수문자 이스케이프 후 치환
+        const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return escapeHtml(text).replace(new RegExp(esc, 'g'),
+            m => `<mark>${escapeHtml(m)}</mark>`);
+    }
+    function renderCard(v, num) {
+        const url = '/Bible/Read?bookName=' + encodeURIComponent(v.bibleText || '') + '&jang=' + v.jang;
+        return `<a href="${url}" class="sr-card">
+            <div class="sr-card-ref">
+                <span class="sr-num">${num}</span>
+                📖 ${escapeHtml(v.bibleText)} ${v.jang}:${v.zul}
+            </div>
+            <div class="sr-card-text">${highlight(v.bibleData, QUERY)}</div>
+        </a>`;
+    }
+
+    async function loadMore() {
+        if (loading || !hasMore) return;
+        loading = true;
+        spinner.style.display = 'block';
+
+        try {
+            const res  = await fetch(`/Bible/SearchMore?q=${encodeURIComponent(QUERY)}&offset=${offset}`);
+            const data = await res.json();
+
+            data.results.forEach((v, i) => {
+                list.insertAdjacentHTML('beforeend', renderCard(v, offset + i + 1));
+            });
+            offset  += data.results.length;
+            hasMore  = data.hasMore;
+
+            if (!hasMore) {
+                spinner.style.display = 'none';
+                endMsg.style.display  = 'block';
+                observer.disconnect();
+            }
+        } catch (e) {
+            console.error('검색 추가 로드 실패', e);
+        } finally {
+            loading = false;
+            spinner.style.display = hasMore ? 'none' : 'none';
+        }
+    }
+
+    // IntersectionObserver: sentinel이 뷰포트에 들어오면 loadMore 호출
+    const observer = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) loadMore();
+    }, { rootMargin: '200px' }); // 200px 전에 미리 로드
+
+    observer.observe(sentinel);
+})();
+</script>
+}
+}

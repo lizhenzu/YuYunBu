@@ -1,0 +1,464 @@
+﻿@using BulletinBoard.ViewModels.Worldview.Admin
+@model List<WorldviewSubmitRankRowVM>
+
+@{
+    Layout = null;
+    int rank = 0;
+    int? lessonNo = ViewBag.LessonNo as int?;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>세계관 공과 제출 기록</title>
+
+    <style>
+        :root {
+            --bg: #0b1220;
+            --panel: rgba(255,255,255,.08);
+            --panel2: rgba(255,255,255,.10);
+            --stroke: rgba(255,255,255,.14);
+            --stroke2: rgba(255,255,255,.10);
+            --text: rgba(255,255,255,.92);
+            --muted: rgba(255,255,255,.68);
+            --muted2: rgba(255,255,255,.55);
+            --shadow: 0 18px 50px rgba(0,0,0,.35);
+            --radius: 18px;
+
+            --chipbg: rgba(255,255,255,.10);
+            --chipfg: rgba(255,255,255,.88);
+
+            --accent1: #60a5fa;
+            --accent2: #a78bfa;
+            --accent3: #34d399;
+            --danger: #fb7185;
+            --warn: #fbbf24;
+        }
+
+        html, body {
+            background:
+                radial-gradient(1200px 600px at 20% -10%, rgba(96,165,250,.28), transparent 55%),
+                radial-gradient(900px 500px at 85% 0%, rgba(167,139,250,.22), transparent 55%),
+                radial-gradient(800px 500px at 50% 120%, rgba(52,211,153,.16), transparent 55%),
+                var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+            letter-spacing: -0.2px;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 22px 16px 48px;
+        }
+
+        .hero {
+            border: 1px solid var(--stroke2);
+            background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+            box-shadow: var(--shadow);
+            border-radius: calc(var(--radius) + 6px);
+            padding: 18px 18px 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            background: radial-gradient(600px 160px at 10% 10%, rgba(96,165,250,.20), transparent 70%),
+                        radial-gradient(520px 160px at 80% 0%, rgba(167,139,250,.18), transparent 70%),
+                        radial-gradient(520px 160px at 60% 120%, rgba(52,211,153,.14), transparent 70%);
+            pointer-events: none;
+        }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .titleRow {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 260px;
+        }
+
+        .title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 900;
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        .sub {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            margin-top: 2px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: var(--chipbg);
+            color: var(--chipfg);
+            border: 1px solid rgba(255,255,255,.10);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--accent1);
+            box-shadow: 0 0 0 3px rgba(96,165,250,.18);
+        }
+        .dot.b { background: var(--accent2); box-shadow: 0 0 0 3px rgba(167,139,250,.16); }
+        .dot.c { background: var(--accent3); box-shadow: 0 0 0 3px rgba(52,211,153,.14); }
+
+        .nav {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            color: rgba(255,255,255,.92);
+            font-weight: 800;
+            font-size: 13px;
+            transition: transform .08s ease, background .12s ease, border-color .12s ease;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,.11);
+            border-color: rgba(255,255,255,.18);
+            transform: translateY(-1px);
+        }
+
+        .panel {
+            margin-top: 14px;
+            border: 1px solid var(--stroke2);
+            background: rgba(255,255,255,.05);
+            box-shadow: var(--shadow);
+            border-radius: calc(var(--radius) + 2px);
+            overflow: hidden;
+        }
+
+        .panelHead {
+            padding: 14px 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+        }
+
+        .panelTitle {
+            font-weight: 900;
+            font-size: 14px;
+            letter-spacing: -0.2px;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        /* table (desktop) */
+        .tableWrap { overflow: auto; }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 980px;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            text-align: left;
+            font-size: 12px;
+            color: rgba(255,255,255,.78);
+            background: rgba(11,18,32,.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            padding: 12px 12px;
+            white-space: nowrap;
+        }
+
+        tbody td {
+            padding: 12px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.07);
+            font-size: 13px;
+            color: rgba(255,255,255,.90);
+            white-space: nowrap;
+        }
+
+        tbody tr:hover td {
+            background: rgba(255,255,255,.05);
+        }
+
+        .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .muted { color: var(--muted); }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.08);
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .badge.ok {
+            border-color: rgba(52,211,153,.25);
+            background: rgba(52,211,153,.12);
+        }
+        .badge.no {
+            border-color: rgba(251,113,133,.25);
+            background: rgba(251,113,133,.12);
+        }
+
+        /* mobile cards */
+        .mobileList { display: none; padding: 12px; }
+        .mCard {
+            border: 1px solid rgba(255,255,255,.10);
+            background: rgba(255,255,255,.06);
+            border-radius: 16px;
+            padding: 12px 12px;
+            margin-bottom: 10px;
+        }
+        .mTop {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .mName { font-weight: 900; font-size: 14px; }
+        .mMeta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+        .mGrid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 10px;
+            margin-top: 10px;
+        }
+        .mItem {
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.05);
+            border-radius: 14px;
+            padding: 10px;
+        }
+        .mLabel { color: var(--muted); font-size: 11px; }
+        .mVal { font-weight: 900; font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+        .empty {
+            padding: 18px 14px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        @@media (max-width: 920px) {
+            table { min-width: 0; }
+        }
+        @@media (max-width: 860px) {
+            .tableWrap { display: none; }
+            .mobileList { display: block; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="hero">
+            <div class="heroInner">
+                <div class="titleRow">
+                    <div class="title">🧾 세계관 공과 제출 기록</div>
+                    <div class="sub">
+                        @if (lessonNo.HasValue)
+                        {
+                            <span>필터: <strong>@lessonNo</strong> 과정(lessonNo)</span>
+                        }
+                        else
+                        {
+                            <span>필터 없음: 전체 제출 기록</span>
+                        }
+                        <br />
+                        <span class="muted">표시는 “제출 1건(행)” 기준입니다.</span>
+                    </div>
+                </div>
+
+                <div class="chips">
+                    <span class="chip"><span class="dot"></span> 제출(SubmittedAt)</span>
+                    <span class="chip"><span class="dot b"></span> 채점(CheckedAt)</span>
+                    <span class="chip"><span class="dot c"></span> TotalPoint</span>
+                </div>
+
+                <div class="nav">
+                    <a class="btn" href="/WorldviewAdmin">🏠 Admin 홈</a>
+                    <a class="btn" href="/WorldviewAdmin/SubmitRank@(lessonNo.HasValue ? $"?lessonNo={lessonNo}" : "")">🏆 계정별 누적</a>
+                    <a class="btn" href="/WorldviewAdmin/SubmitHistory@(lessonNo.HasValue ? $"?lessonNo={lessonNo}" : "")">🧾 제출기록</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panelHead">
+                <div>
+                    <div class="panelTitle">제출 기록 목록</div>
+                    <div class="hint">Rank는 화면 표시용(단순 번호)입니다.</div>
+                </div>
+                <div class="hint">Rows: <strong>@(Model?.Count ?? 0)</strong></div>
+            </div>
+
+            @if (Model == null || Model.Count == 0)
+            {
+                <div class="empty">표시할 제출 기록이 없습니다.</div>
+            }
+            else
+            {
+                <!-- Desktop Table -->
+                <div class="tableWrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:70px;">#</th>
+                                <th style="width:90px;">LessonNo</th>
+                                <th>UserName</th>
+                                <th style="width:110px;">정답여부</th>
+                                <th style="width:110px; text-align:right;">BasePoint</th>
+                                <th style="width:110px; text-align:right;">BonusPoint</th>
+                                <th style="width:120px; text-align:right;">TotalPoint</th>
+                                <th style="width:170px;">SubmittedAt</th>
+                                <th style="width:170px;">CheckedAt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model)
+                            {
+                                rank++;
+                                <tr>
+                                    <td class="muted">@rank</td>
+                                    <td>@row.LessonNo</td>
+                                    <td>@(string.IsNullOrWhiteSpace(row.UserName) ? "-" : row.UserName)</td>
+                                    <td>
+                                        @if (row.IsAllCorrect)
+                                        {
+                                            <span class="badge ok">✅ ALL</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge no">❌ NO</span>
+                                        }
+                                    </td>
+                                    <td class="num">@row.BasePoint</td>
+                                    <td class="num">@row.BonusPoint</td>
+                                    <td class="num"><strong>@row.TotalPoint</strong></td>
+                                    <td>@row.SubmittedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>@(row.CheckedAt?.ToString("yyyy-MM-dd HH:mm") ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Cards -->
+                <div class="mobileList">
+                    @{
+                        rank = 0;
+                    }
+                    @foreach (var row in Model)
+                    {
+                        rank++;
+                        <div class="mCard">
+                            <div class="mTop">
+                                <div>
+                                    <div class="mName">
+                                        #@rank · @(string.IsNullOrWhiteSpace(row.UserName) ? "-" : row.UserName)
+                                    </div>
+                                    <div class="mMeta">
+                                        LessonNo: <strong>@row.LessonNo</strong>
+                                    </div>
+                                </div>
+                                <div>
+                                    @if (row.IsAllCorrect)
+                                    {
+                                        <span class="badge ok">✅ ALL</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge no">❌ NO</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="mGrid">
+                                <div class="mItem">
+                                    <div class="mLabel">BasePoint</div>
+                                    <div class="mVal">@row.BasePoint</div>
+                                </div>
+                                <div class="mItem">
+                                    <div class="mLabel">BonusPoint</div>
+                                    <div class="mVal">@row.BonusPoint</div>
+                                </div>
+                                <div class="mItem">
+                                    <div class="mLabel">TotalPoint</div>
+                                    <div class="mVal">@row.TotalPoint</div>
+                                </div>
+                                <div class="mItem">
+                                    <div class="mLabel">SubmittedAt</div>
+                                    <div class="mVal">@row.SubmittedAt.ToString("yyyy-MM-dd HH:mm")</div>
+                                </div>
+                                <div class="mItem" style="grid-column: 1 / -1;">
+                                    <div class="mLabel">CheckedAt</div>
+                                    <div class="mVal">@((row.CheckedAt?.ToString("yyyy-MM-dd HH:mm")) ?? "-")</div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,214 @@
+@model BulletinBoard.ViewModels.Profile.ProfileEditVM
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    기본 정보 변경 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색)
+    · 입력칸 이름 · 검증 규칙 · 저장 주소는 예전 그대로 (ProfileEditVM · POST Profile/Edit)
+    · 생일 공개 여부는 <select> → 선택 칩(라디오)으로 — 같은 이름(birthDay_PublishYN) 값 y / h
+    · 저장 누르면 검증이 통과했을 때만 대기 카드를 띄운다 (예전에는 오류가 나도 카드가 남아 화면이 멈췄다)
+    · 이전 화면은 Edit.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string backUrl = $"/HumanResource/ManageUserInfo?UserId={Model.Id}";
+    string fullName = (string.IsNullOrWhiteSpace(Model.LastName) && string.IsNullOrWhiteSpace(Model.FirstName)) ? "" : $"{Model.LastName}{Model.FirstName}";
+    bool pubYes = Model.birthDay_PublishYN != "h";   // 비어 있으면 공개
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>기본 정보 변경</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- ✅ unobtrusive까지 포함 (asp-validation-for 동작 필수) -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.3/dist/jquery.validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@4.0.0/dist/jquery.validate.unobtrusive.min.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; --red: #D9534F; --redbg: #FDEEEE; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        .page { max-width: 560px; margin: 0 auto; padding: 0 16px 40px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { color: var(--dim); letter-spacing: .04em; }
+
+        .me { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
+        .me .av { flex: none; width: 60px; height: 60px; border-radius: 50%; background: var(--soft); object-fit: cover; display: block; }
+        .me .k { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .me h1 { margin: 3px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .me .d { margin-top: 2px; font-size: 12px; color: var(--dim); word-break: break-all; }
+
+        .sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 16px; font-weight: 800; color: var(--ink); }
+        .sec small { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+        .f { margin-top: 14px; }
+        .f label { display: block; margin-bottom: 4px; font-size: 12px; font-weight: 400; color: var(--dim2); }
+        .form-control { width: 100%; border: 0; border-radius: 12px; background: var(--grey); padding: 13px 14px; font: inherit; font-size: 15px; color: var(--ink); }
+        .form-control:focus { outline: 0; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        .seg { display: flex; gap: 6px; margin-top: 10px; }
+        .seg label { flex: 1; margin: 0; cursor: pointer; }
+        .seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .seg span { display: block; text-align: center; padding: 11px 0; border-radius: 12px; background: var(--grey); font-size: 14px; font-weight: 700; color: var(--dim2); }
+        .seg input:checked + span { background: var(--soft); color: var(--blue); }
+        .seg input:focus-visible + span { box-shadow: 0 0 0 2px var(--blue); }
+        .help { margin-top: 6px; font-size: 11.5px; line-height: 1.6; color: var(--dim); }
+
+        /* 검증 오류 (ASP.NET unobtrusive 가 붙이는 클래스) */
+        .input-validation-error { background: #fff !important; box-shadow: inset 0 0 0 2px var(--red) !important; }
+        .field-validation-error, .text-danger { display: block; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--red); }
+        .validation-summary-errors { margin-top: 16px; padding: 11px 14px; border-radius: 12px; background: var(--redbg); font-size: 12.5px; line-height: 1.6; color: var(--red); }
+        .validation-summary-errors ul { margin: 0; padding-left: 18px; }
+        .validation-summary-valid { display: none; }
+
+        .btnRow { display: flex; gap: 8px; margin-top: 24px; }
+        .btnSave, .btnBack { height: 48px; border: 0; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+        .btnSave { flex: 1; background: var(--blue); color: #fff; }
+        .btnSave:hover { background: #1F6FDB; }
+        .btnBack { flex: none; width: 100px; background: var(--grey); color: var(--dim2); }
+        .btnBack:hover { color: var(--blue); }
+
+        /* 대기 카드 */
+        #loadingOverlay { display: none; position: fixed; inset: 0; z-index: 100; place-items: center; padding: 20px; background: rgba(17,24,39,.5); }
+        .loadingBox { width: 100%; max-width: 280px; background: #fff; border-radius: 16px; padding: 22px 20px; text-align: center; box-shadow: 0 20px 50px rgba(17,24,39,.3); font-size: 15px; font-weight: 800; color: var(--ink); }
+        .loadingBox small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; color: var(--dim2); }
+        .spinner { width: 32px; height: 32px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid var(--soft); border-top-color: var(--blue); animation: spin .8s linear infinite; }
+        @@keyframes spin { to { transform: rotate(360deg); } }
+        @@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+    </style>
+</head>
+<body>
+
+    <div id="loadingOverlay">
+        <div class="loadingBox">
+            <div class="spinner"></div>
+            저장하는 중이에요
+            <small>잠시만 기다려 주세요</small>
+        </div>
+    </div>
+
+    <div class="page">
+
+        <div class="hdTop">
+            <span><a href="@backUrl">정보 관리</a><span class="sep">›</span>기본 정보</span>
+            <span>PROFILE</span>
+        </div>
+
+        <div class="me">
+            <img id="myImage" class="av" src="@Model.ProfileImageUrl" alt="" onerror="this.removeAttribute('src')" />
+            <div>
+                <div class="k">BASIC INFO</div>
+                <h1>기본 정보 변경</h1>
+                <div class="d">@(string.IsNullOrWhiteSpace(Model.Email) ? "" : Model.Email + " · ")로그인 계정이라 바꿀 수 없어요</div>
+            </div>
+        </div>
+
+        <!-- ✅ action 하드코딩 제거 + AntiForgeryToken 추가 -->
+        <form asp-controller="Profile" asp-action="Edit" method="post" onsubmit="return beforeSubmit(this);" novalidate>
+            @Html.AntiForgeryToken()
+
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="sec">이름</div>
+            <div class="two">
+                <div class="f">
+                    <label asp-for="LastName">성</label>
+                    <input asp-for="LastName" placeholder="예) 홍" class="form-control" autocomplete="family-name" />
+                    <span asp-validation-for="LastName" class="text-danger"></span>
+                </div>
+                <div class="f">
+                    <label asp-for="FirstName">이름</label>
+                    <input asp-for="FirstName" placeholder="예) 길동" class="form-control" autocomplete="given-name" />
+                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="sec">연락처</div>
+            <div class="f">
+                <label asp-for="PhoneNumber">연락처</label>
+                <input asp-for="PhoneNumber" placeholder="010-0000-0000" class="form-control" inputmode="tel" autocomplete="tel" />
+                <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+            </div>
+            <div class="f">
+                <label asp-for="PhoneNumber2">연락처 2 (선택)</label>
+                <input asp-for="PhoneNumber2" placeholder="부모님 번호 등" class="form-control" inputmode="tel" />
+                <span asp-validation-for="PhoneNumber2" class="text-danger"></span>
+            </div>
+
+            <div class="sec">생일<small>선물 · 축하에 쓰여요</small></div>
+            <div class="two">
+                <div class="f">
+                    <label asp-for="bMonth">월</label>
+                    <input asp-for="bMonth" placeholder="1~12" class="form-control" inputmode="numeric" />
+                    <span asp-validation-for="bMonth" class="text-danger"></span>
+                </div>
+                <div class="f">
+                    <label asp-for="bDay">일</label>
+                    <input asp-for="bDay" placeholder="1~31" class="form-control" inputmode="numeric" />
+                    <span asp-validation-for="bDay" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="seg" role="radiogroup" aria-label="생일 공개 여부">
+                <label><input type="radio" name="birthDay_PublishYN" id="birthDay_PublishYN_y" value="y" checked="@pubYes" /><span>공개</span></label>
+                <label><input type="radio" name="birthDay_PublishYN" id="birthDay_PublishYN_h" value="h" checked="@(!pubYes)" /><span>비공개</span></label>
+            </div>
+            <span asp-validation-for="birthDay_PublishYN" class="text-danger"></span>
+            <div class="help">공개하면 생일에 친구들에게 "오늘의 생일자"로 보여요. 월 · 일을 비우려면 0을 적어 주세요.</div>
+
+            <div class="btnRow">
+                <button type="button" class="btnBack" onclick="window.location.href='@Html.Raw(backUrl)';">이전 화면</button>
+                <button type="submit" class="btnSave">저장</button>
+            </div>
+
+            <!-- ✅ 이 hidden은 필요 없으면 삭제 가능 (서버에서 this.UserId 쓰고 있음) -->
+            <input type="hidden" name="UserId" value="@Model.Id" />
+        </form>
+
+    </div>
+
+    <script>
+        function showLoading() {
+            var el = document.getElementById('loadingOverlay');
+            if (el) el.style.display = 'grid';
+            document.body.style.pointerEvents = 'none';
+        }
+
+        function hideLoading() {
+            var el = document.getElementById('loadingOverlay');
+            if (el) el.style.display = 'none';
+            document.body.style.pointerEvents = 'auto';
+        }
+
+        // 검증이 통과했을 때만 대기 카드를 띄운다 (오류가 나면 카드 없이 오류 문구만)
+        function beforeSubmit(form) {
+            if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) { return false; }
+            showLoading();
+            return true;
+        }
+        // 뒤로가기로 돌아왔을 때 카드가 남아 있지 않게
+        window.addEventListener('pageshow', function () { hideLoading(); });
+
+        // 프로필 이미지 캐시 무력화 (최신 이미지 반영)
+        (function () {
+            var img = document.getElementById('myImage');
+            var base = "@Model.ProfileImageUrl";
+            if (img && base) img.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 't=' + new Date().getTime();
+        })();
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,73 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+    ViewData["Title"] = "안내";
+    var msg = (ViewBag.Message as string) ?? "접근할 수 없습니다.";
+
+    // ✅ 관리자 페이지 경로 (원하시는 경로로 바꾸셔도 됩니다)
+    var adminUrl = "/Present/AdminUpcomingBirthdays";
+}
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+</head>
+
+<body>
+    <div class="pw">
+        <div class="pbar">
+            <a href="/">← @ConstatsCommon.ToHome</a>
+            <span>생일 선물</span>
+        </div>
+
+        <div class="pK">잠실새내 유년부 입니다.</div>
+        <h1 class="pT">안내</h1>
+
+        <p class="pmsg">@msg</p>
+
+        <div class="phint">
+            본인 계정으로 로그인한 상태에서만 생일 선물 선택이 가능합니다.<br />
+            대상자가 아니라면 이 안내 화면으로 이동됩니다.
+        </div>
+
+        <div class="pacts">
+            <a class="pbtn pri" href="/">@ConstatsCommon.ToHome 가기</a>
+            <button class="pbtn" type="button" onclick="history.back()">이전으로</button>
+            @if (isSuperAdmin || isAdmin)
+            {
+                <a class="pbtn" href="@adminUrl">관리자 화면</a>
+            }
+        </div>
+
+        <div class="pft">
+            <span>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</span>
+        </div>
+    </div>
+</body>
+</html>

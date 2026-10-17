@@ -1,0 +1,31 @@
+﻿@model MissionContents
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+<div class="mission">
+	<div class="mission-photo">
+		<img src="@Model.BackGround" class="resize-image">
+	</div>
+	<div class="mission-info" style="user-select: none;">
+		<h3 style="margin-top : 1px">@Model.MissionText</h3>
+		<p>25년 3월2일 시작 예정</p>
+
+		@if (await AuthService.IsSignedIn(User) &&
+				(
+				await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+				)
+		{
+			<button class="mission-button @Model.ButtonStyle" onclick="location.href='@Model.MissionURL1'">이동</button>
+			<button class="mission-button mission-button-color-6" onclick="location.href=''">시상</button>
+		}
+		<h4 class="no-margin" onclick="location.href=''" style="color: blue;user-select: none;">소개동영상 보기</h4>
+
+	</div>
+</div>
+

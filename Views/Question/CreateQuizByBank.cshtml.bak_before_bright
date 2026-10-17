@@ -1,0 +1,616 @@
+@using BulletinBoard.Common;
+@using System.Web
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.QuestionTypeDataObjects
+
+@{
+    Layout = null;
+
+    TodayWordToReads todayWordToReads = ViewBag.TodayWordToReads as TodayWordToReads;
+    eBibles _eBibles = ViewBag._eBibles as eBibles;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // ⚠️ QuestionBackground 는 [Required] 다.
+    //    textarea 에 asp-for 를 붙이면 태그 헬퍼가 안쪽에 적어 둔 글자를 모델 값으로 갈아치운다.
+    //    모델 값이 비어 있으면 화면엔 빈 칸이 나오고, 등록을 눌러도 필수 검사에 걸려 저장되지 않는다.
+    //    그래서 기본값을 모델 쪽에 넣어 준다.
+    if (string.IsNullOrWhiteSpace(Model.QuestionBackground))
+    {
+        Model.QuestionBackground = "blank";
+    }
+
+    string questionTypeLabel = Model.QuestionType?.ToLower() switch {
+        "o" => "4지선다",
+        "a" => "O/X",
+        _ => "주관식"
+    };
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>퀴즈 만들기 — @ChurchName @DepartmentName</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f4f6fb;
+            --surface: #ffffff;
+            --primary: #4f46e5;
+            --primary-light: #eef2ff;
+            --primary-dark: #3730a3;
+            --accent: #10b981;
+            --danger: #ef4444;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 14px;
+            --shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .page-wrap {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        /* ── Header ── */
+        .quiz-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: var(--radius);
+            padding: 24px 20px;
+            color: #fff;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        .quiz-header-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .quiz-header-icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            background: rgba(255,255,255,.18);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+        }
+        .quiz-header h1 {
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .quiz-header-meta {
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .quiz-chip {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.16);
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,.9);
+        }
+
+        /* ── Scripture Card ── */
+        .scripture-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 18px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        .scripture-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 8px;
+        }
+        .scripture-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .scripture-range {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* ── Form Card ── */
+        .form-card {
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            padding: 24px 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        .form-card-title {
+            font-size: 16px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .form-card-title span {
+            font-size: 18px;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+        .field:last-child {
+            margin-bottom: 0;
+        }
+        .field-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+        .field-input,
+        .field-textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-family: inherit;
+            color: var(--text);
+            background: #f8fafc;
+            transition: border-color .2s, box-shadow .2s;
+            outline: none;
+        }
+        .field-input:focus,
+        .field-textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79,70,229,.1);
+            background: #fff;
+        }
+        .field-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .field-error {
+            font-size: 12px;
+            color: var(--danger);
+            margin-top: 4px;
+        }
+
+        /* Radio / Choice */
+        .choice-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .choice-item {
+            position: relative;
+        }
+        .choice-item input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0; height: 0;
+        }
+        .choice-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 10px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .2s;
+            background: #f8fafc;
+            text-align: center;
+        }
+        .choice-item input[type="radio"]:checked + .choice-label {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        .choice-label:hover {
+            border-color: var(--primary);
+        }
+
+        /* OX specific */
+        .ox-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .ox-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 28px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: all .2s;
+            background: #f8fafc;
+        }
+        .choice-item input[type="radio"]:checked + .ox-label {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        /* ── Buttons ── */
+        .btn-submit {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity .2s, transform .15s;
+            box-shadow: 0 4px 14px rgba(79,70,229,.25);
+        }
+        .btn-submit:hover { opacity: .92; }
+        .btn-submit:active { transform: scale(.98); }
+
+        .nav-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .btn-nav {
+            flex: 1;
+            padding: 12px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: all .2s;
+        }
+        .btn-nav:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* ── Popup ── */
+        .popup-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+        .popup-box {
+            background: var(--surface);
+            border-radius: var(--radius);
+            max-width: 400px;
+            width: 100%;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        }
+        .popup-body {
+            padding: 24px 20px;
+            text-align: center;
+        }
+        .popup-body h3 {
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .popup-body p {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .popup-actions {
+            display: flex;
+            border-top: 1px solid var(--border);
+        }
+        .popup-action {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: background .15s;
+        }
+        .popup-action:hover { background: #f8fafc; }
+        .popup-action + .popup-action { border-left: 1px solid var(--border); }
+
+        /* ── Loading ── */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,.85);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-box {
+            background: var(--surface);
+            padding: 20px 32px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            font-weight: 700;
+            font-size: 15px;
+        }
+        #processingBox {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--primary-dark);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            z-index: 10001;
+            box-shadow: 0 6px 20px rgba(0,0,0,.2);
+        }
+
+        @@media (max-width: 480px) {
+            .page-wrap { padding: 10px; }
+            .quiz-header { padding: 20px 16px; border-radius: 12px; }
+            .form-card { padding: 20px 16px; }
+            .quiz-header h1 { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-box">📖 처리중입니다</div>
+</div>
+<div id="processingBox">📖 처리 중입니다... 잠시만 기다려 주세요.</div>
+
+<div class="page-wrap">
+
+    <!-- Header -->
+    <div class="quiz-header">
+        <div class="quiz-header-top">
+            <div class="quiz-header-icon">✏️</div>
+            <h1>퀴즈 만들기</h1>
+        </div>
+        <div class="quiz-header-meta">
+            <span class="quiz-chip">@questionTypeLabel</span>
+            <span class="quiz-chip">@Model.ExposeDate.ToString("yyyy-MM-dd")</span>
+            @if (!string.IsNullOrEmpty(ChurchName))
+            {
+                <span class="quiz-chip">@ChurchName</span>
+            }
+        </div>
+    </div>
+
+    <!-- Scripture Info -->
+    @if (todayWordToReads != null)
+    {
+        <div class="scripture-card">
+            <div class="scripture-label">📖 오늘의 말씀</div>
+            <div class="scripture-title">@todayWordToReads.BibleSubject</div>
+            <div class="scripture-range">@todayWordToReads.BibleText @(@todayWordToReads.FromJang)장 @(@todayWordToReads.FromZul)절 ~ @(@todayWordToReads.ToJang)장 @(@todayWordToReads.ToZul)절</div>
+        </div>
+    }
+
+    <!-- Form -->
+    <form asp-action="CreateQuestionProcess" method="post">
+        <div class="form-card">
+            <div class="form-card-title"><span>📝</span> 문제 작성</div>
+
+                <div class="field" style="display:none">
+                <label class="field-label" asp-for="@Model.QuestionBackground"></label>
+                <textarea class="field-textarea" id="QuestionBackground" name="QuestionBackground" asp-for="QuestionBackground" rows="1" placeholder="문제의 배경을 입력하세요"></textarea>
+                <span asp-validation-for="QuestionBackground" class="field-error"></span>
+            </div>
+
+            <div class="field">
+                <label class="field-label" asp-for="@Model.QuestionQ"></label>
+                <textarea class="field-textarea" id="QuestionQ" name="QuestionQ" asp-for="QuestionQ" rows="16" placeholder="질문을 입력하세요"></textarea>
+                <span asp-validation-for="QuestionQ" class="field-error"></span>
+            </div>
+
+            @if (Model.QuestionType.ToLower() == "o")
+            {
+                <div class="field">
+                    <label class="field-label" asp-for="@Model.Question1"></label>
+                    <input type="text" class="field-input" id="Question1" name="Question1" asp-for="Question1" placeholder="보기 1" />
+                    <span asp-validation-for="Question1" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="@Model.Question2"></label>
+                    <input type="text" class="field-input" id="Question2" name="Question2" asp-for="Question2" placeholder="보기 2" />
+                    <span asp-validation-for="Question2" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="@Model.Question3"></label>
+                    <input type="text" class="field-input" id="Question3" name="Question3" asp-for="Question3" placeholder="보기 3" />
+                    <span asp-validation-for="Question3" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="@Model.Question4"></label>
+                    <input type="text" class="field-input" id="Question4" name="Question4" asp-for="Question4" placeholder="보기 4" />
+                    <span asp-validation-for="Question4" class="field-error"></span>
+                </div>
+                <div class="field">
+                    <label class="field-label" asp-for="CorrectAnswer">정답 선택</label>
+                    <div class="choice-grid">
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="1" id="ans1" asp-for="CorrectAnswer" />
+                            <label for="ans1" class="choice-label">① 1번</label>
+                        </div>
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="2" id="ans2" asp-for="CorrectAnswer" />
+                            <label for="ans2" class="choice-label">② 2번</label>
+                        </div>
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="3" id="ans3" asp-for="CorrectAnswer" />
+                            <label for="ans3" class="choice-label">③ 3번</label>
+                        </div>
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="4" id="ans4" asp-for="CorrectAnswer" />
+                            <label for="ans4" class="choice-label">④ 4번</label>
+                        </div>
+                    </div>
+                    <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+                </div>
+            }
+            else if (Model.QuestionType.ToLower() == "a")
+            {
+                <div class="field">
+                    <label class="field-label" asp-for="CorrectAnswer">정답 선택</label>
+                    <div class="ox-grid">
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="o" id="ansO" asp-for="CorrectAnswer" />
+                            <label for="ansO" class="ox-label">⭕ O</label>
+                        </div>
+                        <div class="choice-item">
+                            <input type="radio" name="CorrectAnswer" value="x" id="ansX" asp-for="CorrectAnswer" />
+                            <label for="ansX" class="ox-label">❌ X</label>
+                        </div>
+                    </div>
+                    <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+                </div>
+            }
+            else
+            {
+                <div class="field">
+                    <label class="field-label" asp-for="CorrectAnswer"></label>
+                    <input type="text" class="field-input" asp-for="CorrectAnswer" placeholder="정답을 입력하세요" />
+                    <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+                </div>
+            }
+
+            <div class="field">
+                <label class="field-label" asp-for="@Model.AnswerGuide"></label>
+                <textarea class="field-textarea" name="AnswerGuide" asp-for="AnswerGuide" rows="16" placeholder="힌트나 해설을 입력하세요"></textarea>
+                <span asp-validation-for="AnswerGuide" class="field-error"></span>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-submit">퀴즈 등록</button>
+
+        <input type="hidden" name="QuestionType" value="@Model.QuestionType" />
+        <input type="hidden" name="ExposeDate" value="@Model.ExposeDate" />
+    </form>
+
+    <!-- Navigation -->
+    <div class="nav-row">
+        <a class="btn-nav" href="/">🏠 홈</a>
+        <a class="btn-nav" href="/Question/Index">📅 퀴즈달력</a>
+        <a class="btn-nav" onclick="window.history.back(); return false;" href="#">← 뒤로</a>
+    </div>
+
+</div>
+
+<!-- Popup -->
+<div class="popup-overlay" id="popup-background" style="display:none;">
+    <div class="popup-box">
+        <div class="popup-body">
+            <h3>알려 드려요 ^^</h3>
+            <p>퀴즈뱅크에서 문제가 잘못 생성될 수 있어요.<br/>잘못된 문제는 고민없이 바로 삭제해 주세요.^^</p>
+        </div>
+        <div class="popup-actions">
+            <button class="popup-action" onclick="handleCheckbox('hideToday', 1)">오늘 하루 안보기</button>
+            <button class="popup-action" onclick="handleCheckbox('hide7Days', 7)">7일간 안보기</button>
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script src="/js/asyncProcesing.js"></script>
+<script src="/js/common2.js"></script>
+
+<script>
+    function createQuizById(id) {
+        location.href = "/Question/CreateQuizById?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    function createQuizByBank(id) {
+        location.href = "/Question/CreateQuizByBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    async function deleteQuestion(id, QuestionQ) {
+        let result = await confirmMessage(true, ['퀴즈뱅크에서 아래 퀴즈를 삭제 할까요?', QuestionQ], null, '진행');
+        if (result === 'y') {
+            location.href = "/Question/DeleteQuestionBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+        }
+    }
+    function goBack() { window.history.back(); }
+    function redirectToPage(URL) { window.location.href = URL; }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const hideToday = getCookie('hideToday');
+        const hide7Days = getCookie('hide7Days');
+        if (!hideToday && !hide7Days) {
+            document.getElementById('popup-background').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    });
+
+    function handleCheckbox(cookieName, days) {
+        setCookie(cookieName, 'true', days);
+        document.getElementById('popup-background').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = name + "=" + value + ";expires=" + date.toUTCString() + ";path=/";
+    }
+    function getCookie(name) {
+        const cname = name + "=";
+        const ca = decodeURIComponent(document.cookie).split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(cname) === 0) return c.substring(cname.length);
+        }
+        return "";
+    }
+</script>
+
+</body>
+</html>

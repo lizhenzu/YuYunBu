@@ -1,0 +1,884 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@using BulletinBoard.Services.Abstract
+@model GiftSelectPageVM
+@{
+    Layout = null;
+    string N(int v) => v.ToString("N0");
+
+    // 안전
+    var gifts = Model?.Gifts ?? new List<GiftSelectItemVM>();
+    var avail = Model?.AvailableCredit ?? 0;
+    var curPid = Model?.CurrentDraftProductId; // 없으면 null
+}
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>🎁 선물 선택</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #f6f7fb;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: rgba(2,6,23,.10);
+            --card: rgba(255,255,255,.92);
+            --shadow: 0 20px 56px rgba(2,6,23,.12);
+            --shadow2: 0 12px 30px rgba(2,6,23,.08);
+            --r: 24px;
+            --pri1: #22c55e;
+            --pri2: #3b82f6;
+            --gold1: #fbbf24;
+            --gold2: #fb7185;
+            --ok: #16a34a;
+            --warn: #f97316;
+            --bad: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            color: var(--ink);
+            background: radial-gradient(1200px 700px at 10% 0%, rgba(167,139,250,.15), transparent 60%), radial-gradient(1100px 650px at 90% 10%, rgba(34,197,94,.13), transparent 60%), radial-gradient(900px 600px at 50% 110%, rgba(59,130,246,.12), transparent 60%), linear-gradient(180deg, var(--bg), #fff);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px 14px 28px
+        }
+
+        /* ===== Hero ===== */
+        header.hero {
+            position: relative;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.90);
+            backdrop-filter: blur(10px);
+            border-radius: calc(var(--r) + 10px);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            padding: 16px;
+        }
+
+            header.hero::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(900px 280px at 0% 0%, rgba(34,197,94,.18), transparent 55%), radial-gradient(900px 280px at 100% 0%, rgba(59,130,246,.18), transparent 55%), radial-gradient(900px 340px at 50% 120%, rgba(167,139,250,.16), transparent 55%);
+                pointer-events: none;
+            }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap
+        }
+
+        .heroLeft {
+            min-width: 280px;
+            flex: 1 1 520px
+        }
+
+        .heroRight {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: flex-end
+        }
+
+        .brand {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .logo {
+            width: 56px;
+            height: 56px;
+            border-radius: 20px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 900;
+            font-size: 24px;
+            background: linear-gradient(135deg, var(--pri1), var(--pri2));
+            box-shadow: var(--shadow2);
+        }
+
+        .hTitle {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: -.3px
+        }
+
+        .hSub {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5
+        }
+
+        .pill {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: 999px;
+            padding: 9px 11px;
+            font-size: 12px;
+            color: var(--muted);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 8px 16px rgba(2,6,23,.05);
+            white-space: nowrap;
+        }
+
+            .pill i {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--pri1), var(--pri2));
+                display: inline-block;
+            }
+
+            .pill.gold i {
+                background: linear-gradient(135deg, var(--gold1), var(--gold2));
+            }
+
+            .pill strong {
+                color: var(--ink);
+                font-weight: 900
+            }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            color: var(--ink);
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 10px 22px rgba(2,6,23,.06);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 16px 30px rgba(2,6,23,.10)
+            }
+
+            .btn.primary {
+                border: 0;
+                color: #fff;
+                background: linear-gradient(135deg, var(--pri1), var(--pri2));
+                box-shadow: 0 18px 40px rgba(34,197,94,.16), 0 16px 34px rgba(59,130,246,.14);
+            }
+
+        /* ===== Controls ===== */
+        .controls {
+            margin-top: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: var(--r);
+            box-shadow: var(--shadow2);
+            padding: 12px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .leftControls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center
+        }
+
+        .rightControls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end
+        }
+
+        .input {
+            border: 1px solid rgba(2,6,23,.14);
+            background: #fff;
+            border-radius: 14px;
+            padding: 10px 12px;
+            font-weight: 800;
+            font-size: 13px;
+            outline: none;
+            min-width: 240px;
+            box-shadow: 0 8px 16px rgba(2,6,23,.05);
+        }
+
+        select.input {
+            min-width: 180px;
+            cursor: pointer
+        }
+
+        .toggle {
+            border: 1px solid rgba(2,6,23,.14);
+            border-radius: 14px;
+            padding: 10px 12px;
+            background: #fff;
+            font-weight: 900;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            box-shadow: 0 8px 16px rgba(2,6,23,.05);
+            user-select: none;
+        }
+
+            .toggle.on {
+                border: 0;
+                color: #fff;
+                background: linear-gradient(135deg, var(--pri1), var(--pri2));
+            }
+
+        /* ===== Grid ===== */
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(12,1fr);
+            gap: 12px;
+        }
+
+        .card {
+            grid-column: span 4;
+            position: relative;
+            border-radius: var(--r);
+            border: 1px solid rgba(2,6,23,.10);
+            background: #fff;
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+            transform: translateZ(0);
+            transition: transform .14s ease, box-shadow .14s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 26px 60px rgba(2,6,23,.14);
+            }
+
+        .cardTop {
+            position: relative;
+            height: 160px;
+            overflow: hidden;
+            background: radial-gradient(900px 240px at 0% 0%, rgba(34,197,94,.14), transparent 55%), radial-gradient(900px 240px at 100% 0%, rgba(59,130,246,.14), transparent 55%), #f1f5f9;
+        }
+
+            .cardTop img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                filter: saturate(1.05);
+                transform: scale(1.02);
+            }
+
+        .shine {
+            position: absolute;
+            inset: -30%;
+            background: conic-gradient(from 180deg, rgba(255,255,255,0), rgba(255,255,255,.42), rgba(255,255,255,0));
+            filter: blur(18px);
+            opacity: .55;
+            animation: spin 6s linear infinite;
+            pointer-events: none;
+        }
+        @@keyframes spin {
+            to
+
+        {
+            transform: rotate(360deg);
+        }
+
+        }
+
+        .badgeRow {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .tag {
+            border-radius: 999px;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 900;
+            color: #0b1220;
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(2,6,23,.10);
+            box-shadow: 0 12px 26px rgba(2,6,23,.10);
+            white-space: nowrap;
+        }
+
+            .tag.ok {
+                background: rgba(220,252,231,.95);
+                border-color: rgba(22,163,74,.25);
+            }
+
+            .tag.no {
+                background: rgba(254,242,242,.95);
+                border-color: rgba(239,68,68,.25);
+                color: #7f1d1d;
+            }
+
+            .tag.cur {
+                color: #0b1220;
+                background: linear-gradient(135deg, rgba(251,191,36,.30), rgba(251,113,133,.24));
+                border-color: rgba(251,191,36,.35);
+            }
+
+        .body {
+            padding: 12px
+        }
+
+        .name {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: -.25px;
+            line-height: 1.25;
+            min-height: 40px;
+        }
+
+        .desc {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+            min-height: 36px;
+        }
+
+        .foot {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .price {
+            font-weight: 900;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+            .price small {
+                color: var(--muted);
+                font-weight: 900
+            }
+
+        .miniBtns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .miniBtn {
+            border: 1px solid rgba(2,6,23,.12);
+            background: rgba(255,255,255,.92);
+            border-radius: 12px;
+            padding: 9px 10px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+            .miniBtn.primary {
+                border: 0;
+                color: #fff;
+                background: linear-gradient(135deg, var(--pri1), var(--pri2));
+            }
+
+            .miniBtn.ghost {
+                border: 1px solid rgba(2,6,23,.14);
+                background: #fff;
+            }
+
+            .miniBtn[disabled] {
+                opacity: .55;
+                cursor: not-allowed;
+            }
+
+        .card.locked {
+            opacity: .68;
+            filter: grayscale(.15);
+        }
+
+        /* ===== Modal Preview ===== */
+        .modalBack {
+            position: fixed;
+            inset: 0;
+            background: rgba(2,6,23,.58);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            z-index: 9999;
+        }
+
+        .modal {
+            width: min(560px, 100%);
+            border-radius: 26px;
+            border: 1px solid rgba(2,6,23,.10);
+            background: #fff;
+            box-shadow: 0 28px 86px rgba(2,6,23,.28);
+            overflow: hidden;
+        }
+
+        .mHead {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 16px 16px 10px;
+        }
+
+            .mHead b {
+                font-size: 16px;
+                letter-spacing: -.3px
+            }
+
+        .xBtn {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            border-radius: 12px;
+            padding: 8px 10px;
+            cursor: pointer;
+            font-weight: 900;
+        }
+
+        .mBody {
+            padding: 0 16px 16px
+        }
+
+        .mGrid {
+            display: grid;
+            grid-template-columns: 160px 1fr;
+            gap: 12px;
+            align-items: start
+        }
+
+        .mImg {
+            width: 160px;
+            height: 120px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: #f1f5f9;
+            object-fit: cover;
+        }
+
+        .mName {
+            margin: 0;
+            font-weight: 900;
+            font-size: 16px
+        }
+
+        .mDesc {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5
+        }
+
+        .mInfo {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        .mBtns {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap
+        }
+
+            .mBtns .btn {
+                flex: 1 1 180px;
+                justify-content: center
+            }
+
+        @@media(max - width:980px) {
+            .card
+
+        {
+            grid-column: span 6
+        }
+
+        }
+        @@media(max - width:860px) {
+            .heroRight
+
+        {
+            justify-content: flex-start
+        }
+
+        .input {
+            min-width: 200px
+        }
+
+        }
+        @@media(max - width:620px) {
+            .card
+
+        {
+            grid-column: span 12
+        }
+
+        .mGrid {
+            grid-template-columns: 1fr
+        }
+
+        .mImg {
+            width: 100%;
+            height: 180px
+        }
+
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <!-- Hero -->
+        <header class="hero">
+            <div class="heroInner">
+                <div class="heroLeft">
+                    <div class="brand">
+                        <div class="logo">🎁</div>
+                        <div>
+                            <p class="hTitle">선물 선택</p>
+                            <p class="hSub">
+                                지금은 <b>구매 완료</b> 전이므로 선물을 <b>언제든 재선택</b>할 수 있어요.<br />
+                                내 잔여 포인트 안에서 고를 수 있는 선물만 보여줘요 🙂
+                            </p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+                        <span class="pill gold"><i></i>잔여 포인트 <strong>@N(avail)</strong></span>
+                        @if (curPid.HasValue)
+                        {
+                            <span class="pill"><i></i>현재 선택 <strong>#@curPid.Value</strong></span>
+                        }
+                        else
+                        {
+                            <span class="pill"><i></i>현재 선택 <strong>없음</strong></span>
+                        }
+                    </div>
+                </div>
+
+                <div class="heroRight">
+                    <a class="btn" href="/StudentPointDashboard4/Index">⬅️ 대시보드</a>
+                    <a class="btn primary" href="/StudentPointDashboard4/MyGiftBox">🎁 내 선물함</a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <section class="controls" id="controls">
+            <div class="leftControls">
+                <input class="input" id="q" type="search" placeholder="선물 검색 (예: 문화상품권, 과자, 블록…)" autocomplete="off" />
+                <select class="input" id="sort">
+                    <option value="rec">추천순</option>
+                    <option value="priceAsc">가격 낮은순</option>
+                    <option value="priceDesc">가격 높은순</option>
+                    <option value="nameAsc">이름 A→Z</option>
+                </select>
+
+                <button class="toggle on" id="onlyAffordable" type="button">✅ 잔여 포인트 이하만</button>
+                <button class="toggle" id="onlyRecommended" type="button">⭐ 추천만</button>
+            </div>
+
+            <div class="rightControls">
+                <span class="pill"><i></i>총 <strong id="countText">@gifts.Count</strong>개</span>
+            </div>
+        </section>
+
+        <!-- Gift Grid -->
+        <main class="grid" id="grid">
+            @foreach (var g in gifts)
+            {
+                var affordable = g.UnitPrice <= avail;
+                var isCur = (curPid.HasValue && curPid.Value == g.ProductID);
+                var img = $"/images/AwardItem/{g.ProductID}.jpg";
+
+                <article class="card @(affordable ? "" : "locked")"
+                         data-id="@g.ProductID"
+                         data-name="@((g.ProductName ?? "").ToLowerInvariant())"
+                         data-desc="@((g.ProductDescription ?? "").ToLowerInvariant())"
+                         data-price="@g.UnitPrice"
+                         data-affordable="@(affordable ? "1" : "0")"
+                         data-reco="@(g.IsRecommended ? "1" : "0")"
+                         data-cur="@(isCur ? "1" : "0")"
+                         data-img="@img">
+                    <div class="cardTop">
+                        <div class="shine"></div>
+                        <img src="@img" alt="@g.ProductName" loading="lazy" onerror="this.style.display='none';" />
+
+                        <div class="badgeRow">
+                            <span class="tag @(affordable ? "ok" : "no")">
+                                @(affordable ? "가능" : "포인트 부족")
+                            </span>
+
+                            <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                                @if (g.IsRecommended)
+                                {
+                                    <span class="tag">⭐ 추천</span>
+                                }
+                                @if (isCur)
+                                {
+                                    <span class="tag cur">✅ 현재 선택</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="body">
+                        <h3 class="name">@g.ProductName</h3>
+                        <p class="desc">@g.ProductDescription</p>
+
+                        <div class="foot">
+                            <div class="price">
+                                <span>@N(g.UnitPrice)</span>
+                                <small>포인트</small>
+                            </div>
+
+                            <div class="miniBtns">
+                                <button type="button" class="miniBtn ghost"
+                                        data-preview="1"
+                                        data-pid="@g.ProductID"
+                                        data-pname="@g.ProductName"
+                                        data-pdesc="@g.ProductDescription"
+                                        data-pprice="@g.UnitPrice">
+                                    👀 보기
+                                </button>
+
+                                <form method="post" action="/StudentPointDashboard4/SelectGift" style="margin:0;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="productId" value="@g.ProductID" />
+                                    <button type="submit" class="miniBtn primary" @(affordable ? "" : "disabled")>
+                                        🎁 선택
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            }
+        </main>
+
+        <div style="margin-top:14px; text-align:center; color:#64748b; font-size:12px; opacity:.9; line-height:1.6;">
+            © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modalBack" id="mBack" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal">
+            <div class="mHead">
+                <b id="mTitle">선물 미리보기</b>
+                <button class="xBtn" type="button" id="mClose">닫기</button>
+            </div>
+            <div class="mBody">
+                <div class="mGrid">
+                    <img id="mImg" class="mImg" src="" alt="" />
+                    <div>
+                        <p class="mName" id="mName"></p>
+                        <p class="mDesc" id="mDesc"></p>
+
+                        <div class="mInfo">
+                            <span class="pill gold"><i></i>가격 <strong id="mPrice"></strong></span>
+                            <span class="pill"><i></i>내 잔여 <strong>@N(avail)</strong></span>
+                        </div>
+
+                        <div class="mBtns">
+                            <button class="btn" type="button" id="mBackBtn">뒤로</button>
+                            <a class="btn primary" href="/StudentPointDashboard4/MyGiftBox3">내 선물함</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function(){
+            const q = document.getElementById('q');
+            const sort = document.getElementById('sort');
+            const onlyAffordableBtn = document.getElementById('onlyAffordable');
+            const onlyRecommendedBtn = document.getElementById('onlyRecommended');
+            const grid = document.getElementById('grid');
+            const countText = document.getElementById('countText');
+
+            let onlyAffordable = true;
+            let onlyRecommended = false;
+
+            function norm(s){ return (s||"").toLowerCase().trim(); }
+
+            function getCards(){
+                return Array.from(grid.querySelectorAll('.card'));
+            }
+
+            function apply(){
+                const query = norm(q.value);
+
+                let cards = getCards();
+
+                // filter
+                cards.forEach(c=>{
+                    const name = c.dataset.name || "";
+                    const desc = c.dataset.desc || "";
+                    const ok = c.dataset.affordable === "1";
+                    const reco = c.dataset.reco === "1";
+
+                    let visible = true;
+                    if (onlyAffordable && !ok) visible = false;
+                    if (onlyRecommended && !reco) visible = false;
+
+                    if (query){
+                        if (!(name.includes(query) || desc.includes(query))) visible = false;
+                    }
+
+                    c.style.display = visible ? "" : "none";
+                });
+
+                // sort (visible cards only)
+                let visibleCards = cards.filter(c => c.style.display !== "none");
+                const cur = visibleCards.filter(c => c.dataset.cur === "1"); // 현재 선택은 항상 위로
+                const rest = visibleCards.filter(c => c.dataset.cur !== "1");
+
+                const getPrice = c => Number(c.dataset.price || 0);
+                const getName = c => (c.querySelector('.name')?.textContent || "").trim();
+
+                const mode = sort.value;
+                rest.sort((a,b)=>{
+                    if (mode === "priceAsc") return getPrice(a) - getPrice(b);
+                    if (mode === "priceDesc") return getPrice(b) - getPrice(a);
+                    if (mode === "nameAsc") return getName(a).localeCompare(getName(b), 'ko');
+                    // rec(추천순): 추천 먼저, 그 다음 가격 낮은순
+                    const ar = a.dataset.reco === "1" ? 1 : 0;
+                    const br = b.dataset.reco === "1" ? 1 : 0;
+                    if (ar !== br) return br - ar;
+                    return getPrice(a) - getPrice(b);
+                });
+
+                // re-append
+                const frag = document.createDocumentFragment();
+                cur.concat(rest).forEach(c => frag.appendChild(c));
+                grid.appendChild(frag);
+
+                countText.textContent = String(visibleCards.length);
+            }
+
+            function toggleBtn(btn, on){
+                btn.classList.toggle('on', on);
+            }
+
+            onlyAffordableBtn.addEventListener('click', ()=>{
+                onlyAffordable = !onlyAffordable;
+                toggleBtn(onlyAffordableBtn, onlyAffordable);
+                apply();
+            });
+
+            onlyRecommendedBtn.addEventListener('click', ()=>{
+                onlyRecommended = !onlyRecommended;
+                toggleBtn(onlyRecommendedBtn, onlyRecommended);
+                apply();
+            });
+
+            q.addEventListener('input', apply);
+            sort.addEventListener('change', apply);
+
+            // ===== Preview Modal =====
+            const mBack = document.getElementById('mBack');
+            const mClose = document.getElementById('mClose');
+            const mBackBtn = document.getElementById('mBackBtn');
+            const mImg = document.getElementById('mImg');
+            const mName = document.getElementById('mName');
+            const mDesc = document.getElementById('mDesc');
+            const mPrice = document.getElementById('mPrice');
+
+            function openModal(pid, name, desc, price){
+                const img = `/images/AwardItem/${pid}.jpg`;
+                mImg.src = img;
+                mImg.alt = name || "";
+                mName.textContent = name || "";
+                mDesc.textContent = desc || "";
+                mPrice.textContent = (Number(price||0)).toLocaleString() + " 포인트";
+                mBack.style.display = "flex";
+                mBack.setAttribute("aria-hidden", "false");
+            }
+            function closeModal(){
+                mBack.style.display = "none";
+                mBack.setAttribute("aria-hidden", "true");
+            }
+
+            document.addEventListener('click', (e)=>{
+                const t = e.target;
+                if (!t) return;
+
+                if (t.id === "mClose" || t.id === "mBackBtn") closeModal();
+                if (t.id === "mBack") closeModal();
+
+                if (t.dataset && t.dataset.preview === "1"){
+                    openModal(t.dataset.pid, t.dataset.pname, t.dataset.pdesc, t.dataset.pprice);
+                }
+            });
+
+            // init
+            apply();
+        })();
+    </script>
+
+</body>
+</html>

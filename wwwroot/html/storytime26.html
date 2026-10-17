@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>많이 가지면 행복할까요? — 26과 스토리텔링북</title>
+<style>
+/* ── tokens ── */
+:root {
+  --teal:    #2BB5A0;
+  --teal-d:  #1D8A79;
+  --teal-l:  #A8E6DF;
+  --sun:     #F7C948;
+  --sun-d:   #E5A800;
+  --coral:   #F4724E;
+  --sky:     #5AABDF;
+  --lavender:#9B85D4;
+  --bg:      #FEF9ED;
+  --card:    #FFFFFF;
+  --navy:    #1D2B4F;
+  --ink:     #2C3A50;
+  --muted:   #7A8FA6;
+  --border:  rgba(43,181,160,.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:    #111A26;
+    --card:  #192233;
+    --ink:   #E8F0F8;
+    --muted: #6B82A0;
+    --border:rgba(43,181,160,.22);
+    --teal-l:#1D6B62;
+  }
+}
+:root[data-theme="light"] {
+  --bg:#FEF9ED; --card:#FFFFFF; --ink:#2C3A50; --muted:#7A8FA6;
+  --border:rgba(43,181,160,.18); --teal-l:#A8E6DF;
+}
+:root[data-theme="dark"] {
+  --bg:#111A26; --card:#192233; --ink:#E8F0F8; --muted:#6B82A0;
+  --border:rgba(43,181,160,.22); --teal-l:#1D6B62;
+}
+
+/* ── base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.75;
+  font-size: 16px;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ── theme toggle ── */
+.theme-toggle {
+  position: fixed; top: 16px; right: 16px; z-index: 100;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--card); border: 2px solid var(--border);
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+  cursor: pointer; font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s;
+}
+.theme-toggle:hover { transform: scale(1.1); }
+
+/* ── cover / hero ── */
+.cover {
+  min-height: 100svh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: 60px 24px 80px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1D8A79 0%, #2BB5A0 40%, #5AABDF 80%, #9B85D4 100%);
+}
+.cover-orb {
+  position: absolute; border-radius: 50%; pointer-events: none;
+}
+.cover-orb1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(247,201,72,.30) 0%, transparent 70%); top: -100px; right: -100px; }
+.cover-orb2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(155,133,212,.35) 0%, transparent 70%); bottom: -80px; left: -60px; }
+.cover-orb3 { width: 300px; height: 300px; background: radial-gradient(circle, rgba(244,114,78,.25) 0%, transparent 70%); top: 40%; left: 5%; }
+
+.unit-badge {
+  display: inline-block;
+  background: rgba(255,255,255,.20);
+  border: 1.5px solid rgba(255,255,255,.40);
+  border-radius: 999px;
+  padding: 6px 20px;
+  font-size: 12px; font-weight: 800;
+  color: rgba(255,255,255,.90);
+  letter-spacing: .12em; text-transform: uppercase;
+  margin-bottom: 28px;
+  position: relative; z-index: 1;
+}
+
+.cover-num {
+  font-size: clamp(80px, 18vw, 160px);
+  font-weight: 900;
+  color: rgba(255,255,255,.15);
+  line-height: 1;
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -54%);
+  user-select: none; pointer-events: none;
+  letter-spacing: -4px;
+}
+
+.cover-emoji {
+  font-size: clamp(72px, 14vw, 120px);
+  margin-bottom: 20px;
+  position: relative; z-index: 1;
+  animation: float 4s ease-in-out infinite;
+}
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+
+.cover-title {
+  font-size: clamp(28px, 6vw, 56px);
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.2;
+  text-wrap: balance;
+  position: relative; z-index: 1;
+  margin-bottom: 16px;
+  letter-spacing: -1px;
+}
+.cover-sub {
+  font-size: clamp(14px, 2.5vw, 18px);
+  color: rgba(255,255,255,.75);
+  font-weight: 600;
+  position: relative; z-index: 1;
+  margin-bottom: 40px;
+}
+.cover-scroll {
+  position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  color: rgba(255,255,255,.65); font-size: 12px; font-weight: 700;
+  z-index: 1; animation: bounce 2s ease-in-out infinite;
+}
+@keyframes bounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(6px)} }
+
+/* ── wave divider ── */
+.wave { display: block; width: 100%; overflow: hidden; line-height: 0; }
+.wave svg { display: block; width: 100%; }
+
+/* ── chapter sections ── */
+.chapter {
+  padding: 72px 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.chapter-label {
+  font-size: 11px; font-weight: 900; letter-spacing: .15em;
+  text-transform: uppercase; color: var(--teal);
+  margin-bottom: 12px;
+}
+.chapter-title {
+  font-size: clamp(24px, 5vw, 38px);
+  font-weight: 900; line-height: 1.25;
+  text-wrap: balance; margin-bottom: 20px;
+  letter-spacing: -.5px;
+}
+.chapter-body {
+  font-size: clamp(15px, 2vw, 17px);
+  color: var(--ink); line-height: 1.85;
+}
+.chapter-body p + p { margin-top: 1.2em; }
+
+/* ── bg bands ── */
+.band-teal { background: linear-gradient(135deg, rgba(43,181,160,.07) 0%, rgba(90,171,223,.07) 100%); }
+.band-sun  { background: linear-gradient(135deg, rgba(247,201,72,.08) 0%, rgba(244,114,78,.06) 100%); }
+.band-lav  { background: linear-gradient(135deg, rgba(155,133,212,.08) 0%, rgba(90,171,223,.07) 100%); }
+
+/* ── verse card ── */
+.verse-card {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--sky) 100%);
+  border-radius: 20px;
+  padding: 28px 32px;
+  color: #fff;
+  margin: 32px 0;
+  position: relative; overflow: hidden;
+}
+.verse-card::before {
+  content: '"';
+  position: absolute; top: -10px; left: 16px;
+  font-size: 100px; font-weight: 900;
+  color: rgba(255,255,255,.15); line-height: 1;
+  font-family: Georgia, serif;
+}
+.verse-card-ref {
+  font-size: 11px; font-weight: 900; letter-spacing: .12em;
+  text-transform: uppercase; color: rgba(255,255,255,.70);
+  margin-bottom: 10px;
+}
+.verse-card-text {
+  font-size: clamp(16px, 2.5vw, 20px);
+  font-weight: 800; line-height: 1.6;
+  position: relative; z-index: 1;
+}
+
+/* ── treasure compare ── */
+.compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 32px 0;
+}
+@media (max-width: 480px) { .compare { grid-template-columns: 1fr; } }
+.compare-card {
+  border-radius: 18px; padding: 24px 20px;
+  text-align: center;
+}
+.compare-card.earth {
+  background: linear-gradient(160deg, #FFF3E0 0%, #FFE0CC 100%);
+  border: 2px solid rgba(244,114,78,.25);
+}
+.compare-card.heaven {
+  background: linear-gradient(160deg, #E0F7F4 0%, #CBF0F8 100%);
+  border: 2px solid rgba(43,181,160,.25);
+}
+.compare-icon { font-size: 44px; margin-bottom: 12px; }
+.compare-title { font-size: 15px; font-weight: 900; margin-bottom: 10px; }
+.compare-list {
+  list-style: none; font-size: 13.5px;
+  color: var(--ink); line-height: 2;
+  text-align: left;
+}
+.compare-list li::before { content: '• '; color: var(--coral); font-weight: 900; }
+.compare-card.heaven .compare-list li::before { color: var(--teal); }
+
+@media (prefers-color-scheme: dark) {
+  .compare-card.earth  { background: rgba(244,114,78,.12); }
+  .compare-card.heaven { background: rgba(43,181,160,.12); }
+}
+:root[data-theme="dark"] .compare-card.earth  { background: rgba(244,114,78,.12); }
+:root[data-theme="dark"] .compare-card.heaven { background: rgba(43,181,160,.12); }
+
+/* ── choice path illustration ── */
+.path-illus {
+  margin: 32px 0;
+  border-radius: 20px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  padding: 32px 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.path-illus::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(247,201,72,.06) 0%, rgba(43,181,160,.06) 100%);
+}
+.path-road {
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; z-index: 1;
+}
+.path-person { font-size: 48px; margin-bottom: 4px; }
+.path-stem {
+  width: 4px; height: 36px;
+  background: var(--muted);
+  border-radius: 2px;
+}
+.path-fork {
+  display: flex; gap: 60px; align-items: flex-start;
+  position: relative; margin-top: 0;
+}
+.path-fork::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: calc(100% - 80px); height: 4px;
+  background: var(--muted); border-radius: 2px;
+}
+.path-branch {
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 20px;
+}
+.path-branch-line {
+  width: 4px; height: 48px; border-radius: 2px; margin-bottom: 12px;
+}
+.path-branch.left .path-branch-line { background: var(--coral); }
+.path-branch.right .path-branch-line { background: var(--teal); }
+.path-dest {
+  width: 72px; height: 72px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+}
+.path-branch.left .path-dest  { background: rgba(244,114,78,.15); border: 2.5px solid var(--coral); }
+.path-branch.right .path-dest { background: rgba(43,181,160,.15); border: 2.5px solid var(--teal); }
+.path-label { font-size: 12.5px; font-weight: 800; margin-top: 10px; text-align: center; line-height: 1.4; }
+.path-branch.left .path-label  { color: var(--coral); }
+.path-branch.right .path-label { color: var(--teal); }
+
+/* ── mirror sentence ── */
+.mirror-box {
+  background: var(--card);
+  border: 2.5px dashed var(--teal);
+  border-radius: 18px;
+  padding: 24px 28px;
+  margin: 28px 0;
+  text-align: center;
+}
+.mirror-box-emoji { font-size: 40px; margin-bottom: 8px; }
+.mirror-box-text {
+  font-size: clamp(17px, 3vw, 22px);
+  font-weight: 900; color: var(--teal-d);
+  line-height: 1.5;
+}
+:root[data-theme="dark"] .mirror-box-text { color: var(--teal); }
+@media (prefers-color-scheme: dark) { .mirror-box-text { color: var(--teal); } }
+
+/* ── maze story ── */
+.maze-wrap {
+  background: var(--card);
+  border-radius: 20px;
+  border: 2px solid var(--border);
+  padding: 28px;
+  margin: 28px 0;
+  overflow: hidden;
+}
+.maze-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (max-width: 480px) { .maze-grid { grid-template-columns: 1fr; } }
+.maze-item {
+  border-radius: 14px; padding: 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.maze-item.bad  { background: rgba(244,114,78,.10); border: 1.5px solid rgba(244,114,78,.22); }
+.maze-item.good { background: rgba(43,181,160,.10); border: 1.5px solid rgba(43,181,160,.22); }
+.maze-emoji { font-size: 28px; flex-shrink: 0; }
+.maze-text { font-size: 13.5px; line-height: 1.6; font-weight: 700; }
+.maze-item.bad  .maze-text { color: var(--coral); }
+.maze-item.good .maze-text { color: var(--teal-d); }
+:root[data-theme="dark"] .maze-item.good .maze-text { color: var(--teal); }
+@media (prefers-color-scheme: dark) { .maze-item.good .maze-text { color: var(--teal); } }
+
+/* ── prayer card ── */
+.prayer-card {
+  background: linear-gradient(160deg, #1D2B4F 0%, #2C3A6E 50%, #1D4E6B 100%);
+  border-radius: 24px;
+  padding: 40px 36px;
+  color: #fff;
+  text-align: center;
+  position: relative; overflow: hidden;
+  margin-top: 16px;
+}
+.prayer-card::before {
+  content: '✦';
+  position: absolute; top: 20px; right: 24px;
+  font-size: 80px; color: rgba(255,255,255,.05);
+}
+.prayer-icon { font-size: 52px; margin-bottom: 16px; }
+.prayer-title {
+  font-size: 20px; font-weight: 900;
+  color: var(--sun); margin-bottom: 20px;
+}
+.prayer-text {
+  font-size: 15px; font-weight: 600;
+  line-height: 2.0; color: rgba(255,255,255,.88);
+  font-style: italic;
+  border-top: 1px solid rgba(255,255,255,.15);
+  padding-top: 20px;
+}
+
+/* ── apply card ── */
+.apply-card {
+  background: linear-gradient(135deg, var(--sun) 0%, var(--coral) 100%);
+  border-radius: 20px;
+  padding: 28px;
+  color: #fff;
+  margin: 28px 0;
+}
+.apply-card-label { font-size: 11px; font-weight: 900; letter-spacing: .14em; opacity: .80; margin-bottom: 8px; }
+.apply-card-text { font-size: clamp(16px, 2.8vw, 20px); font-weight: 900; line-height: 1.5; }
+
+/* ── point chips ── */
+.chip-row {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: 999px;
+  font-size: 14px; font-weight: 800;
+  background: var(--card); border: 1.5px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+/* ── progress bar ── */
+.progress-bar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 4px; z-index: 200;
+  background: transparent;
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(to right, var(--teal), var(--sky), var(--lavender));
+  transition: width .1s;
+}
+
+/* ── nav dots ── */
+.nav-dots {
+  position: fixed; right: 18px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 12px; z-index: 99;
+}
+.nav-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--muted); opacity: .4;
+  cursor: pointer; transition: all .25s;
+  border: none; padding: 0;
+}
+.nav-dot.active { opacity: 1; background: var(--teal); transform: scale(1.3); }
+@media (max-width: 600px) { .nav-dots { display: none; } }
+
+/* ── footer ── */
+.footer {
+  text-align: center;
+  padding: 48px 24px;
+  font-size: 13px; color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+/* ── reveal animation ── */
+.reveal {
+  opacity: 0; transform: translateY(28px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
+
+/* ── section wrapper ── */
+.section-wrap { padding: 0; }
+.section-inner {
+  max-width: 720px; margin: 0 auto; padding: 72px 24px;
+}
+</style>
+</head>
+<body>
+
+<!-- Progress bar -->
+<div class="progress-bar"><div class="progress-fill" id="pbar"></div></div>
+
+<!-- Theme toggle -->
+<button class="theme-toggle" id="themeBtn" aria-label="테마 전환">🌙</button>
+
+<!-- Nav dots -->
+<nav class="nav-dots" aria-label="섹션 이동">
+  <button class="nav-dot active" data-section="0" aria-label="표지"></button>
+  <button class="nav-dot" data-section="1" aria-label="1장"></button>
+  <button class="nav-dot" data-section="2" aria-label="2장"></button>
+  <button class="nav-dot" data-section="3" aria-label="3장"></button>
+  <button class="nav-dot" data-section="4" aria-label="4장"></button>
+  <button class="nav-dot" data-section="5" aria-label="기도"></button>
+</nav>
+
+<!-- ════ COVER ════ -->
+<section class="cover" id="sec0">
+  <div class="cover-orb cover-orb1"></div>
+  <div class="cover-orb cover-orb2"></div>
+  <div class="cover-orb cover-orb3"></div>
+  <div class="cover-num">26</div>
+
+  <div class="unit-badge">7단원 · 하나님 나라 백성의 가치 분별</div>
+  <div class="cover-emoji">🔍</div>
+  <h1 class="cover-title">많이 가지면<br>행복할까요?</h1>
+  <p class="cover-sub">마태복음 6장 19–26절 &nbsp;·&nbsp; 26과 스토리텔링북</p>
+
+  <div class="cover-scroll">
+    <span>아래로 스크롤</span>
+    <span style="font-size:20px">↓</span>
+  </div>
+</section>
+
+<!-- wave -->
+<div class="wave" style="background:linear-gradient(135deg,#1D8A79 0%,#5AABDF 100%);margin-top:-1px">
+  <svg viewBox="0 0 1200 60" preserveAspectRatio="none" height="60">
+    <path d="M0,30 C300,60 900,0 1200,30 L1200,60 L0,60 Z" fill="var(--bg)"/>
+  </svg>
+</div>
+
+<!-- ════ CH 1 ════ -->
+<section class="section-wrap" id="sec1">
+  <div class="section-inner">
+    <div class="reveal">
+      <p class="chapter-label">1장 — 이야기 시작</p>
+      <h2 class="chapter-title">💰 100만 원이 생긴다면<br>무엇을 하고 싶나요?</h2>
+    </div>
+    <div class="chapter-body reveal">
+      <p>눈을 감고 상상해 보세요. 어느 날 갑자기 <strong>100만 원</strong>이 내 손에 생겼어요! 마음이 두근두근 설레지 않나요? 여러분은 그 돈으로 무엇을 하고 싶나요?</p>
+      <p>갖고 싶었던 장난감을 살 수도 있고, 맛있는 음식을 실컷 먹을 수도 있어요. 사람들은 저마다 꿈꾸는 것들이 달랐어요. 그리고 모두의 눈이 반짝반짝 빛났지요.</p>
+      <p>그런데 잠깐, 선생님이 이런 질문을 하셨어요.</p>
+    </div>
+
+    <div class="mirror-box reveal">
+      <div class="mirror-box-emoji">🤔</div>
+      <div class="mirror-box-text">"돈이 많아지면, 우리 마음도<br>정말 행복해질까요?"</div>
+    </div>
+
+    <div class="chapter-body reveal">
+      <p>그 질문에 교실이 잠시 조용해졌어요. <em>많이 가질수록 더 행복해질까요?</em> 성경은 뭐라고 말씀할까요? 함께 알아봐요!</p>
+    </div>
+
+    <div class="verse-card reveal">
+      <div class="verse-card-ref">전도서 5장 10절 — 오늘 외울 말씀</div>
+      <div class="verse-card-text">"은을 사랑하는 자는 은으로 만족하지 못하고, 풍요를 사랑하는 자는 소득으로 만족하지 아니하나니 — 이것도 헛되도다"</div>
+    </div>
+  </div>
+</section>
+
+<div class="wave band-teal" style="padding:0">
+  <svg viewBox="0 0 1200 50" preserveAspectRatio="none" height="50">
+    <path d="M0,25 C400,50 800,0 1200,25 L1200,50 L0,50 Z" fill="var(--bg)"/>
+  </svg>
+</div>
+
+<!-- ════ CH 2 ════ -->
+<section class="section-wrap band-sun" id="sec2">
+  <div class="section-inner">
+    <div class="reveal">
+      <p class="chapter-label">2장 — 보물 이야기</p>
+      <h2 class="chapter-title">🏆 보물은 어디에<br>쌓을까요?</h2>
+    </div>
+    <div class="chapter-body reveal">
+      <p>예수님은 이런 말씀을 하셨어요. "보물을 땅에 쌓아두지 말고 하늘에 쌓아라!" 보물을 <strong>땅에 쌓는 사람</strong>과 <strong>하늘에 쌓는 사람</strong>은 어떻게 다를까요?</p>
+    </div>
+
+    <div class="compare reveal">
+      <div class="compare-card earth">
+        <div class="compare-icon">🌍</div>
+        <div class="compare-title">땅에 보물을 쌓는 사람</div>
+        <ul class="compare-list">
+          <li>더 많은 것을 갖고 싶어해요</li>
+          <li>돈이 나의 주인이에요</li>
+          <li>내 마음이 <strong>땅</strong>에 있어요</li>
+          <li>영원히 지킬 수 <strong>없어요</strong></li>
+        </ul>
+      </div>
+      <div class="compare-card heaven">
+        <div class="compare-icon">☁️</div>
+        <div class="compare-title">하늘에 보물을 쌓는 사람</div>
+        <ul class="compare-list">
+          <li>하나님을 위해 사용해요</li>
+          <li>하나님이 나의 주인이에요</li>
+          <li>내 마음이 <strong>하늘</strong>에 있어요</li>
+          <li>영원히 지킬 수 <strong>있어요</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-body reveal">
+      <p>땅 위의 보물은 녹슬고, 도둑이 훔쳐갈 수도 있어요. 하지만 하늘에 쌓은 보물은 영원히 나의 것이 돼요. 어디에 보물을 쌓는 게 더 지혜로울까요?</p>
+    </div>
+
+    <div class="apply-card reveal">
+      <div class="apply-card-label">✦ 학습 요점</div>
+      <div class="apply-card-text">하나님 나라 백성은 소비를 통한 만족 추구를 경계하고, 하나님 안에서 참 행복을 찾아요.</div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="padding:0">
+  <svg viewBox="0 0 1200 50" preserveAspectRatio="none" height="50" style="background:rgba(247,201,72,.08)">
+    <path d="M0,0 C300,50 900,0 1200,50 L1200,0 Z" fill="var(--bg)"/>
+  </svg>
+</div>
+
+<!-- ════ CH 3 ════ -->
+<section class="section-wrap" id="sec3">
+  <div class="section-inner">
+    <div class="reveal">
+      <p class="chapter-label">3장 — 선택의 갈림길</p>
+      <h2 class="chapter-title">🛤️ 한 사람이 두 주인을<br>섬길 수 있을까요?</h2>
+    </div>
+    <div class="chapter-body reveal">
+      <p>예수님은 "한 사람이 두 주인을 섬기지 못한다"고 말씀하셨어요. 한쪽을 사랑하면 다른 쪽을 미워하게 된다고요. 여러분 앞에 두 갈래 길이 있어요. 어느 길을 따라갈 건가요?</p>
+    </div>
+
+    <div class="path-illus reveal">
+      <div class="path-road">
+        <div class="path-person">🧒</div>
+        <div class="path-stem"></div>
+        <div class="path-fork">
+          <div class="path-branch left">
+            <div class="path-branch-line"></div>
+            <div class="path-dest">💸</div>
+            <div class="path-label">돈을 주인으로<br>섬기는 길</div>
+          </div>
+          <div class="path-branch right">
+            <div class="path-branch-line"></div>
+            <div class="path-dest">🙏</div>
+            <div class="path-label">하나님을 주인으로<br>섬기는 길</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chapter-body reveal">
+      <p>돈을 주인으로 여기는 사람은 항상 더 많이 갖고 싶어해요. 아무리 많아도 마음이 채워지지 않아요. 하지만 하나님을 주인으로 모시는 사람은 내가 가진 것에 <strong>감사하고 만족</strong>할 수 있어요.</p>
+      <p>물질은 나쁜 것이 아니에요. 다만, 돈보다 <em>하나님을 더 소중히 여기는 것</em>이 핵심이에요!</p>
+    </div>
+
+    <div class="verse-card reveal" style="background:linear-gradient(135deg,#F4724E,#F7C948)">
+      <div class="verse-card-ref">마태복음 6장 24절</div>
+      <div class="verse-card-text">"너희는 하나님과 재물을 겸하여 섬기지 못하느니라"</div>
+    </div>
+  </div>
+</section>
+
+<!-- ════ CH 4 ════ -->
+<section class="section-wrap band-lav" id="sec4">
+  <div class="section-inner">
+    <div class="reveal">
+      <p class="chapter-label">4장 — 마음 점검하기</p>
+      <h2 class="chapter-title">🧩 내 마음의 미로를<br>따라가 볼까요?</h2>
+    </div>
+    <div class="chapter-body reveal">
+      <p>이제 미로를 따라가며 내 마음을 솔직하게 점검해 봐요. 미로 속 내용이 나의 마음과 같으면 <strong>O</strong>, 다르면 <strong>X</strong>의 길을 따라가요!</p>
+    </div>
+
+    <div class="maze-wrap reveal">
+      <p style="font-size:13px;font-weight:800;color:var(--muted);margin-bottom:16px;text-align:center;letter-spacing:.05em">🗺️ 미로 속 마음 점검</p>
+      <div class="maze-grid">
+        <div class="maze-item bad">
+          <div class="maze-emoji">😤</div>
+          <div class="maze-text">"친구가 나보다 더 좋은 것을 가지고 있으면, 나도 사달라고 조른다"</div>
+        </div>
+        <div class="maze-item good">
+          <div class="maze-emoji">🙌</div>
+          <div class="maze-text">"용돈을 받으면 먼저 하나님께 십일조를 드린다"</div>
+        </div>
+        <div class="maze-item good">
+          <div class="maze-emoji">💝</div>
+          <div class="maze-text">"내가 가진 것으로 어려운 친구를 도와주는 것이 기쁘다"</div>
+        </div>
+        <div class="maze-item good">
+          <div class="maze-emoji">😊</div>
+          <div class="maze-text">"지금 내가 가지고 있는 것들에 감사하고 만족한다"</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chapter-body reveal">
+      <p>어떤 마음의 길을 따라갔나요? O의 길을 따라간 사람은 하나님이 주신 것들에 감사하며, 하나님을 주인으로 모시는 사람이에요. 내 마음에 하나님을 주인으로 모시고 살 때, 참 행복을 누릴 수 있어요.</p>
+    </div>
+
+    <div class="mirror-box reveal" style="border-color:var(--lavender)">
+      <div class="mirror-box-emoji">🪞</div>
+      <div class="mirror-box-text" style="color:var(--lavender)">"많이 사서 가진다 해도<br>내 마음은 채울 수 없어요"</div>
+    </div>
+
+    <div class="chip-row reveal">
+      <div class="chip">😌 감사하는 마음</div>
+      <div class="chip">🙏 하나님이 주인</div>
+      <div class="chip">💛 나눔의 기쁨</div>
+      <div class="chip">✨ 참 행복</div>
+    </div>
+  </div>
+</section>
+
+<div class="wave" style="background:rgba(155,133,212,.08)">
+  <svg viewBox="0 0 1200 50" preserveAspectRatio="none" height="50">
+    <path d="M0,50 C400,0 800,50 1200,0 L1200,50 Z" fill="var(--bg)"/>
+  </svg>
+</div>
+
+<!-- ════ CH 5 ════ -->
+<section class="section-wrap" id="sec5">
+  <div class="section-inner">
+    <div class="reveal">
+      <p class="chapter-label">5장 — 오늘의 결심</p>
+      <h2 class="chapter-title">🌟 참 행복의 비밀을<br>찾았나요?</h2>
+    </div>
+    <div class="chapter-body reveal">
+      <p>오늘 우리는 중요한 비밀을 배웠어요. 돈이 많고 물건이 많다고 해서 마음이 채워지는 게 아니에요. 사람의 마음은 하나님 안에서만 진짜로 채워질 수 있어요!</p>
+      <p>기독교 신앙은 돈과 물질을 무조건 나쁘다고 하지 않아요. 다만 하나님을 최우선으로 두고, 하나님이 주신 것들을 <strong>지혜롭게 감사하게</strong> 사용하는 것이 바로 하나님 나라 백성의 모습이에요.</p>
+    </div>
+
+    <div class="apply-card reveal" style="background:linear-gradient(135deg,var(--teal) 0%,var(--sky) 100%)">
+      <div class="apply-card-label">💡 오늘의 적용</div>
+      <div class="apply-card-text">내가 가진 것에 만족하고 감사하며 살아가도록 노력하자!</div>
+    </div>
+
+    <div class="chapter-body reveal">
+      <p>한 주 동안 이 다짐을 기억하며 살아봐요. 나 ○○○은(는) <strong>하나님을 내 마음의 주인으로 모시고, 내게 주신 것들에 감사하고 만족하겠어요!</strong></p>
+    </div>
+
+    <div class="prayer-card reveal">
+      <div class="prayer-icon">🙏</div>
+      <div class="prayer-title">함께 기도해요</div>
+      <div class="prayer-text">
+        "하나님 아버지!<br>
+        하나님이 주신 것에 감사하고, 만족해요.<br>
+        하나님이 맡겨 주신 돈을 선하고<br>
+        지혜롭게 사용하도록 도와주세요.<br>
+        예수님의 이름으로 기도합니다. 아멘."
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>📖 26과 · 많이 가지면 행복할까요? · 마태복음 6:19–26</p>
+  <p style="margin-top:6px;font-size:11px;opacity:.55">7단원 하나님 나라 백성의 가치 분별 · 유년부 교사용</p>
+</footer>
+
+<script>
+// theme
+const btn = document.getElementById('themeBtn');
+let theme = localStorage.getItem('storyTheme') || 'auto';
+function applyTheme(t) {
+  theme = t;
+  if (t === 'dark')       { document.documentElement.dataset.theme = 'dark';  btn.textContent = '☀️'; }
+  else if (t === 'light') { document.documentElement.dataset.theme = 'light'; btn.textContent = '🌙'; }
+  else                    { delete document.documentElement.dataset.theme;     btn.textContent = '🌙'; }
+  localStorage.setItem('storyTheme', t);
+}
+applyTheme(theme);
+btn.addEventListener('click', () => {
+  const cur = document.documentElement.dataset.theme || 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+});
+
+// progress bar
+const pbar = document.getElementById('pbar');
+window.addEventListener('scroll', () => {
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  pbar.style.width = (h > 0 ? window.scrollY / h * 100 : 0) + '%';
+}, { passive: true });
+
+// reveal
+const reveals = document.querySelectorAll('.reveal');
+const ro = new IntersectionObserver(entries => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); ro.unobserve(e.target); } });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+reveals.forEach(el => ro.observe(el));
+
+// nav dots
+const sections = ['sec0','sec1','sec2','sec3','sec4','sec5'].map(id => document.getElementById(id));
+const dots = document.querySelectorAll('.nav-dot');
+dots.forEach((d, i) => d.addEventListener('click', () => sections[i]?.scrollIntoView({ behavior: 'smooth' })));
+const so = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const idx = sections.indexOf(e.target);
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    }
+  });
+}, { threshold: 0.4 });
+sections.forEach(s => s && so.observe(s));
+</script>
+</body>
+</html>

@@ -1,0 +1,549 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using BulletinBoard.Services.Abstract
+@using Newtonsoft.Json
+@model IEnumerable<BulletinBoard.Models.QuestionBankData>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경 골든벨</title>
+
+    <style>
+        :root {
+            --title-size: clamp(22px, 3.2vw, 48px);
+            --meta-size: clamp(14px, 1.6vw, 20px);
+            --q-size: clamp(20px, 2.6vw, 40px);
+            --opt-size: clamp(18px, 2.2vw, 34px);
+            --btn-size: clamp(14px, 1.8vw, 20px);
+            --gap-lg: 30px;
+            --gap-md: 10px; /* 기본 간격 */
+            --gap-sm: 8px;
+            --blink-bg: #fff3bf;
+            --q-color: #0f5132; /* 진한 녹색 */
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: #ffffff;
+            color: #111111;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans KR, Apple SD Gothic Neo, Arial, sans-serif;
+            line-height: 1.45;
+        }
+
+        .wrap {
+            min-height: 100vh;
+            padding: 12px clamp(7px, 1.4vw, 24px);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap-lg);
+        }
+
+        .top-row {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+        }
+
+        /* 타이틀 데코 영역 */
+        .title {
+            grid-column: 2 / 3;
+            text-align: center;
+            font-weight: 800;
+            font-size: var(--title-size);
+            letter-spacing: 0.02em;
+        }
+
+        .title-deco {
+            display: inline-flex;
+            align-items: center;
+            gap: .6em;
+            padding: 10px 20px;
+            border-radius: 999px;
+            border: 1px solid #ffd43b;
+            background: radial-gradient(120% 90% at 50% 0%, #fffbe6 0%, transparent 60%), linear-gradient(180deg, #fffdf5, #ffffff);
+            box-shadow: 0 6px 22px rgba(255, 196, 0, .18), inset 0 0 0 6px rgba(255, 212, 59, .12);
+        }
+
+        .title-icon {
+            font-size: 1.1em;
+        }
+
+        .title-sparkle {
+            position: relative;
+        }
+
+            .title-sparkle::before,
+            .title-sparkle::after {
+                content: "✦";
+                position: absolute;
+                font-size: .6em;
+                color: #ffc300;
+                opacity: .65;
+            }
+
+            .title-sparkle::before {
+                top: -10px;
+                left: -12px;
+                transform: rotate(-10deg);
+            }
+
+            .title-sparkle::after {
+                bottom: -12px;
+                right: -14px;
+                transform: rotate(15deg);
+            }
+
+        .progress {
+            grid-column: 3 / 4;
+            justify-self: end;
+            font-size: var(--meta-size);
+            opacity: 0.8;
+        }
+
+        .card {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap-md);
+            width: 100%;
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: clamp(12px, 1.8vw, 22px);
+            overflow: hidden;
+        }
+
+        .scroll-area {
+            overflow: auto;
+            padding-bottom: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap-md);
+        }
+
+        .q-label {
+            font-size: var(--meta-size);
+            opacity: 0.7;
+            font-weight: 600; /* 700 → 600 */
+            margin-bottom: 2px;
+        }
+
+        /* 설명문(배경 설명) */
+        .desc {
+            font-size: var(--q-size);
+            font-weight: 600;
+            color: #111;
+            margin: 0;
+            margin-bottom: 10px; /* 설명과 Q 사이 간격 10px */
+        }
+
+        /* 실제 질문 라인 */
+        .question {
+            font-size: var(--q-size);
+            font-weight: 600;
+            color: var(--q-color);
+            margin: 0;
+        }
+
+            .question::before {
+                content: "Q. ";
+                font-weight: 600;
+                margin-right: 0.25em;
+            }
+
+        .options {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: var(--gap-sm);
+        }
+
+        .option {
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: clamp(10px, 1.4vw, 16px);
+            font-size: var(--opt-size);
+            background: #fafafa;
+            font-weight: 600;
+        }
+
+        /* 하단 버튼 바: 항상 보이도록 sticky */
+        .btn-bar {
+            position: sticky;
+            bottom: 0;
+            left: 0;
+            background: #ffffff;
+            border-top: 1px solid #e9ecef;
+            padding: 10px 8px;
+            margin-top: var(--gap-sm);
+            display: flex;
+            flex-direction: column; /* 위: 기본 버튼들 / 아래: 효과음 그룹 */
+            gap: var(--gap-sm);
+            z-index: 5;
+        }
+
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--gap-sm);
+            justify-content: center; /* 가운데 정렬 */
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: var(--btn-size);
+            background: #f1f3f5;
+            color: #111111;
+            cursor: pointer;
+            transition: transform .02s ease, background .2s ease, box-shadow .2s ease;
+            font-weight: 600;
+        }
+
+            .btn:hover {
+                background: #e9ecef;
+            }
+
+            .btn:active {
+                transform: translateY(1px);
+            }
+
+        .btn-primary {
+            background: #e7f5ff;
+            border-color: #d0ebff;
+        }
+
+            .btn-primary:hover {
+                background: #d0ebff;
+            }
+
+        .btn-accent {
+            background: #fff0f6;
+            border-color: #fcc2d7;
+        }
+
+            .btn-accent:hover {
+                background: #ffe3e3;
+            }
+
+        /* 정답버튼 전용: 크게 + 강조 */
+        .btn-answer-large {
+            font-size: calc(var(--btn-size) * 1.45);
+            padding: 14px 22px;
+            border-width: 2px;
+            background: linear-gradient(180deg, #fff5f5, #ffe3e3);
+            border-color: #ffa8a8;
+            box-shadow: 0 8px 24px rgba(255, 82, 82, .18), inset 0 0 0 4px rgba(255, 170, 170, .18);
+        }
+
+            .btn-answer-large:hover {
+                background: linear-gradient(180deg, #ffe3e3, #ffd7d7);
+            }
+
+        /* 효과음 그룹 */
+        .sfx-group {
+            border: 1px dashed #e9ecef;
+            border-radius: 12px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .sfx-title {
+            font-size: var(--meta-size);
+            font-weight: 700;
+            margin: 0 0 6px 2px;
+            opacity: .85;
+            text-align: center; /* 가운데 정렬 */
+        }
+
+        /* 정답 블링킹 (Razor 충돌 회피 위해 @@keyframes) */
+        @@keyframes blink {
+            0% {
+                background: transparent;
+            }
+
+            50% {
+                background: var(--blink-bg);
+            }
+
+            100% {
+                background: transparent;
+            }
+        }
+
+        .blinking {
+            animation: blink 0.9s linear infinite;
+            outline: 3px solid #ffd43b;
+        }
+
+        /* 입력 그대로 표시 */
+        .formatted-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top-row">
+            <div></div>
+            <div class="title">
+                <span class="title-deco title-sparkle">
+                    <span class="title-icon">✨</span>
+                    성경 골든벨
+                    <span class="title-icon">🔔</span>
+                </span>
+            </div>
+            <div class="progress"><span id="pos">1</span>/<span id="total">0</span></div>
+        </div>
+
+        <div class="card">
+            <div class="scroll-area">
+                <div class="q-label" id="bibleRef"></div>
+
+                <!-- 설명과 질문을 분리 렌더링 -->
+                <div class="desc formatted-text" id="descText" style="display:none;"></div>
+                <div class="question formatted-text" id="questionText">질문을 불러오는 중…</div>
+
+                <div class="options">
+                    <div class="option formatted-text" id="opt1" data-idx="1">1. </div>
+                    <div class="option formatted-text" id="opt2" data-idx="2">2. </div>
+                    <div class="option formatted-text" id="opt3" data-idx="3">3. </div>
+                    <div class="option formatted-text" id="opt4" data-idx="4">4. </div>
+                </div>
+            </div>
+
+            <div class="btn-bar">
+                <!-- 1) 기본 조작 버튼 행 (이모지 추가 + 정답버튼 크게) -->
+                <div class="btn-row">
+                    <button class="btn" id="btnPrev">⬅️ 이전문제</button>
+                    <button class="btn btn-accent btn-answer-large" id="btnAnswer">✅ 정답버튼</button>
+                    <button class="btn" id="btnNext">다음문제 ➡️</button>
+                    <!-- a 태그 → 일반 버튼으로 변경 -->
+                    <button class="btn" id="btnHome">🏠 홈으로</button>
+                    <button class="btn" id="btnQuizHome">🧩 퀴즈홈</button>
+                </div>
+
+                <!-- 2) 효과음 그룹 -->
+                <div class="sfx-group">
+                    <div class="sfx-title">효과음 🔊</div>
+                    <div class="btn-row">
+                        <button class="btn" id="btnSfx1">✍️ 정답 적는 소리</button>
+                        <button class="btn" id="btnSfx2">🗣️ 정답 다 적으셨죠</button>
+                        <button class="btn" id="btnSfx3">👂 정답을 들어주세요</button>
+                        <button class="btn" id="btnSfx4">⏳ 질문이 끝날 때쯤</button>
+                        <button class="btn" id="btnSfx5">✅ 정답은</button>
+                        <button class="btn" id="btnSfx6">🔔 골든벨 울림</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DATA = @Html.Raw(JsonConvert.SerializeObject(Model ?? Enumerable.Empty<BulletinBoard.Models.QuestionBankData>()));
+
+        let idx = 0;
+        const totalEl = document.getElementById('total');
+        const posEl = document.getElementById('pos');
+
+        const descEl = document.getElementById('descText');
+        const questionEl = document.getElementById('questionText');
+        const bibleRefEl = document.getElementById('bibleRef');
+        const optEls = [
+            document.getElementById('opt1'),
+            document.getElementById('opt2'),
+            document.getElementById('opt3'),
+            document.getElementById('opt4'),
+        ];
+
+        // 정답 버튼 전용 피드백음
+        const sndCorrect = new Audio('/sound/goldenBell/5.정답은.wav');
+
+        // ===== 효과음 파일 지정 (요청하신 경로 그대로) =====
+        const snd1 = new Audio('/sound/goldenBell/1.시계초침소리-정답적고있을때.mp3');
+        const snd2 = new Audio('/sound/goldenBell/2.정답다적으셨죠.wav');
+        const snd3 = new Audio('/sound/goldenBell/3.정답을들어주세요.wav');
+        const snd4 = new Audio('/sound/goldenBell/4.질문이끝날때쯤이거.mp3');
+        const snd5 = new Audio('/sound/goldenBell/5.정답은.wav');
+        const snd6 = new Audio('/sound/goldenBell/6.골든벨울리는소리.mp3');
+
+        function clampIndex(i) {
+            if (!DATA || DATA.length === 0) return 0;
+            if (i < 0) return 0;
+            if (i >= DATA.length) return DATA.length - 1;
+            return i;
+        }
+
+        function clearBlink() {
+            optEls.forEach(el => el.classList.remove('blinking'));
+        }
+
+        /* 성경 참조를 "출애굽기 3장 00절" 형식으로
+           - 장만 있으면 반드시 "00절" 붙임
+           - 절 범위 있으면 "3–5절"
+           - !! 대소문자 구분: Zul, Zul1 사용 !!
+        */
+        function formatBibleRef(q) {
+            const book = (q.BibleText ?? '').trim(); // 예: "출애굽기"
+            const jang = (q.Jang ?? null);
+
+            const zulVal = (q.Zul ?? null);
+            const hasZul = zulVal !== null && zulVal !== undefined && zulVal !== '' && !Number.isNaN(Number(zulVal));
+            const zul = hasZul ? Number(zulVal) : null;
+
+            const zul1Val = (q.Zul1 ?? null);
+            const hasZul1 = zul1Val !== null && zul1Val !== undefined && zul1Val !== '' && !Number.isNaN(Number(zul1Val));
+            const zul1 = hasZul1 ? Number(zul1Val) : null;
+
+            const parts = [];
+            if (book) parts.push(book);
+            if (jang && Number(jang) > 0) parts.push(`${jang}장`);
+            // 규칙: 절이 없더라도 "00절" 표시
+            if (zul && zul > 0) {
+                if (zul1 && zul1 > zul) parts.push(`${zul}–${zul1}절`);
+                else parts.push(`${zul}절`);
+            } else {
+                parts.push(`00절`);
+            }
+            return parts.join(' ').trim();
+        }
+
+        /* 설명문과 질문을 분리 */
+        function splitDescAndQuestion(raw) {
+            const text = (raw ?? '').replace(/\r\n?/g, '\n');
+            const lines = text.split('\n');
+            let qIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+                if (/^\s*Q[\.\)]?\s*/i.test(lines[i])) { qIndex = i; break; }
+            }
+            if (qIndex === -1) {
+                return { desc: '', question: text.trim() };
+            }
+            const desc = lines.slice(0, qIndex).join('\n').trim();
+            const qLine = lines[qIndex].replace(/^\s*Q[\.\)]?\s*/i, '').trim();
+            return { desc, question: qLine };
+        }
+
+        function render() {
+            if (!DATA || DATA.length === 0) {
+                totalEl.textContent = '0';
+                posEl.textContent = '0';
+                descEl.style.display = 'none';
+                questionEl.textContent = '문제가 없습니다.';
+                optEls.forEach((el, i) => el.textContent = (i + 1) + '. ');
+                bibleRefEl.textContent = '';
+                return;
+            }
+
+            idx = clampIndex(idx);
+            const q = DATA[idx];
+
+            totalEl.textContent = DATA.length.toString();
+            posEl.textContent = (idx + 1).toString();
+
+            bibleRefEl.textContent = formatBibleRef(q);
+
+            const parsed = splitDescAndQuestion(q.QuestionQ);
+            if (parsed.desc) {
+                descEl.style.display = '';
+                descEl.textContent = parsed.desc;
+            } else {
+                descEl.style.display = 'none';
+                descEl.textContent = '';
+            }
+            questionEl.textContent = parsed.question;
+
+            const choices = [
+                q.Question1 ?? '',
+                q.Question2 ?? '',
+                q.Question3 ?? '',
+                q.Question4 ?? ''
+            ];
+            choices.forEach((txt, i) => {
+                optEls[i].textContent = (i + 1) + '. ' + (txt ?? '');
+            });
+
+            clearBlink();
+        }
+
+        function guessCorrectIndex(q) {
+            let c = (q.CorrectAnswer ?? '').toString().trim();
+
+            const n = parseInt(c, 10);
+            if (!isNaN(n) && n >= 1 && n <= 4) return n - 1;
+
+            const m = /^question([1-4])$/i.exec(c);
+            if (m) {
+                const k = parseInt(m[1], 10);
+                if (k >= 1 && k <= 4) return k - 1;
+            }
+
+            const choices = [q.Question1, q.Question2, q.Question3, q.Question4].map(x => (x ?? '').trim());
+            const found = choices.findIndex(x => x === c);
+            if (found >= 0) return found;
+
+            return 0;
+        }
+
+        // 네비게이션
+        document.getElementById('btnPrev').addEventListener('click', () => {
+            idx = clampIndex(idx - 1);
+            render();
+        });
+        document.getElementById('btnNext').addEventListener('click', () => {
+            idx = clampIndex(idx + 1);
+            render();
+        });
+
+        // 홈/퀴즈홈 이동(일반 버튼)
+        document.getElementById('btnHome').addEventListener('click', () => {
+            window.location.href = '/';
+        });
+        document.getElementById('btnQuizHome').addEventListener('click', () => {
+            window.location.href = '/QuestionBank/IndexByCode';
+        });
+
+        // 효과음 1~6 (효과음 그룹)
+        document.getElementById('btnSfx1').addEventListener('click', () => { snd1.currentTime = 0; snd1.play(); });
+        document.getElementById('btnSfx2').addEventListener('click', () => { snd2.currentTime = 0; snd2.play(); });
+        document.getElementById('btnSfx3').addEventListener('click', () => { snd3.currentTime = 0; snd3.play(); });
+        document.getElementById('btnSfx4').addEventListener('click', () => { snd4.currentTime = 0; snd4.play(); });
+        document.getElementById('btnSfx5').addEventListener('click', () => { snd5.currentTime = 0; snd5.play(); });
+        document.getElementById('btnSfx6').addEventListener('click', () => { snd6.currentTime = 0; snd6.play(); });
+
+        // 정답 표시 + 전용 피드백음
+        document.getElementById('btnAnswer').addEventListener('click', () => {
+            if (!DATA || DATA.length === 0) return;
+            const q = DATA[idx];
+            const correctIdx = guessCorrectIndex(q);
+
+            clearBlink();
+            const el = optEls[correctIdx];
+            if (el) el.classList.add('blinking');
+
+            sndCorrect.currentTime = 0;
+            sndCorrect.play();
+        });
+
+        render();
+    </script>
+</body>
+</html>

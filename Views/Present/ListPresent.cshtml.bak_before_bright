@@ -1,0 +1,280 @@
+@model IEnumerable<BulletinBoard.Models.AwardItem>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    선물 목록(구경) — 성경통독 · 생일 · 새친구 · 특별.  종류만 다르고 화면은 하나.
+    Bone(호텔 인쇄물) 스킨.  선물 고르기(GiftSelect) 와 같은 격자를 쓴다.  사진을 누르면 상세.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var option      = (ViewBag.ProductDisplayOpton + "").Trim();
+    var optionLower = option.ToLowerInvariant();
+
+    bool isChallenge = optionLower == ProductDisplayOpton.challengeMissionBible.ToString().ToLowerInvariant();
+    bool isBirth     = optionLower == ProductDisplayOpton.birth.ToString().ToLowerInvariant();
+    bool isNewComer  = optionLower == ProductDisplayOpton.newComer.ToString().ToLowerInvariant();
+    bool isSpecial   = optionLower == ProductDisplayOpton.Special.ToString().ToLowerInvariant();
+
+    string kicker =
+        isChallenge ? "BIBLE READING" :
+        isBirth     ? "BIRTHDAY" :
+        isNewComer  ? "NEW FRIEND" :
+        isSpecial   ? "SPECIAL" : "GIFT CATALOG";
+
+    string pageTitle =
+        isChallenge ? $"{ConstatsCommon.ReadBibleAllTitleButton} 선물" :
+        isBirth     ? "생일 선물" :
+        isNewComer  ? "새친구 선물" :
+        isSpecial   ? "특별 선물" : "선물 목록";
+
+    string why =
+        isChallenge ? $"{ConstatsCommon.myDoToRi}를 모으면 단계마다 고를 수 있는 선물이에요. 고르는 곳은 나의 선물함." :
+        isBirth     ? "생일이 가까워지면 선물함에서 고를 수 있어요. 마음이 바뀌면 다시 골라도 돼요." :
+        isNewComer  ? "처음 온 친구와 등반한 친구에게 드리는 환영 선물이에요." :
+        isSpecial   ? "특별한 날을 위해 준비한 선물이에요." :
+        "받을 수 있는 선물을 미리 구경해요.";
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff     = isAdmin || isSuperAdmin;
+
+    // 가격이 0인 품목은 SuperAdmin 만 본다 (예전 규칙 그대로)
+    var items = (Model ?? Enumerable.Empty<BulletinBoard.Models.AwardItem>())
+                .Where(x => isSuperAdmin || x.UnitPrice > 0).ToList();
+
+    string N(int v) => v.ToString("N0");
+    var priced = items.Where(x => x.UnitPrice > 0).Select(x => x.UnitPrice).ToList();
+    string rangeText = priced.Count == 0 ? "" : (priced.Min() == priced.Max() ? N(priced.Min()) : $"{N(priced.Min())} ~ {N(priced.Max())}");
+
+    // 종류 = 상품명별 묶음 (GiftSelect 와 같은 꼬리표)
+    string Kind(BulletinBoard.Models.AwardItem x) => string.IsNullOrWhiteSpace(x.ProductName) ? "기타" : x.ProductName.Trim();
+    var kinds = items.GroupBy(Kind).Select(g => new { Name = g.Key, Count = g.Count() })
+                     .OrderByDescending(g => g.Count).ThenBy(g => g.Name).ToList();
+
+    string returnUrl = (Context?.Request?.Path ?? "/") + (Context?.Request?.QueryString.ToString() ?? "");
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    var tabs = new[]
+    {
+        (Key: "display",  Label: ConstatsCommon.ReadBibleAllTitleButton, On: isChallenge),
+        (Key: "birth",    Label: "생일",   On: isBirth),
+        (Key: "newComer", Label: "새친구", On: isNewComer),
+        (Key: "Special",  Label: "특별",   On: isSpecial),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@pageTitle — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+    .qz { max-width: 920px; }
+
+    /* ── 머리 (어두운 띠) : GiftSelect 와 같다 ── */
+    .qz .gsHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 24px var(--pad) 20px; }
+    .qz .gsTop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .qz .gsHome { font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: #8F8B84; text-decoration: none; }
+    .qz .gsHome:hover { color: #C9AE82; }
+    .qz .gsDate { font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .12em; color: #8F8B84; }
+    .qz .gsK { font-size: 10px; font-weight: 600; letter-spacing: .24em; color: #C9AE82; margin-top: 18px; }
+    .qz .gsT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.4; margin-top: 9px; word-break: keep-all; }
+    .qz .gsW { font-size: 11.5px; color: #A7A39B; margin-top: 9px; line-height: 1.7; word-break: keep-all; }
+    .qz .gsC { margin-top: 16px; padding-top: 13px; border-top: 1px solid #33352F;
+               display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .qz .gsCk { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: #8F8B84; }
+    .qz .gsCv { font-family: "Inter", sans-serif; font-size: 13.5px; color: #E8D9BE; font-variant-numeric: tabular-nums; }
+    .qz .gsCv u { text-decoration: none; font-size: 11px; color: #9A9690; margin-left: 3px; }
+
+    /* ── 종류 탭 (성경통독 · 생일 · 새친구 · 특별) ── */
+    .qz .gsTabs { display: flex; border-bottom: 1px solid var(--rule); margin-top: 4px; }
+    .qz .gsTabs a { flex: 1; text-align: center; padding: 12px 0 10px; font-size: 11.5px; letter-spacing: .1em; color: var(--dim);
+                    text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+    .qz .gsTabs a.on { color: var(--tx); border-bottom-color: var(--acc); font-weight: 600; }
+    .qz .gsTabs a:hover { color: var(--acc); }
+
+    .qz .gsSec { display: flex; justify-content: space-between; align-items: baseline;
+                 margin-top: 22px; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .gsSecT { font-family: "Noto Serif KR", serif; font-size: 16px; }
+    .qz .gsSecS { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .qz .gsHint { font-size: 11.5px; color: var(--dim); margin-top: 10px; line-height: 1.7; }
+
+    /* ── 종류 거르기 ── */
+    .qz .gsChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .qz .gsChip { font-family: inherit; font-size: 12px; padding: 6px 11px; border: 1px solid var(--rule);
+                  background: transparent; color: var(--dim2); cursor: pointer; border-radius: 1px; }
+    .qz .gsChip b { font-family: "Inter", sans-serif; font-weight: 400; color: var(--dim); margin-left: 4px; }
+    .qz .gsChip.on { background: var(--tx); border-color: var(--tx); color: var(--bg); }
+    .qz .gsChip.on b { color: #B9B3A8; }
+
+    /* ── 격자 : 모바일 2열 → 3 · 4열 ── */
+    .qz .gsGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
+                  background: var(--rule); border: 1px solid var(--rule); margin-top: 12px; }
+    .qz .gsCard { position: relative; background: var(--bg); padding: 10px; display: flex; flex-direction: column; }
+    .qz .gsCard[hidden] { display: none; }
+    .qz .gsCard:hover .gsNm { color: var(--acc); }
+    .qz .gsImg { position: relative; display: block; width: 100%; aspect-ratio: 1 / 1;
+                 background: repeating-linear-gradient(45deg, #EFEDE8 0 6px, #E7E4DE 6px 12px); overflow: hidden; }
+    .qz .gsImg img { width: 100%; height: 100%; object-fit: cover; display: block; background: #fff; }
+    .qz .gsNo { position: absolute; left: 5px; top: 5px; font-family: "Inter", sans-serif; font-weight: 300; font-size: 10px;
+                background: rgba(247,246,243,.9); color: var(--dim2); padding: 2px 6px; font-variant-numeric: tabular-nums; }
+    .qz .gsPt { position: absolute; left: 5px; bottom: 5px; font-size: 9.5px; font-weight: 600; letter-spacing: .06em;
+                background: var(--acc); color: #fff; padding: 2px 6px; }
+    .qz .gsPrice { position: absolute; right: 5px; bottom: 5px; font-family: "Inter", sans-serif; font-size: 10px;
+                   background: rgba(22,24,28,.82); color: #F7F6F3; padding: 2px 6px; font-variant-numeric: tabular-nums; }
+    .qz .gsNm { font-family: "Noto Serif KR", serif; font-size: 13.5px; margin-top: 8px; word-break: keep-all; }
+    .qz .gsNm a { color: inherit; text-decoration: none; }
+    .qz .gsDs { font-size: 10.5px; color: var(--dim); margin-top: 3px; line-height: 1.5;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+    .qz .gsFt { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+    .qz .gsFt a { font-size: 10px; font-weight: 600; letter-spacing: .1em; color: var(--dim2); text-decoration: none; white-space: nowrap; }
+    .qz .gsFt a:hover { color: var(--acc); }
+    .qz .gsEmpty { padding: 40px 0; text-align: center; font-size: 13px; color: var(--dim); }
+
+    @@media (min-width: 560px) { .qz .gsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @@media (min-width: 860px) { .qz .gsGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule);
+                  display: flex; justify-content: space-between; gap: 14px; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; }
+    .qz .brFoot a { color: var(--dim2); text-decoration: none; }
+    .qz .brFoot a:hover { color: var(--acc); }
+    .qz .brFoot span a { margin-left: 14px; }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="gsHead">
+            <div class="gsTop">
+                <div><a class="gsHome" href="/">@ConstatsCommon.ToHome</a><span style="color:#33352F;margin:0 8px">·</span><a class="gsHome" href="/Present/Kind">선물 목록</a></div>
+                <div class="gsDate">@dateText</div>
+            </div>
+            <div class="gsK">@kicker</div>
+            <div class="gsT">@pageTitle</div>
+            <div class="gsW">@why</div>
+            <div class="gsC">
+                <span class="gsCk">선물 @(items.Count)종@(kinds.Count > 1 ? $" · {kinds.Count}가지" : "")</span>
+                @if (isStaff && rangeText != "")
+                {
+                    <span class="gsCv">@rangeText<u>credit</u></span>
+                }
+            </div>
+        </div>
+
+        <div class="gsTabs">
+            @foreach (var t in tabs)
+            {
+                <a href="/Present/ListPresent?productDisplayOpton=@t.Key" class="@(t.On ? "on" : "")">@t.Label</a>
+            }
+        </div>
+
+        @if (items.Count == 0)
+        {
+            <div class="gsEmpty">아직 준비된 선물이 없어요.</div>
+        }
+        else
+        {
+            <div class="gsSec">
+                <span class="gsSecT">구경하기</span>
+                <span class="gsSecS" id="gsCount">@(items.Count)종</span>
+            </div>
+            <div class="gsHint">사진이나 이름을 누르면 자세히 볼 수 있어요.</div>
+
+            @if (kinds.Count > 1)
+            {
+                <div class="gsChips" id="gsChips">
+                    <button type="button" class="gsChip on" data-kind="">전체<b>@items.Count</b></button>
+                    @foreach (var k in kinds)
+                    {
+                        <button type="button" class="gsChip" data-kind="@k.Name">@k.Name<b>@k.Count</b></button>
+                    }
+                </div>
+            }
+
+            <div class="gsGrid" id="gsGrid">
+                @{ int no = 0; }
+                @foreach (var item in items)
+                {
+                    no++;
+                    string detailUrl = $"/Present/Detail?productId={item.ProductID}&returnUrl={Uri.EscapeDataString(returnUrl)}&productDisplayOpton={Uri.EscapeDataString(option)}";
+                    <article class="gsCard" data-kind="@Kind(item)">
+                        <a class="gsImg" href="@detailUrl" title="@item.ProductName 자세히">
+                            <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" loading="lazy"
+                                 onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                            <span class="gsNo">@no.ToString("00")</span>
+                            @if (isChallenge && !string.IsNullOrWhiteSpace(item.PointRequirement))
+                            {
+                                <span class="gsPt">@item.PointRequirement</span>
+                            }
+                            @if (isStaff && item.UnitPrice > 0)
+                            {
+                                <span class="gsPrice">@N(item.UnitPrice) credit</span>
+                            }
+                        </a>
+                        <div class="gsNm"><a href="@detailUrl">@item.ProductName</a></div>
+                        @if (!string.IsNullOrWhiteSpace(item.ProductDescription))
+                        {
+                            <div class="gsDs">@item.ProductDescription</div>
+                        }
+                        <div class="gsFt">
+                            <a href="@detailUrl">자세히 →</a>
+                            @if (isStaff && !string.IsNullOrWhiteSpace(item.ExternalUrl))
+                            {
+                                <a href="@item.ExternalUrl" target="_blank" rel="noopener noreferrer">쿠팡 →</a>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+
+        <div class="brFoot">
+            <span>© BULLETIN BOARD · GIFT CATALOG</span>
+            <span>
+                @if (isChallenge) { <a href="/Home/MissionMainBoard">@ConstatsCommon.MainKeyTitle →</a> }
+                <a href="/Present/Kind">선물 목록 →</a>
+                <a href="/">홈으로 →</a>
+            </span>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 종류 거르기 (GiftSelect 와 같은 동작)
+    (function () {
+        var chips = document.getElementById('gsChips');
+        if (!chips) return;
+        var cards = Array.prototype.slice.call(document.querySelectorAll('#gsGrid .gsCard'));
+        var count = document.getElementById('gsCount');
+        chips.addEventListener('click', function (e) {
+            var btn = e.target.closest('.gsChip');
+            if (!btn) return;
+            var kind = btn.getAttribute('data-kind') || '';
+            chips.querySelectorAll('.gsChip').forEach(function (c) { c.classList.toggle('on', c === btn); });
+            var n = 0;
+            cards.forEach(function (c) {
+                var show = !kind || c.getAttribute('data-kind') === kind;
+                if (show) { c.removeAttribute('hidden'); n++; } else { c.setAttribute('hidden', ''); }
+            });
+            if (count) count.textContent = n + '종';
+        });
+    })();
+</script>
+</body>
+</html>

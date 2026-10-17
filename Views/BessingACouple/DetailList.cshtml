@@ -1,0 +1,275 @@
+@model IEnumerable<BulletinBoard.Models.BessingACoupleDatas>
+@using BulletinBoard.Common
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    부부 기도 목록 — ?Kind=Husband · Wife
+    · 2026-10-11 B안 확정 — 최신 밝은 테마(DailyMission4) · 기도문 화면(DetailWords)과 같은 머리
+      오늘의 기도(연파랑) + 주제별 카드(몸과 쉼 / 마음 / 믿음 / 부부 / 삶과 사람)
+    · 주제는 제목 글자로 자동 분류 (DB 칸 없음)
+    · 기도 관리자 = 로그인 아이디 Basic · SuperAdmin 두 계정 (역할은 보지 않음, Admin 은 일반 사용자)
+      읽음 수 · 수정: 기도 관리자  /  등록 · 리셋 · 삭제: 원래대로 SuperAdmin 역할
+    · 이전 화면은 DetailList.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    bool isForHusband = (string)ViewBag.Kind == "Husband";
+    string kindA = isForHusband ? "남편" : "아내";     // 기도를 받는 사람
+    string kindB = isForHusband ? "아내" : "남편";     // 기도하는 사람
+    string josa = isForHusband ? "을" : "를";
+    string josaB = isForHusband ? "가" : "이";
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    string pageTitle = $"{kindA}{josa} 위한 기도 · {ChurchName} {DepartmentName}";
+
+    var items = (Model ?? Enumerable.Empty<BulletinBoard.Models.BessingACoupleDatas>()).ToList();   // Id 순 (DetailWords 와 같은 순서)
+
+    // 오늘의 기도 — DetailWords 와 같은 계산
+    int todayIdx = items.Count > 0 ? SharedComm.CalculateIndex(items.Count, SharedComm.GetToday()) : -1;
+
+    var kNow = DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow.Month}월 {kNow.Day}일 {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // 주제 — 제목 글자로 나눈다. 위에서부터 먼저 맞는 묶음으로 간다.
+    var groups = new (string Name, string[] Words)[]
+    {
+        ("몸과 쉼", new[] { "잠과", "힘을", "몸을", "술 앞에서", "아픈", "아플 때", "끼니", "쉼", "오가는", "하루를 지켜" }),
+        ("마음",    new[] { "무게", "지쳐", "화를", "속마음", "비교", "불안", "상처", "꿈", "흔들리는", "기쁨", "마음이 상한", "웃음", "걱정", "가라앉", "억울", "외로", "탓하는", "귀하게", "감사가 넘치", "두려운", "사랑을 깊이" }),
+        ("믿음",    new[] { "예배", "말씀", "기도하는", "기도 제목", "메마른", "섬김", "신앙", "믿음", "공동체", "이름을 부르며", "눈과 마음" }),
+        ("부부",    new[] { "부부", "말투", "서운함", "친밀", "집안일", "다툰", "결혼", "감사하는", "신뢰", "끝까지 듣는", "익숙함", "다른 습관", "바꾸려", "말이 통하는" }),
+        ("삶과 사람", new string[0])
+    };
+    Func<string, string> GroupOf = title =>
+    {
+        var t = title ?? "";
+        for (int g = 0; g < groups.Length - 1; g++)
+            if (groups[g].Words.Any(w => t.Contains(w))) return groups[g].Name;
+        return "삶과 사람";
+    };
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    // 기도 관리자 = 로그인 아이디 "Basic" · "SuperAdmin" 두 계정 (역할은 보지 않는다 — 2026-10-11)
+    //   → 읽음 수 보기 · 수정 버튼.  등록 · 리셋 · 삭제는 원래대로 SuperAdmin 역할
+    var isPrayManager = PrayManagerHelper.IsPrayManager(User);
+    var canSeeCount = isPrayManager;
+    // 검증 표시 — 관리자이고 표에 검증 칸이 있을 때만 (SQL 실행 전에는 숨긴다)
+    bool verifyReady = ViewBag.VerifyReady is bool _vr && _vr;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@pageTitle</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --blue:#2F80ED; --soft:#EAF2FD; --softH:#DCEAFB; --ink:#111827; --tx:#374151; --dim:#6B7280; --dim2:#9CA3AF; --line:#EEF0F3; --grey:#F4F6F9; --num:#7FA3DB; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        .pz { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+
+        /* 맨 위 한 줄 */
+        .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; font-size: 13px; color: var(--dim2); }
+        .bar > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar a { color: var(--tx); font-weight: 700; }
+        .bar a:hover { color: var(--blue); }
+        .bar .sep { margin: 0 6px; color: #D1D5DB; }
+        .prog { height: 3px; border-radius: 99px; background: var(--grey); }
+
+        /* 머리 — 두 고리 + 제목 (DetailWords 와 같은 결) */
+        .phd { display: flex; gap: 14px; align-items: center; margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+        .rings { flex: none; width: 64px; height: 64px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+        .rings i { position: relative; width: 42px; height: 26px; }
+        .rings i::before, .rings i::after { content: ""; position: absolute; top: 0; width: 26px; height: 26px; border-radius: 50%; border: 3px solid var(--blue); }
+        .rings i::before { left: 0; }
+        .rings i::after { right: 0; border-color: var(--num); }
+        .phdTx { flex: 1; min-width: 0; }
+        .kk { font-size: 12px; font-weight: 800; color: var(--blue); }
+        .ttl { margin: 4px 0 0; font-size: 19px; font-weight: 800; line-height: 1.35; color: var(--ink); word-break: keep-all; }
+        .sub { margin-top: 3px; font-size: 12px; color: var(--dim2); }
+
+        .who { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+        .who a { font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 13px; background: var(--grey); color: var(--dim); }
+        .who a:hover { color: var(--blue); }
+        .who a.on { background: var(--soft); color: var(--blue); }
+        .who a.new { margin-left: auto; background: var(--blue); color: #fff; }
+
+        /* 오늘의 기도 */
+        .today { display: block; margin-top: 14px; padding: 14px 16px; border-radius: 8px; background: var(--soft); }
+        .today:hover { background: var(--softH); }
+        .today small { font-size: 11.5px; font-weight: 800; color: var(--blue); }
+        .today b { display: block; margin-top: 4px; font-size: 16px; font-weight: 800; line-height: 1.4; color: var(--ink); word-break: keep-all; }
+        .today span { display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 800; color: var(--blue); }
+
+        /* 주제 카드 */
+        .card { margin-top: 14px; background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.06); padding: 4px 16px; }
+        .cardHd { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 6px; }
+        .cardHd b { font-size: 16px; font-weight: 800; color: var(--ink); }
+        .cardHd em { font-style: normal; font-size: 12px; color: var(--dim); }
+        .row { display: flex; gap: 12px; align-items: flex-start; padding: 13px 0; border-top: 1px solid var(--line); }
+        .row .n { flex: none; width: 24px; font-size: 13px; font-weight: 800; color: var(--num); font-variant-numeric: tabular-nums; padding-top: 2px; }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t > a { display: block; font-size: 15px; font-weight: 700; line-height: 1.45; color: var(--ink); word-break: keep-all; }
+        .row .t > a:hover { color: var(--blue); }
+        .row .go { flex: none; color: var(--num); font-size: 18px; line-height: 1.2; }
+        .row.is-today .t > a { color: var(--blue); }
+        .tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 800; vertical-align: 2px; background: var(--soft); color: var(--blue); }
+        /* 관리자 줄 — 읽음 수 · 검증 표시 */
+        .mt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; }
+        .cnt { font-size: 11.5px; font-weight: 500; color: var(--dim2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .vok, .vno { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 800; }
+        .vok { background: #E8F6EE; color: #1B7A4B; }
+        .vok::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #1B7A4B; }
+        .vno { background: var(--grey); color: var(--dim); font-weight: 700; }
+        /* 검증 현황 */
+        .vsum { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 8px; background: var(--grey); font-size: 13px; color: var(--tx); font-variant-numeric: tabular-nums; }
+        .vsum b { color: var(--ink); }
+        .vbar { flex: 1; min-width: 40px; height: 6px; border-radius: 99px; background: #E1E6EE; overflow: hidden; }
+        .vbar i { display: block; height: 100%; border-radius: 99px; background: #1B7A4B; }
+        .adm { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+        .adm a { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: var(--grey); color: var(--dim); }
+        .adm a:hover { color: var(--blue); }
+        .adm a.del { color: #B42318; }
+
+        .none { margin-top: 24px; text-align: center; padding: 28px 20px; border-radius: 14px; background: var(--grey); color: var(--dim); font-size: 14px; }
+        .act { display: flex; gap: 8px; margin-top: 18px; }
+        .act a { flex: 1; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 14px; font-weight: 800; }
+        .act .p { background: var(--soft); color: var(--blue); }
+        .act .p:hover { background: var(--softH); }
+        .act .s { background: var(--grey); color: var(--dim); }
+        .act .s:hover { color: var(--blue); }
+        .foot { margin-top: 18px; font-size: 11.5px; color: var(--dim2); text-align: center; }
+        :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">← @ConstatsCommon.ToHome</a><span class="sep">·</span>부부 기도</span>
+        <span>@(items.Count)편</span>
+    </div>
+    <div class="prog"></div>
+
+    <div class="phd">
+        <div class="rings" aria-hidden="true"><i></i></div>
+        <div class="phdTx">
+            <div class="kk">부부 기도 · 목록</div>
+            <h1 class="ttl">@(kindA)@(josa) 위한 기도</h1>
+            <div class="sub">@(kindB)@(josaB) 드리는 기도 · 매일 한 편씩 바뀝니다</div>
+        </div>
+    </div>
+
+    <div class="who">
+        <a class="@(isForHusband ? "" : "on")" href="/BessingACouple/DetailList?Kind=Wife">아내를 위해</a>
+        <a class="@(isForHusband ? "on" : "")" href="/BessingACouple/DetailList?Kind=Husband">남편을 위해</a>
+        @if (ViewBag.CanAddPray is bool _ca && _ca)
+        {
+            @* 새 기도문 — SuperAdmin 역할 · Basic 계정 (2026-10-15) *@
+            <a class="new" href="/BessingACouple/EnrollView?Kind=@ViewBag.Kind">＋ 새 기도문</a>
+        }
+    </div>
+
+    @if (items.Count == 0)
+    {
+        <div class="none">등록된 기도문이 없어요</div>
+    }
+    else
+    {
+        var todayItem = items[todayIdx];
+        <a class="today" href="/BessingACouple/DetailWords?Kind=@ViewBag.Kind&Id=@todayItem.Id">
+            <small>오늘의 기도 · @dateStr</small>
+            <b>@todayItem.PrayTitle</b>
+            <span>기도문 읽기 ›</span>
+        </a>
+
+        @if (verifyReady)
+        {
+            int vDone = items.Count(i => i.IsVerified);
+            int vPct = (int)Math.Round(vDone * 100.0 / items.Count);
+            <div class="vsum">
+                <span>검증 <b>@vDone</b> / @(items.Count)편</span>
+                <span class="vbar" aria-hidden="true"><i style="width:@(vPct)%"></i></span>
+                <span>@(vPct)%</span>
+            </div>
+        }
+
+        foreach (var g in groups)
+        {
+            var rows = items.Select((it, ix) => new { it, ix }).Where(x => GroupOf(x.it.PrayTitle) == g.Name).ToList();
+            if (!rows.Any()) { continue; }
+            <div class="card">
+                <div class="cardHd"><b>@g.Name</b><em>@(rows.Count)편</em></div>
+                @foreach (var x in rows)
+                {
+                    bool isToday = x.ix == todayIdx;
+                    string href = $"/BessingACouple/DetailWords?Kind={ViewBag.Kind}&Id={x.it.Id}";
+                    <div class="row @(isToday ? "is-today" : "")">
+                        <span class="n">@(x.ix + 1)</span>
+                        <div class="t">
+                            <a href="@href">
+                                @x.it.PrayTitle
+                                @if (isToday)
+                                {
+                                    <span class="tag">오늘</span>
+                                }
+                            </a>
+                            @if (canSeeCount)
+                            {
+                                <div class="mt">
+                                    <span class="cnt">읽음 @x.it.visited</span>
+                                    @if (verifyReady)
+                                    {
+                                        if (x.it.IsVerified)
+                                        {
+                                            <span class="vok">검증완료</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="vno">검증 전</span>
+                                        }
+                                    }
+                                </div>
+                            }
+                            @if (isPrayManager)
+                            {
+                                <div class="adm">
+                                    <a href="/BessingACouple/ModifyView?Kind=@ViewBag.Kind&Id=@x.it.Id">수정</a>
+                                    @if (isSuperAdmin)
+                                    {
+                                        <a href="/BessingACouple/DecreasetHitACouple?Kind=@ViewBag.Kind&Id=@x.it.Id" onclick="return confirm('읽음 수를 리셋할까요?');">리셋</a>
+                                        <a class="del" href="/BessingACouple/DeleteView?Kind=@ViewBag.Kind&Id=@x.it.Id" onclick="return confirm('이 기도문을 삭제할까요?');">삭제</a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                        <a class="go" href="@href" aria-hidden="true" tabindex="-1">›</a>
+                    </div>
+                }
+            </div>
+        }
+    }
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/PrayHome/Index">기도홈</a>
+    </div>
+    <p class="foot">@ChurchName @DepartmentName · 부부 기도</p>
+
+</div>
+</body>
+</html>

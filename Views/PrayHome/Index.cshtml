@@ -1,0 +1,159 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using Cfg365 = BulletinBoard.Models.Prayer365.Prayer365Config
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject BulletinBoard.Services.Prayer365.IPrayer365Service Prayer365
+
+@*  ══════════════════════════════════════════════════════════════
+    기도홈 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 번호 목록)
+    · 맨 위 "오늘의 기도" — 365일 축복 기도를 볼 수 있는 사람(공개 뒤 누구나 · 지금은 관리자)에게는 오늘 365 제목,
+      그 밖에는 자녀를 위한 축복 기도로
+    · 이전 화면(보라빛 · 이모지 카드)은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultDataOG = $"{@ViewBag.Domain}/images/workspace/marriedcouple/horizontal/MarriedCouple_{todayDate}.webp";
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // 우리 반을 위한 기도 — SuperAdmin 에게만 보인다
+    var signedUser   = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && signedUser != null
+                       && await AuthService.IsInRole(signedUser, nameof(Roles.SuperAdmin));
+
+    // 365일 축복 기도를 볼 수 있는지 — Prayer365Controller 의 IsStaff 와 같은 기준
+    // 링크는 누구에게나 보인다 — 로그인하지 않은 사람이 누르면 로그인 화면으로 간다 (Prayer365Controller). 제목은 로그인한 회원에게만
+    bool can365 = true;
+    bool see365Title = !Cfg365.StaffOnly || User?.Identity?.IsAuthenticated == true;
+    var kToday = DateHelper.GetKoreaToday();
+    string? todayTitle = null;
+    if (see365Title)
+    {
+        try { todayTitle = await Prayer365.GetTitleAsync(Cfg365.Md(kToday)); } catch { todayTitle = null; }
+    }
+    string todayHref = can365 ? "/Prayer365?view=user" : "/BessingChild/DetailWords";
+    string todayKick = can365 ? "오늘의 기도 · 자녀를 위한 365" : "오늘의 기도 · 자녀를 위한 축복 기도";
+    string todayText = !string.IsNullOrWhiteSpace(todayTitle) ? todayTitle! : "오늘 우리 아이를 위해 기도해요";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>기도 공간 · @ChurchName</title>
+    <meta property="og:title"       content="@ChurchName · @DepartmentName">
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다.">
+    <meta property="og:image"       content="@formattedModResultDataOG">
+    <meta property="og:url"         content="@ViewBag.FullURL">
+    <meta property="og:type"        content="website">
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px 36px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { color: var(--dim); letter-spacing: .04em; }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .hdS { margin-top: 4px; font-size: 13px; color: var(--dim2); }
+
+        /* 오늘의 기도 */
+        .today { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--soft); transition: background .15s; }
+        .today:hover { background: #DCEAFB; }
+        .today .cal { flex: none; width: 52px; border-radius: 10px; overflow: hidden; background: #fff; text-align: center; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
+        .today .cal small { display: block; padding: 3px 0; background: var(--blue); color: #fff; font-size: 10.5px; font-weight: 800; }
+        .today .cal b { display: block; padding: 2px 0 5px; font-size: 22px; font-weight: 300; line-height: 1.1; color: var(--ink); }
+        .today .tx { flex: 1; min-width: 0; }
+        .today .tx i { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--blue); }
+        .today .tx b { display: block; margin-top: 2px; font-size: 15.5px; font-weight: 800; color: var(--ink); line-height: 1.4; word-break: keep-all; }
+        .today .go { flex: none; font-size: 20px; font-weight: 300; color: var(--blue); }
+
+        /* 묶음 · 줄 */
+        .sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); }
+        .sec b { font-size: 16px; font-weight: 800; color: var(--ink); }
+        .sec span { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+        .row { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+        .row:last-child { border-bottom: 0; }
+        .row + .sec { margin-top: 8px; border-top: 0; }   /* 줄 밑선이 묶음 구분선을 대신 — 선이 두 번 겹치지 않게 */
+        .row:has(+ .ft) { border-bottom: 0; }
+        .row .n { flex: none; width: 28px; font-size: 16px; font-weight: 800; color: #7FA3DB; }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t b { display: block; font-size: 15.5px; font-weight: 800; color: var(--ink); transition: color .15s; }
+        .row .t small { display: block; margin-top: 1px; font-size: 12px; color: var(--dim); }
+        .row .tg { flex: none; font-size: 11px; font-weight: 800; color: var(--blue); background: var(--soft); border-radius: 999px; padding: 2px 8px; }
+        .row .g { flex: none; font-size: 18px; font-weight: 300; color: #7FA3DB; }
+        .row:hover .t b, .row:hover .g { color: var(--blue); }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--dim); }
+        .ft a { color: var(--dim2); font-weight: 700; margin-left: 10px; }
+        .ft a:hover { color: var(--blue); }
+    </style>
+</head>
+<body>
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>기도홈</span>
+        <span>PRAYER</span>
+    </div>
+    <div class="hdK">PRAYER HOME</div>
+    <h1 class="hdT">함께 드리는 기도</h1>
+    <div class="hdS">가족과 이웃, 교회를 위해 마음을 모아요</div>
+
+    <a class="today" href="@todayHref">
+        <span class="cal"><small>@(kToday.Month)월</small><b>@kToday.Day</b></span>
+        <span class="tx"><i>@todayKick</i><b>@todayText</b></span>
+        <span class="go">›</span>
+    </a>
+
+    <div class="sec"><b>하루를 여는 기도</b><span>1</span></div>
+    <a class="row" href="/Prayer/Index"><span class="n">01</span><span class="t"><b>오늘 하루 다짐 기도</b><small>마음을 새롭게, 말과 행동을 주님께</small></span><span class="g">›</span></a>
+
+    <div class="sec"><b>가정을 위한 기도</b><span>@(can365 ? 4 : 3)</span></div>
+    <a class="row" href="/BessingChild/DetailWords"><span class="n">02</span><span class="t"><b>자녀를 위해</b><small>우리 아이를 위한 축복 기도</small></span><span class="tg">매일</span><span class="g">›</span></a>
+    @* 자녀를 위한 365 — 365일 기도문을 볼 수 있는 사람(공개 전에는 관리자)에게만. 맨 위 "오늘의 기도" 카드와 같은 곳으로 *@
+    @if (can365)
+    {
+        <a class="row" href="/Prayer365?view=user"><span class="n">03</span><span class="t"><b>자녀를 위한 365</b><small>@(@kToday.Month)월 @(@kToday.Day)일 · @todayText</small></span><span class="tg">매일</span><span class="g">›</span></a>
+    }
+    <a class="row" href="/BessingACouple/DetailWords?Kind=Wife"><span class="n">@(can365 ? "04" : "03")</span><span class="t"><b>아내를 위해</b><small>남편이 드리는 기도</small></span><span class="g">›</span></a>
+    <a class="row" href="/BessingACouple/DetailWords?Kind=Husband"><span class="n">@(can365 ? "05" : "04")</span><span class="t"><b>남편을 위해</b><small>아내가 드리는 기도</small></span><span class="g">›</span></a>
+
+    <div class="sec"><b>이웃을 위한 기도</b><span>3</span></div>
+    <a class="row" href="/HealingAndRestorationPray/Index"><span class="n">@(can365 ? "06" : "05")</span><span class="t"><b>치료와 회복을 위해</b><small>몸과 마음이 아픈 이를 위해</small></span><span class="g">›</span></a>
+    @* 수험생 — 오늘의 기도문(Index)으로, 목록은 그 안에서 *@
+    <a class="row" href="/EntranceExamPray/Index"><span class="n">@(can365 ? "07" : "06")</span><span class="t"><b>수험생을 위해</b><small>입시를 준비하는 학생 · 매일 한 편</small></span><span class="tg">매일</span><span class="g">›</span></a>
+    <a class="row" href="/PrayHome/Intercessory"><span class="n">@(can365 ? "08" : "07")</span><span class="t"><b>선교사님을 위해</b><small>교회 · 목사님 · 선교사님 중보기도</small></span><span class="g">›</span></a>
+
+    @* 우리 반을 위한 기도 — SuperAdmin 에게만 *@
+    @if (isSuperAdmin)
+    {
+        <div class="sec"><b>우리 반을 위한 기도</b><span>관리자</span></div>
+        <a class="row" href="/PrayHome/coClass"><span class="n">@(can365 ? "09" : "08")</span><span class="t"><b>내 반 · 동역 교사를 위해</b><small>내 반 아이들과 함께 섬기는 선생님들</small></span><span class="g">›</span></a>
+    }
+
+    <div class="ft">
+        <span>@ChurchName · @DepartmentName</span>
+        <span><a href="/DailyMission2/Index">@ConstatsCommon.MainKeyTitle</a><a href="/RhapsodyOfReality/DetailWords">말씀묵상</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+
+</div>
+</body>
+</html>

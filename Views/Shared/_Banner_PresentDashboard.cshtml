@@ -1,0 +1,458 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.ViewModels.Attendance
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    // 권한/로그인 (기존 패턴 유지)
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    // ✅ ViewBag로 받기
+    var vm = ViewBag.AttendanceAdminTrendVM as AttendanceAdminTrendVM;
+
+    // 안전장치: 없으면 빈 화면 대신 안내
+    var hasData = (vm != null && vm.Weeks != null && vm.Weeks.Count > 0);
+
+    // "지지난주/지난주/이번주" 순서로 보이게(서비스가 이미 정렬해줬어도 방어)
+    var weeks = hasData
+        ? vm!.Weeks
+            .OrderBy(w => w.Label == "지지난주" ? 0 : (w.Label == "지난주" ? 1 : 2))
+            .ToList()
+        : new List<AttendanceAdminTrendVM.WeekRow>();
+
+    string ToKoDdd(DateTime dt)
+        => dt.ToString("ddd", new System.Globalization.CultureInfo("ko-KR"));
+
+    string GetLevel(double rate)
+    {
+        if (rate < 70) return "danger";
+        if (rate < 85) return "warn";
+        return "good";
+    }
+
+    string GetBadgeText(double rate)
+    {
+        if (rate < 70) return "낮음";
+        if (rate < 85) return "주의";
+        return "좋음";
+    }
+
+    // 상세보기 이동 시 date 파라미터를 유지하고 싶으면 baseDate 사용
+    var baseDateStr = vm?.BaseDate.ToString("yyyy-MM-dd") ?? DateHelper.GetKoreaNow().ToString("yyyy-MM-dd");
+    var detailUrl = $"/Attendance/AdminTrend3Weeks?date={baseDateStr}";
+}
+
+@if (!isSignedIn)
+{
+    <div style="padding:14px; border-radius:14px; background:#fff; border:1px solid rgba(0,0,0,.08); color:#444;">
+        ⚠️ 이 기능은 로그인한 사용자에게만 제공됩니다.
+    </div>
+}
+else
+{
+    <style>
+        :root {
+            --bg0: #07131a;
+            --bg1: #0b1d26;
+            --card: rgba(255,255,255,.08);
+            --card2: rgba(255,255,255,.10);
+            --line: rgba(255,255,255,.14);
+            --text: rgba(255,255,255,.92);
+            --muted: rgba(255,255,255,.70);
+            --good: #35d08a;
+            --warn: #ffb020;
+            --danger: #ff4d5a;
+            --shadow: 0 18px 55px rgba(0,0,0,.35);
+            --radius: 22px;
+            /* ✅ 추가: 버튼 강조 컬러 */
+            --cta: #4f9fff;
+            --cta2: #7fd6ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        .att-wrap {
+            margin: 18px 0 26px;
+            padding: 16px;
+            border-radius: var(--radius);
+            background: radial-gradient(900px 520px at 12% -10%, rgba(53,208,138,.22), transparent 60%), radial-gradient(700px 420px at 92% 0%, rgba(255,176,32,.18), transparent 56%), radial-gradient(720px 520px at 50% 120%, rgba(79,159,255,.16), transparent 58%), linear-gradient(180deg, var(--bg1), var(--bg0));
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: var(--shadow);
+            color: var(--text);
+            overflow: hidden;
+            position: relative;
+        }
+
+            .att-wrap::before {
+                content: "";
+                position: absolute;
+                inset: -2px -2px auto -2px;
+                height: 64px;
+                background: linear-gradient(90deg, rgba(255,255,255,.14), rgba(255,255,255,0));
+                opacity: .45;
+                pointer-events: none;
+            }
+
+        .att-head {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 4px 4px 10px;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            margin-bottom: 12px;
+        }
+
+        .att-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 240px;
+        }
+
+        .att-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,.10);
+            border: 1px solid rgba(255,255,255,.16);
+            box-shadow: 0 10px 25px rgba(0,0,0,.22);
+            font-size: 1.5rem;
+        }
+
+        .att-texts {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .att-h1 {
+            font-size: 1.15rem;
+            font-weight: 1000;
+            letter-spacing: -.2px;
+            margin: 0;
+        }
+
+        .att-sub {
+            font-size: .82rem;
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .att-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .att-btn {
+            border: 0;
+            cursor: pointer;
+            padding: 10px 12px;
+            border-radius: 999px;
+            font-weight: 950;
+            font-size: .82rem;
+            color: var(--text);
+            background: rgba(255,255,255,.10);
+            border: 1px solid rgba(255,255,255,.18);
+            box-shadow: 0 8px 22px rgba(0,0,0,.22);
+            text-decoration: none;
+            white-space: nowrap;
+            transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+        }
+
+            .att-btn:hover {
+                transform: translateY(-1px);
+                background: rgba(255,255,255,.14);
+                box-shadow: 0 12px 26px rgba(0,0,0,.28);
+            }
+
+            /* ✅ 추가: 상세 보기 버튼(CTA)만 확실히 구별 */
+            .att-btn.att-btn-cta {
+                background: linear-gradient(135deg, rgba(79,159,255,.95), rgba(127,214,255,.85));
+                color: #04131d;
+                border: 1px solid rgba(127,214,255,.55);
+                box-shadow: 0 14px 34px rgba(79,159,255,.22);
+            }
+
+                .att-btn.att-btn-cta:hover {
+                    background: linear-gradient(135deg, rgba(79,159,255,1), rgba(127,214,255,.95));
+                    box-shadow: 0 18px 42px rgba(79,159,255,.30);
+                }
+
+                .att-btn.att-btn-cta:focus {
+                    outline: 2px solid rgba(127,214,255,.85);
+                    outline-offset: 2px;
+                }
+
+        .att-meta-pill {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 999px;
+            font-size: .82rem;
+            color: var(--muted);
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12);
+            white-space: nowrap;
+        }
+
+            .att-meta-pill b {
+                color: var(--text);
+            }
+
+        .att-grid {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0,1fr));
+            gap: 12px;
+            padding: 4px;
+        }
+
+        @@media (max-width: 980px) {
+            .att-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .wk-card {
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 18px;
+            padding: 14px;
+            box-shadow: 0 12px 32px rgba(0,0,0,.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .wk-card::after {
+                content: "";
+                position: absolute;
+                inset: auto -20px -30px -20px;
+                height: 90px;
+                background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), transparent 65%);
+                opacity: .35;
+                pointer-events: none;
+            }
+
+        .wk-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .wk-label {
+            font-weight: 1000;
+            font-size: .98rem;
+            letter-spacing: -.2px;
+            margin: 0;
+        }
+
+        .wk-date {
+            margin-top: 4px;
+            font-size: .78rem;
+            color: var(--muted);
+        }
+
+        .wk-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: .78rem;
+            font-weight: 1000;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(0,0,0,.18);
+            white-space: nowrap;
+        }
+
+            .wk-badge i {
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+
+            .wk-badge.good i {
+                background: var(--good);
+            }
+
+            .wk-badge.warn i {
+                background: var(--warn);
+            }
+
+            .wk-badge.danger i {
+                background: var(--danger);
+            }
+
+        .wk-rate {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            margin-top: 2px;
+        }
+
+            .wk-rate strong {
+                font-size: 1.9rem;
+                font-weight: 1100;
+                letter-spacing: -.5px;
+                line-height: 1;
+            }
+
+            .wk-rate span {
+                font-size: .82rem;
+                color: var(--muted);
+                padding-bottom: 2px;
+            }
+
+        .bar {
+            margin-top: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.10);
+            border: 1px solid rgba(255,255,255,.14);
+            overflow: hidden;
+            position: relative;
+        }
+
+            .bar > em {
+                display: block;
+                height: 100%;
+                width: 0%;
+                border-radius: 999px;
+                background: linear-gradient(90deg, rgba(53,208,138,.95), rgba(79,159,255,.85));
+                box-shadow: 0 10px 24px rgba(0,0,0,.22);
+                transition: width .35s ease;
+            }
+
+            .bar.warn > em {
+                background: linear-gradient(90deg, rgba(255,176,32,.95), rgba(79,159,255,.85));
+            }
+
+            .bar.danger > em {
+                background: linear-gradient(90deg, rgba(255,77,90,.95), rgba(255,176,32,.85));
+            }
+
+        .wk-mini {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: .8rem;
+        }
+
+            .wk-mini b {
+                color: var(--text);
+            }
+
+        .att-empty {
+            padding: 14px;
+            border-radius: 18px;
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.12);
+            color: var(--muted);
+            box-shadow: 0 12px 32px rgba(0,0,0,.22);
+        }
+    </style>
+
+    <div class="att-wrap" aria-label="출석 대시보드">
+        <div class="att-head">
+            <div class="att-title">
+                <div class="att-icon">📊</div>
+                <div class="att-texts">
+                    <p class="att-h1">출석 대시보드(테스트중...)</p>
+                    <p class="att-sub">최근 3주 출석률 추이 (주일 기준)</p>
+                </div>
+            </div>
+
+            <div class="att-actions">
+                <span class="att-meta-pill">기준일 <b>@baseDateStr</b></span>
+
+                <!-- ✅ 여기만 class 추가해서 색상/강조 적용 -->
+                <a class="att-btn att-btn-cta" href="@detailUrl">상세 보기 →</a>
+            </div>
+        </div>
+
+        @if (!hasData)
+        {
+            <div class="att-empty">데이터가 없습니다. (ViewBag.AttendanceAdminTrendVM 또는 Weeks를 확인해 주세요)</div>
+        }
+        else
+        {
+            <div class="att-grid">
+              @foreach (var w in weeks.OrderByDescending(x => x.SundayDate))
+                {
+                    var rate = (double)w.Rate;
+                    var lv = GetLevel(rate);
+                    var badgeText = GetBadgeText(rate);
+                    var dStr = w.SundayDate.ToString("yyyy-MM-dd") + $" ({ToKoDdd(w.SundayDate)})";
+
+                    <div class="wk-card">
+                        <div class="wk-top">
+                            <div>
+                                <p class="wk-label">@dStr</p>
+                            </div>
+
+                            <span class="wk-badge @lv" title="출석률 상태">
+                                <i></i> @badgeText
+                            </span>
+                        </div>
+
+                        <div class="wk-rate">
+                            <strong>@w.Rate%</strong>
+                        </div>
+
+                        <div class="bar @lv" role="img" aria-label="출석률 막대 그래프">
+                            <em style="width:@w.Rate%"></em>
+                        </div>
+
+                        <div class="wk-mini">
+                            <span>총원 <b>@w.Total</b>명</span>
+                            <span>출석 <b>@w.Present</b>명</span>
+                            <span>결석 <b>@w.Absent</b>명</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <script>
+        // 첫 로드시 막대가 자연스럽게 차오르는 느낌(옵션)
+        (function(){
+            const bars = document.querySelectorAll('.att-wrap .bar > em');
+            if(!bars || bars.length === 0) return;
+
+            bars.forEach(el => {
+                const w = el.style.width;
+                el.style.width = '0%';
+                el.getBoundingClientRect();
+                setTimeout(() => { el.style.width = w; }, 30);
+            });
+        })();
+    </script>
+}

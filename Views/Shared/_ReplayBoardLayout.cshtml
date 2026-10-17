@@ -1,0 +1,57 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    // ViewBag.Board가 있으면 게시판명을 상단 타이틀로 사용
+    var boardTitle = (ViewBag.Board?.BoardName ?? ViewBag.Title ?? "ReplayBoard").ToString();
+    var pageTitle = (ViewBag.Title ?? boardTitle ?? "ReplayBoard").ToString();
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@pageTitle</title>
+
+    <link rel="stylesheet" href="~/css/replayboard.css" />
+    @RenderSection("Head", required: false)
+</head>
+
+<body>
+    <div class="wrap">
+
+        <header class="topbar">
+            <div class="topbar-inner">
+                <div class="brand">
+                    <div class="brand-badge">📌</div>
+                    <div>
+                        <div style="font-size:14px; font-weight:900; line-height:1.1;">@boardTitle</div>
+                        <div style="font-size:12px; color:var(--muted); font-weight:800;">ReplayBoard</div>
+                    </div>
+                </div>
+
+                <nav class="actions">
+                    @RenderSection("TopActions", required: false)
+                </nav>
+            </div>
+        </header>
+
+        <main class="container">
+            @RenderBody()
+        </main>
+
+        <footer class="footer">
+            © @DateHelper.GetKoreaNow().Year · ReplayBoard
+        </footer>
+
+    </div>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

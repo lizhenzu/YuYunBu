@@ -1,0 +1,497 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using Microsoft.EntityFrameworkCore
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject BibleReadingThrough.Data.AppDbContext GiftDb
+
+@{
+    var user        = await AuthService.GetSignedUser(User);
+    var isSignedIn  = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff    = isAdmin || isSuperAdmin;
+
+    // 선물 관리 화면을 열 수 있는 사람 — Admin · SuperAdmin 역할, 예외로 "Basic" 계정
+    bool canManageGifts = isStaff
+                          || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
+
+    var familyMilestones = ViewBag.FamilyMilestones
+        as List<FamilyMilestoneDisplayVM>
+        ?? new List<FamilyMilestoneDisplayVM>();
+
+    var milestoneConfigs = ViewBag.FamilyMilestoneConfigs
+        as List<FamilyMilestoneConfigVM>
+        ?? new List<FamilyMilestoneConfigVM>();
+
+    // 선물 상세(설명 · 구매 링크) — 팝업에서 쓴다. 표가 없거나 오류면 빈 값으로 둔다.
+    var giftInfo = new Dictionary<int, (string Desc, string Url)>();
+    try
+    {
+        var giftIds = familyMilestones.Where(x => x.ProductId.HasValue)
+                                      .Select(x => x.ProductId!.Value).Distinct().ToList();
+        if (giftIds.Count > 0)
+        {
+            var allItems = GiftDb.AwardItems.AsNoTracking().ToList();
+            foreach (var it in allItems.Where(a => giftIds.Contains(a.ProductID)))
+            {
+                giftInfo[it.ProductID] = (it.ProductDescription ?? "", it.ExternalUrl ?? "");
+            }
+        }
+    }
+    catch { }
+
+    var myUserNameForMilestone = (ViewBag.MyUserName as string) ?? "";
+
+    // 가족 미니트리 헬퍼
+    string MftAvCls(string rel) => rel switch
+    {
+        "엄마" => "mft-av-mom", "아빠" => "mft-av-dad",
+        "할머니" or "할아버지" => "mft-av-grand",
+        "본인" => "mft-av-self",
+        "형" or "동생" or "언니" or "누나" or "오빠" => "mft-av-sib",
+        _ => "mft-av-other"
+    };
+    // rel로 성별이 확정되는 경우 우선, 그 외엔 sex("M"/"F") 기준
+    string MftEmoji(string rel, string sex = "")
+    {
+        return rel switch
+        {
+            "엄마"     => "👩",
+            "아빠"     => "👨",
+            "할머니"   => "👵",
+            "할아버지" => "👴",
+            "언니"     => "👧",
+            "누나"     => "👧",
+            "형"       => "👦",
+            "오빠"     => "👦",
+            // 성별 불명 관계는 sex 필드로 판단
+            _ => sex?.ToUpper() == "F" ? "👧"
+               : sex?.ToUpper() == "M" ? "👦"
+               : "🧒"
+        };
+    }
+    bool MftIsParent(string? rel) => rel == "엄마" || rel == "아빠" || rel == "할머니" || rel == "할아버지";
+    string MftDefaultPhoto = "/images/icon/people/people_01.webp";
+    bool MftHasPhoto(string? photo) => !string.IsNullOrWhiteSpace(photo) && !photo.Contains("people_01.webp");
+    string MftRoleCls(string rel) => rel switch
+    {
+        "엄마" => "mft-role-mom", "아빠" => "mft-role-dad",
+        "본인" => "mft-role-self",
+        _ => "mft-role-etc"
+    };
+
+    // 이름 마스킹: 부모/조부모는 항상 끝자 *, 나머지는 비로그인 시만 끝자 *
+    string MaskName(string? name, string? rel)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "";
+        bool isParentRel = MftIsParent(rel ?? "");
+        bool shouldMask  = isParentRel || !isSignedIn;
+        if (!shouldMask) return name;
+        return name.Length <= 1 ? "*" : name.Substring(0, name.Length - 1) + "*";
+    }
+}
+
+@* 이미지 로딩 중 화면 전환 차단 방지: 링크 클릭 시 미완료 이미지 src 즉시 해제 *@
+<script>
+(function () {
+    function abortPendingImages() {
+        document.querySelectorAll('img').forEach(function (img) {
+            if (!img.complete) { img.src = ''; }
+        });
+    }
+    function isNavLink(el) {
+        var a = el.closest('a[href]');
+        if (!a) return false;
+        var href = a.getAttribute('href') || '';
+        return href && href.charAt(0) !== '#' && href.indexOf('javascript') !== 0;
+    }
+    // 모바일: touchstart에서 즉시 처리 (300ms 딜레이 전에)
+    document.addEventListener('touchstart', function (e) {
+        if (isNavLink(e.target)) abortPendingImages();
+    }, { passive: true, capture: true });
+    // 데스크탑: click에서 처리
+    document.addEventListener('click', function (e) {
+        if (isNavLink(e.target)) abortPendingImages();
+    }, true);
+})();
+</script>
+
+
+@*  ══════════════════════════════════════════════════════════════
+    가족 마일스톤 — 한 가족 = 한 카드.  상단 타임라인(1,000 → 2,000 → 3,000 → 4,000 …)에
+    단계마다 상태(전달완료 · 구매완료 · 신청중 · 고르기 · 박수 · 미도달)를 보여 주고,
+    가족 구성(가계도)은 「가족팀 보기」 를 눌러야 팝업으로 나온다.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    // 단계 목록 (설정 표 순서).  설정이 비어 있으면 실제 달성 행에서 뽑는다.
+    var steps = milestoneConfigs.OrderBy(c => c.PointThreshold)
+                                .Select(c => (Threshold: c.PointThreshold, Type: (c.MilestoneType ?? "AWARD").ToUpperInvariant(), Emoji: c.DisplayEmoji ?? ""))
+                                .ToList();
+    if (steps.Count == 0)
+        steps = familyMilestones.GroupBy(r => r.PointThreshold).OrderBy(g => g.Key)
+                                .Select(g => (Threshold: g.Key, Type: (g.First().MilestoneType ?? "AWARD").ToUpperInvariant(), Emoji: g.First().DisplayEmoji ?? ""))
+                                .ToList();
+
+    // 팀별로 묶는다 (합산 높은 팀부터).
+    // 지금 받을 선물이 있는 팀만 — 도달한 '시상' 단계 중 아직 전달(HIDDEN)되지 않은 것이 하나라도 있어야 한다.
+    var teams = familyMilestones.GroupBy(r => r.FamilyTeamId)
+                                .Select(g => new { First = g.OrderBy(x => x.PointThreshold).First(), Rows = g.ToDictionary(x => x.PointThreshold, x => x) })
+                                .Where(t => t.Rows.Values.Any(r => string.Equals(r.MilestoneType, "AWARD", StringComparison.OrdinalIgnoreCase)
+                                                                   && !string.Equals(r.GiftStatus, "HIDDEN", StringComparison.OrdinalIgnoreCase)))
+                                .OrderByDescending(t => t.First.TeamTotalDm2).ThenBy(t => t.First.TeamName)
+                                .ToList();
+}
+
+@if (teams.Count > 0 && steps.Count > 0)
+{
+<style>
+    /* ── 카드 ── */
+    .fmT { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 18px; padding: 16px 18px 14px; margin: 10px 0; box-shadow: 0 1px 8px rgba(0,0,0,.05); }
+    .fmTKick { font-size: 11px; font-weight: 800; color: #b45309; }
+    .fmTKick .fmTLink { color: #b45309; text-decoration: underline; text-decoration-color: #e0b94c; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+    .fmTKick .fmTLink:hover { color: #78350f; text-decoration-color: #78350f; }
+    .fmTKick .fmTLink .ar { font-family: "Inter", sans-serif; font-weight: 900; font-size: 11px; }
+    .fmTHd { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; }
+    .fmTHd .t { font-size: 15px; font-weight: 900; color: #2F4A33; min-width: 0; }
+    .fmTBtn { border: 1.5px solid #e2e8f0; background: #fff; color: #334155; border-radius: 999px; padding: 7px 13px; font-family: inherit; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .fmTBtn:hover { border-color: #94a3b8; }
+    .fmTTeam { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .fmTAv { width: 36px; height: 36px; border-radius: 50%; background: #d1fae5; display: grid; place-items: center; font-size: 18px; border: 2px solid #fff; box-shadow: 0 0 0 2px #bbf7d0; flex: 0 0 auto; overflow: hidden; }
+    .fmTAv img { width: 100%; height: 100%; object-fit: cover; }
+    .fmTTeam .n { font-size: 14px; font-weight: 800; color: #0f172a; }
+    .fmTTeam .n small { font-size: 11px; color: #64748b; font-weight: 600; margin-left: 6px; }
+    .fmTTeam .s { font-size: 12px; color: #64748b; margin-top: 1px; }
+    .fmTTeam .s b { color: #0f172a; }
+
+    /* ── 타임라인 (가로) ── */
+    .fmTL { position: relative; display: grid; gap: 8px; margin-top: 16px; padding-top: 26px; }
+    .fmTL::before { content: ""; position: absolute; left: var(--edge); right: var(--edge); top: 9px; height: 3px; background: #e2e8f0; border-radius: 2px; }
+    .fmTL .fill { position: absolute; left: var(--edge); top: 9px; height: 3px; width: var(--hfill); background: linear-gradient(90deg, #f59e0b, #f97316); border-radius: 2px; }
+    .fmN { position: relative; text-align: center; }
+    .fmN::before { content: ""; position: absolute; left: 50%; top: -25px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: #fff; border: 3px solid #e2e8f0; box-sizing: border-box; }
+    .fmN.done::before { background: #f59e0b; border-color: #f59e0b; box-shadow: 0 0 0 4px rgba(245,158,11,.18); }
+    .fmN.now::before  { background: #fff; border-color: #f97316; box-shadow: 0 0 0 4px rgba(249,115,22,.22); }
+    .fmN .pt { font-size: 12.5px; font-weight: 900; color: #0f172a; }
+    .fmN.off .pt { color: #94a3b8; }
+    .fmN .kind { font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: .06em; margin-top: 1px; }
+    .fmB { margin-top: 8px; border: 1px solid #f1f5f9; background: #f8fafc; border-radius: 12px; padding: 9px 8px; min-height: 78px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+    .fmB img { width: 42px; height: 42px; border-radius: 9px; object-fit: cover; background: #e2e8f0; border: 1px solid #e2e8f0; cursor: zoom-in; }
+    .fmB .gn { font-size: 11.5px; font-weight: 800; color: #1e293b; line-height: 1.25; word-break: keep-all; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .fmB .st { font-size: 10px; font-weight: 800; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+    .fmB .st.done { background: #dcfce7; color: #166534; }
+    .fmB .st.buy  { background: #dbeafe; color: #1e40af; }
+    .fmB .st.pick { background: #fef3c7; color: #92400e; }
+    .fmB.gift { background: #fffbeb; border-color: #fde68a; }
+    /* 관리자만 — 선물 칸이 링크 (사진 크게 보기 대신 통합 선물 관리로) */
+    a.fmB.lnk { text-decoration: none; color: inherit; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+    a.fmB.lnk:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    a.fmB.lnk img { cursor: pointer; }
+    .fmB.clap { background: #fdf2f8; border-color: #fbcfe8; }
+    .fmB.clap .em { font-size: 26px; line-height: 1; }
+    .fmB.clap .gn { color: #9d174d; }
+    .fmB.todo { background: #fff7ed; border-color: #fed7aa; }
+    .fmB.todo .go { background: #f97316; color: #fff; border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+    .fmB.todo .who { font-size: 10.5px; color: #9a3412; }
+    .fmB.off { background: #fff; border-style: dashed; }
+    .fmB.off .gn { color: #94a3b8; font-weight: 700; }
+    .fmB.off .left { font-size: 10.5px; color: #94a3b8; }
+    .fmTFoot { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e2e8f0; font-size: 11.5px; color: #64748b; }
+    .fmTFoot b { color: #0f172a; }
+
+    /* ── 모바일 : 세로 타임라인 ── */
+    @@media (max-width: 560px) {
+        .fmTL { grid-template-columns: 1fr !important; padding-top: 0; padding-left: 26px; gap: 10px; }
+        .fmTL::before { left: 8px; right: auto; top: 8px; bottom: 8px; width: 3px; height: auto; }
+        .fmTL .fill { left: 8px; top: 8px; right: auto; width: 3px; height: var(--vfill); background: linear-gradient(180deg, #f59e0b, #f97316); }
+        .fmN { text-align: left; display: flex; gap: 10px; align-items: stretch; }
+        .fmN::before { left: -24px; top: 8px; margin-left: 0; }
+        .fmN .hdr { width: 64px; flex: 0 0 auto; padding-top: 6px; }
+        .fmB { margin-top: 0; flex: 1; min-height: 0; flex-direction: row; justify-content: flex-start; padding: 8px 10px; text-align: left; }
+        .fmB .gn { max-width: none; }
+        .fmB.todo .go { margin-left: auto; }
+    }
+
+    /* ── 휴대폰 축소판 (2026-09-27) — PC 에서는 보이지 않는다 ── */
+    .fmTBtns { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+    .fmC, .fmTMore { display: none; }
+    .fmTMore { font-family: inherit; font-size: 11.5px; font-weight: 800; color: #b45309; background: #FFF7E8; border: 1px solid #FBD9A0; border-radius: 999px; padding: 6px 10px; cursor: pointer; white-space: nowrap; }
+    .fmTMore.on { background: #b45309; color: #fff; border-color: #b45309; }
+    .fmC { gap: 6px; margin-top: 10px; }
+    .fmCs { border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; padding: 7px 5px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+    .fmCs.clap { background: #fdf2f8; border-color: #fbcfe8; }
+    .fmCs .p { font-family: "Inter", sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; }
+    .fmCs .e { font-size: 18px; line-height: 1.3; }
+    .fmCs .im { width: 26px; height: 26px; border-radius: 7px; overflow: hidden; background: #fff; display: grid; place-items: center; font-size: 14px; }
+    .fmCs .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .fmCs .im.noimg::before { content: "🎁"; }
+    .fmCs .n { font-size: 11px; font-weight: 800; color: #1e293b; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fmCs.clap .n { color: #9d174d; }
+    .fmCs .st { font-size: 9.5px; font-weight: 800; border-radius: 999px; padding: 1px 6px; white-space: nowrap; }
+    .fmCs .st.done { background: #dcfce7; color: #166534; }
+    .fmCs .st.buy  { background: #dbeafe; color: #1e40af; }
+    .fmCs .st.pick { background: #fef3c7; color: #92400e; }
+    @@media (max-width: 639px) {
+        .fmT .fmTL { display: none; }
+        .fmC { display: grid; }
+        .fmTMore { display: inline-flex; }
+        /* 상세히 · 가족팀 보기 — 카드 오른쪽 맨 위(키커 줄)로 올려 제목이 한 줄에 들어가게 */
+        .fmT { position: relative; }
+        .fmTBtns { position: absolute; top: 10px; right: 10px; gap: 5px; }
+        .fmTBtns .fmTMore, .fmTBtns .fmTBtn { font-size: 11px; padding: 4px 9px; }
+        .fmTHd { margin-top: 10px; }   /* 버튼(키커 줄) 아래로 제목을 내려 겹치지 않게 */
+        .fmT.open .fmTL { display: grid; }   /* 상세히 — 지금 모습 */
+        .fmT.open .fmC { display: none; }
+    }
+
+    /* ── 가족팀 팝업 ── */
+    .fmPop { display: none; position: fixed; inset: 0; z-index: 10050; background: rgba(15,23,42,.55); align-items: center; justify-content: center; padding: 16px; }
+    .fmPop.on { display: flex; }
+    .fmPopBox { background: #fff; border-radius: 18px; width: 100%; max-width: 420px; padding: 16px 18px 18px; max-height: 90vh; overflow: auto; }
+    .fmPopHd { display: flex; justify-content: space-between; align-items: center; }
+    .fmPopHd b { font-size: 14px; color: #0f172a; }
+    .fmPopX { border: 0; background: #f1f5f9; border-radius: 999px; padding: 5px 10px; font-family: inherit; font-size: 11px; font-weight: 800; color: #475569; cursor: pointer; }
+    .fmPopSum { margin-top: 12px; text-align: center; font-size: 12px; color: #64748b; }
+    .fmPopSum b { color: #0f172a; }
+    .fmPop .fmMileTree { margin-top: 14px; }
+
+    /* 선물 크게 보기 (기존) */
+    #fmGiftModal { display: none; position: fixed; inset: 0; z-index: 10060; background: rgba(0,0,0,.75); align-items: center; justify-content: center; padding: 18px; }
+    #fmGiftModal.on { display: flex; }
+    .fmGiftBoxIn { background: #fff; border-radius: 16px; max-width: 420px; width: 100%; padding: 12px; }
+    .fmGiftBoxIn img { width: 100%; height: auto; display: block; border-radius: 10px; background: #F5F5F3; }
+    .fmGiftName2 { font-size: 16px; font-weight: 900; color: #78350f; text-align: center; padding: 13px 6px 0; }
+    .fmGiftDesc2 { font-size: 13px; line-height: 1.75; color: #6b7280; text-align: center; padding: 8px 8px 2px; word-break: keep-all; }
+    .fmGiftBuy { display: block; text-align: center; margin-top: 12px; padding: 12px; border-radius: 11px; background: #FF6B4A; color: #fff; font-size: 13.5px; font-weight: 800; text-decoration: none; }
+    .fmGiftClose { width: 100%; margin-top: 8px; padding: 12px; border: 0; border-radius: 11px; background: #78350f; color: #fff; font-family: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
+</style>
+
+<div id="fmGiftModal" onclick="fmGiftClose(event)">
+    <div class="fmGiftBoxIn" onclick="event.stopPropagation()">
+        <img id="fmGiftImg2" src="" alt="">
+        <div class="fmGiftName2" id="fmGiftName2"></div>
+        <div class="fmGiftDesc2" id="fmGiftDesc2"></div>
+        @if (canManageGifts)
+        {
+            <a class="fmGiftBuy" id="fmGiftBuy" href="#" target="_blank" rel="noopener" data-nowait>🛒 쿠팡에서 보기</a>
+        }
+        <button type="button" class="fmGiftClose" onclick="fmGiftClose(event)">닫기</button>
+    </div>
+</div>
+
+<div style="margin-top:10px; margin-bottom:10px;">
+@foreach (var t in teams)
+{
+    var f = t.First;
+    int total = f.TeamTotalDm2;
+    // 도달한 단계만 보여 준다 (앞으로 받을 상 · 남은 점수는 보여 주지 않는다)
+    var mySteps = steps.Where(s => s.Threshold <= total).ToList();
+    if (mySteps.Count == 0) { continue; }
+    int reachedCount = mySteps.Count;
+    // 채워진 선 : 첫 점부터 마지막 점까지 (점 사이 간격 = (100 - 2*edge) / (n-1))
+    double edge = 100.0 / (mySteps.Count * 2);
+    double fillPct = mySteps.Count <= 1 ? 0 : (reachedCount - 1) * (100.0 - 2 * edge) / (mySteps.Count - 1);
+    double vfill = mySteps.Count <= 1 ? 0 : 100;
+    bool isRecipientMe = isSignedIn && string.Equals(myUserNameForMilestone, f.RecipientUserName, StringComparison.OrdinalIgnoreCase);
+    bool isMember = f.MemberUserNames.Contains(myUserNameForMilestone);
+    string popId = "fmPop-" + f.FamilyTeamId;
+    var mParents = f.Members.Where(m => MftIsParent(m.RelationLabel)).ToList();
+    var mKids    = f.Members.Where(m => !MftIsParent(m.RelationLabel)).ToList();
+
+    <div class="fmT" id="fmT-@f.FamilyTeamId">
+        @* 머리 : 1줄 = 작은 링크(키커), 2줄 = 제목 + 버튼 — 모바일에서도 안 밀린다 *@
+        <div class="fmTKick">🏆 <a class="fmTLink" href="/DailyMission2/Welcome" title="@ConstatsCommon.MainKeyTitle 으로 가기">@ConstatsCommon.MainKeyTitle <span class="ar">→</span></a></div>
+        <div class="fmTHd">
+            <div class="t">가족팀 마일스톤 도달 축하해요!</div>
+            <span class="fmTBtns">
+                @* 휴대폰에서만 — 축소판 ↔ 지금 모습 (2026-09-27) *@
+                <button type="button" class="fmTMore" aria-expanded="false"
+                        onclick="var c=document.getElementById('fmT-@f.FamilyTeamId'),o=c.classList.toggle('open');this.textContent=o?'접기 ▴':'상세히 ▾';this.classList.toggle('on',o);this.setAttribute('aria-expanded',o);">상세히 ▾</button>
+                <button type="button" class="fmTBtn" data-pop="@popId">👨‍👩‍👧 가족팀 보기</button>
+            </span>
+        </div>
+
+        <div class="fmTTeam">
+            <div class="fmTAv">@if (MftHasPhoto(f.RecipientPhoto)) { <img src="@f.RecipientPhoto" alt="" loading="lazy" onerror="this.remove()" /> } else { <text>🧑</text> }</div>
+            <div>
+                <div class="n">@f.TeamName<small>선물 수령자 @MaskName(f.RecipientFullName, "본인")</small></div>
+                <div class="s">합산 <b>@(total.ToString("N0"))점</b></div>
+            </div>
+        </div>
+
+        @* 휴대폰 축소판 (2026-09-27) — 단계를 한 줄 칸으로.  "상세히"를 누르면 아래 타임라인 *@
+        <div class="fmC" style="grid-template-columns: repeat(@(Math.Min(mySteps.Count, 4)), 1fr);">
+            @foreach (var cs in mySteps)
+            {
+                t.Rows.TryGetValue(cs.Threshold, out var crow);
+                bool cAward = cs.Type == "AWARD";
+                <div class="fmCs @(cAward ? "" : "clap")">
+                    <div class="p">@(cs.Threshold.ToString("N0"))</div>
+                    @if (!cAward)
+                    {
+                        <div class="e">👏</div><div class="n">박수</div>
+                    }
+                    else if (crow != null && crow.ProductId.HasValue)
+                    {
+                        string cCls = crow.GiftStatus switch { "HIDDEN" => "done", "PURCHASED" => "buy", _ => "pick" };
+                        string cTxt = crow.GiftStatus switch { "HIDDEN" => "전달완료", "PURCHASED" => "구매완료", _ => "신청중" };
+                        <div class="im"><img src="/images/AwardItem/@(crow.ProductId).jpg" alt="" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove();" /></div>
+                        <div class="n">@crow.ProductName</div>
+                        <span class="st @cCls">@cTxt</span>
+                    }
+                    else
+                    {
+                        <div class="e">🎁</div><div class="n">고르기 전</div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="fmTL" style="grid-template-columns: repeat(@mySteps.Count, 1fr); --edge: @(edge.ToString("0.##"))%; --hfill: @(fillPct.ToString("0.##"))%; --vfill: @(vfill.ToString("0.#"))%;">
+            <div class="fill"></div>
+            @for (int si = 0; si < mySteps.Count; si++)
+            {
+                var s = mySteps[si];
+                bool isLastReached = si == reachedCount - 1;
+                t.Rows.TryGetValue(s.Threshold, out var row);
+                bool isAward = s.Type == "AWARD";
+                string ndCls = (isLastReached && (row == null || string.IsNullOrWhiteSpace(row.GiftStatus)) && isAward) ? "now" : "done";
+
+                <div class="fmN @ndCls">
+                    <div class="hdr">
+                        <div class="pt">@(s.Threshold.ToString("N0"))점</div>
+                        <div class="kind">@(isAward ? "시상" : "박수")</div>
+                    </div>
+                    @if (!isAward)
+                    {
+                        <div class="fmB clap"><div class="em">👏</div><div class="gn">박수 시상</div></div>
+                    }
+                    else if (row != null && row.ProductId.HasValue)
+                    {
+                        string gDesc = "", gUrl = "";
+                        if (giftInfo.ContainsKey(row.ProductId.Value)) { gDesc = giftInfo[row.ProductId.Value].Desc; gUrl = giftInfo[row.ProductId.Value].Url; }
+                        var gBuy = string.IsNullOrWhiteSpace(gUrl) ? "https://www.coupang.com/np/search?q=" + Uri.EscapeDataString(row.ProductName ?? "") : gUrl;
+                        string stCls = row.GiftStatus switch { "HIDDEN" => "done", "PURCHASED" => "buy", _ => "pick" };
+                        // 상태 문구는 홈 선물 카드 모두 같게 — 신청중 · 구매완료 · 전달완료 (2026-09-27 통일)
+                        string stTxt = row.GiftStatus switch { "HIDDEN" => "전달완료", "PURCHASED" => "구매완료", _ => "신청중" };
+                        @if (canManageGifts)
+                        {
+                            @* 관리자만 — 선물 칸을 누르면 통합 선물 관리로 (사진 크게 보기는 그 화면에서) *@
+                            <a class="fmB gift lnk" href="/StudentPointDashboard4/AdminPurchaseList" title="관리자 — 통합 선물 관리로">
+                                <img src="/images/AwardItem/@(row.ProductId).jpg" alt="@row.ProductName" loading="lazy" decoding="async"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.png';" />
+                                <div><div class="gn">@row.ProductName</div><span class="st @stCls">@stTxt</span></div>
+                            </a>
+                        }
+                        else
+                        {
+                            <div class="fmB gift">
+                                <img src="/images/AwardItem/@(row.ProductId).jpg" alt="@row.ProductName" class="fmGiftImg" loading="lazy" decoding="async"
+                                     data-gname="@row.ProductName" data-gdesc="@gDesc" data-gbuy="@gBuy"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.png';" />
+                                <div><div class="gn">@row.ProductName</div><span class="st @stCls">@stTxt</span></div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="fmB todo">
+                            <div class="gn">아직 안 골랐어요</div>
+                            @if (isRecipientMe)
+                            {
+                                <a class="go" href="/StudentPointDashboard4/GiftSelect?type=family&threshold=@s.Threshold">🎁 선물 고르기</a>
+                            }
+                            else
+                            {
+                                <div class="who">@MaskName(f.RecipientFullName, "본인")님이 골라요</div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="fmTFoot">
+            <span>선물은 <b>@MaskName(f.RecipientFullName, "본인")</b>님께 지급돼요</span>
+            <span>박수 단계는 선물 대신 예배 시간에 박수로 축하해요</span>
+        </div>
+    </div>
+
+    @* 가족팀 팝업 — 기존 가계도 그대로 *@
+    <div class="fmPop" id="@popId" data-popmask>
+        <div class="fmPopBox" onclick="event.stopPropagation()">
+            <div class="fmPopHd"><b>👨‍👩‍👧 @f.TeamName</b><button type="button" class="fmPopX" data-popclose>닫기 ✕</button></div>
+            <div class="fmMileTree">
+                @if (mParents.Any())
+                {
+                    <div class="fmMileTreeRow">
+                        @for (int pi = 0; pi < mParents.Count; pi++)
+                        {
+                            var mn = mParents[pi]; var rl = mn.RelationLabel ?? "";
+                            <div class="fmMileTreeNode">
+                                <div class="fmMileTreeAv @MftAvCls(rl)">@MftEmoji(rl, mn.Sex)</div>
+                                <div class="fmMileTreeNm">@MaskName(mn.FullName, rl)</div>
+                                <span class="fmMileTreeRole @MftAvCls(rl)">@rl</span>
+                                <div class="fmMileTreePt">@(mn.YearPoint.ToString("N0"))점</div>
+                            </div>
+                            @if (pi < mParents.Count - 1) { <div class="fmMileTreeHline"></div> }
+                        }
+                    </div>
+                }
+                @if (mParents.Any() && mKids.Any()) { <div class="fmMileTreeVline"></div> }
+                @if (mKids.Any())
+                {
+                    <div class="fmMileTreeRow">
+                        @foreach (var mn in mKids)
+                        {
+                            var rl = mn.RelationLabel ?? "";
+                            <div class="fmMileTreeNode">
+                                <div class="fmMileTreeAv @MftAvCls(rl)">@MftEmoji(rl, mn.Sex)</div>
+                                <div class="fmMileTreeNm">@MaskName(mn.FullName, rl)</div>
+                                <span class="fmMileTreeRole @MftAvCls(rl)">@rl</span>
+                                <div class="fmMileTreePt">@(mn.YearPoint.ToString("N0"))점</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="fmPopSum">@(f.Members.Count)명 합산 <b>@(total.ToString("N0"))점</b> · 선물은 <b>@MaskName(f.RecipientFullName, "본인")</b>님께</div>
+        </div>
+    </div>
+}
+</div>
+
+<script>
+    function fmGiftClose(e) { if (e) e.stopPropagation(); document.getElementById('fmGiftModal').classList.remove('on'); }
+    (function () {
+        function bind() {
+            // 선물 사진 크게
+            document.querySelectorAll('.fmGiftImg').forEach(function (img) {
+                img.addEventListener('click', function (e) {
+                    e.preventDefault(); e.stopPropagation();
+                    document.getElementById('fmGiftImg2').src = img.getAttribute('src');
+                    document.getElementById('fmGiftName2').textContent = img.getAttribute('data-gname') || '';
+                    document.getElementById('fmGiftDesc2').textContent = img.getAttribute('data-gdesc') || '';
+                    var buy = document.getElementById('fmGiftBuy');
+                    if (buy) buy.href = img.getAttribute('data-gbuy') || '#';
+                    document.getElementById('fmGiftModal').classList.add('on');
+                });
+            });
+            // 가족팀 팝업
+            document.querySelectorAll('[data-pop]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var p = document.getElementById(b.getAttribute('data-pop'));
+                    if (p) { p.classList.add('on'); document.body.style.overflow = 'hidden'; }
+                });
+            });
+            function closeAll() { document.querySelectorAll('.fmPop.on').forEach(function (p) { p.classList.remove('on'); }); document.body.style.overflow = ''; }
+            document.querySelectorAll('[data-popclose]').forEach(function (b) { b.addEventListener('click', closeAll); });
+            document.querySelectorAll('[data-popmask]').forEach(function (m) { m.addEventListener('click', function (e) { if (e.target === m) closeAll(); }); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { fmGiftClose(); closeAll(); } });
+        }
+        if (document.readyState !== 'loading') bind();
+        else document.addEventListener('DOMContentLoaded', bind);
+    })();
+</script>
+}

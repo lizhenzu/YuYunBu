@@ -1,0 +1,580 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+@model BulletinBoard.ViewModels.BirthConfirmVM
+@{
+    Layout = null;
+    ViewData["Title"] = "내 생일 확인";
+
+    var displayName = string.IsNullOrWhiteSpace(Model.FullName)
+        ? (Model.UserName ?? "친구")
+        : Model.FullName;
+
+    var initial = string.IsNullOrWhiteSpace(displayName) ? "?" : displayName.Substring(0, 1);
+
+    var hasBirth = (Model.BMonth > 0 && Model.BDay > 0);
+
+    // ReturnUrl: 있으면 그쪽으로, 없으면 기본 선물 페이지
+    var giftUrl = string.IsNullOrWhiteSpace(Model.ReturnUrl)
+        ? $"/Present/Birth?userid={Model.UserId}"
+        : Model.ReturnUrl;
+
+    // ✅ birthDay_PublishYN 기본값(표시용)
+    var publish = string.IsNullOrWhiteSpace(Model.birthDay_PublishYN)
+        ? "y"
+        : Model.birthDay_PublishYN.Trim().ToLowerInvariant();
+
+    // ✅ "선물 고르기" 버튼 노출 조건: 생일이 1개월(31일) 이내일 때만
+    bool showGiftBtn = false;
+
+    if (hasBirth)
+    {
+        var today = DateHelper.GetKoreaNow();
+
+        var thisYear = today.Year;
+        DateTime thisYearBirth;
+        try
+        {
+            thisYearBirth = new DateTime(thisYear, Model.BMonth, Model.BDay);
+        }
+        catch
+        {
+            thisYearBirth = DateTime.MinValue;
+        }
+
+        DateTime nextBirth = thisYearBirth;
+        if (nextBirth != DateTime.MinValue && nextBirth < today)
+        {
+            try { nextBirth = new DateTime(thisYear + 1, Model.BMonth, Model.BDay); }
+            catch { nextBirth = DateTime.MinValue; }
+        }
+
+        if (nextBirth != DateTime.MinValue)
+        {
+            var days = (nextBirth - today).TotalDays;
+            showGiftBtn = (days >= 0 && days <= 31);
+        }
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        :root {
+            --bg: #f3f7ff;
+            --ink: #1f2a37;
+            --card: #fff;
+            --border: rgba(15,23,42,.10);
+            --shadow: 0 12px 28px rgba(15,23,42,.10);
+            --sun: #ffb703;
+            --sun2: #ffd166;
+            --ok: #2ecc71;
+            --ok2: #a8e6cf;
+            --danger: #b00020;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        .wrap {
+            max-width: 820px;
+            margin: 0 auto;
+            padding: 20px 14px 56px;
+        }
+
+        /* ===== Top Hero ===== */
+        .hero {
+            position: relative;
+            border-radius: 28px;
+            padding: 1.5rem;
+            background: radial-gradient(circle at top left, #e3f2fd 0%, #e8f5e9 40%, #fffde7 100%);
+            border: 2px solid rgba(25,118,210,.20);
+            box-shadow: 0 16px 34px rgba(33,150,243,.14);
+            overflow: hidden;
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -120px -140px auto;
+            width: 340px;
+            height: 340px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 35% 35%, rgba(255,183,3,.25), rgba(255,183,3,0) 62%);
+            pointer-events: none;
+        }
+
+        .deco {
+            position: absolute;
+            right: 14px;
+            top: 10px;
+            font-size: 1.7rem;
+            opacity: .55;
+            animation: floatSoft 3s ease-in-out infinite;
+        }
+
+        @@keyframes floatSoft {
+            0% { transform: translateY(0) }
+            50% { transform: translateY(-4px) }
+            100% { transform: translateY(0) }
+        }
+
+        .label {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .28rem .9rem;
+            border-radius: 999px;
+            background: rgba(25,118,210,.08);
+            border: 1px solid rgba(25,118,210,.28);
+            font-weight: 950;
+            color: #0d47a1;
+            font-size: .85rem;
+        }
+
+        .title {
+            margin: .65rem 0 .25rem;
+            font-size: 1.72rem;
+            font-weight: 1000;
+            color: #1b3a57;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .sub {
+            margin: 0;
+            color: #425b71;
+            font-weight: 800;
+            line-height: 1.6;
+        }
+
+        /* ===== Card ===== */
+        .card {
+            margin-top: 16px;
+            background: var(--card);
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .cardHead {
+            padding: 14px 14px 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 2px solid rgba(25,118,210,.24);
+            background: linear-gradient(135deg, #bbdefb, #c8e6c9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+            box-shadow: 0 8px 18px rgba(0,0,0,.08);
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .avatar .initial {
+            font-size: 1.65rem;
+            font-weight: 1000;
+            color: #1b3a57;
+        }
+
+        .who {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .who .name {
+            font-size: 1.2rem;
+            font-weight: 1000;
+            color: #16324a;
+        }
+
+        .who .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            font-size: .92rem;
+            font-weight: 800;
+            color: #546e7a;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,.08);
+            background: rgba(255,255,255,.9);
+            box-shadow: 0 3px 10px rgba(0,0,0,.05);
+            white-space: nowrap;
+        }
+
+        .pill-blue {
+            background: rgba(25,118,210,.08);
+            border-color: rgba(25,118,210,.18);
+            color: #0d47a1;
+        }
+
+        .pill-green {
+            background: rgba(46,204,113,.12);
+            border-color: rgba(46,204,113,.18);
+            color: #0f3d22;
+        }
+
+        .pill-warn {
+            background: rgba(255,183,3,.16);
+            border-color: rgba(255,183,3,.22);
+            color: #6a4300;
+        }
+
+        .cardBody {
+            padding: 14px;
+            border-top: 1px solid rgba(15,23,42,.06);
+        }
+
+        .notice {
+            background: #f8fbff;
+            border: 1px dashed rgba(25,118,210,.35);
+            border-radius: 18px;
+            padding: 12px;
+            color: #294a63;
+            line-height: 1.6;
+            font-weight: 850;
+        }
+
+        /* ===== Form sections ===== */
+        .section {
+            margin-top: 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(25,118,210,.03);
+            padding: 12px;
+        }
+
+        .sectionTitle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 1000;
+            color: #1b3a57;
+            margin-bottom: 10px;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .field {
+            border-radius: 16px;
+            border: 1px solid rgba(15,23,42,.12);
+            padding: 10px;
+            background: rgba(255,255,255,.8);
+        }
+
+        .field label {
+            display: block;
+            font-size: .86rem;
+            font-weight: 1000;
+            color: #1b3a57;
+            margin-bottom: 6px;
+        }
+
+        .field input {
+            width: 100%;
+            border: 0;
+            outline: none;
+            border-radius: 12px;
+            padding: 9px 10px;
+            font-size: 1.05rem;
+            font-weight: 1000;
+            background: rgba(25,118,210,.06);
+        }
+
+        .validation {
+            margin-top: 10px;
+            color: var(--danger);
+            font-weight: 900;
+        }
+
+        /* ===== Actions ===== */
+        .actions {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn {
+            border-radius: 16px;
+            padding: 12px 14px;
+            border: 0;
+            cursor: pointer;
+            font-weight: 1000;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .5rem;
+            min-width: 190px;
+            box-shadow: 0 10px 22px rgba(15,23,42,.10);
+            transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 26px rgba(15,23,42,.12);
+            opacity: .97;
+        }
+
+        .btnSave {
+            background: linear-gradient(135deg, var(--ok), var(--ok2));
+            color: #0f3d22;
+            border: 1px solid rgba(46,204,113,.35);
+        }
+
+        .btnLater {
+            background: #fff;
+            border: 1px solid rgba(15,23,42,.12);
+            color: #245074;
+        }
+
+        .btnHide {
+            background: linear-gradient(135deg, rgba(71,85,105,.95), rgba(15,23,42,.95));
+            border: 1px solid rgba(15,23,42,.20);
+            color: #fff;
+        }
+
+        .btnGift {
+            background: linear-gradient(135deg, var(--sun), var(--sun2));
+            color: #4a2c00;
+            border: 1px solid rgba(255,183,3,.55);
+        }
+
+        .btnGhost {
+            background: #fff;
+            border: 1px solid rgba(15,23,42,.12);
+            color: #245074;
+        }
+
+        @@media (max-width:560px) {
+            .grid2 { grid-template-columns: 1fr; }
+            .btn { width: 100%; min-width: 0; }
+        }
+    </style>
+</head>
+
+<body>
+<div class="wrap">
+
+    <section class="hero">
+        <div class="deco">🎈</div>
+        <div class="label">🎂 내 생일 설정</div>
+        <div class="title">내 생일 정보를 수정해 주세요!</div>
+        <p class="sub">
+            생일을 저장해 두면, 나중에 <b>생일 선물</b>을 받을 수 있어요 🎁<br />
+            지금 아니어도 괜찮아요. <b>다음에</b> 할 수도 있고, <b>비공개</b>로 숨길 수도 있어요 🙈<br />
+            부담 없이, 내 마음대로! 😄
+        </p>
+    </section>
+
+    <section class="card">
+        <div class="cardHead">
+            <div class="avatar">
+                @if (!string.IsNullOrWhiteSpace(Model.ProfilePicturePath))
+                {
+                    <img src="@Model.ProfilePicturePath" alt="@displayName"
+                         onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                }
+                else
+                {
+                    <span class="initial">@initial</span>
+                }
+            </div>
+
+            <div class="who">
+                <div class="name">@displayName</div>
+
+                <div class="meta">
+                    @if (hasBirth)
+                    {
+                        <span class="pill pill-blue">📅 내 생일: <b>@Model.BMonth/@Model.BDay</b></span>
+                    }
+                    else
+                    {
+                        <span class="pill pill-warn">📅 내 생일: <b>아직 없어요</b></span>
+                    }
+
+                    @* ✅ 화면에는 내부 코드(y/n/h) 안 보이게 "말"로만 표시 *@
+                    @if (publish == "h")
+                    {
+                        <span class="pill pill-warn">🙈 상태: <b>숨김</b></span>
+                    }
+                    else if (publish == "n")
+                    {
+                        <span class="pill pill-blue">⏳ 상태: <b>나중에</b></span>
+                    }
+                    else
+                    {
+                        <span class="pill pill-green">👀 상태: <b>공개</b></span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="cardBody">
+
+            <div class="notice">
+                ✏️ 생일이 다르면 아래에서 월/일을 바꾸고 <b>저장하기</b>를 눌러 주세요.<br />
+                원하시면 <b>내 생일 숨기기</b> 또는 <b>다음에 내 생일 설정하기</b>도 선택할 수 있어요.
+            </div>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="validation">
+                    @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>@e.ErrorMessage</div>
+                    }
+                </div>
+            }
+
+            <form method="post" asp-action="ConfirmBirth" asp-controller="HumanResource" autocomplete="off" id="birthForm">
+                @Html.AntiForgeryToken()
+
+                <input type="hidden" name="UserId" value="@Model.UserId" />
+                <input type="hidden" name="ReturnUrl" value="@giftUrl" />
+
+                <!-- ✅ 내부값(y/n/h)은 화면에 노출 안 함(숨김필드로만 전송) -->
+                <input type="hidden" name="BirthDay_PublishYN" id="BirthDay_PublishYN" value="y" />
+                <input type="hidden" name="SkipBirthValidation" id="SkipBirthValidation" value="false" />
+
+                <!-- 1) 생일 입력 -->
+                <div class="section">
+                    <div class="sectionTitle">🗓️ 내 생일 (월/일)</div>
+                    <div class="grid2">
+                        <div class="field">
+                            <label for="BMonth">월</label>
+                            <input id="BMonth" name="BMonth" type="number" min="0" max="12"
+                                   value="@(Model.BMonth > 0 ? Model.BMonth.ToString() : "")" required />
+                        </div>
+                        <div class="field">
+                            <label for="BDay">일</label>
+                            <input id="BDay" name="BDay" type="number" min="0" max="31"
+                                   value="@(Model.BDay > 0 ? Model.BDay.ToString() : "")" required />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2) 버튼 -->
+                <div class="actions">
+                    @if (showGiftBtn)
+                    {
+                        <a class="btn btnGift" href="@giftUrl">🎁 선물 고르기</a>
+                    }
+
+                    <button type="submit" class="btn btnSave" id="btnSave">💾 저장하기</button>
+                    <button type="button" class="btn btnHide" id="btnHide">🙈 내 생일 숨기기</button>
+                    <button type="button" class="btn btnLater" id="btnLater">⏳ 다음에 내 생일 설정하기</button>
+
+                    <a class="btn btnGhost" href="/">🏠 홈으로</a>
+                </div>
+            </form>
+
+        </div>
+    </section>
+
+</div>
+
+<script>
+    (function () {
+        const form = document.getElementById("birthForm");
+        const publishEl = document.getElementById("BirthDay_PublishYN");
+        const skipEl = document.getElementById("SkipBirthValidation");
+        const month = document.getElementById("BMonth");
+        const day = document.getElementById("BDay");
+
+        function setSkip(skip) {
+            if (skipEl) skipEl.value = skip ? "true" : "false";
+
+            // n/h 버튼일 때만 브라우저 required 검증을 꺼서 진행
+            if (month) {
+                if (skip) month.removeAttribute("required");
+                else month.setAttribute("required", "required");
+            }
+            if (day) {
+                if (skip) day.removeAttribute("required");
+                else day.setAttribute("required", "required");
+            }
+        }
+
+        // 저장하기(공개)
+        const btnSave = document.getElementById("btnSave");
+        if (btnSave) {
+            btnSave.addEventListener("click", function () {
+                if (publishEl) publishEl.value = "y";
+                setSkip(false);
+            });
+        }
+
+        // 다음에 설정
+        const btnLater = document.getElementById("btnLater");
+        if (btnLater) {
+            btnLater.addEventListener("click", function () {
+                if (publishEl) publishEl.value = "n";
+                setSkip(true);
+                form.submit();
+            });
+        }
+
+        // 숨기기
+        const btnHide = document.getElementById("btnHide");
+        if (btnHide) {
+            btnHide.addEventListener("click", function () {
+                if (publishEl) publishEl.value = "h";
+                setSkip(true);
+                form.submit();
+            });
+        }
+
+        // 기본값
+        if (publishEl) publishEl.value = "y";
+        setSkip(false);
+    })();
+</script>
+</body>
+</html>

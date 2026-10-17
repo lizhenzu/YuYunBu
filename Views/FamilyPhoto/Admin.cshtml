@@ -1,0 +1,182 @@
+﻿@model BulletinBoard.Models.FamilyPhoto.FamilyPhotoAdminVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@using BulletinBoard.Models.FamilyPhoto
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+
+@*  관리 — 실시간 합계 · 가족/사진 숨김 · PIN 초기화 · 발표하기.  Admin · SuperAdmin. *@
+
+@{
+    Layout = null;
+    var now = DateHelper.GetKoreaNow();
+    string dateText = now.ToString("yyyy.MM.dd") + " " + now.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+    string phaseText = Model.Phase switch
+    {
+        FamilyPhotoPhase.Before => "시작 전",
+        FamilyPhotoPhase.Upload => "올리기 기간",
+        FamilyPhotoPhase.Like   => "좋아요 기간",
+        _ => "마감",
+    };
+    int rank = 0;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>가족 사진 관리 — @ConstatsCommon.MainKeyTitle</title>
+<partial name="_FamilyPhotoStyle" />
+<style>
+    .qz .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); margin-top: 16px; background: #fff; }
+    .qz .stats div { padding: 12px 14px; border-right: 1px solid var(--rule); }
+    .qz .stats div:last-child { border-right: 0; }
+    .qz .stats b { display: block; font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; color: var(--tx); line-height: 1; }
+    .qz .stats b.acc { color: var(--acc); }
+    .qz .stats b.warn { color: var(--warn); }
+    .qz .stats span { font-size: 10px; letter-spacing: .14em; color: var(--dim); display: block; margin-top: 5px; white-space: nowrap; }
+    .qz .pub { margin-top: 14px; border: 1px solid var(--tx); background: #fff; padding: 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .qz .pub .t { font-family: "Noto Serif KR", serif; font-size: 15.5px; }
+    .qz .pub .s { font-size: 11px; color: var(--dim); margin-top: 3px; line-height: 1.6; }
+    .qz .fam .rk { font-family: "Inter", sans-serif; font-weight: 300; font-size: 20px; color: var(--acc); margin-right: 8px; }
+    .qz .fam .tot { font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px; color: var(--acc); }
+    .qz .fam .tot u { text-decoration: none; font-size: 9.5px; color: var(--dim); margin-left: 3px; letter-spacing: .1em; }
+    .qz .adm { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rule); }
+    .qz .ph .p { cursor: default; }
+    .qz .ph .p .sus { position: absolute; right: 6px; top: 6px; font-size: 9.5px; font-weight: 600; letter-spacing: .06em; background: var(--warn); color: #fff; padding: 2px 6px; }
+    .qz .ph .p .hidebtn { position: absolute; right: 6px; bottom: 6px; font-family: inherit; font-size: 9.5px; letter-spacing: .08em; border: 1px solid #16181C; background: rgba(247,246,243,.95); color: #16181C; padding: 3px 7px; cursor: pointer; }
+    .qz .ph .p.off .hidebtn { background: var(--acc); border-color: var(--acc); color: #fff; }
+    .qz .tag { font-size: 9.5px; font-weight: 600; letter-spacing: .06em; padding: 3px 7px; border: 1px solid var(--rule); color: var(--dim); white-space: nowrap; }
+    .qz .tag.off { background: var(--rule); color: var(--dim2); }
+    @@media (max-width: 640px) {
+        .qz .stats { grid-template-columns: repeat(2, 1fr); }
+        .qz .stats div:nth-child(2) { border-right: 0; }
+        .qz .stats div:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/FamilyPhoto">가족 사진</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>관리</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">ADMIN · @Cfg.Kicker</div>
+        <div class="brH1"><b>가족 사진 관리</b></div>
+        <div class="brSum">지금은 <b style="font-weight:600;color:var(--tx)">@phaseText</b> · 올리기 @Cfg.UploadStart.ToString("M.d")– (마감 없음) · 좋아요 투표 @Cfg.LikeStart.ToString("M.d")– (마감 없음 · 관리자는 지금도 투표 가능) · 발표 · 상품 전달 @Cfg.AnnounceDay.ToString("M.d"). 좋아요 수는 발표일 전까지 여기서만 보여요.</div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Toast)) { <div class="msg">@Model.Toast</div> }
+
+        <div class="stats">
+            <div><b>@Model.EntryCount</b><span>참여 가족</span></div>
+            <div><b>@Model.PhotoCount</b><span>사진</span></div>
+            <div><b class="acc">@Model.LikeTotal</b><span>좋아요 합계</span></div>
+            <div><b class="@(Model.HiddenCount > 0 ? "warn" : "")">@Model.HiddenCount</b><span>숨김</span></div>
+        </div>
+
+        <div class="pub">
+            <div>
+                <div class="t">@(Model.State.IsPublished ? "결과를 발표했어요" : "아직 발표 전이에요")</div>
+                <div class="s">
+                    @if (Model.State.IsPublished)
+                    {
+                        <text>@Model.State.PublishedAt?.ToString("M.d HH:mm") · @Model.State.PublishedBy — 결과 화면과 홈 배너에 순위가 보여요.</text>
+                    }
+                    else
+                    {
+                        <text>「발표하기」를 누르면 그 순간부터 누구나 결과 화면을 볼 수 있어요. 주일 예배 시간에 맞춰 누르세요.</text>
+                    }
+                </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <a class="btn line sm" href="/FamilyPhoto/Judge">심사 평가</a>
+                <a class="btn line sm" href="/FamilyPhoto/Result?preview=true">미리보기</a>
+                <form method="post" action="/FamilyPhoto/AdminPublish" onsubmit="return confirm('@(Model.State.IsPublished ? "발표를 되돌릴까요? 결과 화면이 다시 닫혀요." : "결과를 발표할까요? 누구나 순위를 볼 수 있게 돼요.")');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="published" value="@(Model.State.IsPublished ? "false" : "true")" />
+                    <button type="submit" class="btn sm @(Model.State.IsPublished ? "line" : "acc")">@(Model.State.IsPublished ? "발표 되돌리기" : "발표하기")</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="sec"><span style="letter-spacing:.2em;font-weight:600">가족 · 좋아요 순</span><span>@(Model.Entries.Count)가족 (숨김 포함)</span></div>
+
+        @if (Model.Entries.Count == 0) { <div class="empty">아직 참여한 가족이 없어요.</div> }
+
+        @foreach (var e in Model.Entries)
+        {
+            rank++;
+            <div class="fam @(e.IsHidden ? "off" : "")">
+                <div class="famH">
+                    <span class="famN"><span class="rk">@rank</span>@e.FamilyName<i>@(e.Photos.Count) PHOTOS · @e.CreatedAt.ToString("M.d HH:mm")</i>@if (e.IsHidden) { <span class="tag off" style="margin-left:8px">숨김</span> }</span>
+                    <span class="tot">@e.LikeTotal<u>LIKES</u></span>
+                </div>
+                <div class="ph">
+                    @for (int i = 0; i < e.Photos.Count; i++)
+                    {
+                        var p = e.Photos[i];
+                        Model.SuspiciousIpMax.TryGetValue(p.PhotoId, out var susMax);
+                        <div class="p @(i == 0 ? "wide" : "") @(p.IsHidden ? "off" : "")">
+                            <a href="@p.FilePath" target="_blank" rel="noopener"><img src="@p.ThumbPath" alt="" loading="lazy" /></a>
+                            <span class="cnt">@p.LikeCount</span>
+                            @if (susMax >= 10) { <span class="sus">한 IP @(susMax)표</span> }
+                            @if (!string.IsNullOrWhiteSpace(p.Caption)) { <span class="cap">@p.Caption</span> }
+                            <form method="post" action="/FamilyPhoto/AdminPhotoHidden" style="position:absolute;right:0;bottom:0">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="photoId" value="@p.PhotoId" />
+                                <input type="hidden" name="hidden" value="@(p.IsHidden ? "false" : "true")" />
+                                <button type="submit" class="hidebtn" style="position:static;margin:0 6px 6px 0">@(p.IsHidden ? "다시 보이기" : "사진 숨김")</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+                <div class="adm">
+                    <form method="post" action="/FamilyPhoto/AdminResetPin" onsubmit="return confirm('@e.FamilyName 의 비밀번호를 새로 만들까요? 새 번호는 한 번만 보여요.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="entryId" value="@e.EntryId" />
+                        <button type="submit" class="btn line sm">비밀번호 초기화</button>
+                    </form>
+                    <form method="post" action="/FamilyPhoto/AdminEntryHidden" onsubmit="return confirm('@(e.IsHidden ? "이 가족을 다시 보일까요?" : "이 가족을 갤러리에서 숨길까요?")');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="entryId" value="@e.EntryId" />
+                        <input type="hidden" name="hidden" value="@(e.IsHidden ? "false" : "true")" />
+                        <button type="submit" class="btn sm @(e.IsHidden ? "" : "line")">@(e.IsHidden ? "가족 다시 보이기" : "가족 숨김")</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        <div class="hint">「한 IP N표」는 같은 곳에서 한 사진에 10표 넘게 누른 경우예요. 집 와이파이라면 가족 여럿이 누른 것일 수 있어요 (한 IP 한도 @(Cfg.IpLimitPerPhoto)표).</div>
+
+        @if (User.IsInRole("SuperAdmin"))
+        {
+            <div class="sec"><span style="letter-spacing:.2em;font-weight:600;color:var(--warn)">전체 초기화 · SUPERADMIN</span><span>테스트 자료 정리용</span></div>
+            <form method="post" action="/FamilyPhoto/AdminResetAll" class="pub" style="border-color:var(--warn)"
+                  onsubmit="return confirm('가족 · 사진 · 좋아요 · 파일을 전부 지우고 발표도 되돌립니다. 되돌릴 수 없어요. 계속할까요?');">
+                @Html.AntiForgeryToken()
+                <div>
+                    <div class="t" style="color:var(--warn)">모든 참가 자료 지우기</div>
+                    <div class="s">테스트가 끝나면(9/23) 여기서 한 번에 비워요. 확인 칸에 <b style="color:var(--tx)">초기화</b> 라고 적고 누르세요.</div>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                    <input name="confirm" placeholder="초기화" style="width:90px;border:1px solid var(--rule);padding:8px 10px;font:inherit;font-size:12px" />
+                    <button type="submit" class="btn sm" style="background:var(--warn);border-color:var(--warn)">전부 지우기</button>
+                </div>
+            </form>
+        }
+
+        <div class="brFoot">
+            <span><a href="/FamilyPhoto">갤러리 →</a><a href="/">홈으로 →</a></span>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

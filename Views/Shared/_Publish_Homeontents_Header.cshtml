@@ -1,0 +1,113 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    string OneLineText = ViewData[HttpContextSessionCategory.OneLineText.ToString()] as string;
+    int OneLineTextID = (int)ViewData["OneLineTextID"];
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var sessionValue = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+
+    var visitDateInfoDatas = ViewBag.VisitDateInfoDatas as List<VisitDateInfoData>;
+    var DeptNM = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.DeptNM.ToString());
+}
+<style>
+
+    .no-select {
+        user-select: none;
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+    }
+    .formatted-text {
+        white-space: pre-wrap; /* 유지된 공백 및 줄바꿈 */
+        word-wrap: break-word; /* 너무 긴 단어를 자동으로 줄바꿈 */
+    }
+
+</style>
+<div class="content">
+    <h3 class="no-select" onclick="ManageUserInfo('@ViewData["UserId"]')">안녕하세요.</h3>
+    <h3>🌿 @ChurchName · @DepartmentName 입니다. 🌿</h3>
+
+    @if (!string.IsNullOrEmpty(UserFullName))
+    {
+        <img id="myImage" src="@ViewData["ProfilePicturePath"]" alt="Profile Picture" loading="lazy" onclick="ManageUserInfo('@ViewData["UserId"]')" class="profile-picture" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);">
+
+        <h5>(위 사진을 클릭해서 사진을 변경할 수 있어요~)</h5>
+        <h5>"@UserFullName"님!!!</h5>
+    }
+    else
+    {
+        <img id="myImage" src="@ConstatsCommon.representFaceImage" alt="Profile Picture" loading="lazy" onclick="location.href='/Identity/Account/Login'" class="profile-picture" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover;border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);">
+        <h5>(위 사진을 클릭해서 로그인할 수 있어요~)</h5>
+    }
+
+    @if (!string.IsNullOrEmpty(@DeptNM))
+    {
+        <h5>여기는 "@DeptNM" 공간 입니다.</h5>
+    }
+
+
+</div>
+
+@if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+{
+    <div class="content" style="background-color: #404040; ">
+        <h5>@BulletinBoard.Common.SharedComm.GetTodayStringKor()</h5>
+        <p>@ViewBag.DB_NAME</p>
+        <table>
+            <tr><td>CD</td><td style="text-align: right;">@ViewData["BessingChild"]    </td><td>-</td><td>-</td></tr>
+            <tr><td>HU</td><td style="text-align: right;">@ViewData["Husband"]         </td><td>WF</td><td style="text-align: right;">@ViewData["Wife"]</td></tr>
+            <tr><td>JM</td><td style="text-align: right;">@ViewData["JuManNa"]         </td><td>ROR</td><td style="text-align: right;">@ViewData["RhapsodyOfRealities"]</td></tr>
+            <tr><td>WK</td><td style="text-align: right;">@ViewData["WeeklyWordToRead"]</td><td>PF</td><td style="text-align: right;">@ViewData["PrayFreind"]</td></tr>
+            <tr><td>CK</td><td style="text-align: right;">@ViewData["Click"]           </td><td>-</td><td>-</td></tr>
+        </table>
+        <br />
+        <table>
+            @if (visitDateInfoDatas != null && visitDateInfoDatas.Count > 0)
+            {
+                foreach (var item in visitDateInfoDatas)
+                {
+                    <tr><td>@item.kind</td><td style="text-align: right;">@item.CreatedDate.ToString("yyyy-MM-dd HH:mm:ss")</td><td style="text-align: right;">@item.DCount</td></tr>
+                }
+            }
+        </table>
+        <br />
+
+        <div class="miss1ion">
+            <div class="mission-info" style="user-select: none;">
+                <button class="mission-button mission-button-color-6" onclick="location.href='Developer/ListALLTable'">세부이력</button>
+            </div>
+        </div>
+        <br />
+    </div>
+}
+
+
+@if (!string.IsNullOrEmpty(OneLineText))
+{
+    <div class="content" style="margin: 5px;border-radius: 7px;background-color:  #A5D6A7;color: #1B5E20;">
+        <h3 onclick="window.location.href='/OneLineFamousWord/Index'" style="user-select: none;">오늘의 명언(@OneLineTextID)</h3>
+        <h4 class="formatted-text">@OneLineText</h4>
+    </div>
+}
+
+<script>
+    function loadLatestImage() {
+        const imageElement = document.getElementById('myImage');
+        const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+        imageElement.src = `@ViewData["ProfilePicturePath"]?${timestamp}`;
+    }
+
+    // 페이지 로드 시 실행 또는 필요할 때 호출
+    window.onload = loadLatestImage;
+                // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+</script>

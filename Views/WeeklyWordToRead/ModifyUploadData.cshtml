@@ -1,0 +1,101 @@
+@model UploadDataWithID
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    var addUrl    = $"/FileUpload/Upload?category={Model.SelectedCategory}&WeeklyWordToReadID={Model.WeeklyWordToReadID}";
+    var lessonUrl = $"/WeeklyReport/IndexByID?Id={Model.WeeklyWordToReadID}";
+    var listUrl   = "/WeeklyWordToRead/WeeklyWordToReadDetailList";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>공과 자료 관리</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .ud { list-style: none; margin: 0; padding: 0; }
+        .ud li { border-bottom: 1px solid var(--line); }
+        .ud label { display: flex; align-items: center; gap: 12px; padding: 13px 2px; cursor: pointer; }
+        .ud label:hover { background: var(--card); }
+        .ud input[type=checkbox] { flex: none; width: 17px; height: 17px; accent-color: var(--acc); margin: 0; }
+        .ud .t { flex: 1; min-width: 0; font-size: 14.5px; word-break: break-all; }
+        .ud .id { flex: none; font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .ud li:has(input:checked) { background: var(--mark); }
+        .ok { margin-top: 18px; padding: 11px 14px; border-left: 2px solid var(--acc); background: var(--card); color: var(--acc); font-size: 14px; }
+        .fAct { justify-content: space-between; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="@listUrl">공과 목록</a></span>
+                <span>No. @Model.WeeklyWordToReadID</span>
+            </div>
+            <div class="hdK">MATERIALS · @Model.SelectedCategory</div>
+            <h1 class="hdT">공과 자료 관리</h1>
+            <div class="hdS">체크한 자료를 저장하거나 지울 수 있어요.</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="tb">
+            <a class="nbtn" href="@lessonUrl">← 공과 본문</a>
+            <a class="nbtn" href="@listUrl">공과 목록</a>
+            <span class="grow"></span>
+            <a class="nbtn pri" href="@addUrl">＋ 자료 추가</a>
+        </div>
+
+        @if (ViewBag.Message != null)
+        {
+            <div class="ok">@ViewBag.Message</div>
+        }
+
+        <form asp-action="SaveUploadData" method="post" class="fm">
+            <section class="sec" style="margin-top:0">
+                <div class="secH">
+                    <div><div class="secK">FILES</div><div class="secT">등록된 자료</div></div>
+                    <span class="secN">@Model.UploadDatas.Count 개</span>
+                </div>
+                @if (Model.UploadDatas.Count == 0)
+                {
+                    <div class="empty">등록된 자료가 없습니다.</div>
+                }
+                <ul class="ud">
+                    @for (int i = 0; i < Model.UploadDatas.Count; i++)
+                    {
+                        <li>
+                            <input type="hidden" asp-for="@Model.UploadDatas[i].UploadID" />
+                            <input type="hidden" asp-for="@Model.UploadDatas[i].TEXTData" />
+                            <input type="hidden" asp-for="@Model.UploadDatas[i].URLData" />
+                            <label>
+                                <input type="checkbox" asp-for="@Model.UploadDatas[i].checkData" />
+                                <span class="t">@Model.UploadDatas[i].TEXTData</span>
+                                <span class="id">#@Model.UploadDatas[i].UploadID</span>
+                            </label>
+                        </li>
+                    }
+                </ul>
+            </section>
+
+            <input type="hidden" id="WeeklyWordToReadID" name="WeeklyWordToReadID" value="@Model.WeeklyWordToReadID" />
+            <input type="hidden" id="SelectedCategory" name="SelectedCategory" value="@Model.SelectedCategory.ToString()" />
+
+            <div class="fAct" style="margin-top:18px">
+                <button type="submit" name="action" value="delete" class="nbtn dan" onclick="return confirm('체크한 자료를 삭제할까요?');">체크한 자료 삭제</button>
+                <button type="submit" name="action" value="save" class="nbtn pri">저장</button>
+            </div>
+        </form>
+
+        <div class="ft"><span>© 유년부 · 공과 자료</span></div>
+    </main>
+</body>
+</html>

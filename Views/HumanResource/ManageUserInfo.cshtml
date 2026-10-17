@@ -1,0 +1,231 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model BulletinBoard.Models.UserInfo
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    정보 관리 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 번호 목록 · 6묶음 한 화면)
+    · 예전 3단계 메뉴(/Admin/Index → /Admin/IndexPoint)를 이 화면으로 모았다.
+      옛 주소(/Admin/Index · /Admin/IndexPoint)는 AdminController 가 이 화면의 해당 묶음으로 보낸다.
+    · 권한은 아래 menu 목록 한 곳에서 줄마다 글자로 정한다  →  나중에 바꾸려면 이 글자만 고치면 된다.
+        "all" = 로그인한 누구나 · "AS" = Admin 롤(A) + SuperAdmin 롤(S) + "Basic" 계정 · "S" = SuperAdmin 롤만 · "SB" = SuperAdmin 롤 + "Basic" 계정 (Admin 롤은 제외)
+    · 권한 배지(A · S · 전체)와 아래 설명 줄은 2026-10-04 에 화면에서 뺐다(권한 판단은 위 글자 그대로 쓴다).
+    · 이전 화면은 ManageUserInfo.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdminRole  = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isBasicAcct = isSignedIn && string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
+
+    // 관리자(A) = Admin 롤 · SuperAdmin 롤 · 예외로 "Basic" 계정
+    bool isStaff = isSuperAdmin || isAdminRole || isBasicAcct;
+    string myRoleTxt = isSuperAdmin ? "SuperAdmin" : isAdminRole ? "Admin" : isBasicAcct ? "Basic" : "일반";
+
+    // 줄 하나가 이 사람에게 보이는가
+    bool Can(string roles)
+    {
+        if (roles == "all") return isSignedIn;
+        if (isSuperAdmin) return true;                       // S 는 모든 줄을 본다
+        if (roles.Contains('B') && isBasicAcct) return true; // B = "Basic" 계정에게만 추가로 열어 준다 (Admin 롤은 제외)
+        return (isAdminRole || isBasicAcct) && roles.Contains('A');
+    }
+
+    string uid = Model?.UserId ?? "";
+
+    // ── 메뉴 ─────────────────────────────────────────────────────
+    //  Group · Title · Desc · Url · Roles · Extras(작은 보조 링크: 라벨, 주소)
+    var X = new List<(string, string)>();
+    var menu = new List<(string Group, string Title, string Desc, string Url, string Roles, (string L, string U)[] Extras)>
+    {
+        // ① 내 정보
+        ("g1", "사진 정보 수정",   "프로필 사진 바꾸기",           $"/HumanResource/ModifyHRPhoto?UserId={uid}", "all", new (string,string)[0]),
+        ("g1", "나의 정보 수정",   "이름 · 연락처 · 생일",         "/Profile/Edit",                              "all", new (string,string)[0]),
+
+
+        // ③ 선물
+        ("g3", "통합 선물 관리",   "완독 선물 선택 · 구매 · 전달",  "/StudentPointDashboard4/AdminPurchaseList?kind=Bible", "AS", new (string,string)[0]),
+        ("g3", "생일자 선물 관리", "다가오는 생일자 선물",          "/Present/AdminUpcomingBirthdays",            "AS", new (string,string)[0]),
+        ("g3", "선물 아이템 관리", "등록 · 수정 · 삭제",            "/Present/AwardItemAdmin",                    "AS", new (string,string)[0]),
+
+        // ④ 콘텐츠 만들기
+        ("g4", "퀴즈 작성",         "퀴즈 쓰기 · 수정",             "/Question/QuestionDetailList",               "AS", new (string,string)[0]),
+        ("g4", "기도문 작성",       "",                            "/PrayPhrase/PrayPhraseDetailList",           "S", new (string,string)[0]),
+        ("g4", "공과 작성",         "",                            "/WeeklyWordToRead/WeeklyWordToReadDetailList", "S", new (string,string)[0]),
+        ("g4", "성경 입력",         "",                            "/BibleBulk/BibleMissingList",                "S", new (string,string)[0]),
+        ("g4", "퀴즈 대량 등록",    "",                            "/BibleBulk/EnrollBulkQuiz",                  "S", new (string,string)[0]),
+        ("g4", "퀴즈 답변 정정",    "맞지 않는 답변 기록 바로잡기",  "/CheckPoint/MismatchClickHistoryForQuestion", "S", new (string,string)[0]),
+        ("g4", "말씀 정리",         "월별 그룹 · 정리",             "/JuManNa/IndexGroupByYYYYMM",                "S", new (string,string)[0]),
+        ("g4", "명구 관리",         "명구 등록 · 정리",             "/OneLineFamousWord/Index",                   "S", new (string,string)[0]),
+
+        // ⑤ 사람 · 권한
+        ("g5", "이 사람 부서 정보 수정", "",                        $"/HumanResource/ChangeUserDeptInfoIntro?UserId={uid}", "S", new (string,string)[0]),
+        ("g5", "팀 구성",           "도전성경 팀 구성",             "/DailyMission2FamilyAdmin",                  "S", new (string,string)[0]),
+        ("g5", "Role 관리",         "Role 만들기 · 정리",           "/RoleManager/Index",                         "S", new (string,string)[0]),
+        ("g5", "사용자별 Role 설정", "사람마다 Role 지정",          "/UserRoles/Index",                           "S", new (string,string)[0]),
+
+        // ⑥ 운영 · 점검
+        ("g6", "이상 징후",         "이상 데이터 관리",             "/SuperAdminAnomaly/Index",                   "S", new (string,string)[0]),
+        ("g6", "사용자 접속 정보",   "접속 · 로그인 기록",           "/LoginHistMgmt/Index",                       "AS", new (string,string)[0]),
+        ("g6", "방문자 통계",         "홈 하루 · 누적 방문자 수",     "/SiteVisit/Index",                           "SB", new (string,string)[0]),
+    };
+
+    var groups = new[]
+    {
+        (Id: "g1", Name: "내 정보",        Roles: "all", Chip: "내 정보"),
+        (Id: "g3", Name: "선물",           Roles: "AS",  Chip: "선물"),
+        (Id: "g4", Name: "콘텐츠 만들기",   Roles: "AS",  Chip: "콘텐츠"),
+        (Id: "g5", Name: "사람 · 권한",     Roles: "S",   Chip: "사람·권한"),
+        (Id: "g6", Name: "운영 · 점검",     Roles: "AS",  Chip: "운영"),
+    };
+
+    // 이 사람에게 보이는 묶음만
+    var shown = groups.Where(g => menu.Any(m => m.Group == g.Id && Can(m.Roles))).ToList();
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>정보 관리</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; --red: #D9534F; }
+        html { scroll-behavior: smooth; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px 40px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { flex: none; color: var(--dim); }
+
+        .me { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
+        .me .av { flex: none; width: 56px; height: 56px; border-radius: 50%; background: var(--soft); overflow: hidden; display: grid; place-items: center; }
+        .me .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .me .k { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .me h1 { margin: 3px 0 0; font-size: 22px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .me .d { margin-top: 2px; font-size: 12px; color: var(--dim); }
+
+        .chips { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; padding: 8px 0; background: rgba(255,255,255,.96); }
+        .chips a { font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--grey); color: var(--dim2); white-space: nowrap; }
+        .chips a:hover { color: var(--blue); }
+
+        /* 분류 이름 = 회색 띠 위의 큰 제목 + 파란 막대 / 메뉴 항목 = 흰 바탕의 큰 글씨 (2026-10-04 A안 + B안 합친 버전) */
+        .sec { display: flex; align-items: center; gap: 10px; margin: 26px -16px 0; padding: 12px 16px; background: var(--grey); scroll-margin-top: 56px; }
+        .sec::before { content: ""; flex: none; width: 5px; height: 22px; border-radius: 3px; background: var(--blue); }
+        .sec b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .sec small { margin-left: auto; font-size: 12px; color: var(--dim2); }
+
+        .row { display: flex; align-items: center; gap: 10px; padding: 15px 2px; border-bottom: 1px solid var(--line); }
+        .row:last-of-type { border-bottom: 0; }
+        .row .n { flex: none; width: 26px; font-size: 14px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t b { display: block; font-size: 16px; font-weight: 700; color: var(--ink); transition: color .15s; }
+        .row .t small { display: block; margin-top: 1px; font-size: 12px; color: var(--dim2); }
+        .row:hover .t b { color: var(--blue); }
+        .ex { flex: none; display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; }
+        .ex a { font-size: 11px; font-weight: 800; color: var(--dim2); background: var(--grey); border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+        .ex a:hover { color: var(--blue); }
+        .rl { flex: none; display: inline-flex; gap: 3px; }
+        .rl i { font-style: normal; font-size: 10.5px; font-weight: 800; line-height: 1; border-radius: 6px; padding: 3px 5px; }
+        .rl i.a { color: var(--blue); background: var(--soft); }
+        .rl i.s { color: var(--red); background: #FDEEEE; }
+        .rl i.all { color: var(--dim2); background: var(--grey); }
+        .row .g { flex: none; font-size: 18px; font-weight: 300; color: #7FA3DB; }
+
+        .act { display: flex; gap: 8px; margin-top: 22px; }
+        .act a, .act button { flex: 1; height: 46px; border: 0; border-radius: 14px; display: grid; place-items: center; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .act .p { background: var(--soft); color: var(--blue); }
+        .act .s { background: var(--grey); color: var(--dim2); }
+        .act .p:hover { background: #DCEAFB; }
+        .legend { margin-top: 14px; font-size: 11.5px; color: var(--dim); text-align: center; }
+        .legend i { font-style: normal; font-weight: 800; margin: 0 2px; }
+    </style>
+</head>
+<body>
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>정보 관리</span>
+        <span>권한 @myRoleTxt</span>
+    </div>
+
+    <div class="me">
+        <div class="av"><img id="myImage" src="@Model.ProfilePicturePath" alt="" onerror="this.remove()"></div>
+        <div>
+            <div class="k">@(isStaff ? "MY & ADMIN" : "MY")</div>
+            <h1>@Model.FullName</h1>
+            <div class="d">@(isStaff ? "내 정보 · 관리 기능을 한곳에서" : "내 정보 관리")</div>
+        </div>
+    </div>
+
+    @if (shown.Count > 1)
+    {
+        <div class="chips">
+            @foreach (var g in shown)
+            {
+                <a href="#@g.Id">@g.Chip</a>
+            }
+        </div>
+    }
+
+    @{ int no = 0; }
+    @foreach (var g in shown)
+    {
+        <div class="sec" id="@g.Id"><b>@g.Name</b><small>@(menu.Count(x => x.Group == g.Id && Can(x.Roles)))개</small></div>
+        @foreach (var m in menu.Where(m => m.Group == g.Id && Can(m.Roles)))
+        {
+            no++;
+            <div class="row">
+                <span class="n">@(no.ToString("00"))</span>
+                <a class="t" href="@m.Url"><b>@m.Title</b>@if (!string.IsNullOrEmpty(m.Desc)) { <small>@m.Desc</small> }</a>
+                @if (m.Extras.Length > 0)
+                {
+                    <span class="ex">@foreach (var e in m.Extras) { <a href="@e.U">@e.L</a> }</span>
+                }
+                <a class="g" href="@m.Url" aria-hidden="true" tabindex="-1">›</a>
+            </div>
+        }
+    }
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <button class="s" type="button" onclick="logoutNow()">로그아웃</button>
+    </div>
+</div>
+
+<!-- 기존 로그아웃 폼 유지 -->
+<form id="logoutForm" class="form-inline" asp-area="Identity" asp-page="/Account/Logout"
+      asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })"
+      style="display:none;">
+    <button type="submit">로그아웃</button>
+</form>
+
+<script>
+    function logoutNow() {
+        var f = document.getElementById('logoutForm');
+        if (f) f.submit();
+    }
+
+    // 프로필 이미지 캐시 무력화 (최신 이미지 반영)
+    (function () {
+        var img = document.getElementById('myImage');
+        if (img) img.src = '@Model.ProfilePicturePath' + '?' + new Date().getTime();
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,433 @@
+@model BulletinBoard.Models.TeacherBookVM
+@{
+    Layout = null;
+    string T(string s) => string.IsNullOrWhiteSpace(s) ? "" : s;
+    // 진행N> 마커 기준으로 텍스트를 스텝 카드로 분할
+    System.Collections.Generic.List<(string stepNum, string content)> SplitSteps(string raw)
+    {
+        var result = new System.Collections.Generic.List<(string, string)>();
+        if (string.IsNullOrWhiteSpace(raw)) return result;
+        var lines = raw.Split('\n');
+        string curStep = ""; var curLines = new System.Collections.Generic.List<string>();
+        foreach (var line in lines)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(line.Trim(), @"^진행\s*([1-3])[>〉]\s*(.*)");
+            if (m.Success)
+            {
+                if (curLines.Count > 0 || curStep != "")
+                    result.Add((curStep, string.Join("\n", curLines).Trim()));
+                curStep = m.Groups[1].Value;
+                curLines = new System.Collections.Generic.List<string>();
+                if (m.Groups[2].Value.Trim() != "") curLines.Add(m.Groups[2].Value.Trim());
+            }
+            else { curLines.Add(line); }
+        }
+        if (curLines.Count > 0 || curStep != "")
+            result.Add((curStep, string.Join("\n", curLines).Trim()));
+        return result;
+    }
+    string NL(string s) => T(s).Replace("\n", "<br>");
+    string TimeFromContent(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "";
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"수업\s*진행\s*(\d+분)");
+        return m.Success ? m.Groups[1].Value : "";
+    }
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>@Model.LessonLabel — 교사용 공과</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --teal:    #3aaea0;
+  --teal-dk: #2a8e82;
+  --teal-lt: #e8f7f5;
+  --teal-bg: #f0faf8;
+  --amber:   #f59e0b;
+  --rose:    #e11d48;
+  --gray1:   #1f2937;
+  --gray2:   #374151;
+  --gray3:   #6b7280;
+  --gray4:   #d1d5db;
+  --gray5:   #f3f4f6;
+  --border:  #e5e7eb;
+  --serif:   'Noto Serif KR', serif;
+  --sans:    'Noto Sans KR', sans-serif;
+  --radius:  10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--gray1);background:#f9fafb;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+/* ── HEADER ── */
+.tb-header{background:var(--teal);position:sticky;top:0;z-index:100;padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(58,174,160,.35)}
+.tb-header-title{font-weight:700;font-size:15px;color:#fff;letter-spacing:.02em}
+.tb-nav{display:flex;gap:8px}
+.tb-nav a{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600;transition:background .15s}
+.tb-nav a:hover{background:rgba(255,255,255,.35)}
+.tb-nav a.disabled{opacity:.35;pointer-events:none}
+
+/* ── WRAPPER ── */
+.tb-wrap{max-width:860px;margin:0 auto;padding:28px 16px 80px}
+
+/* ── COVER CARD ── */
+.cover-card{border-radius:var(--radius);overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.10);margin-bottom:28px}
+.cover-band{background:linear-gradient(135deg,var(--teal-dk),var(--teal));padding:28px 32px 22px;color:#fff}
+.cover-unit{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;opacity:.8;margin-bottom:6px}
+.cover-lesson{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.cover-num{font-family:var(--serif);font-size:52px;font-weight:700;line-height:1;opacity:.85}
+.cover-gwak{font-size:22px;font-weight:700}
+.cover-title{font-family:var(--serif);font-size:1.55rem;font-weight:700;line-height:1.3;margin-top:4px}
+.cover-body{background:#fff;padding:0}
+.cover-table{width:100%;border-collapse:collapse}
+.cover-table td{padding:12px 20px;vertical-align:top;border-bottom:1px solid var(--border);font-size:14px}
+.cover-table tr:last-child td{border-bottom:none}
+.cover-table .ct-label{width:90px;font-weight:700;color:var(--teal-dk);white-space:nowrap;background:var(--teal-bg)}
+.cover-table .ct-val{color:var(--gray2)}
+.cover-table .ct-verse{font-family:var(--serif);font-style:italic;color:var(--gray2);line-height:1.8}
+
+/* ── SECTION CARD ── */
+.sec-card{border-radius:var(--radius);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.07);margin-bottom:22px;border:1px solid var(--border)}
+.sec-head{background:var(--teal);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.sec-head.amber{background:#d97706}
+.sec-head.slate{background:#475569}
+.sec-title{font-size:14.5px;font-weight:700;letter-spacing:.02em}
+.sec-time{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.3);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600}
+.sec-body{background:#fff;padding:0}
+
+/* ── TEACHER STUDY ── */
+.teacher-study{background:var(--gray5);padding:22px 24px}
+.ts-title{font-size:16px;font-weight:700;color:var(--gray1);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ts-title::before{content:'';display:inline-block;width:4px;height:20px;background:var(--teal);border-radius:2px}
+.ts-content{font-size:13.5px;color:var(--gray2);line-height:1.9;white-space:pre-line}
+
+/* ── STEP CARD ── */
+.step-list{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.step-item{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.step-head{background:var(--teal-lt);padding:8px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.step-num{background:var(--teal);color:#fff;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;flex-shrink:0}
+.step-label{font-size:13px;font-weight:700;color:var(--teal-dk)}
+.step-content{padding:14px 16px;font-size:13.5px;color:var(--gray2);line-height:1.85;white-space:pre-line}
+
+/* ── WORD GLASSES ── */
+.wg-box{margin:0 20px 16px;background:linear-gradient(135deg,var(--teal-bg),#fff);border:2px solid var(--teal);border-radius:10px;padding:16px 20px;display:flex;align-items:flex-start;gap:12px}
+.wg-icon{font-size:28px;flex-shrink:0}
+.wg-label{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--teal-dk);margin-bottom:4px}
+.wg-text{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--gray1);line-height:1.5}
+
+/* ── TEACHER TIP ── */
+.tip-box{margin:0 20px 16px;background:#fffbeb;border-left:4px solid var(--amber);border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#92400e;white-space:pre-line}
+.tip-box strong{display:block;margin-bottom:4px;font-weight:700}
+
+/* ── PRAYER BOX ── */
+.prayer-box{margin:0 20px 20px;background:linear-gradient(135deg,#f0fdf4,#fff);border:2px solid #86efac;border-radius:10px;padding:18px 20px}
+.prayer-label{font-size:11px;font-weight:700;letter-spacing:.12em;color:#16a34a;margin-bottom:8px}
+.prayer-text{font-family:var(--serif);font-size:14px;color:var(--gray2);line-height:1.9;white-space:pre-line}
+
+/* ── NO-CONTENT ── */
+.no-content{padding:24px 20px;color:var(--gray3);font-size:13px;text-align:center}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{display:flex;justify-content:space-between;margin-top:32px;gap:12px}
+.bottom-nav a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;background:#fff;border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;color:var(--gray2);transition:all .15s;max-width:240px}
+.bottom-nav a:hover{border-color:var(--teal);color:var(--teal);background:var(--teal-bg)}
+.bottom-nav a.disabled{opacity:.35;pointer-events:none}
+.bottom-nav .spacer{flex:1}
+
+/* ── RESPONSIVE ── */
+@@media(max-width:600px){
+  .cover-num{font-size:38px}
+  .cover-band{padding:20px 18px 16px}
+  .cover-title{font-size:1.2rem}
+  .tb-wrap{padding:16px 10px 60px}
+  .wg-box{margin:0 12px 14px}
+  .tip-box,.prayer-box{margin:0 12px 14px}
+  .step-list{padding:12px 12px}
+}
+</style>
+</head>
+<body>
+
+<header class="tb-header">
+  <div class="tb-header-title">📖 교사용 공과 — @Model.LessonLabel</div>
+  <nav class="tb-nav">
+    @if (!string.IsNullOrEmpty(Model.PrevLessonKey))
+    {
+      <a href="/viewTeacherBooks/@Model.PrevLessonKey">◀ 이전</a>
+    }
+    <a href="/TeacherBooks/List">목록</a>
+    @if (!string.IsNullOrEmpty(Model.NextLessonKey))
+    {
+      <a href="/viewTeacherBooks/@Model.NextLessonKey">다음 ▶</a>
+    }
+  </nav>
+</header>
+
+<div class="tb-wrap">
+
+  @* ══════════════════════════════════════
+     1. COVER — 과 표지
+  ══════════════════════════════════════ *@
+  <div class="cover-card">
+    <div class="cover-band">
+      @if (Model.UnitNumber.HasValue)
+      {
+        <div class="cover-unit">@(Model.UnitNumber)단원 &nbsp;·&nbsp; @T(Model.UnitTitle)</div>
+      }
+      <div class="cover-lesson">
+        @if (Model.LessonNumber.HasValue)
+        {
+          <span class="cover-num">@Model.LessonNumber</span>
+          <span class="cover-gwak">과</span>
+        }
+        else
+        {
+          <span class="cover-gwak">@Model.LessonLabel</span>
+        }
+      </div>
+      <div class="cover-title">@T(Model.LessonTitle)</div>
+    </div>
+    <table class="cover-table">
+      @if (!string.IsNullOrWhiteSpace(Model.BibleTextRef))
+      {
+        <tr>
+          <td class="ct-label">본 문</td>
+          <td class="ct-val">@T(Model.BibleTextRef)</td>
+        </tr>
+      }
+      @if (!string.IsNullOrWhiteSpace(Model.MemoryVerseRef) || !string.IsNullOrWhiteSpace(Model.MemoryVerseText))
+      {
+        <tr>
+          <td class="ct-label">외울말씀</td>
+          <td class="ct-val">
+            @if (!string.IsNullOrWhiteSpace(Model.MemoryVerseRef))
+            {
+              <div style="font-size:12px;color:var(--teal-dk);font-weight:600;margin-bottom:4px">@T(Model.MemoryVerseRef)</div>
+            }
+            <div class="ct-verse">@T(Model.MemoryVerseText)</div>
+          </td>
+        </tr>
+      }
+      @if (!string.IsNullOrWhiteSpace(Model.LearningObjective))
+      {
+        <tr>
+          <td class="ct-label">학습요점</td>
+          <td class="ct-val">@T(Model.LearningObjective)</td>
+        </tr>
+      }
+      @if (!string.IsNullOrWhiteSpace(Model.ApplicationText))
+      {
+        <tr>
+          <td class="ct-label">적 용</td>
+          <td class="ct-val">@T(Model.ApplicationText)</td>
+        </tr>
+      }
+    </table>
+  </div>
+
+  @* ══════════════════════════════════════
+     2. 교사들을 위한 본문 이해
+  ══════════════════════════════════════ *@
+  @if (!string.IsNullOrWhiteSpace(Model.TeacherStudyTitle) || !string.IsNullOrWhiteSpace(Model.TeacherStudyContent))
+  {
+    <div class="sec-card">
+      <div class="sec-head slate">
+        <span class="sec-title">📚 교사들을 위한 본문 이해</span>
+      </div>
+      <div class="teacher-study">
+        @if (!string.IsNullOrWhiteSpace(Model.TeacherStudyTitle))
+        {
+          <div class="ts-title">@T(Model.TeacherStudyTitle)</div>
+        }
+        <div class="ts-content">@T(Model.TeacherStudyContent)</div>
+      </div>
+    </div>
+  }
+
+  @* ══════════════════════════════════════
+     3. 단원 소개 및 선생님과 함께
+  ══════════════════════════════════════ *@
+  @if (!string.IsNullOrWhiteSpace(Model.UnitIntroContent))
+  {
+    var introTime = TimeFromContent(Model.UnitIntroContent);
+    var introSteps = SplitSteps(Model.UnitIntroContent);
+    <div class="sec-card">
+      <div class="sec-head">
+        <span class="sec-title">🤝 단원 소개 및 선생님과 함께</span>
+        @if (!string.IsNullOrEmpty(introTime)) { <span class="sec-time">⏱ @introTime</span> }
+      </div>
+      <div class="sec-body">
+        @if (introSteps.Count > 0)
+        {
+          <div class="step-list">
+            @foreach (var s in introSteps)
+            {
+              <div class="step-item">
+                @if (!string.IsNullOrEmpty(s.stepNum))
+                {
+                  <div class="step-head">
+                    <div class="step-num">@s.stepNum</div>
+                    <span class="step-label">진행 @s.stepNum</span>
+                  </div>
+                }
+                <div class="step-content">@s.content</div>
+              </div>
+            }
+          </div>
+        }
+        else { <div class="no-content">내용 없음</div> }
+      </div>
+    </div>
+  }
+
+  @* ══════════════════════════════════════
+     4. 성경적 세계관 배우기
+  ══════════════════════════════════════ *@
+  @if (!string.IsNullOrWhiteSpace(Model.LearnContent))
+  {
+    var learnTime = TimeFromContent(Model.LearnContent);
+    var learnSteps = SplitSteps(Model.LearnContent);
+    <div class="sec-card">
+      <div class="sec-head">
+        <span class="sec-title">📖 성경적 세계관 배우기</span>
+        @if (!string.IsNullOrEmpty(learnTime)) { <span class="sec-time">⏱ @learnTime</span> }
+      </div>
+      <div class="sec-body">
+        @if (learnSteps.Count > 0)
+        {
+          <div class="step-list">
+            @foreach (var s in learnSteps)
+            {
+              <div class="step-item">
+                @if (!string.IsNullOrEmpty(s.stepNum))
+                {
+                  <div class="step-head">
+                    <div class="step-num">@s.stepNum</div>
+                    <span class="step-label">진행 @s.stepNum</span>
+                  </div>
+                }
+                <div class="step-content">@s.content</div>
+              </div>
+            }
+          </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.WordGlassesText))
+        {
+          <div class="wg-box">
+            <div class="wg-icon">👓</div>
+            <div>
+              <div class="wg-label">말씀 안경</div>
+              <div class="wg-text">@T(Model.WordGlassesText)</div>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @* ══════════════════════════════════════
+     5. 성경적 세계관 살아가기
+  ══════════════════════════════════════ *@
+  @if (!string.IsNullOrWhiteSpace(Model.LiveContent))
+  {
+    var liveTime = TimeFromContent(Model.LiveContent);
+    var liveSteps = SplitSteps(Model.LiveContent);
+    <div class="sec-card">
+      <div class="sec-head amber">
+        <span class="sec-title">🌱 성경적 세계관 살아가기</span>
+        @if (!string.IsNullOrEmpty(liveTime)) { <span class="sec-time">⏱ @liveTime</span> }
+      </div>
+      <div class="sec-body">
+        @if (liveSteps.Count > 0)
+        {
+          <div class="step-list">
+            @foreach (var s in liveSteps)
+            {
+              <div class="step-item">
+                @if (!string.IsNullOrEmpty(s.stepNum))
+                {
+                  <div class="step-head">
+                    <div class="step-num">@s.stepNum</div>
+                    <span class="step-label">진행 @s.stepNum</span>
+                  </div>
+                }
+                <div class="step-content">@s.content</div>
+              </div>
+            }
+          </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.TeacherTip))
+        {
+          <div class="tip-box">
+            <strong>💡 교사 꿀팁</strong>@T(Model.TeacherTip)
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @* ══════════════════════════════════════
+     6. 마무리
+  ══════════════════════════════════════ *@
+  @if (!string.IsNullOrWhiteSpace(Model.ClosingContent) || !string.IsNullOrWhiteSpace(Model.PrayerText))
+  {
+    var closeTime = TimeFromContent(Model.ClosingContent ?? "");
+    var closeSteps = SplitSteps(Model.ClosingContent ?? "");
+    <div class="sec-card">
+      <div class="sec-head" style="background:#7c3aed">
+        <span class="sec-title">🙏 마무리</span>
+        @if (!string.IsNullOrEmpty(closeTime)) { <span class="sec-time">⏱ @closeTime</span> }
+      </div>
+      <div class="sec-body">
+        @if (closeSteps.Count > 0)
+        {
+          <div class="step-list">
+            @foreach (var s in closeSteps)
+            {
+              <div class="step-item">
+                @if (!string.IsNullOrEmpty(s.stepNum))
+                {
+                  <div class="step-head">
+                    <div class="step-num">@s.stepNum</div>
+                    <span class="step-label">진행 @s.stepNum</span>
+                  </div>
+                }
+                <div class="step-content">@s.content</div>
+              </div>
+            }
+          </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.PrayerText))
+        {
+          <div class="prayer-box">
+            <div class="prayer-label">🙏 기도하기</div>
+            <div class="prayer-text">@T(Model.PrayerText)</div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @* ── 하단 이전/다음 ── *@
+  <div class="bottom-nav">
+    @if (!string.IsNullOrEmpty(Model.PrevLessonKey))
+    {
+      <a href="/viewTeacherBooks/@Model.PrevLessonKey">◀ @(Model.PrevLessonNumber.HasValue ? Model.PrevLessonNumber+"과" : Model.PrevLessonKey)</a>
+    }
+    else { <div class="spacer"></div> }
+    <a href="/TeacherBooks/List" style="background:var(--teal);color:#fff;border-color:var(--teal)">📋 목록</a>
+    @if (!string.IsNullOrEmpty(Model.NextLessonKey))
+    {
+      <a href="/viewTeacherBooks/@Model.NextLessonKey">@(Model.NextLessonNumber.HasValue ? Model.NextLessonNumber+"과" : Model.NextLessonKey) ▶</a>
+    }
+    else { <div class="spacer"></div> }
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,346 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.JuManNas
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    string WeeklyString = $"{@Model.ExposeDate.Year}년 {@Model.ExposeDate.Month}월{@Model.ExposeDate.Day}일 {@Model.WeekDayKor}요일";
+
+    string JanZulString = SharedComm.MakeBibleSerialJangZul(Model.BibleText, Model.FromJang, Model.FromZul, Model.ToJang, Model.ToZul);
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@ChurchName · @DepartmentName</title>
+
+<style>
+  body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
+  .container { width: 98%; max-width: 600px; margin: 5px auto; background-color: white; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); overflow: hidden; }
+  .container2 { width: 98%; max-width: 600px; margin: 5px auto; border-radius: 10px; overflow: hidden; }
+  .header { background-color: #d2b48c; padding: 20px; text-align: center; color: white; border-bottom: 1px solid #ccc; }
+  .header h1 { margin: 0; }
+
+  .medication-card { display: flex; justify-content: space-between; padding: 13px; border-bottom: 1px solid #ccc; position: relative; }
+  .medication-card:last-child { border-bottom: none; }
+
+  .medication-info { display: flex; align-items: center; }
+  .medication-info img { margin-right: 5px; }
+  .medication-info div { font-size: 16px; }
+  .medication-time { color: #777; padding: 5px; }
+
+  .footer { display: flex; padding: 10px 0; justify-content: space-between; align-items: center; background-color: #d2b48c; }
+  .footer img { width: 50px; height: 50px; margin: 0 10px; }
+
+  a.button-hyperlink, a.local-textPhrase {
+    padding: 3px; color: #007bff; text-decoration: none; border-radius: 4px;
+    transition: all .3s ease; right: 3px; top: 3px;
+  }
+  a.button-hyperlink:hover, a.local-textPhrase:hover { background-color: #007bff; color: #fff; }
+
+  .icon-foreground {
+    background: #0d792d; width: 59px; height: 59px; color: white; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; box-shadow: 0 4px 8px rgba(0,0,0,.3); border-radius: 50%; z-index: 3;
+  }
+
+  .text-font-bold { font-weight: bold; }
+  .text-color-bold { font-weight: bold; color: #006633; }
+
+  /* 모달 */
+  .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,.6); }
+  .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 70%; max-width: 700px; text-align: center; position: relative; }
+  .closeBtn { position: absolute; top: 10px; right: 15px; color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+  .closeBtn:hover { color: #000; }
+
+  /* 반응형 */
+  @@media (max-width: 768px) {
+    .modal-content { width: 90%; margin: 20% auto; }
+    #player { width: 100% !important; height: auto !important; aspect-ratio: 16 / 9; }
+  }
+
+  /* 재생 버튼 스타일 (텍스트 div를 버튼처럼) */
+  .openModalBtn {
+    display: inline-block;
+    padding: 6px 10px;
+    background-color: #388e3c;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .openModalBtn:hover { background-color: #2e7d32; }
+</style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <p>매일성경 묵상 노트</p>
+      <p>@WeeklyString</p>
+      <h2>@Model.BibleSubject</h2>
+    </div>
+
+    <div class="medication-card">
+      <div class="medication-info">
+        <div>
+          <div class="text-font-bold text-color-bold">오늘의 말씀</div>
+          <div class="medication-time">
+            @JanZulString
+            <a href="/DailyMission/BibleSheet?ControllerSource=@ControllerSource&ActionSource=@ActionSource&Id=@Model.Id" class="button-hyperlink">본문읽기</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @* ===== 유튜브 카드들 ===== *@
+    @if (!string.IsNullOrEmpty(@Model.URL))
+    {
+        string startTimeMMSS   = $"{Model.YouTuBuStartMM}:{Model.YouTuBuStartSS:D2} ~ {Model.YouTuBuEndMM}:{Model.YouTuBuEndSS:D2}";
+        int startSec           = (Model.YouTuBuStartMM * 60) + Model.YouTuBuStartSS;
+        int endSec             = (Model.YouTuBuEndMM * 60)   + Model.YouTuBuEndSS;
+
+        <div class="medication-card">
+          <div class="medication-info">
+            <div>
+              <div class="text-font-bold text-color-bold">유튜브 정보</div>
+              <div class="medication-time">@Model.URL</div>
+              <div class="medication-time">00:00 ~ @Model.TimeMM:@Model.TimeSS</div>
+              <div class="medication-time openModalBtn"
+                   data-video-id="@Model.URL"
+                   data-start="@startSec"
+                   data-end="@endSec">
+                   Play Video @startTimeMMSS
+              </div>
+            </div>
+          </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(@Model.URL2))
+    {
+        string startTimeMMSS2  = $"{Model.YouTuBuStartMM2}:{Model.YouTuBuStartSS2:D2} ~ {Model.YouTuBuEndMM2}:{Model.YouTuBuEndSS2:D2}";
+        int startSec2          = (Model.YouTuBuStartMM2 * 60) + Model.YouTuBuStartSS2;
+        int endSec2            = (Model.YouTuBuEndMM2 * 60)   + Model.YouTuBuEndSS2;
+
+        <div class="medication-card">
+          <div class="medication-info">
+            <div>
+              <div class="text-font-bold text-color-bold">유튜브 정보</div>
+              <div class="medication-time">@Model.URL2</div>
+              <div class="medication-time">00:00 ~ @Model.TimeMM2:@Model.TimeSS2</div>
+              <div class="medication-time openModalBtn"
+                   data-video-id="@Model.URL2"
+                   data-start="@startSec2"
+                   data-end="@endSec2">
+                   Play Video @startTimeMMSS2
+              </div>
+            </div>
+          </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(@Model.URL3))
+    {
+        string startTimeMMSS3  = $"{Model.YouTuBuStartMM3}:{Model.YouTuBuStartSS3:D2} ~ {Model.YouTuBuEndMM3}:{Model.YouTuBuEndSS3:D2}";
+        int startSec3          = (Model.YouTuBuStartMM3 * 60) + Model.YouTuBuStartSS3;
+        int endSec3            = (Model.YouTuBuEndMM3 * 60)   + Model.YouTuBuEndSS3;
+
+        <div class="medication-card">
+          <div class="medication-info">
+            <div>
+              <div class="text-font-bold text-color-bold">유튜브 정보</div>
+              <div class="medication-time">@Model.URL3</div>
+              <div class="medication-time">00:00 ~ @Model.TimeMM3:@Model.TimeSS3</div>
+              <div class="medication-time openModalBtn"
+                   data-video-id="@Model.URL3"
+                   data-start="@startSec3"
+                   data-end="@endSec3">
+                   Play Video @startTimeMMSS3
+              </div>
+            </div>
+          </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(@Model.URL4))
+    {
+        string startTimeMMSS4  = $"{Model.YouTuBuStartMM4}:{Model.YouTuBuStartSS4:D2} ~ {Model.YouTuBuEndMM4}:{Model.YouTuBuEndSS4:D2}";
+        int startSec4          = (Model.YouTuBuStartMM4 * 60) + Model.YouTuBuStartSS4;
+        int endSec4            = (Model.YouTuBuEndMM4 * 60)   + Model.YouTuBuEndSS4;
+
+        <div class="medication-card">
+          <div class="medication-info">
+            <div>
+              <div class="text-font-bold text-color-bold">유튜브 정보</div>
+              <div class="medication-time">@Model.URL4</div>
+              <div class="medication-time">00:00 ~ @Model.TimeMM4:@Model.TimeSS4</div>
+              <div class="medication-time openModalBtn"
+                   data-video-id="@Model.URL4"
+                   data-start="@startSec4"
+                   data-end="@endSec4">
+                   Play Video @startTimeMMSS4
+              </div>
+            </div>
+          </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(@Model.URL5))
+    {
+        string startTimeMMSS5  = $"{Model.YouTuBuStartMM5}:{Model.YouTuBuStartSS5:D2} ~ {Model.YouTuBuEndMM5}:{Model.YouTuBuEndSS5:D2}";
+        int startSec5          = (Model.YouTuBuStartMM5 * 60) + Model.YouTuBuStartSS5;
+        int endSec5            = (Model.YouTuBuEndMM5 * 60)   + Model.YouTuBuEndSS5;
+
+        <div class="medication-card">
+          <div class="medication-info">
+            <div>
+              <div class="text-font-bold text-color-bold">유튜브 정보</div>
+              <div class="medication-time">@Model.URL5</div>
+              <div class="medication-time">00:00 ~ @Model.TimeMM5:@Model.TimeSS5</div>
+              <div class="medication-time openModalBtn"
+                   data-video-id="@Model.URL5"
+                   data-start="@startSec5"
+                   data-end="@endSec5">
+                   Play Video @startTimeMMSS5
+              </div>
+            </div>
+          </div>
+        </div>
+    }
+
+    @* ===== 모달 ===== *@
+    <div id="myModal" class="modal">
+      <div class="modal-content">
+        <span class="closeBtn" onclick="closeModal()">&times;</span>
+        <div id="player"></div>
+      </div>
+    </div>
+
+    @* ===== 텍스트 섹션 ===== *@
+    @if (!string.IsNullOrEmpty(@Model.Synopsis))
+    {
+      <div class="medication-card">
+        <div class="medication-info">
+          <div>
+            <div class="text-font-bold text-color-bold">말씀 Synopsis</div>
+            <div class="medication-time">@Model.Synopsis</div>
+          </div>
+        </div>
+      </div>
+    }
+
+    @if (!string.IsNullOrEmpty(@Model.BibleSummary))
+    {
+      <div class="medication-card">
+        <div class="medication-info">
+          <div>
+            <div class="text-font-bold text-color-bold">말씀요약</div>
+            <div class="medication-time">@Model.BibleSummary</div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="footer">
+    <img src="/images/icon/list/fileList_01.webp" class="icon-foreground" onclick="redirectToPage('/JuManNa/IndexGroupByYYYYMM')" alt="GoBack">
+
+    @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+    {
+      <img src="/images/ICON/list/fileModify.webp" class="icon-foreground" onclick="redirectToPage('/JuManNa/ModifyJuManNa?Id=@Model.Id')" alt="Modify">
+            <img src="/images/ICON/list/fileModify.webp" class="icon-foreground" onclick="redirectToPage('/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@Model.ExposeDate.ToString("yyyy-MM")')" alt="Modify">
+    }
+    <img src="/images/ICON/list/fileHome.webp" class="icon-foreground" onclick="redirectToPage('/')" alt="Home">
+    <img src="/images/ICON/quiz/toGoQuiz004.webp" class="icon-foreground" onclick="redirectToPage('/Question')" alt="Question">
+    <img src="/images/ICON/mission/Mission.webp" class="icon-foreground" onclick="redirectToPage('/Home/MissionMainBoard')" alt="Home">
+  </div>
+
+  <script>
+    function redirectToPage(URL) { window.location.href = URL; }
+  </script>
+
+  <script>
+    // ===== 모달/플레이어 상태 =====
+    const modal = document.getElementById("myModal");
+    let player = null;
+    let loopTimer = null;
+    let currentStart = 0;
+    let currentEnd = 0;
+
+    // 여러 버튼 바인딩
+    document.querySelectorAll('.openModalBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const videoId = btn.dataset.videoId;
+        currentStart = parseFloat(btn.dataset.start) || 0;
+        currentEnd   = parseFloat(btn.dataset.end)   || 0;
+
+        modal.style.display = "block";
+        ensurePlayer(videoId, currentStart);
+      });
+    });
+
+    function closeModal() {
+      modal.style.display = "none";
+      if (player && typeof player.pauseVideo === 'function') player.pauseVideo();
+      if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+    }
+
+    // ===== YouTube Iframe API 로드 =====
+    (function loadYT() {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const first = document.getElementsByTagName('script')[0];
+      first.parentNode.insertBefore(tag, first);
+    })();
+
+    let ytReady = false;
+    function onYouTubeIframeAPIReady() { ytReady = true; }
+
+    function ensurePlayer(videoId, startSec) {
+      if (!ytReady || !window.YT || !YT.Player) {
+        return setTimeout(() => ensurePlayer(videoId, startSec), 100);
+      }
+      if (player) {
+        player.loadVideoById({ videoId, startSeconds: startSec });
+      } else {
+        player = new YT.Player('player', {
+          height: '360',
+          width: '640',
+          videoId: videoId,
+          playerVars: { autoplay: 1, controls: 1, modestbranding: 1 },
+          events: {
+            onReady: (e) => { e.target.seekTo(startSec, true); e.target.playVideo(); },
+            onStateChange: onPlayerStateChange
+          }
+        });
+      }
+    }
+
+    function onPlayerStateChange(e) {
+      if (e.data === YT.PlayerState.PLAYING) {
+        if (loopTimer) clearInterval(loopTimer);
+        loopTimer = setInterval(() => {
+          if (!currentEnd) return;
+          const t = player?.getCurrentTime?.() || 0;
+          if (t >= currentEnd) player.seekTo(currentStart, true);
+        }, 250);
+      } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
+        if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+﻿@model List<BulletinBoard.ViewModels.Worldview.HeaderTitleCardRow>
+@{
+    Layout = null;
+    var activeLessonNo = (int)(ViewBag.ActiveLessonNo ?? 1);
+    var msg = TempData["Msg"] as string;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Worldview 관리자 · 활성 과정 설정</title>
+
+    <style>
+        :root {
+            --bg1: #f7fbff;
+            --bg2: #fff7f5;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: rgba(15,23,42,.10);
+            --shadow: 0 18px 50px rgba(2,6,23,.08), 0 6px 18px rgba(2,6,23,.05);
+            --radius: 22px;
+            --brand: #2563eb;
+            --brand2: #1d4ed8;
+            --ok: #16a34a;
+            --ok2: #0f7a38;
+            --warn: #f59e0b;
+            --chip: #f1f5f9;
+            --chipText: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            background: radial-gradient(1200px 600px at 15% 0%, rgba(37,99,235,.12), transparent 55%), radial-gradient(900px 520px at 85% 15%, rgba(245,158,11,.12), transparent 60%), linear-gradient(180deg, var(--bg1) 0%, #ffffff 45%, var(--bg2) 100%);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 22px 16px 70px;
+        }
+
+        /* 헤더 */
+        .topbar {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .headline {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+            .kicker .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--brand), #60a5fa);
+                box-shadow: 0 8px 18px rgba(37,99,235,.25);
+            }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: -.2px;
+            font-weight: 1000;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.75);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 26px rgba(2,6,23,.05);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: var(--muted);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+            .pill b {
+                color: var(--text);
+            }
+
+        /* 토스트 */
+        .toast {
+            border-radius: 16px;
+            padding: 12px 12px;
+            border: 1px solid rgba(37,99,235,.20);
+            background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(37,99,235,.06));
+            color: #1d4ed8;
+            box-shadow: 0 12px 30px rgba(37,99,235,.10);
+            margin: 12px 0 14px;
+            line-height: 1.45;
+        }
+
+        /* 그리드 */
+        .grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(12, 1fr);
+        }
+        /* 기본: 데스크탑 4열 정도 느낌 */
+        .col {
+            grid-column: span 4;
+        }
+        @@media (max-width: 980px) {
+            .col
+
+        {
+            grid-column: span 6;
+        }
+
+        }
+
+        @@media (max-width: 620px) {
+            .topbar
+
+        {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .toolbar {
+            justify-content: flex-start;
+        }
+
+        .col {
+            grid-column: span 12;
+        }
+
+        }
+
+        /* 카드 */
+        .card {
+            position: relative;
+            border-radius: var(--radius);
+            background: rgba(255,255,255,.85);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+            .card::before {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(600px 160px at 0% 0%, rgba(37,99,235,.12), transparent 55%), radial-gradient(520px 160px at 100% 0%, rgba(245,158,11,.10), transparent 60%);
+                pointer-events: none;
+            }
+
+        .cardInner {
+            position: relative;
+            padding: 16px 16px 14px;
+        }
+
+        .row1 {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: var(--chip);
+            color: var(--chipText);
+            font-size: 12px;
+            font-weight: 900;
+        }
+
+            .status .ico {
+                width: 18px;
+                height: 18px;
+                border-radius: 6px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                background: #e2e8f0;
+                color: #334155;
+                font-size: 12px;
+            }
+
+            .status.active {
+                background: rgba(34,197,94,.12);
+                color: var(--ok2);
+                border: 1px solid rgba(34,197,94,.22);
+            }
+
+                .status.active .ico {
+                    background: rgba(34,197,94,.18);
+                    color: var(--ok2);
+                }
+
+        .lessonNoBadge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 52px;
+            padding: 8px 10px;
+            border-radius: 14px;
+            font-weight: 1000;
+            color: #0b1220;
+            background: rgba(255,255,255,.70);
+            border: 1px solid rgba(2,6,23,.10);
+            box-shadow: 0 10px 26px rgba(2,6,23,.06);
+        }
+
+        .title {
+            margin: 2px 0 6px;
+            font-size: 18px;
+            font-weight: 1000;
+            letter-spacing: -.2px;
+            line-height: 1.25;
+        }
+
+        .meta {
+            margin: 0;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+            .meta code {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+                font-size: 11px;
+                background: rgba(15,23,42,.06);
+                border: 1px solid rgba(15,23,42,.08);
+                padding: 2px 6px;
+                border-radius: 8px;
+                color: #334155;
+            }
+
+        .actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            width: 100%;
+            border: 0;
+            border-radius: 14px;
+            padding: 11px 12px;
+            font-weight: 1000;
+            cursor: pointer;
+            transition: transform .06s ease, box-shadow .2s ease, opacity .2s ease;
+            letter-spacing: -.2px;
+        }
+
+            .btn:active {
+                transform: translateY(1px);
+            }
+
+        .btnPrimary {
+            background: linear-gradient(135deg, var(--ok), #22c55e);
+            color: #fff;
+            box-shadow: 0 14px 30px rgba(34,197,94,.18);
+        }
+
+            .btnPrimary:hover {
+                box-shadow: 0 18px 40px rgba(34,197,94,.22);
+            }
+
+            .btnDisabled, .btnPrimary:disabled {
+                background: rgba(15,23,42,.12);
+                color: rgba(15,23,42,.45);
+                cursor: not-allowed;
+                box-shadow: none;
+            }
+
+        .divider {
+            height: 1px;
+            background: rgba(15,23,42,.08);
+            margin: 14px 0 12px;
+        }
+
+        /* 하단 홈 버튼 */
+        .footer {
+            margin-top: 22px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .homeBtn {
+            max-width: 320px;
+            width: 100%;
+            background: linear-gradient(135deg, var(--brand), #60a5fa);
+            color: #fff;
+            box-shadow: 0 18px 45px rgba(37,99,235,.18);
+        }
+
+            .homeBtn:hover {
+                box-shadow: 0 22px 55px rgba(37,99,235,.22);
+            }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="topbar">
+            <div class="headline">
+                <div class="kicker"><span class="dot"></span> Worldview Admin</div>
+                <h1>활성 과정(lessonNo) 설정</h1>
+            </div>
+
+            <div class="toolbar">
+                <div class="pill">현재 ACTIVE: <b>@activeLessonNo</b></div>
+                <div class="pill">총 과목: <b>@(Model?.Count ?? 0)</b></div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="toast">@msg</div>
+        }
+
+        <div class="grid">
+            @foreach (var row in Model)
+            {
+                var isActive = (row.LessonNo == activeLessonNo);
+
+                <div class="col">
+                    <div class="card">
+                        <div class="cardInner">
+                            <div class="row1">
+                                <span class="status @(isActive ? "active" : "")">
+                                    <span class="ico">@(isActive ? "✓" : "…")</span>
+                                    @(isActive ? "ACTIVE" : "대기")
+                                </span>
+
+                                <span class="lessonNoBadge">@row.LessonNo 과</span>
+                            </div>
+
+                            <div class="title">@row.Title</div>
+
+                            <p class="meta">
+                                LessonNo <code>@row.LessonNo</code>
+                                · ContentId <code>@row.ContentId</code>
+                                · Key <code>@row.SectionKey</code>
+                            </p>
+
+                            <div class="divider"></div>
+
+                            <form method="post" action="/WorldviewAdmin/SetActive" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="lessonNo" value="@row.LessonNo" />
+
+                                <button type="submit"
+                                        class="btn btnPrimary @(isActive ? "btnDisabled" : "")"
+                                        @(isActive ? "disabled" : "")>
+                                    @(isActive ? "현재 ACTIVE 입니다" : "이 과를 ACTIVE로 설정")
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="footer">
+            <button type="button" class="btn homeBtn" onclick="location.href='/'">
+                🏠 홈으로 가기
+            </button>
+        </div>
+    </div>
+</body>
+</html>

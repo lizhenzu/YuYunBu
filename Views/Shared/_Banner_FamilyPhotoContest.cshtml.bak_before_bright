@@ -1,0 +1,230 @@
+﻿@using BulletinBoard.Helpers
+@using BulletinBoard.Models.FamilyPhoto
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+@inject BulletinBoard.Services.FamilyPhoto.IFamilyPhotoService FamilyPhoto
+
+@*  홈 카드 — 추석맞이 우리 가족 사진 콘테스트 (2026-09-27 확정 시안: 썸네일 모자이크 + 단계 줄)
+    · 썸네일은 이미 만들어 둔 480px(ThumbPath)만 쓴다 — 원본 1600px 은 쓰지 않는다
+    · 사진은 lazy · async 로 받고, 칸 크기를 미리 고정해 화면이 덜컥거리지 않게 한다
+    · 데이터는 FamilyPhotoService.GetBannerAsync() 가 1분 캐시 (올리기 · 숨기기 · 발표 때 바로 비움)
+    · 사진이 없으면 한 줄 카드.  BannerEnd 뒤엔 사라진다.
+    · 가족 수 · 사진 수는 Basic 계정에게만 *@
+
+@{
+    var now = DateHelper.GetKoreaNow();
+    FamilyPhotoBannerVM? bg = null;
+    bool allowed = !Cfg.BannerOnlySuperAdmin
+                   || (User?.Identity?.IsAuthenticated == true && User.IsInRole("SuperAdmin"));
+    if (allowed && now <= Cfg.BannerEnd)
+    {
+        try { await FamilyPhoto.EnsureTablesAsync(); bg = await FamilyPhoto.GetBannerAsync(); }
+        catch { bg = null; }   // 표가 아직 없거나 DB 문제면 배너 없이 간다
+    }}
+
+@if (bg != null)
+{
+    string DM(DateTime d) => $"{d.Month}/{d.Day}";
+    bool isBasic = string.Equals(User?.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
+
+    // 단계별 문구 · 버튼 · 이동할 곳
+    string badge, title, desc, go, href;
+    int on;   // 단계 줄에서 지금 칸 (0 올리기 · 1 좋아요 · 2 발표)
+    if (bg.IsPublished)
+    {
+        badge = "결과 발표"; on = 2;
+        title = "함께 나눈 사진, 고마워요 🎉"; desc = "좋아요를 많이 받은 사진이에요";
+        go = "결과 보기 ›"; href = "/FamilyPhoto/Result";
+    }
+    else switch (bg.Phase)
+    {
+        case FamilyPhotoPhase.Before:
+            badge = "곧 시작"; on = 0;
+            title = $"{Cfg.UploadStart.Month}월 {Cfg.UploadStart.Day}일부터 우리 가족 추석 사진을 올릴 수 있어요";
+            desc = $"로그인 없이 가족명만 적고 사진 {Cfg.MaxPhotos}장까지";
+            go = "자세히 보기 ›"; href = "/FamilyPhoto/Welcome"; break;
+        case FamilyPhotoPhase.Like:
+            badge = "좋아요 투표 중"; on = 1;
+            title = "마음에 드는 가족 사진에 좋아요를 눌러 주세요 💛";
+            desc = $"좋아요 투표 {DM(Cfg.LikeStart)}~ 언제든 · 결과는 {DM(Cfg.AnnounceDay)} 주일 공개";
+            go = "좋아요 누르러 가기 ›"; href = "/FamilyPhoto"; break;
+        case FamilyPhotoPhase.Closed:
+            badge = "발표 준비 중"; on = 2;
+            title = $"{DM(Cfg.AnnounceDay)} 주일에 같이 사진을 봐요";
+            desc = "좋아요 투표가 끝났어요 · 사진은 계속 올릴 수 있어요";
+            go = "사진 보러 가기 ›"; href = "/FamilyPhoto"; break;
+        default:
+            badge = "사진 올리기 중"; on = 0;
+            title = "송편보다 예쁜 우리 가족 사진, 보여 주세요 🤗";
+            desc = $"사진 올리기 {DM(Cfg.UploadStart)}~ 언제든 · 가족마다 {Cfg.MaxPhotos}장까지";
+            go = "사진 올리러 가기 ›"; href = "/FamilyPhoto/Welcome"; break;
+    }
+
+    var thumbs = bg.Thumbs ?? new List<FamilyPhotoBannerThumb>();
+    int n = thumbs.Count;
+    bool hasMore = n >= 5;   // 5장이면 마지막 칸은 "더 보기"
+    string mosaicCls = n >= 5 ? "m5" : $"m{n}";
+
+    <style>
+        .fpc { position: relative; display: block; overflow: hidden; margin: 10px 0; padding: 18px 18px 16px; text-align: left;
+               border-radius: 20px; text-decoration: none; color: #3b1d0b;
+               background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 55%, #fde68a 130%); border: 1.5px solid #fdba74;
+               box-shadow: 0 4px 18px rgba(217,119,6,.14); transition: transform .15s, box-shadow .15s; }
+        .fpc:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(217,119,6,.2); }
+        .fpc .moon { position: absolute; right: -40px; top: -60px; width: 190px; height: 190px; border-radius: 50%; pointer-events: none;
+                     background: radial-gradient(circle at 35% 35%, #fff7cc, #fde68a 55%, #fbbf24); opacity: .55; }
+        .fpc .hill { position: absolute; left: -60px; right: -60px; bottom: -120px; height: 180px; border-radius: 50%; background: #fed7aa; opacity: .45; pointer-events: none; }
+        .fpc > * { position: relative; }
+        .fpc .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+        .fpc .k { font-size: 12px; font-weight: 800; color: #c2410c; letter-spacing: .02em; }
+        .fpc .t { font-size: 19px; font-weight: 900; margin-top: 3px; line-height: 1.3; word-break: keep-all; }
+        .fpc .d { font-size: 12.5px; color: #9a3412; margin-top: 4px; word-break: keep-all; }
+        .fpc .phase { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: #fff;
+                      background: #ea580c; padding: 6px 11px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 8px rgba(234,88,12,.3); }
+        .fpc .phase i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: fpcBlink 1.4s ease-in-out infinite; }
+        @@keyframes fpcBlink { 50% { opacity: .3; } }
+
+        /* 썸네일 — 칸 크기를 미리 고정 (사진이 늦게 와도 연한 주황 바탕이 먼저) */
+        .fpc .mosaic { display: grid; gap: 6px; margin-top: 14px; height: 220px; }
+        .fpc .mosaic.m1 { grid-template-columns: 1fr; height: 200px; }
+        .fpc .mosaic.m2 { grid-template-columns: 2fr 1fr; height: 200px; }
+        .fpc .mosaic.m3 { grid-template-columns: 2fr 1fr 1fr; height: 200px; }
+        .fpc .mosaic.m4 { grid-template-columns: 2fr 1fr 1fr 1fr; height: 200px; }
+        .fpc .mosaic.m5 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .fpc .mosaic.m5 .ph:first-child { grid-row: 1 / span 2; }
+        .fpc .ph { position: relative; border-radius: 12px; overflow: hidden; background: #fde7c7; min-width: 0; }
+        .fpc .ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+        .fpc .ph::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(transparent, rgba(0,0,0,.45)); pointer-events: none; }
+        .fpc .ph .cap { position: absolute; left: 7px; right: 7px; bottom: 6px; z-index: 1; font-size: 11px; font-weight: 800; color: #fff;
+                        text-shadow: 0 1px 3px rgba(0,0,0,.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fpc .ph .heart { position: absolute; right: 6px; top: 6px; z-index: 1; font-size: 11px; font-weight: 800; background: rgba(255,255,255,.92); color: #e11d48; padding: 2px 7px; border-radius: 999px; }
+        .fpc .ph.more { background: #9a3412; }   /* 사진이 안 와도 "더 보기" 글자가 보이게 */
+        .fpc .ph.more img { filter: saturate(.8) brightness(.6); }
+        .fpc .ph.more::after { display: none; }
+        .fpc .ph.more .mtx { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+                             color: #fff; font-weight: 900; font-size: 15px; }
+        .fpc .ph.more .mtx small { font-size: 11px; font-weight: 700; opacity: .9; }
+
+        /* AI 심사평 띠 (2026-10-03 B안) — 발표 뒤부터.  Judge 페이지와 같은 "추석 밤" 색 */
+        .fpc .aiStrip { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 14px; color: #fff; cursor: pointer;
+                        background: linear-gradient(100deg, #1F2547, #34305E); box-shadow: 0 3px 10px rgba(31,37,71,.25); transition: transform .15s; }
+        .fpc .aiStrip:hover { transform: translateY(-1px); }
+        .fpc .aiStrip:focus-visible { outline: 3px solid #1F2547; outline-offset: 2px; }
+        .fpc .aiStrip .m { width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center; text-align: center;
+                           background: radial-gradient(circle at 42% 38%, #FFF6CF, #F6C84B); box-shadow: 0 0 14px rgba(246,200,75,.45);
+                           font-size: 10.5px; font-weight: 900; line-height: 1.05; color: #8A5A10; }
+        .fpc .aiStrip .tx { flex: 1; min-width: 0; }
+        .fpc .aiStrip .tx b { display: block; font-size: 14.5px; font-weight: 900; }
+        .fpc .aiStrip .tx small { display: block; font-size: 11px; color: #C9C6E4; margin-top: 1px; word-break: keep-all; }
+        .fpc .aiStrip .ar { flex: none; font-size: 12px; font-weight: 900; color: #1F2547; background: #F6C84B; padding: 7px 11px; border-radius: 999px; white-space: nowrap; }
+
+        /* 단계 줄 */
+        .fpc .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
+        .fpc .sp { background: rgba(255,255,255,.65); border: 1px solid #fed7aa; border-radius: 12px; padding: 7px 10px; min-width: 0; }
+        .fpc .sp b { display: block; font-size: 12.5px; font-weight: 900; color: #7c2d12; }
+        .fpc .sp span { font-size: 11.5px; font-weight: 700; color: #9a3412; font-variant-numeric: tabular-nums; }
+        .fpc .sp.on { background: #f97316; border-color: #f97316; }
+        .fpc .sp.on b, .fpc .sp.on span { color: #fff; }
+        .fpc .sp.done { opacity: .55; }
+        .fpc .sp.done b::after { content: " ✓"; }
+
+        .fpc .foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+        .fpc .note { font-size: 12px; color: #9a3412; word-break: keep-all; }
+        .fpc .note .cnt { display: inline-block; margin-left: 4px; font-weight: 800; background: rgba(255,255,255,.7); border: 1px solid #fed7aa; border-radius: 999px; padding: 1px 8px; }
+        .fpc .go { flex: none; font-size: 14px; font-weight: 900; color: #fff; background: #f97316; padding: 11px 18px; border-radius: 999px; white-space: nowrap; box-shadow: 0 3px 10px rgba(249,115,22,.35); }
+        .fpc:hover .go { background: #ea580c; }
+
+        /* 휴대폰 — 썸네일은 옆으로 밀어 보기 */
+        @@media (max-width: 560px) {
+            .fpc { padding: 16px 14px 14px; }
+            .fpc .top { flex-direction: column; gap: 8px; }
+            .fpc .t { font-size: 17px; }
+            .fpc .mosaic, .fpc .mosaic.m1, .fpc .mosaic.m2, .fpc .mosaic.m3, .fpc .mosaic.m4, .fpc .mosaic.m5 {
+                display: flex; height: auto; overflow-x: auto; scroll-snap-type: x mandatory; margin-right: -14px; padding-right: 14px; scrollbar-width: none; }
+            .fpc .mosaic::-webkit-scrollbar { display: none; }
+            .fpc .ph { flex: none; width: 118px; height: 148px; scroll-snap-align: start; }
+            .fpc .ph:first-child { width: 150px; }
+            .fpc .mosaic.m1 .ph { width: 100%; height: 180px; }
+            .fpc .aiStrip { padding: 9px 10px; gap: 8px; }
+            .fpc .aiStrip .m { width: 34px; height: 34px; font-size: 9.5px; }
+            .fpc .aiStrip .tx b { font-size: 13.5px; }
+            .fpc .aiStrip .ar { padding: 6px 9px; font-size: 11.5px; }
+            .fpc .steps { gap: 4px; }
+            .fpc .sp { padding: 6px 7px; }
+            .fpc .sp b { font-size: 11.5px; }
+            .fpc .sp span { font-size: 10.5px; }
+            .fpc .foot { flex-direction: column; align-items: stretch; }
+            .fpc .go { text-align: center; }
+        }
+        @@media (prefers-reduced-motion: reduce) { .fpc { transition: none; } .fpc .phase i { animation: none; } }
+    </style>
+
+    <a class="fpc" href="@href">
+        <div class="moon"></div><div class="hill"></div>
+
+        <div class="top">
+            <div>
+                <div class="k">🌕 추석맞이 · 우리 가족 사진 콘테스트</div>
+                <div class="t">@title</div>
+                <div class="d">@desc</div>
+            </div>
+            <span class="phase"><i></i>@badge</span>
+        </div>
+
+        @if (n > 0)
+        {
+            <div class="mosaic @mosaicCls">
+                @for (int i = 0; i < n; i++)
+                {
+                    var th = thumbs[i];
+                    bool isMore = hasMore && i == n - 1;
+                    <div class="ph @(isMore ? "more" : "")">
+                        <img src="@th.ThumbPath" alt="@th.FamilyName" loading="lazy" decoding="async" width="480" height="480"
+                             onerror="this.remove()" />
+                        @if (isMore)
+                        {
+                            <div class="mtx">더 보기 ›<small>사진 전체</small></div>
+                        }
+                        else
+                        {
+                            if (bg.IsPublished && th.LikeCount > 0) { <span class="heart">♥ @th.LikeCount.ToString("N0")</span> }
+                            <div class="cap">@th.FamilyName</div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @* AI 심사평 띠 — 발표 뒤부터 (발표 전엔 Judge 페이지에서 좋아요 수가 미리 보이므로 감춘다).
+           카드 전체가 <a> 라서 링크를 겹칠 수 없어, 눌렀을 때 스크립트로 Judge 로 보낸다. *@
+        @if (bg.IsPublished)
+        {
+            <span class="aiStrip" role="link" tabindex="0" data-href="/FamilyPhoto/Judge" aria-label="AI 심사평 보러 가기">
+                <span class="m">AI<br />심사평</span>
+                <span class="tx"><b>AI 심사위원의 심사평 도착!</b><small>사진 한 장씩 점수와 따뜻한 칭찬을 남겼어요</small></span>
+                <span class="ar">보러 가기 ›</span>
+            </span>
+            <script>
+                (function () {
+                    var s = document.currentScript.previousElementSibling;
+                    function go(e) { e.preventDefault(); e.stopPropagation(); location.href = s.getAttribute('data-href'); }
+                    s.addEventListener('click', go);
+                    s.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') go(e); });
+                })();
+            </script>
+        }
+
+        <div class="steps">
+            @* 사진 올리기는 마감이 없다 — 지나간 단계여도 ✓ 대신 "언제든" *@
+            <div class="sp @(on == 0 ? "on" : "")"><b>사진 올리기</b><span>@DM(Cfg.UploadStart)~ 언제든</span></div>
+            <div class="sp @(on == 1 ? "on" : on > 1 ? "done" : "")"><b>좋아요 투표</b><span>@DM(Cfg.LikeStart)~ 언제든</span></div>
+            <div class="sp @(on == 2 ? "on" : "")"><b>발표</b><span>@DM(Cfg.AnnounceDay) 주일</span></div>
+        </div>
+
+        <div class="foot">
+            <span class="note">'좋아요'를 많이 받은 가족에게 소정의 상품 드려요
+                @if (isBasic) { <span class="cnt">👨‍👩‍👧 @(bg.EntryCount)가족 · 사진 @(bg.PhotoCount)장</span> }
+            </span>
+            <span class="go">@go</span>
+        </div>
+    </a>
+}

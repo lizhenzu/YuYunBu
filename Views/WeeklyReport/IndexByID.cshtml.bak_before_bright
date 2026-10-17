@@ -1,0 +1,471 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using Microsoft.AspNetCore.Html
+@using System.Text
+@using System.Linq
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.TodayCollectWeeklyWordToRead
+
+@{
+    Layout = null;
+
+    string WeeklyString  = $"{Model.WeeklyWordToReadData.WeekTitle_DW}단원 {Model.WeeklyWordToReadData.WeekTitle_DW_Title}";
+    string WeeklyString1 = $"{Model.WeeklyWordToReadData.WeekTitle_GUA}과 {Model.WeeklyWordToReadData.BibleTitle}";
+
+    string ActionSource     = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as string;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as string;
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // ── 본문·외울말씀 칩 → /DailyMission4/BibleReadRange (구절 범위 성경읽기) ──
+    //    돌아올 곳은 지금 보고 있는 주일공과(IndexByID?Id=)
+    int weeklyReturnId = int.TryParse(Context.Request.Query["Id"], out var _qid) ? _qid : Model.WeeklyWordToReadData.Id;
+    string RangeUrl(BulletinBoard.Models.eBibles? b, string label)
+    {
+        if (b == null || string.IsNullOrWhiteSpace(b.BibleText)) return "#";
+        return "/DailyMission4/BibleReadRange"
+             + $"?BibleText={Uri.EscapeDataString(b.BibleText)}&FromJang={b.FromJang}&FromZul={b.FromZul}&ToJang={b.ToJang}&ToZul={b.ToZul}"
+             + $"&from=weekly&returnId={weeklyReturnId}&label={Uri.EscapeDataString(label)}";
+    }
+
+    string queryStringA = $"/DailyMission/BibleSheet3?ControllerSource={ControllerSource}&ActionSource={ActionSource}&WeeklyWordToReadDataId={Model.WeeklyWordToReadData.Id}";
+    string queryString1 = queryStringA + SharedComm.MakeBibleQueryString(Model.WeekeBiblesDataToRead.BibleText, Model.WeekeBiblesDataToRead.FromJang, Model.WeekeBiblesDataToRead.FromZul, Model.WeekeBiblesDataToRead.ToJang, Model.WeekeBiblesDataToRead.ToZul);
+    string queryString2 = queryStringA + SharedComm.MakeBibleQueryString(Model.WeekeBiblesDataToRead_1.BibleText, Model.WeekeBiblesDataToRead_1.FromJang, Model.WeekeBiblesDataToRead_1.FromZul, Model.WeekeBiblesDataToRead_1.ToJang, Model.WeekeBiblesDataToRead_1.ToZul);
+    string queryStringWeekeBiblesDataToRecite = queryStringA + SharedComm.MakeBibleQueryString(Model.WeekeBiblesDataToRecite.BibleText, Model.WeekeBiblesDataToRecite.FromJang, Model.WeekeBiblesDataToRecite.FromZul, Model.WeekeBiblesDataToRecite.ToJang, Model.WeekeBiblesDataToRecite.ToZul);
+
+    bool hasRelated      = SharedComm.HasGeomorphologicalCategory(Model.UploadDatas, Category.Related.ToString());
+    bool hasStudent      = SharedComm.HasGeomorphologicalCategory(Model.UploadDatas, Category.Student.ToString());
+    bool hasTeacher      = SharedComm.HasGeomorphologicalCategory(Model.UploadDatas, Category.Teacher.ToString());
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    string teacherBookNo  = (Model.WeeklyWordToReadData.WeekTitle_GUA).ToString("00");
+    string teacherBookUrl = $"/HTML/2026/1_Detail/TearcherBook/{teacherBookNo}.html";
+
+    ViewBag.IsSuperAdmin = isSuperAdmin;
+
+    List<BulletinBoard.Models.UploadData> GetUploads(Category cat)
+        => (Model.UploadDatas ?? new List<BulletinBoard.Models.UploadData>())
+           .Where(u => u != null && u.checkData && u.CategoryData == cat.ToString())
+           .ToList();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@Model.WeeklyWordToReadData.BibleTitle · 주일공과</title>
+    <meta name="description" content="하나바이블 주일공과" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        /* ── 주일공과 본문 — Bone 톤 (공통: wwwroot/css/board-bone.css) ── */
+        .sh { max-width: 880px; }
+        html { scroll-behavior: smooth; }
+        .hdP { margin-top: 12px; font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.7; color: var(--headdim); word-break: keep-all; }
+        .hdP::before { content: "“"; color: var(--headk); }
+        .hdP::after { content: "”"; color: var(--headk); }
+
+        /* 빠른 이동 — 화면 위에 붙는 띠 */
+        .qn { position: sticky; top: 0; z-index: 50; background: var(--bg); border-bottom: 1px solid var(--rule); }
+        .qn .sh { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+        .qn .sh::-webkit-scrollbar { display: none; }
+        .qn a { flex: none; padding: 13px 14px; font-size: 13.5px; color: var(--dim2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+        .qn a:first-child { padding-left: 0; }
+        .qn a:hover, .qn a.on { color: var(--tx); border-bottom-color: var(--acc); }
+
+        /* 학습 목표 */
+        .obj { display: grid; grid-template-columns: 1fr 1fr; margin-top: 26px; background: var(--card); border: 1px solid var(--rule); }
+        .obj > div { padding: 18px 20px; }
+        .obj > div + div { border-left: 1px solid var(--line); }
+        .objK { font-size: 11px; font-weight: 600; letter-spacing: .16em; color: var(--acc); }
+        .objT { margin-top: 6px; font-family: "Noto Serif KR", serif; font-size: 15.5px; line-height: 1.8; word-break: keep-all; }
+        @@media (max-width: 600px) { .obj { grid-template-columns: 1fr; } .obj > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+
+        .sec { scroll-margin-top: 56px; }
+
+        /* 본문 · 외울말씀 */
+        .bible-chip { display: flex; align-items: center; gap: 16px; padding: 18px 2px; border-bottom: 1px solid var(--line); transition: background .15s; }
+        .bible-chip:hover { background: var(--card); }
+        .bcNo { flex: none; width: 34px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 24px; color: var(--acc); }
+        .bcTx { flex: 1; min-width: 0; }
+        .bible-chip-type { font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--dim); }
+        .bible-chip-ref { margin-top: 3px; font-family: "Noto Serif KR", serif; font-size: 19px; line-height: 1.4; color: var(--tx); }
+        .bible-chip-go { flex: none; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; color: var(--dim); transition: transform .15s, color .15s; }
+        .bible-chip:hover .bible-chip-go { color: var(--acc); transform: translateX(3px); }
+        .bible-chip.recite .bcNo { color: var(--tx); }
+
+        /* 영상 */
+        .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+        @@media (max-width: 700px) { .video-grid { grid-template-columns: 1fr; } }
+        .video-label { font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--dim2); margin-bottom: 8px; }
+        .yt { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; background: #000; border: 1px solid var(--rule); }
+        .yt iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+        /* 추가 자료 — RenderCategory 가 만드는 클래스 */
+        details.acc { border-bottom: 1px solid var(--line); }
+        details.acc > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 16px 2px; font-family: "Noto Serif KR", serif; font-size: 16.5px; color: var(--tx); user-select: none; }
+        details.acc > summary::-webkit-details-marker { display: none; }
+        details.acc > summary::before { content: "+"; flex: none; width: 22px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; line-height: 1; color: var(--acc); }
+        details.acc[open] > summary::before { content: "−"; }
+        details.acc > summary > span:first-child { flex: 1; }
+        details.acc > summary:hover { color: var(--acc); }
+        .accBody { margin: 0 2px 18px 34px; padding: 14px 16px; background: var(--card); border-left: 2px solid var(--acc); }
+        .badge { flex: none; font-family: "Inter", "Gothic A1", sans-serif; font-size: 12px; color: var(--dim); }
+        .muted { font-size: 13px; color: var(--dim); line-height: 1.6; }
+        .links { display: flex; gap: 6px; flex-wrap: wrap; }
+        .btn-link { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; padding: 8px 13px; border: 1px solid var(--rule); background: var(--bg); color: var(--tx); transition: border-color .15s, color .15s; }
+        .btn-link:hover { border-color: var(--acc); color: var(--acc); }
+        @@media (max-width: 480px) { .accBody { margin-left: 0; } }
+
+        /* 사진 */
+        .galleryGrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-top: 12px; }
+        @@media (min-width: 640px) { .galleryGrid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+        @@media (min-width: 860px) { .galleryGrid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+        figure.thumb { margin: 0; aspect-ratio: 4/3; overflow: hidden; background: var(--mark); border: 1px solid var(--rule); cursor: zoom-in; transition: border-color .15s; }
+        figure.thumb:hover { border-color: var(--acc); }
+        figure.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+        figure.thumb:hover img { transform: scale(1.03); }
+        .secBody { margin-top: 14px; }
+        .adm { margin-top: 14px; }
+
+        /* 사진 크게 보기 */
+        #viewer { border: none; padding: 0; max-width: 96vw; background: transparent; }
+        #viewer::backdrop { background: rgba(12,13,15,.9); }
+        #viewer[open] { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(12,13,15,.9); z-index: 9999; }
+        #viewer-img { display: block; max-width: 94vw; max-height: 84vh; }
+        .viewer-close { position: absolute; top: 10px; right: 10px; width: 38px; height: 38px; display: grid; place-items: center; background: none; border: 1px solid #3A3C40; color: #F2EFEA; font-size: 18px; cursor: pointer; }
+        .viewer-close:hover { border-color: #D9C29B; color: #D9C29B; }
+    </style>
+</head>
+
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="/WeeklyWordToRead/WeeklyWordToReadDetailList">공과 목록</a></span>
+                <span>HANA BIBLE</span>
+            </div>
+            <div class="hdK">LESSON @(Model.WeeklyWordToReadData.WeekTitle_GUA) · @WeeklyString</div>
+            <h1 class="hdT">@Model.WeeklyWordToReadData.BibleTitle</h1>
+            @if (!string.IsNullOrWhiteSpace(Model.WeeklyWordToReadData.OnePoint))
+            {
+                <p class="hdP">@Model.WeeklyWordToReadData.OnePoint</p>
+            }
+        </div>
+    </header>
+
+    <nav class="qn" aria-label="빠른 이동">
+        <div class="sh">
+            <a href="#core">본문 · 암송</a>
+            <a href="#videos">영상</a>
+            <a href="#materials">추가 자료</a>
+            <a href="#teacher2Book">교사용 교재</a>
+            <a href="#studentBook">학생용 교재</a>
+        </div>
+    </nav>
+
+    <main class="sh">
+
+        @if (!string.IsNullOrWhiteSpace(Model.WeeklyWordToReadData.LearningObjectives1) || !string.IsNullOrWhiteSpace(Model.WeeklyWordToReadData.LearningObjectives2))
+        {
+            <div class="obj">
+                @if (!string.IsNullOrWhiteSpace(Model.WeeklyWordToReadData.LearningObjectives1))
+                {
+                    <div><div class="objK">학습 요점</div><div class="objT">@Model.WeeklyWordToReadData.LearningObjectives1</div></div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.WeeklyWordToReadData.LearningObjectives2))
+                {
+                    <div><div class="objK">적용</div><div class="objT">@Model.WeeklyWordToReadData.LearningObjectives2</div></div>
+                }
+            </div>
+        }
+
+        <!-- ─── 본문 / 암송 ─── -->
+        <section class="sec" id="core">
+            <div class="secH">
+                <div><div class="secK">SCRIPTURE</div><div class="secT">본문 · 외울말씀</div></div>
+                <span class="secN">누르면 성경 읽기로 가요</span>
+            </div>
+            <a class="bible-chip" href="@RangeUrl(Model.WeekeBiblesDataToRead, "읽을말씀")">
+                <span class="bcNo">01</span>
+                <span class="bcTx"><span class="bible-chip-type" style="display:block">읽을말씀</span><span class="bible-chip-ref" style="display:block">@Model.WeekeBiblesDataToRead.JanZulString</span></span>
+                <span class="bible-chip-go" aria-hidden="true">→</span>
+            </a>
+            @if (!string.IsNullOrEmpty(Model.WeekeBiblesDataToRead_1?.JanZulString))
+            {
+                <a class="bible-chip" href="@RangeUrl(Model.WeekeBiblesDataToRead_1, "읽을말씀 2")">
+                    <span class="bcNo">02</span>
+                    <span class="bcTx"><span class="bible-chip-type" style="display:block">읽을말씀 2</span><span class="bible-chip-ref" style="display:block">@Model.WeekeBiblesDataToRead_1.JanZulString</span></span>
+                    <span class="bible-chip-go" aria-hidden="true">→</span>
+                </a>
+            }
+            <a class="bible-chip recite" href="@RangeUrl(Model.WeekeBiblesDataToRecite, "외울말씀")">
+                <span class="bcNo">✎</span>
+                <span class="bcTx"><span class="bible-chip-type" style="display:block">외울말씀</span><span class="bible-chip-ref" style="display:block">@Model.WeekeBiblesDataToRecite.JanZulString</span></span>
+                <span class="bible-chip-go" aria-hidden="true">→</span>
+            </a>
+        </section>
+
+        <!-- ─── 영상 ─── -->
+        <section class="sec" id="videos">
+            <div class="secH">
+                <div><div class="secK">VIDEO</div><div class="secT">영상</div></div>
+            </div>
+            <div class="video-grid">
+                <div id="videoStory">
+                    <div class="video-label">성경스토리 영상</div>
+                    <div class="yt">
+                        <iframe src="https://www.youtube.com/embed/@(Model.WeeklyWordToReadData.CharcaterMovingURL)"
+                                title="성경스토리 영상" allowfullscreen loading="lazy"></iframe>
+                    </div>
+                </div>
+                <div id="videoDemo">
+                    <div class="video-label">공과시연 영상</div>
+                    <div class="yt">
+                        <iframe src="https://www.youtube.com/embed/@(Model.WeeklyWordToReadData.YoJulSongURL)"
+                                title="공과시연 영상" allowfullscreen loading="lazy"></iframe>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ─── 추가 자료 (카테고리 아코디언) ─── -->
+        <section class="sec" id="materials">
+            <div class="secH">
+                <div><div class="secK">MATERIALS</div><div class="secT">추가 자료</div></div>
+                <span class="secN">눌러서 펼쳐 보세요</span>
+            </div>
+            @RenderCategory(Category.BackGround,       "배경설명",              "성경말씀의 배경을 설명합니다.")
+            @RenderCategory(Category.BibleExplanation, "본문설명",              "본문 이해를 돕는 설명 자료입니다.")
+            @RenderCategory(Category.BibileStudy,      "교사들을 위한 본문 이해", "교사(리더)를 위한 핵심 정리입니다.")
+            @RenderCategory(Category.RelatedBible,     "관련 성경구절",          "본문과 연관된 성경구절 모음입니다.")
+            @RenderCategory(Category.StoryTellingBook, "스토리텔링북",           "본문과 연관된 스토리텔링북 자료입니다.")
+            @RenderCategory(Category.People,           "성경탐구 · 인물",        "본문과 연관된 성경 인물 자료입니다.")
+            @RenderCategory(Category.Geomorphological, "성경탐구 · 일반",        "본문과 연관된 성경 내용 자료입니다.")
+        </section>
+
+        <!-- ─── 관련 이미지 ─── -->
+        @if (hasRelated || isSuperAdmin)
+        {
+            var relatedItems = GetUploads(Category.Related);
+            <section class="sec" id="related">
+                <div class="secH">
+                    <div><div class="secK">IMAGES</div><div class="secT">관련 이미지</div></div>
+                    <span class="secN">@relatedItems.Count 개</span>
+                </div>
+                <div class="secBody">
+                    @if (relatedItems.Any(u => IsImage(u.URLData)))
+                    {
+                        <p class="muted">사진을 누르면 크게 볼 수 있어요.</p>
+                    }
+                    @RenderGallery(relatedItems)
+                    @if (isSuperAdmin)
+                    {
+                        <div class="links adm"><a class="btn-link" href="/WeeklyWordToRead/ModifyUploadData?category=@Category.Related&WeeklyWordToReadID=@Model.WeeklyWordToReadData.Id">업로드 · 수정</a></div>
+                    }
+                </div>
+            </section>
+        }
+
+        <!-- ─── 공과교재 (교사용 이미지) ─── -->
+        @{var teacherItems = GetUploads(Category.Teacher);}
+        <section class="sec" id="teacher2Book">
+            <div class="secH">
+                <div><div class="secK">TEACHER</div><div class="secT">공과교재 · 교사용</div></div>
+                <span class="secN">@teacherItems.Count 개</span>
+            </div>
+            <div class="secBody">
+                @if (teacherItems.Any(u => IsImage(u.URLData)))
+                {
+                    <p class="muted">사진을 누르면 크게 볼 수 있어요.</p>
+                }
+                @RenderGallery(teacherItems)
+                @if (isSuperAdmin)
+                {
+                    <div class="links adm"><a class="btn-link" href="/WeeklyWordToRead/ModifyUploadData?category=@Category.Teacher&WeeklyWordToReadID=@Model.WeeklyWordToReadData.Id">업로드 · 수정</a></div>
+                }
+            </div>
+        </section>
+
+        <!-- ─── 공과교재 (학생용 이미지) ─── -->
+        @{var studentItems = GetUploads(Category.Student);}
+        <section class="sec" id="studentBook">
+            <div class="secH">
+                <div><div class="secK">STUDENT</div><div class="secT">공과교재 · 학생용</div></div>
+                <span class="secN">@studentItems.Count 개</span>
+            </div>
+            <div class="secBody">
+                @if (studentItems.Any(u => IsImage(u.URLData)))
+                {
+                    <p class="muted">사진을 누르면 크게 볼 수 있어요.</p>
+                }
+                @RenderGallery(studentItems)
+                @if (isSuperAdmin)
+                {
+                    <div class="links adm"><a class="btn-link" href="/WeeklyWordToRead/ModifyUploadData?category=@Category.Student&WeeklyWordToReadID=@Model.WeeklyWordToReadData.Id">업로드 · 수정</a></div>
+                }
+            </div>
+        </section>
+
+        @if (isSuperAdmin)
+        {
+            <div class="tb" style="margin-top:30px; border-top:1px solid var(--rule)">
+                <span class="secK" style="margin-right:6px">관리자</span>
+                <a href="/WeeklyWordToRead/ModifyWeeklyWordToRead?Id=@Model.WeeklyWordToReadData.Id" class="nbtn">공과 수정</a>
+                <a href="/WeeklyWordToRead/DecreasetHitWeeklyWordToRead?Id=@Model.WeeklyWordToReadData.Id" class="nbtn">열람 수 줄이기 (@Model.WeeklyWordToReadData.visited)</a>
+            </div>
+        }
+
+        <div class="ft">
+            <a href="/WeeklyWordToRead/WeeklyWordToReadDetailList">← 공과 목록</a>
+            <a href="/">@ConstatsCommon.ToHome</a>
+        </div>
+    </main>
+
+    <!-- ── 사진 크게 보기 ── -->
+    <dialog id="viewer">
+        <div style="position:relative;">
+            <img alt="미리보기" id="viewer-img">
+            <button type="button" id="viewer-close" class="viewer-close" aria-label="닫기">✕</button>
+        </div>
+    </dialog>
+
+    <script>
+        function redirectToPage(url) { window.location.href = url; }
+        function openPopup(url) { window.open(url, 'Popup', 'width=940,height=720'); }
+
+        const viewer    = document.getElementById('viewer');
+        const viewerImg = document.getElementById('viewer-img');
+        const canModal  = typeof viewer?.showModal === 'function';
+
+        document.addEventListener('click', (e) => {
+            const img = e.target?.closest?.('.thumb img');
+            if (!img) return;
+            viewerImg.src = img.dataset.full || img.src;
+            if (canModal) viewer.showModal();
+            else viewer.setAttribute('open', '');
+        });
+
+        const closeViewer = () => {
+            if (canModal) viewer.close(); else viewer.removeAttribute('open');
+            viewerImg.src = '';
+        };
+
+        viewer?.addEventListener('click', (e) => { if (e.target === viewer) closeViewer(); });
+        document.getElementById('viewer-close')?.addEventListener('click', closeViewer);
+        viewer?.addEventListener('close', () => { viewerImg.src = ''; });
+    </script>
+
+</body>
+</html>
+
+@functions {
+
+    bool IsImage(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        var lower = url.ToLowerInvariant();
+        return lower.EndsWith(".jpg") || lower.EndsWith(".jpeg") || lower.EndsWith(".png") || lower.EndsWith(".webp") || lower.EndsWith(".gif");
+    }
+
+    bool IsHtml(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        var lower = url.ToLowerInvariant();
+        return lower.EndsWith(".html") || lower.EndsWith(".htm");
+    }
+
+    bool IsSuperAdminSafe() => (ViewBag.IsSuperAdmin as bool?) == true;
+
+    public HtmlString RenderCategory(Category cat, string title, string desc)
+    {
+        var uploads = (Model.UploadDatas ?? new List<BulletinBoard.Models.UploadData>())
+            .Where(u => u != null && u.checkData && u.CategoryData == cat.ToString())
+            .ToList();
+
+        if (!uploads.Any() && !IsSuperAdminSafe())
+            return new HtmlString("");
+
+        var htmlLinks = uploads.Where(u => IsHtml(u.URLData)).ToList();
+        var images    = uploads.Where(u => IsImage(u.URLData)).ToList();
+
+        var sb = new StringBuilder();
+        sb.Append("<details class='acc'>");
+        sb.Append("<summary>");
+        sb.Append($"<span>{title}</span>");
+        sb.Append($"<span class='badge'>{uploads.Count} 개</span>");
+        sb.Append("</summary>");
+
+        sb.Append("<div class='accBody'>");
+        sb.Append($"<div class='muted' style='margin-bottom:10px;'>{System.Net.WebUtility.HtmlEncode(desc)}</div>");
+
+        if (htmlLinks.Any())
+        {
+            sb.Append("<div class='links' style='margin-bottom:14px;'>");
+            foreach (var u in htmlLinks)
+            {
+                var text = string.IsNullOrWhiteSpace(u.TEXTData) ? "자료 열기" : u.TEXTData;
+                sb.Append($@"<a class='btn-link' href=""javascript:openPopup('{u.URLData}')"">{System.Net.WebUtility.HtmlEncode(text)} ↗</a>");
+            }
+            sb.Append("</div>");
+        }
+
+        if (images.Any())
+        {
+            sb.Append("<p class='muted' style='margin-bottom:8px;'>사진을 누르면 크게 볼 수 있어요.</p>");
+            sb.Append("<div class='galleryGrid'>");
+            foreach (var u in images)
+            {
+                sb.Append("<figure class='thumb'>");
+                sb.Append($@"<img src=""{u.URLData}"" data-full=""{u.URLData}"" alt=""image"" loading=""lazy"">");
+                sb.Append("</figure>");
+            }
+            sb.Append("</div>");
+        }
+
+        if (IsSuperAdminSafe())
+        {
+            sb.Append("<div class='links' style='margin-top:14px;'>");
+            sb.Append($@"<a class='btn-link' href=""/WeeklyWordToRead/ModifyUploadData?category={cat}&WeeklyWordToReadID={Model.WeeklyWordToReadData.Id}"">업로드 · 수정</a>");
+            sb.Append("</div>");
+        }
+
+        sb.Append("</div>");
+        sb.Append("</details>");
+        return new HtmlString(sb.ToString());
+    }
+
+    public HtmlString RenderGallery(List<BulletinBoard.Models.UploadData> uploads)
+    {
+        var imgs = (uploads ?? new List<BulletinBoard.Models.UploadData>())
+            .Where(u => u != null && u.checkData && IsImage(u.URLData))
+            .ToList();
+
+        if (!imgs.Any())
+            return new HtmlString("<div class='muted'>등록된 이미지가 없습니다.</div>");
+
+        var sb = new StringBuilder();
+        sb.Append("<div class='galleryGrid'>");
+        foreach (var u in imgs)
+        {
+            sb.Append("<figure class='thumb'>");
+            sb.Append($@"<img src=""{u.URLData}"" data-full=""{u.URLData}"" alt=""thumb"" loading=""lazy"">");
+            sb.Append("</figure>");
+        }
+        sb.Append("</div>");
+        return new HtmlString(sb.ToString());
+    }
+}

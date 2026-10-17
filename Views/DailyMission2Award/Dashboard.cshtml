@@ -1,0 +1,656 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+
+@using BulletinBoard.Models.DailyMission2
+@model List<AwardDashboardRow>
+
+    @{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+
+@{
+    Layout = null; // ✅ 독립 페이지
+    ViewData["Title"] = "시상 대시보드";
+
+    int cYear = (ViewBag.cYear as int?) ?? DateHelper.GetKoreaNow().Year;
+
+    string DisplayName(AwardDashboardRow r)
+    {
+        if (r == null) return "";
+        return !string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName;
+    }
+
+    string StatusTone(string status)
+    {
+        status = (status ?? "").Trim().ToLowerInvariant();
+        if (status.Contains("deliv")) return "tone-green";
+        if (status.Contains("select")) return "tone-blue";
+        if (status.Contains("eligible")) return "tone-amber";
+        if (status.Contains("ineligible")) return "tone-gray";
+        return "tone-gray";
+    }
+
+    // ✅ 사람사진 규칙: /images/profile/{UserId}.png?t=... (없으면 onerror fallback)
+    string ProfileSrc(AwardDashboardRow row)
+    {
+        var uid = row?.UserId?.ToString();
+        if (string.IsNullOrWhiteSpace(uid))
+            return "/images/icon/people/people_01.webp";
+
+        var t = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        return $"/images/profile/{uid}.png?t={t}";
+    }
+
+    // ✅ 현재 페이지로 돌아오기 위한 returnUrl
+    string returnUrl = Context.Request.Path + Context.Request.QueryString;
+
+
+    string StatusText(string status)
+{
+    status = (status ?? "").Trim().ToLowerInvariant();
+
+        if (status == "selected") return "선물선택완료";
+    if (status == "eligible") return "선물선택안함";
+
+    return status; // 그 외 값은 원본 표시
+}
+
+}
+
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        :root {
+            --bg0: #070A12;
+            --bg1: #0A1022;
+            --card: rgba(255,255,255,.06);
+            --card2: rgba(255,255,255,.09);
+            --line: rgba(255,255,255,.12);
+            --text: rgba(255,255,255,.92);
+            --muted: rgba(255,255,255,.65);
+            --muted2: rgba(255,255,255,.45);
+            --shadow: 0 18px 60px rgba(0,0,0,.45);
+            --shadow2: 0 14px 42px rgba(0,0,0,.35);
+            --radius: 22px;
+            --radius2: 16px;
+            --accent: rgba(99,102,241,.95);
+            --accent2: rgba(34,211,238,.85);
+        }
+
+        /* ✅ minimal reset */
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+            background:
+                radial-gradient(900px 500px at 15% 10%, rgba(99,102,241,.28), transparent 60%),
+                radial-gradient(900px 500px at 85% 20%, rgba(34,211,238,.18), transparent 55%),
+                radial-gradient(900px 600px at 50% 95%, rgba(16,185,129,.10), transparent 60%),
+                linear-gradient(160deg, var(--bg0), var(--bg1));
+        }
+        a { color: inherit; }
+
+        /* ✅ full width layout */
+        .page {
+            min-height: 100%;
+            padding: 18px 14px 40px;
+        }
+        .wrap {
+            width: 100%;
+            margin: 0 auto;
+            max-width: 1600px; /* PC에서 너무 넓지 않게만 제한 */
+        }
+
+        /* ✅ header card */
+        .hero {
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .heroTop {
+            padding: 16px 16px 12px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .hTitle {
+            margin: 0;
+            font-weight: 950;
+            letter-spacing: -.04em;
+            font-size: 22px;
+            line-height: 1.12;
+        }
+        .hSub {
+            margin-top: 6px;
+            color: var(--muted);
+            font-weight: 700;
+            font-size: .95rem;
+        }
+
+        .tools {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+                width:100%;          /* ✅ 이 줄 추가 */
+    min-width:0;         /* ✅ 이 줄 추가 (overflow 방지 핵심) */
+        }
+   .searchBox{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:rgba(0,0,0,.25);
+    backdrop-filter:blur(10px);
+    box-shadow:0 10px 26px rgba(0,0,0,.25);
+
+    flex: 1 1 520px;     /* ✅ 부모 안에서 늘/줄 */
+    width: auto;         /* ✅ vw 제거 */
+    max-width: 720px;    /* ✅ 최대만 제한 */
+    min-width: 0;        /* ✅ overflow 방지 핵심 */
+}
+        .searchBox .icon { opacity: .9; font-weight: 900; }
+.searchBox input{
+    width:100%;
+    min-width:0;         /* ✅ 이 줄 추가 */
+    border:0;
+    outline:0;
+    background:transparent;
+    color:var(--text);
+    font-weight:850;
+    letter-spacing:-.01em;
+    font-size:14px;
+}
+        .searchBox input::placeholder { color: rgba(255,255,255,.45); font-weight: 800; }
+
+        .statPill {
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.06);
+            font-weight: 950;
+            letter-spacing: -.02em;
+            white-space: nowrap;
+        }
+
+        .heroNote {
+            padding: 12px 16px 14px;
+            border-top: 1px solid rgba(255,255,255,.10);
+            color: var(--muted);
+            font-weight: 750;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .heroNote b { color: rgba(255,255,255,.92); }
+
+        /* ✅ grid full width + responsive */
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 14px;
+        }
+        @@media (min-width: 640px)  { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @@media (min-width: 1024px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @@media (min-width: 1400px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } } /* ✅ 넓은 화면은 4열 */
+
+        .cardx {
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04));
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+            position: relative;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .cardx:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+
+        .cardHead {
+            padding: 14px 14px 12px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+        }
+        .person {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            min-width: 0;
+        }
+        .avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,.18);
+            background: rgba(0,0,0,.25);
+            flex: 0 0 auto;
+        }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .pmeta { min-width: 0; }
+        .pname {
+            font-weight: 950;
+            letter-spacing: -.02em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .puser {
+            margin-top: 4px;
+            color: var(--muted);
+            font-weight: 800;
+            font-size: .86rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .badges {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            flex: 0 0 auto;
+        }
+        .badgeP {
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-weight: 950;
+            font-size: .82rem;
+            line-height: 1;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(0,0,0,.18);
+            white-space: nowrap;
+        }
+        .lvl { border-color: rgba(99,102,241,.28); background: rgba(99,102,241,.14); }
+        .status { border-color: rgba(255,255,255,.12); }
+
+        .tone-green { background: rgba(16,185,129,.14) !important; border-color: rgba(16,185,129,.28) !important; }
+        .tone-blue  { background: rgba(59,130,246,.14) !important; border-color: rgba(59,130,246,.28) !important; }
+        .tone-amber { background: rgba(245,158,11,.14) !important; border-color: rgba(245,158,11,.28) !important; }
+        .tone-gray  { background: rgba(148,163,184,.14) !important; border-color: rgba(148,163,184,.28) !important; }
+
+        .cardBody { padding: 14px; display: grid; gap: 12px; }
+
+        .metaRow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(0,0,0,.16);
+            color: rgba(255,255,255,.86);
+            font-weight: 900;
+            font-size: .86rem;
+            white-space: nowrap;
+        }
+        .chip small { color: var(--muted2); font-weight: 900; }
+
+        /* ✅ product block: 세로 정렬 */
+        .productBlock {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            justify-items: center;
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(0,0,0,.14);
+        }
+        .pimgBtn {
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            cursor: pointer;
+            padding: 0;
+            display: block;
+            text-decoration: none;
+        }
+        .pimgBtn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .prodMini {
+            width: 100%;
+            text-align: center;
+            min-width: 0;
+            display: grid;
+            gap: 6px;
+        }
+        .prodName {
+            font-weight: 950;
+            letter-spacing: -.02em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .noProduct {
+            padding: 14px 12px;
+            border-radius: var(--radius2);
+            border: 1px dashed rgba(255,255,255,.20);
+            background: rgba(255,255,255,.04);
+            text-align: center;
+            color: var(--muted);
+            font-weight: 900;
+        }
+
+        .adminbar {
+            padding: 12px 14px 14px;
+            border-top: 1px solid rgba(255,255,255,.10);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    
+
+        .empty {
+            margin-top: 16px;
+            border-radius: var(--radius);
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.06);
+            padding: 16px;
+            color: var(--muted);
+            font-weight: 900;
+        }
+
+        /* ✅ small screen polish */
+        @@media (max-width: 420px) {
+            .hTitle { font-size: 20px; }
+            .pimgBtn {  }
+            .chip { font-size: .82rem; }
+        }
+    </style>
+
+    <style>
+
+        .homeBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.04));
+    color: var(--text);
+    font-weight: 900;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform .12s ease, filter .12s ease;
+    text-decoration: none;
+}
+.homeBtn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+}
+    </style>
+
+<style>
+  .btnx{
+    appearance:none;
+    border:0;
+    cursor:pointer;
+    user-select:none;
+
+    padding: 12px 20px;
+    border-radius: 14px;
+
+    /* ✅ Green 3D Gradient */
+    background: linear-gradient(180deg, #4ade80 0%, #16a34a 100%);
+    color:#ffffff;
+    font-weight:800;
+    letter-spacing:-0.02em;
+
+    /* ✅ 볼륨감 그림자 */
+    box-shadow:
+      0 14px 26px rgba(0,0,0,.18),
+      0 6px 12px rgba(0,0,0,.14),
+      inset 0 1px 0 rgba(255,255,255,.45),
+      inset 0 -2px 0 rgba(0,0,0,.20);
+
+    transform: translateY(-1px);
+    transition: all .12s ease;
+  }
+
+  /* 🌿 Hover - 살짝 떠오르는 느낌 */
+  .btnx:hover{
+    filter: brightness(1.05);
+    transform: translateY(-2px);
+    box-shadow:
+      0 18px 34px rgba(0,0,0,.22),
+      0 8px 16px rgba(0,0,0,.16),
+      inset 0 1px 0 rgba(255,255,255,.45),
+      inset 0 -2px 0 rgba(0,0,0,.20);
+  }
+
+  /* 👇 Active - 눌림 효과 */
+  .btnx:active{
+    transform: translateY(1px);
+    box-shadow:
+      0 8px 16px rgba(0,0,0,.18),
+      0 3px 8px rgba(0,0,0,.12),
+      inset 0 1px 0 rgba(255,255,255,.30),
+      inset 0 -1px 0 rgba(0,0,0,.25);
+  }
+
+  .btnx:focus-visible{
+    outline: 3px solid rgba(34,197,94,.35);
+    outline-offset: 3px;
+  }
+
+  .btnx:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+    transform:none;
+  }
+</style>
+</head>
+
+<body>
+    <div class="page">
+        <div class="wrap">
+            <section class="hero">
+                <div class="heroTop">
+                    <div>
+                        <h2 class="hTitle">시상 대시보드 <span style="opacity:.7;">(@cYear)</span></h2>
+                    </div>
+
+                <div class="tools">
+    <a href="/" class="homeBtn" title="홈으로 이동">
+        🏠 홈으로 가기
+    </a>
+
+    <div class="searchBox" title="이름/아이디/학년반(또는 역할)/상품명 검색">
+        <span class="icon">🔎</span>
+        <input id="q" type="text" placeholder="검색: 이름, 아이디, 학년/역할, 상품명" />
+    </div>
+
+    <div class="statPill">총 @(Model?.Count ?? 0)명</div>
+</div>
+                </div>
+
+          @*       <div class="heroNote">
+                    <span>🖼️ 상품사진 클릭 → 상품 상세 페이지</span>
+                    <span>•</span>
+                    <span>🔎 검색은 즉시 필터링</span>
+                    @if (isAdmin)
+                    {
+                        <span>•</span>
+                        <span>🛡️ 관리자: 상세에서 가격 확인 + Delivered 처리</span>
+                    }
+                </div> *@
+            </section>
+
+            @if (Model == null || Model.Count == 0)
+            {
+                <div class="empty">표시할 데이터가 없습니다.</div>
+            }
+            else
+            {
+                <div class="grid" id="grid">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        var row = Model[i];
+                        bool hasProduct = row.SelectedProductID.HasValue;
+
+                        string imgUrl = !string.IsNullOrWhiteSpace(row.ProductImageUrl)
+                            ? row.ProductImageUrl
+                            : (hasProduct ? $"/images/AwardItem/{row.SelectedProductID!.Value}.jpg" : "/images/common/no-image.jpg");
+
+                        string personUrl = ProfileSrc(row);
+
+                        string groupText = !string.IsNullOrWhiteSpace(row.DisplayGroupText) ? row.DisplayGroupText : "학년/반 없음";
+                        string displayName = DisplayName(row);
+                        string statusTone = StatusTone(row.Status);
+
+                        string searchText = $"{displayName} {row.UserName} {groupText} {row.SelectedProductID} {row.SelectedProductName}"
+                            .ToLowerInvariant();
+
+                        <article class="cardx" data-search="@searchText">
+                            <div class="cardHead">
+                                <div class="person">
+                                    <div class="avatar" title="@displayName">
+                                        <img src="@personUrl"
+                                             onerror="this.onerror=null; this.src='/images/icon/people/people_01.webp';"
+                                             alt="대표 프로필"
+                                             loading="lazy" />
+                                    </div>
+                                    <div class="pmeta">
+                                        <div class="pname" title="@displayName">@displayName</div>
+                                        <div class="puser" title="@row.UserName">@row.UserName</div>
+                                    </div>
+                                </div>
+
+                           
+
+                                <div class="badges">
+                                    <div class="badgeP lvl">LV @row.AwardLevel</div>
+                                    <div class="badgeP status @statusTone">
+                                        @StatusText(row.Status)
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="cardBody">
+                                <div class="metaRow">
+                                    <div class="chip">🏫 <span>@groupText</span></div>
+                                    <div class="chip">⭐ <span>@row.YearTotalPoint</span> <small>점</small></div>
+                                </div>
+
+                                @if (!hasProduct)
+                                {
+                                    <div class="noProduct">상품 미선택</div>
+                                }
+                                else
+                                {
+                                    <div class="productBlock">
+                                        <a class="pimgBtn"
+                                           title="상품 상세 보기"
+                                           href="/Present/Detail?productId=@row.SelectedProductID&returnUrl=@Uri.EscapeDataString(returnUrl)">
+                                            <img src="@imgUrl"
+                                                 onerror="this.onerror=null; this.src='/images/common/no-image.jpg';"
+                                                 alt="상품 이미지" />
+                                        </a>
+
+                                        <div class="prodMini">
+                                            <div class="prodName" title="@row.SelectedProductName">
+                                                @if (isAdmin || isSuperAdmin)
+                                                {
+                                                    @($"{row.SelectedProductID?.ToString() ?? ""}.{row.SelectedProductName}")
+                                                }
+                                                else
+                                                {
+                                                    @row.SelectedProductName
+                                                }
+
+                                            </div>
+                                            <div style="color:var(--muted); font-weight:450; font-size:.75rem;">
+                                                (사진을 누르면 상품 상세 페이지로 이동)
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                            @if (isAdmin)
+                            {
+                                <div class="adminbar">
+                                    @if (string.Equals(row.Status, "Selected", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <form method="post" action="/DailyMission2Award/MarkDelivered">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="userName" value="@row.UserName" />
+                                            <input type="hidden" name="cYear" value="@row.cYear" />
+                                            <input type="hidden" name="awardLevel" value="@row.AwardLevel" />
+                                            <button type="submit" class="btnx">전달완료 표시</button>
+                                        </form>
+                                    }
+                                </div>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const q = document.getElementById('q');
+            const grid = document.getElementById('grid');
+            if (!q || !grid) return;
+
+            const cards = Array.from(grid.querySelectorAll('.cardx'));
+            function norm(v) { return (v || "").toString().trim().toLowerCase(); }
+
+            function apply() {
+                const needle = norm(q.value);
+                if (!needle) { cards.forEach(c => c.style.display = ""); return; }
+                cards.forEach(c => {
+                    const hay = (c.getAttribute('data-search') || "");
+                    c.style.display = hay.includes(needle) ? "" : "none";
+                });
+            }
+
+            q.addEventListener('input', apply);
+        })();
+    </script>
+</body>
+</html>

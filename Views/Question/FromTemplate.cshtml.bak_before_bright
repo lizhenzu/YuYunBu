@@ -1,0 +1,326 @@
+﻿@using BulletinBoard.Common;
+@using System.Web
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.QuestionTypeDataObjects>
+
+@{
+    Layout = "_Layout_Quiz";
+
+    TodayWordToReads todayWordToReads = ViewBag.TodayWordToReads as TodayWordToReads;
+    eBibles _eBibles = ViewBag._eBibles as eBibles;
+}
+
+
+<style>
+    /* 팝업 백그라운드 */
+    .popup-background {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); /* 배경 어둡게 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999; /* 화면에서 최상단에 표시되도록 설정 */
+    }
+
+    /* 팝업 스타일 */
+    .popup {
+        background-color: white;
+        text-align: center;
+        width: 90%;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 팝업에 약간의 그림자 추가 */
+    }
+</style>
+<style>
+    /* 영역 1 스타일 */
+    .popup-header {
+        background-color: #f0f4c3; /* 부드러운 연한 녹색 */
+        padding: 10px;
+        text-align: center;
+    }
+
+    /* 영역 2 스타일 */
+    .popup-content {
+        background-color: #fffde7; /* 연한 크림색 */
+        padding: 20px;
+        text-align: center;
+        border-bottom: 1px solid #eeeeee; /* 구분선 */
+    }
+
+    /* 영역 3 스타일 */
+    .popup-checkboxes {
+        background-color: #f1f8e9; /* 연한 그린 계열 */
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    /* 공통 스타일 */
+    .popup p {
+        margin: 5px 0;
+    }
+
+    .popup-checkboxes label {
+        font-weight: bold;
+    }
+</style>
+
+<style>
+
+    .mission-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.1);
+        margin: 5px 0;
+        padding: 25px;
+        
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: transform 0.2s ease-in-out, background 0.3s;
+    }
+
+        .mission-card:active {
+            border-color: #ff7043;
+        }
+
+        .mission-card:hover {
+            border-color: #ff7043;
+        }
+
+        .mission-card img {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            border: 3px solid #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            border-radius: 35px;
+        }
+
+    .mission-text {
+        flex: 1;
+        margin-left: 15px;
+        text-align: left;
+    }
+
+    .mission-title {
+        font-size: 22px;
+        font-weight: bold;
+        color: #37474F;
+    }
+
+    .mission-desc {
+        font-size: 16px;
+        color: #546E7A;
+    }
+
+    .mission-status {
+        padding: 10px 10px;
+        border-radius: 50%;
+        font-size: 16px;
+        border: 3px solid white;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+</style>
+
+<link rel="stylesheet" href="/css/bibleOneByOne.css">
+<link rel="stylesheet" href="/css/ProcessBar.css">
+<link rel="stylesheet" href="/css/ButtonBase7.css">
+<link rel="stylesheet" href="/css/ColorBase7.css">
+
+<script src="/js/ProcessBar73.js"></script>
+<script src="/js/bibleOneByOne.js"></script>
+
+<div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-box">처리중입니다</div>
+</div>
+<div id="processingBox">
+    📖 처리 중입니다... 잠시만 기다려 주세요.
+</div>
+
+<div class="container">
+
+    @await Html.PartialAsync("_PublisheQuizHeader", "퀴즈뱅크에서 퀴즈 선택" )
+
+    @await Html.PartialAsync("_Publish_MissionBar_Word_Details", @todayWordToReads)
+
+    <div class="content-blank">
+ 
+        @await Html.PartialAsync("_PublisheBible43", @_eBibles)
+    </div>
+
+    @foreach (var item in Model)
+    {
+
+        <!-- Example cards, replace with actual data -->
+        <div class="card">
+            <div> @item.sequenceNo) @item.QuestionQ</div>
+            @if (@item.QuestionType == "o")
+            {
+                <div>
+                    <ol>
+                        @if (@item.CorrectAnswer == "1")
+                        {
+                            <li style="color:#DC143C;"> @item.Question1 (정답)</li>
+                        }
+                        else
+                        {
+                            <li> @item.Question1</li>
+                        }
+                        @if (@item.CorrectAnswer == "2")
+                        {
+                            <li style="color:#DC143C;"> @item.Question2 (정답)</li>
+                        }
+                        else
+                        {
+                            <li> @item.Question2</li>
+                        }
+
+                        @if (@item.CorrectAnswer == "3")
+                        {
+                            <li style="color:#DC143C;"> @item.Question3 (정답)</li>
+                        }
+                        else
+                        {
+                            <li> @item.Question3</li>
+                        }
+
+                        @if (@item.CorrectAnswer == "4")
+                        {
+                            <li style="color:#DC143C;"> @item.Question4 (정답)</li>
+                        }
+                        else
+                        {
+                            <li> @item.Question4</li>
+                        }
+                    </ol>
+                </div>
+            }
+            else
+            {
+                <div>정답) @item.CorrectAnswer </div>
+            }
+            <div class="card-buttons2">
+                <div class="card-button create" onclick="createQuizById(@item.Id)">수정없이 퀴즈로 등록</div>
+                <div class="card-button modify" onclick="createQuizByBank(@item.Id)">수정해서 퀴즈로 등록</div>
+                <div class="card-button delete" onclick="deleteQuestion( @item.Id, '@HttpUtility.JavaScriptStringEncode(item.QuestionQ)')">퀴즈뱅크에서 이 퀴즈 삭제</div>
+                <div class="card-button bible" onclick="location.href='/BibleBulk/BibleSheet2?BibleText=@Html.Raw(item.BibleText)&Jang=@item.Jang'">관련 성경구절 보기</div>
+
+            </div>
+        </div>
+    }
+
+    @await Html.PartialAsync("_Layout_Quiz_NavigationButton", string.Empty)
+</div>
+
+
+
+<div class="popup-background" id="popup-background" style="display: none;">
+    <div class="popup">
+        <!-- 영역 1 -->
+        <div class="popup-header">
+            <h2>알려 드려요.^^</h2>
+        </div>
+
+        <!-- 영역 2 -->
+        <div class="popup-content">
+            <p>퀴즈뱅크에서 문제가 잘못 생성될 수 있어요.</p>
+            <p>잘못된 문제는 고민없이 바로 삭제해 주세요.^^</p>
+        </div>
+
+        <!-- 영역 3 -->
+        <div class="popup-checkboxes">
+            <label><input type="checkbox" id="hideToday" onclick="handleCheckbox('hideToday', 1)"> 오늘 하루 안보기</label>
+            <label><input type="checkbox" id="hide7Days" onclick="handleCheckbox('hide7Days', 7)"> 7일간 안보기</label>
+        </div>
+    </div>
+</div>
+
+<script src="/js/asyncProcesing.js"></script>
+<script src="/js/common2.js"></script>
+
+<script>
+    function createQuizById(id) {
+        location.href = "/Question/CreateQuizById?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+
+    function createQuizByBank(id) {
+        location.href = "/Question/CreateQuizByBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    async function deleteQuestion(id, QuestionQ) {
+
+        let result = await confirmMessage(true, ['퀴즈뱅크에서 아래 퀴즈를 삭제 할까요?', QuestionQ], null, '진행'); // 취소 버튼 표시
+        if (result === 'y') {
+
+            location.href = "/Question/DeleteQuestionBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+
+        } else if (result === 'c') {
+            //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+            // 작업 취소 로직
+            return;
+        }
+
+
+    }
+</script>
+
+<script>
+
+    function goBack() {
+        window.history.back();
+    }
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const hideToday = getCookie('hideToday');
+        const hide7Days = getCookie('hide7Days');
+
+        // hideToday 또는 hide7Days 쿠키가 없을 때만 팝업을 표시
+        if (!hideToday && !hide7Days) {
+            document.getElementById('popup-background').style.display = 'flex'; // 팝업 표시
+            document.body.style.overflow = 'hidden'; // 스크롤 비활성화
+        }
+    });
+
+    function handleCheckbox(cookieName, days) {
+        setCookie(cookieName, 'true', days); // 쿠키 설정
+        document.getElementById('popup-background').style.display = 'none'; // 팝업 숨김
+        document.body.style.overflow = 'auto'; // 스크롤 다시 활성화
+    }
+
+    // 쿠키 설정 함수
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000)); // 쿠키 만료 시간 설정
+        const expires = "expires=" + date.toUTCString();
+        document.cookie = name + "=" + value + ";" + expires + ";path=/"; // 쿠키 설정
+    }
+
+    // 쿠키 가져오기 함수
+    function getCookie(name) {
+        const cname = name + "=";
+        const decodedCookie = decodeURIComponent(document.cookie);
+        const ca = decodedCookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(cname) === 0) {
+                return c.substring(cname.length, c.length);
+            }
+        }
+        return ""; // 쿠키가 없으면 빈 문자열 반환
+    }
+</script>
+

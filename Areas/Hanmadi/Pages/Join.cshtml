@@ -1,0 +1,200 @@
+@page "/hanmadi/join"
+@model BulletinBoard.Areas.Hanmadi.Pages.JoinModel
+@{
+    Layout = null;
+    ViewData["Title"] = "한마디 참여";
+    var blocked  = Request.Query["blocked"].FirstOrDefault()  == "true";
+    var rejoined = Request.Query["rejoined"].FirstOrDefault() ?? "";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>한마디 참여</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f1f5f9; color: #0f172a;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .card {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 22px; padding: 36px 28px;
+    width: 100%; max-width: 380px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  }
+  .top-icon { font-size: 40px; margin-bottom: 10px; display: block; text-align: center; }
+  h1 { font-size: 22px; font-weight: 900; text-align: center; color: #4f46e5; margin-bottom: 6px; }
+  .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 28px; }
+
+  label { display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 13px 14px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; color: #0f172a;
+    font-size: 16px; outline: none; font-family: inherit;
+    transition: border-color .2s;
+  }
+  input:focus { border-color: #6366f1; background: #fff; }
+  .field { margin-bottom: 16px; }
+  .code-input {
+    text-transform: uppercase; letter-spacing: 6px;
+    font-weight: 900; text-align: center; font-size: 22px;
+  }
+  .err { color: #ef4444; font-size: 12px; margin-top: 5px; }
+  .err-box {
+    background: #fef2f2; border: 1px solid #fecaca;
+    border-radius: 10px; padding: 10px 14px;
+    color: #dc2626; font-size: 13px; font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .btn {
+    width: 100%; padding: 14px; border-radius: 12px;
+    font-size: 15px; font-weight: 700;
+    cursor: pointer; border: none;
+    background: #6366f1; color: #fff;
+    margin-top: 6px; transition: background .15s;
+  }
+  .btn:hover { background: #4f46e5; }
+  .btn-result {
+    width: 100%; padding: 13px; border-radius: 12px;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; border: 1.5px solid #e2e8f0;
+    background: #f8fafc; color: #475569;
+    margin-top: 8px; transition: all .15s;
+    font-family: inherit;
+  }
+  .btn-result:hover { background: #ede9fe; border-color: #c4b5fd; color: #5b5bd6; }
+  .divider {
+    display: flex; align-items: center; gap: 10px;
+    margin: 14px 0 6px; color: #cbd5e1; font-size: 12px;
+  }
+  .divider::before, .divider::after {
+    content: ""; flex: 1; height: 1px; background: #e2e8f0;
+  }
+  .back { display: block; text-align: center; color: #94a3b8; font-size: 13px;
+          text-decoration: none; margin-top: 16px; }
+  .back:hover { color: #6366f1; }
+
+  /* 로딩 오버레이 */
+  .loading-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(241,245,249,.88); backdrop-filter: blur(6px);
+    z-index: 999; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px;
+  }
+  .loading-overlay.show { display: flex; }
+  .spinner {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: 5px solid #e2e8f0; border-top-color: #6366f1;
+    animation: spin .7s linear infinite;
+  }
+  @@keyframes spin { to { transform: rotate(360deg); } }
+  .loading-msg { font-size: 16px; font-weight: 700; color: #4f46e5; }
+  .loading-sub { font-size: 13px; color: #94a3b8; margin-top: -10px; }
+
+  /* 재참여 안내 오버레이 */
+  .rejoin-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(241,245,249,.92); backdrop-filter: blur(8px);
+    z-index: 999; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px;
+  }
+  .rejoin-overlay.show { display: flex; }
+  .rejoin-box {
+    background: #fff; border: 1.5px solid #c7d2fe;
+    border-radius: 20px; padding: 32px 28px;
+    text-align: center; max-width: 320px;
+    box-shadow: 0 8px 32px rgba(99,102,241,.12);
+  }
+  .rejoin-icon { font-size: 44px; margin-bottom: 12px; display: block; }
+  .rejoin-title { font-size: 18px; font-weight: 900; color: #4f46e5; margin-bottom: 6px; }
+  .rejoin-desc  { font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.6; }
+  .rejoin-bar {
+    height: 6px; border-radius: 99px; background: #e2e8f0; overflow: hidden;
+  }
+  .rejoin-bar-fill {
+    height: 100%; background: #6366f1; border-radius: 99px;
+    width: 0%; transition: width 2.5s linear;
+  }
+  .rejoin-hint { font-size: 11px; color: #94a3b8; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <span class="top-icon">🎤</span>
+  <h1>한마디 참여</h1>
+  <p class="sub">선생님께 받은 3자리 코드를 입력하세요</p>
+
+  <form method="post">
+    <div class="field">
+      <label>참여 코드</label>
+      <input class="code-input" asp-for="Code" maxlength="3" placeholder="ABC"
+             autofocus autocomplete="off" oninput="this.value=this.value.toUpperCase()"/>
+      <span asp-validation-for="Code" class="err"></span>
+    </div>
+    <div class="field">
+      <label>닉네임 <span style="font-weight:400;color:#94a3b8">(선택)</span></label>
+      <input asp-for="Nickname" maxlength="20" placeholder="익명으로도 참여 가능해요"/>
+    </div>
+
+    @if (blocked)
+    {
+      <div class="err-box">🔒 결과는 참여자만 볼 수 있어요. 코드를 입력하고 먼저 참여해 주세요.</div>
+    }
+    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+    {
+      <div class="err-box">⚠️ @Model.ErrorMessage</div>
+    }
+
+    <button type="submit" class="btn" id="join-btn">참여하기 →</button>
+  </form>
+  <a href="/hanmadi" class="back">← 처음으로</a>
+</div>
+
+<!-- 로딩 오버레이 -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-msg">문제 준비 중이에요 ✨</div>
+  <div class="loading-sub">잠시만 기다려 주세요</div>
+</div>
+
+<!-- 재참여 안내 오버레이 -->
+<div class="rejoin-overlay" id="rejoin-overlay">
+  <div class="rejoin-box">
+    <span class="rejoin-icon">✅</span>
+    <div class="rejoin-title">이미 참여하셨어요!</div>
+    <div class="rejoin-desc">결과 화면으로<br/>바로 이동합니다.</div>
+    <div class="rejoin-bar"><div class="rejoin-bar-fill" id="rejoin-bar-fill"></div></div>
+    <div class="rejoin-hint">잠시만 기다려 주세요…</div>
+  </div>
+</div>
+
+<script>
+document.querySelector('form').addEventListener('submit', function(e) {
+  const code = document.getElementById('Code').value.trim();
+  if (!code || code.length < 3) return;
+  document.getElementById('loading-overlay').classList.add('show');
+  document.getElementById('join-btn').disabled = true;
+});
+
+@if (!string.IsNullOrEmpty(rejoined))
+{
+  <text>
+  (function() {
+    const dest = '/hanmadi/results/@rejoined';
+    const overlay = document.getElementById('rejoin-overlay');
+    overlay.classList.add('show');
+    requestAnimationFrame(() => {
+      document.getElementById('rejoin-bar-fill').style.width = '100%';
+    });
+    setTimeout(() => { location.href = dest; }, 2600);
+  })();
+  </text>
+}
+</script>
+</body>
+</html>

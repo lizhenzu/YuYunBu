@@ -1,0 +1,913 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+
+@{
+    var user        = await AuthService.GetSignedUser(User);
+    var isSignedIn  = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    var isBasic     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool isStaff    = (isAdmin || isSuperAdmin || isModerator);
+}
+
+@{
+    ViewData["Title"] = "성경통독 참여자";
+    Layout = null;
+
+    var communityUsers = ViewBag.CommunityUsers as List<BulletinBoard.Models.BibleLastReadRateByUserSimple>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserSimple>();
+    var lastReadBooks  = ViewBag.LastReadBooks  as Dictionary<string, BulletinBoard.Models.BibleLastReadInfo>
+                         ?? new Dictionary<string, BulletinBoard.Models.BibleLastReadInfo>();
+    var completedUsers = ViewBag.CompletedUsers as List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>();
+    var kstNow         = DateHelper.GetKoreaNow();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>성경통독 참여자</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f172a; }
+    </style>
+</head>
+<body>
+
+<style>
+    /* ── 전체 페이지 (Welcome과 동일 테마) ── */
+    .participants-page {
+        min-height: 100vh;
+        background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 50%, #0f2744 100%);
+        padding: 0 0 80px;
+        font-family: 'Noto Serif KR', 'Malgun Gothic', serif;
+    }
+
+    /* ── 히어로 배너 ── */
+    .hero {
+        position: relative;
+        text-align: center;
+        padding: 34px 20px 52px;
+        overflow: hidden;
+    }
+    .hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background:
+            radial-gradient(ellipse 80% 60% at 50% 0%, rgba(99,179,237,0.18) 0%, transparent 70%),
+            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(167,139,250,0.15) 0%, transparent 60%);
+        pointer-events: none;
+    }
+    .hero::after {
+        content: '✦ ✧ ✦ ✧ ✦ ✧ ✦ ✧ ✦';
+        position: absolute; top: 18px; left: 0; right: 0;
+        text-align: center; font-size: 11px;
+        color: rgba(255,255,255,0.2); letter-spacing: 14px;
+        animation: twinkle 3s ease-in-out infinite;
+    }
+    @@keyframes twinkle {
+        0%,100% { opacity: 0.2; }
+        50%      { opacity: 0.6; }
+    }
+
+    /* ── 뒤로 가기 버튼 ── */
+    .back-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        position: relative; z-index: 2;
+        background: rgba(99,179,237,0.12);
+        border: 1px solid rgba(99,179,237,0.28);
+        color: #93c5fd;
+        font-size: 13px; font-weight: 700;
+        padding: 8px 18px; border-radius: 30px;
+        text-decoration: none; cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+        margin-bottom: 26px;
+    }
+    .back-btn:hover {
+        background: rgba(99,179,237,0.24);
+        color: #fff;
+        transform: translateY(-1px);
+        text-decoration: none;
+    }
+
+    .hero-icon {
+        font-size: 54px;
+        display: block;
+        margin-bottom: 14px;
+        filter: drop-shadow(0 0 20px rgba(147,197,253,0.6));
+        animation: float 4s ease-in-out infinite;
+        position: relative; z-index: 1;
+    }
+    @@keyframes float {
+        0%,100% { transform: translateY(0); }
+        50%      { transform: translateY(-8px); }
+    }
+
+    .hero-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: rgba(99,179,237,0.15);
+        border: 1px solid rgba(99,179,237,0.3);
+        color: #93c5fd;
+        font-size: 12px; font-weight: 600; letter-spacing: 2px;
+        padding: 5px 14px; border-radius: 20px;
+        margin-bottom: 18px;
+        text-transform: uppercase;
+        position: relative; z-index: 1;
+    }
+
+    .hero h1 {
+        font-size: clamp(24px, 5vw, 40px);
+        font-weight: 700;
+        color: #fff;
+        line-height: 1.3;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 20px rgba(0,0,0,0.4);
+        position: relative; z-index: 1;
+    }
+    .hero h1 span {
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd, #f9a8d4);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-sub {
+        font-size: 14px; color: rgba(255,255,255,0.5);
+        font-weight: 400; line-height: 1.6;
+        position: relative; z-index: 1;
+    }
+
+    /* ── 구분선 ── */
+    .divider {
+        width: 60px; height: 3px; margin: 22px auto 0;
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+        border-radius: 10px;
+        position: relative; z-index: 1;
+    }
+
+    /* ══════════════════════════════════════════════
+       COMMUNITY SECTION
+    ══════════════════════════════════════════════ */
+    .community-section {
+        max-width: 1100px; margin: 0 auto;
+        padding: 32px 20px 72px;
+    }
+
+    /* ── 섹션 헤더 ── */
+    .comm-header {
+        display: flex; align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap; gap: 16px;
+        margin-bottom: 26px;
+    }
+    .comm-title-wrap {
+        display: flex; align-items: center;
+        gap: 12px; flex-wrap: wrap;
+    }
+    .comm-icon { font-size: 30px; filter: drop-shadow(0 0 10px rgba(147,197,253,0.55)); }
+    .comm-title {
+        font-size: 24px; font-weight: 800; margin: 0;
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .comm-count-badge {
+        background: rgba(99,179,237,0.15);
+        border: 1px solid rgba(99,179,237,0.3);
+        color: #93c5fd; font-size: 12px; font-weight: 600;
+        padding: 4px 12px; border-radius: 20px;
+    }
+
+    /* ── 컨트롤 (검색 + 정렬) ── */
+    .comm-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .comm-search-wrap {
+        display: flex; align-items: center; gap: 8px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 12px; padding: 8px 14px;
+    }
+    .comm-search {
+        background: none; border: none; outline: none;
+        color: #fff; font-size: 13px; width: 150px;
+        font-family: inherit;
+    }
+    .comm-search::placeholder { color: rgba(255,255,255,0.3); }
+    .comm-sort-btns { display: flex; gap: 6px; }
+    .csort-btn {
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.55);
+        padding: 8px 14px; border-radius: 10px;
+        font-size: 12px; font-weight: 600; cursor: pointer;
+        transition: all 0.2s; font-family: inherit;
+    }
+    .csort-btn.active {
+        background: rgba(99,179,237,0.2);
+        border-color: rgba(99,179,237,0.4); color: #93c5fd;
+    }
+    .csort-btn:hover:not(.active) { background: rgba(255,255,255,0.12); color: #fff; }
+
+    /* ── 통계 바 ── */
+    .comm-stats-bar {
+        display: flex; align-items: center;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.09);
+        border-radius: 18px; padding: 18px 28px;
+        margin-bottom: 36px; backdrop-filter: blur(10px);
+        gap: 0;
+    }
+    .cstat { flex: 1; text-align: center; }
+    .cstat-num {
+        display: block; font-size: 28px; font-weight: 900;
+        line-height: 1.1;
+        background: linear-gradient(90deg, #93c5fd, #c4b5fd);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .cstat-lbl { font-size: 11px; color: rgba(255,255,255,0.38); margin-top: 3px; display: block; }
+    .cstat-div { width: 1px; height: 38px; background: rgba(255,255,255,0.09); }
+
+    /* ── 카드 그리드 ── */
+    .comm-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 18px;
+    }
+
+    /* ── 카드 기본 ── */
+    .comm-card {
+        position: relative;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 24px; padding: 22px 16px 18px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        overflow: hidden; backdrop-filter: blur(12px);
+        transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), box-shadow 0.3s;
+        opacity: 0; transform: translateY(22px);
+        animation: commCardIn 0.55s ease forwards;
+    }
+    .comm-card:hover {
+        transform: translateY(-7px) scale(1.025);
+        box-shadow: 0 22px 52px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.13);
+    }
+    @@keyframes commCardIn {
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 완독자 카드 (골드 테마) ── */
+    .comm-card--complete {
+        background: linear-gradient(145deg, rgba(28,18,0,0.92) 0%, rgba(44,30,0,0.92) 100%);
+        border-color: rgba(245,158,11,0.38);
+        box-shadow: 0 0 36px rgba(245,158,11,0.13), 0 8px 32px rgba(0,0,0,0.4);
+    }
+    .comm-card--complete:hover {
+        box-shadow: 0 22px 56px rgba(245,158,11,0.28), 0 0 0 1px rgba(245,158,11,0.32);
+    }
+
+    /* 골드 shimmer */
+    .card-shimmer {
+        position: absolute; inset: 0; border-radius: inherit;
+        background: linear-gradient(
+            115deg,
+            transparent 0%, transparent 38%,
+            rgba(245,158,11,0.13) 50%,
+            transparent 62%, transparent 100%
+        );
+        background-size: 300% 300%;
+        animation: goldShimmer 2.8s ease-in-out infinite;
+    }
+    @@keyframes goldShimmer {
+        0%   { background-position: 120% 120%; }
+        100% { background-position: -120% -120%; }
+    }
+
+    /* 완독 크라운 뱃지 */
+    .card-crown {
+        display: flex; align-items: center; gap: 5px;
+        background: linear-gradient(90deg, rgba(245,158,11,0.22), rgba(251,191,36,0.18));
+        border: 1px solid rgba(245,158,11,0.42);
+        border-radius: 20px; padding: 4px 12px;
+        font-size: 11px; font-weight: 700; color: #fcd34d;
+        letter-spacing: 0.3px; white-space: nowrap; z-index: 1;
+    }
+
+    /* ── 진행 링 영역 ── */
+    .ring-area {
+        position: relative; width: 118px; height: 118px; flex-shrink: 0;
+    }
+    .pring {
+        width: 118px; height: 118px;
+        transform: rotate(-90deg);
+        overflow: visible;
+    }
+    .pring-bg {
+        fill: none;
+        stroke: rgba(255,255,255,0.06);
+        stroke-width: 7;
+    }
+    .pring-fill {
+        fill: none; stroke-width: 7;
+        stroke-linecap: round;
+        transition: stroke-dashoffset 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* 아바타 skeleton shimmer */
+    .ring-avatar.img-loading {
+        background: linear-gradient(90deg,
+            rgba(255,255,255,0.06) 25%,
+            rgba(255,255,255,0.13) 50%,
+            rgba(255,255,255,0.06) 75%);
+        background-size: 200% 100%;
+        animation: avatarSkeleton 1.4s ease-in-out infinite;
+    }
+    @@keyframes avatarSkeleton {
+        0%   { background-position:  200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    .ring-avatar img.img-loaded {
+        animation: avatarFadeIn 0.45s ease;
+    }
+    @@keyframes avatarFadeIn {
+        from { opacity: 0; transform: scale(0.92); }
+        to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* 아바타 — 링 중앙 */
+    .ring-avatar {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 74px; height: 74px; border-radius: 50%;
+        overflow: hidden;
+        background: rgba(255,255,255,0.08);
+        border: 2.5px solid rgba(255,255,255,0.14);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+    .ring-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ring-avatar-fb {
+        width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; font-weight: 800;
+        color: rgba(255,255,255,0.75);
+        background: linear-gradient(135deg, #3b4280, #5b21b6);
+    }
+
+    /* % 오버레이 — 링 하단 */
+    .ring-pct {
+        position: absolute; bottom: -5px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(11,17,34,0.92);
+        border: 1px solid rgba(255,255,255,0.13);
+        border-radius: 10px; padding: 2px 9px;
+        font-size: 13px; font-weight: 800; color: #fff;
+        white-space: nowrap; backdrop-filter: blur(6px); z-index: 2;
+    }
+    .ring-pct small { font-size: 9px; opacity: 0.65; }
+    .ring-pct--gold { color: #fcd34d; }
+
+    /* ── 이름 ── */
+    .card-name {
+        font-size: 15px; font-weight: 700; color: #fff;
+        text-align: center; margin-top: 4px; z-index: 1;
+        display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .user-id-badge {
+        font-size: 11px; font-weight: 600; color: #93c5fd;
+        background: rgba(147,197,253,0.12);
+        border: 1px solid rgba(147,197,253,0.3);
+        padding: 3px 10px; border-radius: 20px;
+        letter-spacing: 0.3px;
+    }
+
+    /* ── 정보 칩 ── */
+    .card-info { display: flex; flex-direction: column; gap: 5px; width: 100%; z-index: 1; }
+    .ci-chip {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 11.5px; color: rgba(255,255,255,0.5);
+        background: rgba(255,255,255,0.04);
+        border-radius: 8px; padding: 5px 10px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* ── 하단 진행 바 ── */
+    .card-prog-bar {
+        width: 100%; height: 4px;
+        background: rgba(255,255,255,0.07);
+        border-radius: 10px; overflow: hidden;
+        margin-top: auto; z-index: 1;
+    }
+    .card-prog-fill {
+        height: 100%; border-radius: 10px; width: 0%;
+        transition: width 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    /* ── 빈 상태 ── */
+    .comm-empty { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.3); }
+    .comm-empty-icon { font-size: 52px; margin-bottom: 14px; }
+
+    /* ── 하단 안내 ── */
+    .footer-note {
+        text-align: center; margin-top: 40px;
+        color: rgba(255,255,255,0.3); font-size: 12px;
+    }
+
+    /* ── 반응형 ── */
+    @@media (max-width: 640px) {
+        .comm-header { flex-direction: column; }
+        .comm-controls { width: 100%; }
+        .comm-search-wrap { flex: 1; }
+        .comm-search { width: 100%; }
+        .comm-stats-bar { padding: 14px 14px; gap: 0; }
+        .cstat-num { font-size: 20px; }
+        .comm-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        .ring-area { width: 100px; height: 100px; }
+        .pring { width: 100px; height: 100px; }
+        .ring-avatar { width: 62px; height: 62px; }
+        .hero { padding: 24px 16px 38px; }
+    }
+
+    /* ══ 완독자 명예의 전당 섹션 ══ */
+    .hall-section {
+        max-width: 1100px; margin: 0 auto;
+        padding: 32px 20px 0;
+    }
+    .hall-header {
+        display: flex; align-items: center; gap: 14px;
+        margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .hall-icon { font-size: 32px; filter: drop-shadow(0 0 10px rgba(245,158,11,.6)); }
+    .hall-title {
+        font-size: 24px; font-weight: 800;
+        background: linear-gradient(90deg, #f59e0b, #fbbf24, #fde68a);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .hall-count-badge {
+        background: rgba(245,158,11,.15);
+        border: 1px solid rgba(245,158,11,.35);
+        color: #fcd34d; font-size: 12px; font-weight: 600;
+        padding: 4px 12px; border-radius: 20px;
+    }
+    .hall-divider {
+        height: 1px;
+        background: linear-gradient(90deg, rgba(245,158,11,.4), transparent);
+        margin-bottom: 24px;
+    }
+    .hall-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 18px;
+        margin-bottom: 48px;
+    }
+    /* 완독 카드 (골드 테마 고정) */
+    .hall-card {
+        position: relative;
+        background: linear-gradient(145deg, rgba(28,18,0,.92) 0%, rgba(44,30,0,.92) 100%);
+        border: 1px solid rgba(245,158,11,.38);
+        border-radius: 24px; padding: 22px 16px 18px;
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+        overflow: hidden; backdrop-filter: blur(12px);
+        box-shadow: 0 0 36px rgba(245,158,11,.12), 0 8px 32px rgba(0,0,0,.4);
+        transition: transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s;
+        opacity: 0; transform: translateY(22px);
+        animation: commCardIn .55s ease forwards;
+    }
+    .hall-card:hover {
+        transform: translateY(-7px) scale(1.025);
+        box-shadow: 0 22px 56px rgba(245,158,11,.28), 0 0 0 1px rgba(245,158,11,.32);
+    }
+    /* 완독 횟수 왕관 배지 */
+    .hall-crown {
+        display: flex; align-items: center; gap: 5px;
+        background: linear-gradient(90deg, rgba(245,158,11,.22), rgba(251,191,36,.18));
+        border: 1px solid rgba(245,158,11,.42);
+        border-radius: 20px; padding: 4px 12px;
+        font-size: 11px; font-weight: 700; color: #fcd34d;
+        letter-spacing: .3px; white-space: nowrap; z-index: 1;
+    }
+    /* 완독 횟수 큰 뱃지 */
+    .hall-count-ring {
+        position: relative; width: 118px; height: 118px; flex-shrink: 0;
+    }
+    .hall-count-center {
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%,-50%);
+        width: 74px; height: 74px; border-radius: 50%;
+        overflow: hidden;
+        background: rgba(255,255,255,.08);
+        border: 2.5px solid rgba(245,158,11,.45);
+        box-shadow: 0 4px 16px rgba(0,0,0,.35);
+    }
+    .hall-count-center img { width:100%; height:100%; object-fit:cover; display:block; }
+    .hall-count-center-fb {
+        width:100%; height:100%;
+        display:flex; align-items:center; justify-content:center;
+        font-size:26px; font-weight:800;
+        color:rgba(255,255,255,.75);
+        background: linear-gradient(135deg,#78350f,#b45309);
+    }
+    .hall-count-pct {
+        position: absolute; bottom: -5px; left: 50%;
+        transform: translateX(-50%);
+        background: rgba(11,17,34,.92);
+        border: 1px solid rgba(245,158,11,.4);
+        border-radius: 10px; padding: 2px 9px;
+        font-size: 13px; font-weight: 800; color: #fcd34d;
+        white-space: nowrap; backdrop-filter: blur(6px); z-index: 2;
+    }
+    .hall-name {
+        font-size: 15px; font-weight: 700; color: #fff;
+        text-align: center; margin-top: 4px; z-index: 1;
+    }
+    @@media (max-width: 640px) {
+        .hall-grid { grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap:12px; }
+        .hall-count-ring { width:100px; height:100px; }
+        .hall-count-center { width:62px; height:62px; }
+    }
+</style>
+
+<div class="participants-page">
+
+    <!-- ══ 히어로 배너 ══ -->
+    <div class="hero">
+        <a href="/" class="back-btn" style="margin-right:8px">🏠 홈</a>
+        <a href="/Bible/Welcome" class="back-btn">← 허브로 돌아가기</a>
+
+        <span class="hero-icon">📖</span>
+        <div class="hero-badge">👥 Bible Participants</div>
+        <h1>함께 읽는 <span>말씀</span></h1>
+        <p class="hero-sub">성경통독에 참여 중인 모든 분들의 진도를 한눈에 확인하세요.</p>
+        <div class="divider"></div>
+    </div>
+
+    <!-- ══ 완독자 명예의 전당 ══ -->
+    @if (completedUsers.Any())
+    {
+    <section class="hall-section">
+        <div class="hall-header">
+            <span class="hall-icon">👑</span>
+            <h2 class="hall-title">성경 완독자 명예의 전당</h2>
+            <span class="hall-count-badge">🏆 @(completedUsers.Count)명</span>
+        </div>
+        <div class="hall-divider"></div>
+        <div class="hall-grid" id="hallGrid">
+        @{
+            int hallIdx = 0;
+            const double HALL_CIRC = 314.0;
+        }
+        @foreach (var cu in completedUsers)
+        {
+            string hallDelay = $"{hallIdx * 55}ms";
+            int maxRead = completedUsers.Max(x => x.readBibleAllCount);
+            double hallPct = maxRead > 0 ? Math.Min(cu.readBibleAllCount * 100.0 / maxRead, 100) : 100;
+            int hallDashOff = (int)Math.Round(HALL_CIRC * (1.0 - hallPct / 100.0));
+            hallIdx++;
+
+            <div class="hall-card" style="animation-delay:@hallDelay"
+                 data-name="@cu.UserName" data-count="@cu.readBibleAllCount">
+                <div class="card-shimmer"></div>
+                <div class="hall-crown">
+                    <span>👑</span>
+                    <span>@(cu.readBibleAllCount)독 완독!</span>
+                </div>
+
+                <!-- 프로필 링 -->
+                <div class="hall-count-ring">
+                    <svg class="pring" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="pring-bg" cx="60" cy="60" r="50"/>
+                        <circle class="pring-fill"
+                                cx="60" cy="60" r="50"
+                                stroke="#f59e0b"
+                                stroke-dasharray="314"
+                                stroke-dashoffset="314"
+                                data-target="@hallDashOff"/>
+                    </svg>
+                    <div class="hall-count-center img-loading">
+                        <img data-src="/HumanResource/GetProfilePicture?userId=@cu.UserId" alt="@cu.UserName"
+                             style="opacity:0"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                        <div class="hall-count-center-fb" style="display:none">@(cu.UserName?.Length > 0 ? cu.UserName.Substring(0,1) : "?")</div>
+                    </div>
+                    <div class="hall-count-pct">@(cu.readBibleAllCount)<small style="font-size:9px;opacity:.7">독</small></div>
+                </div>
+
+                <!-- 이름 -->
+                <div class="hall-name">
+                    @($"{cu.LastName ?? ""}{cu.FirstName ?? ""}")
+                    @if (isSuperAdmin)
+                    {
+                        <div><span class="user-id-badge">@cu.UserName</span></div>
+                    }
+                </div>
+            </div>
+        }
+        </div>
+    </section>
+    }
+
+    <!-- ══ 커뮤니티 성경 진행 현황 ══ -->
+    <section class="community-section">
+
+        <!-- 헤더 -->
+        <div class="comm-header">
+            <div class="comm-title-wrap">
+                <span class="comm-icon">✝</span>
+                <h2 class="comm-title">성경통독 참여자</h2>
+                @if (communityUsers.Any())
+                {
+                    <span class="comm-count-badge">👥 @(@communityUsers.Count)명 참여 중</span>
+                }
+            </div>
+            @if (communityUsers.Any())
+            {
+                <div class="comm-controls">
+                    <div class="comm-search-wrap">
+                        <span style="font-size:13px;opacity:.4">🔍</span>
+                        <input type="text" id="commSearch" placeholder="이름 검색..." class="comm-search" />
+                    </div>
+                    <div class="comm-sort-btns">
+                        <button class="csort-btn active" onclick="sortCards('progress',this)">📖 진도률순</button>
+                        <button class="csort-btn"        onclick="sortCards('date',this)">🕐 최근순</button>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- 통계 바 -->
+        @if (communityUsers.Any())
+        {
+            double avgRate      = communityUsers.Average(u => (double)u.TotalProgressRate);
+            int completedCnt    = communityUsers.Count(u => u.readBibleAllCount >= 1);
+            int totalReadings   = communityUsers.Sum(u => u.readBibleAllCount);
+
+            <div class="comm-stats-bar">
+                <div class="cstat">
+                    <span class="cstat-num">@communityUsers.Count</span>
+                    <span class="cstat-lbl">전체 참여자</span>
+                </div>
+                <div class="cstat-div"></div>
+                <div class="cstat">
+                    <span class="cstat-num">@completedCnt</span>
+                    <span class="cstat-lbl">완독자</span>
+                </div>
+                <div class="cstat-div"></div>
+                <div class="cstat">
+                    <span class="cstat-num">@avgRate.ToString("F2")%</span>
+                    <span class="cstat-lbl">평균 진도율</span>
+                </div>
+                <div class="cstat-div"></div>
+                <div class="cstat">
+                    <span class="cstat-num">@totalReadings</span>
+                    <span class="cstat-lbl">누적 완독 횟수</span>
+                </div>
+            </div>
+        }
+
+        <!-- 카드 그리드 -->
+        <div class="comm-grid" id="commGrid">
+        @{
+            int cardIdx = 0;
+            const double CIRC = 314.0;
+        }
+        @foreach (var u in communityUsers)
+        {
+            bool isComplete = u.readBibleAllCount >= 1;
+            double rate     = Math.Min(Math.Max((double)u.TotalProgressRate, 0), 100);
+            int    rateInt  = (int)Math.Round(rate);
+            string rateStr  = rate.ToString("F2");
+            int    dashOff  = (int)Math.Round(CIRC * (1.0 - rate / 100.0));
+
+            string ringColor = isComplete        ? "#f59e0b"
+                             : rate >= 70        ? "#22d3ee"
+                             : rate >= 40        ? "#818cf8"
+                             :                     "#6366f1";
+
+            string barGrad = isComplete
+                ? "linear-gradient(90deg,#f59e0b,#fbbf24)"
+                : "linear-gradient(90deg,#6366f1,#22d3ee)";
+
+            lastReadBooks.TryGetValue(u.UserId, out var lr);
+            string lastBookStr = lr != null ? $"{lr.BibleText} {lr.Jang}장" : "";
+
+            int daysSince = (int)(kstNow - u.ReadDate).TotalDays;
+            string dateStr = daysSince <= 0 ? "오늘"
+                           : daysSince == 1 ? "어제"
+                           : $"{daysSince}일 전";
+
+            string animDelay = $"{cardIdx * 55}ms";
+            cardIdx++;
+
+            <div class="comm-card @(isComplete ? "comm-card--complete" : "")"
+                 data-name="@u.UserName"
+                 data-progress="@rateInt"
+                 data-rawprogress="@((long)Math.Round(Math.Max((double)u.TotalProgressRate, 0)))"
+                 data-count="@u.readBibleAllCount"
+                 data-date="@u.ReadDate.Ticks"
+                 style="animation-delay:@animDelay">
+
+                @if (isComplete)
+                {
+                    <div class="card-shimmer"></div>
+                    <div class="card-crown">
+                        <span>👑</span>
+                        <span>@(@u.readBibleAllCount)독 완독!</span>
+                    </div>
+                }
+
+                <!-- 진행 링 + 아바타 -->
+                <div class="ring-area">
+                    <svg class="pring" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="pring-bg" cx="60" cy="60" r="50"/>
+                        <circle class="pring-fill"
+                                cx="60" cy="60" r="50"
+                                stroke="@ringColor"
+                                stroke-dasharray="314"
+                                stroke-dashoffset="314"
+                                data-target="@dashOff"/>
+                    </svg>
+                    <div class="ring-avatar img-loading">
+                        <img data-src="@u.ProfilePicturePath" alt="@u.UserName"
+                             style="opacity:0"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                        <div class="ring-avatar-fb" style="display:none">@(u.UserName?.Length > 0 ? u.UserName.Substring(0,1) : "?")</div>
+                    </div>
+                    <div class="ring-pct @(isComplete ? "ring-pct--gold" : "")">@rateStr<small>%</small></div>
+                </div>
+
+                <!-- 이름 -->
+                <div class="card-name">
+                    @($"{u.LastName ?? ""}{u.FirstName ?? ""}")
+                    @if(isSuperAdmin)
+                    {
+                    <span class="user-id-badge">@u.UserName</span>
+                    }
+                </div>
+
+                <!-- 분류 칩 -->
+                @{
+                    string roleLabel;
+                    string roleColor;
+                    var rc = u.RoleCode ?? "";
+                    if (!string.IsNullOrEmpty(rc) && rc != "T1001")
+                    {
+                        roleLabel = "교사";
+                        roleColor = "#fde68a;color:#92400e";
+                    }
+                    else if (u.ClassYear > 0 && u.ClassBan > 0)
+                    {
+                        roleLabel = $"{u.ClassYear}학년 {u.ClassBan}반";
+                        roleColor = "#dbeafe;color:#1e40af";
+                    }
+                    else if (u.ClassYear > 0)
+                    {
+                        roleLabel = $"{u.ClassYear}학년";
+                        roleColor = "#dbeafe;color:#1e40af";
+                    }
+                    else
+                    {
+                        roleLabel = "기타";
+                        roleColor = "#f1f5f9;color:#64748b";
+                    }
+                }
+                <div style="margin:3px 0 5px">
+                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;background:@roleColor">@roleLabel</span>
+                </div>
+
+                <!-- 정보 칩 -->
+                <div class="card-info">
+                    @if (!string.IsNullOrEmpty(lastBookStr))
+                    {
+                        <span class="ci-chip">📖 @lastBookStr</span>
+                    }
+                    <span class="ci-chip">🕐 @dateStr</span>
+                </div>
+
+                <!-- 하단 진행 바 -->
+                <div class="card-prog-bar">
+                    <div class="card-prog-fill"
+                         data-width="@rateInt"
+                         style="background:@barGrad"></div>
+                </div>
+            </div>
+        }
+        </div>
+
+        @if (!communityUsers.Any())
+        {
+            <div class="comm-empty">
+                <div class="comm-empty-icon">📖</div>
+                <p>아직 성경통독을 시작한 분이 없습니다.</p>
+            </div>
+        }
+    </section>
+
+    <!-- 하단 안내 -->
+    <div class="footer-note">
+        📖 말씀을 읽는 것이 복입니다 — 요한계시록 1:3
+    </div>
+
+</div>
+
+<!-- ══ JS ══ -->
+<script>
+(function () {
+    /* ── 링 & 바 IntersectionObserver 애니메이션 ── */
+    var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            var el = entry.target;
+            if (el.classList.contains('pring-fill')) {
+                el.style.strokeDashoffset = el.getAttribute('data-target') || '314';
+            } else if (el.classList.contains('card-prog-fill')) {
+                el.style.width = (el.getAttribute('data-width') || '0') + '%';
+            }
+            io.unobserve(el);
+        });
+    }, { threshold: 0.25 });
+
+    document.querySelectorAll('.pring-fill, .card-prog-fill').forEach(function (el) {
+        io.observe(el);
+    });
+
+    /* ── 이미지 지연(Lazy) 로딩 ── */
+    var imgIO = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            var img  = entry.target;
+            var wrap = img.closest('.ring-avatar') || img.closest('.hall-count-center');
+            var src  = img.getAttribute('data-src');
+            if (!src) { if (wrap) wrap.classList.remove('img-loading'); return; }
+
+            img.src = src;
+            img.removeAttribute('data-src');
+
+            img.addEventListener('load', function () {
+                img.style.opacity = '1';
+                img.classList.add('img-loaded');
+                if (wrap) wrap.classList.remove('img-loading');
+            }, { once: true });
+
+            img.addEventListener('error', function () {
+                img.style.display = 'none';
+                var fb = wrap ? (wrap.querySelector('.ring-avatar-fb') || wrap.querySelector('.hall-count-center-fb')) : null;
+                if (fb) fb.style.display = 'flex';
+                if (wrap) wrap.classList.remove('img-loading');
+            }, { once: true });
+
+            imgIO.unobserve(img);
+        });
+    }, { rootMargin: '200px 0px', threshold: 0 });
+
+    document.querySelectorAll('.ring-avatar img[data-src], .hall-count-center img[data-src]').forEach(function (img) {
+        imgIO.observe(img);
+    });
+
+    /* ── 페이지 로드 시 기본 정렬: 진도률순 (읽은 장 수 많은 순) ── */
+    (function applyDefaultSort() {
+        var grid = document.getElementById('commGrid');
+        if (!grid) return;
+        var cards = Array.from(grid.children);
+        cards.sort(function (a, b) {
+            return parseInt(b.getAttribute('data-rawprogress') || '0') - parseInt(a.getAttribute('data-rawprogress') || '0');
+        });
+        cards.forEach(function (c) { grid.appendChild(c); });
+    })();
+
+    /* ── 이름 검색 ── */
+    var searchEl = document.getElementById('commSearch');
+    if (searchEl) {
+        searchEl.addEventListener('input', function () {
+            var q = this.value.toLowerCase();
+            document.querySelectorAll('.comm-card').forEach(function (card) {
+                var name = (card.getAttribute('data-name') || '').toLowerCase();
+                card.style.display = name.includes(q) ? '' : 'none';
+            });
+        });
+    }
+
+    /* ── 정렬 ── */
+    window.sortCards = function (type, btn) {
+        document.querySelectorAll('.csort-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var grid = document.getElementById('commGrid');
+        if (!grid) return;
+        var cards = Array.from(grid.children);
+        cards.sort(function (a, b) {
+            if (type === 'progress') {
+                // 진도율(읽은 장 수) 높은 순
+                return parseInt(b.getAttribute('data-rawprogress') || '0') - parseInt(a.getAttribute('data-rawprogress') || '0');
+            } else {
+                return parseFloat(b.getAttribute('data-date') || '0') - parseFloat(a.getAttribute('data-date') || '0');
+            }
+        });
+        cards.forEach(function (c) { grid.appendChild(c); });
+    };
+})();
+</script>
+</body>
+</html>

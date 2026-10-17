@@ -1,0 +1,413 @@
+ <!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>🎁 생일 선물 선택 안내</title>
+
+<style>
+  *{ box-sizing:border-box; margin:0; padding:0; }
+
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+    background: #f0f4ff;
+    color: #1e293b;
+    min-height: 100vh;
+    padding:
+      calc(20px + env(safe-area-inset-top))
+      16px
+      calc(20px + env(safe-area-inset-bottom));
+  }
+
+  a{ color: inherit; text-decoration: none; }
+
+  .wrap{
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* ── 최상단 알림 배지 ── */
+  .notice-bar{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1.5px solid #e0e7ff;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #4f46e5;
+    font-weight: 700;
+  }
+  .notice-bar .icon{ font-size: 16px; flex-shrink: 0; }
+  .notice-bar span{ color: #64748b; font-weight: 600; }
+
+  /* ── 메인 카드 ── */
+  .card{
+    background: #fff;
+    border-radius: 24px;
+    padding: 28px 24px;
+    box-shadow: 0 4px 24px rgba(99,102,241,.10), 0 1px 4px rgba(0,0,0,.06);
+  }
+
+  /* ── 헤더 ── */
+  .card-header{
+    text-align: center;
+    padding-bottom: 22px;
+    border-bottom: 1.5px solid #f1f5f9;
+  }
+  .emoji-wrap{
+    width: 72px;
+    height: 72px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #ede9fe, #dbeafe);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    margin: 0 auto 14px;
+    box-shadow: 0 4px 16px rgba(99,102,241,.15);
+  }
+  .card-title{
+    font-size: 22px;
+    font-weight: 900;
+    color: #1e293b;
+    letter-spacing: -.3px;
+    line-height: 1.2;
+  }
+  .card-sub{
+    margin-top: 6px;
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  /* ── 안내 문구 ── */
+  .desc-box{
+    margin-top: 20px;
+    background: #f8faff;
+    border: 1.5px solid #e0e7ff;
+    border-radius: 16px;
+    padding: 16px;
+    font-size: 14.5px;
+    color: #334155;
+    font-weight: 600;
+    line-height: 1.65;
+    word-break: keep-all;
+  }
+  .desc-box b{ color: #4f46e5; font-weight: 800; }
+
+  /* ── 스텝 섹션 ── */
+  .steps-label{
+    margin-top: 24px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .steps{ display: grid; gap: 10px; }
+
+  .step{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px 14px;
+    transition: border-color .15s;
+  }
+  .step:hover{ border-color: #a5b4fc; }
+
+  .step-num{
+    width: 36px;
+    height: 36px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    color: #fff;
+    font-weight: 900;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(99,102,241,.25);
+  }
+
+  .step-body{ min-width: 0; }
+  .step-title{ font-weight: 800; font-size: 14.5px; color: #1e293b; }
+  .step-desc{
+    margin-top: 3px;
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .url-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: #ede9fe;
+    color: #4f46e5;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -.1px;
+  }
+
+  /* ── CTA 버튼 ── */
+  .cta-wrap{ margin-top: 22px; }
+
+  .btn-main{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: -.2px;
+    box-shadow: 0 8px 24px rgba(99,102,241,.30);
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .btn-main:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(99,102,241,.38);
+  }
+  .btn-main:active{
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(99,102,241,.20);
+  }
+  .btn-main .arr{ opacity: .85; font-size: 20px; }
+
+  /* ── 로그인 불편 대안 안내 ── */
+  .alt-box{
+    margin-top: 14px;
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+    border-radius: 16px;
+    padding: 16px;
+  }
+  .alt-box-head{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 800;
+    color: #15803d;
+    margin-bottom: 8px;
+  }
+  .alt-box-head .badge{
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 900;
+    color: #15803d;
+    white-space: nowrap;
+  }
+  .alt-box-desc{
+    font-size: 13.5px;
+    color: #166534;
+    font-weight: 600;
+    line-height: 1.6;
+    word-break: keep-all;
+    margin-bottom: 10px;
+  }
+  .alt-box-desc b{ font-weight: 800; color: #15803d; }
+  .btn-alt{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 13px 16px;
+    border-radius: 12px;
+    background: #fff;
+    border: 1.5px solid #86efac;
+    color: #15803d;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+    word-break: break-all;
+  }
+  .btn-alt:hover{
+    background: #f0fdf4;
+    border-color: #4ade80;
+  }
+  .btn-alt .left-alt{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .btn-alt .url-text{
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #16a34a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .btn-alt .arr-g{ font-size:18px; flex-shrink:0; opacity:.8; }
+
+  /* ── 안내 힌트 ── */
+  .hint-box{
+    margin-top: 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: #fefce8;
+    border: 1.5px solid #fde68a;
+    border-radius: 14px;
+    padding: 13px 14px;
+    font-size: 13.5px;
+    color: #92400e;
+    font-weight: 700;
+    line-height: 1.5;
+    word-break: keep-all;
+  }
+  .hint-box .hi{ font-size: 18px; flex-shrink: 0; }
+  .hint-box b{ color: #b45309; }
+
+  /* ── 푸터 ── */
+  .footer{
+    margin-top: 22px;
+    text-align: center;
+    font-size: 13px;
+    color: #94a3b8;
+    font-weight: 700;
+    line-height: 1.6;
+  }
+  .footer strong{
+    display: block;
+    margin-top: 4px;
+    font-size: 13.5px;
+    color: #64748b;
+    font-weight: 800;
+  }
+
+  @media (max-width: 420px){
+    .card{ padding: 22px 18px; }
+    .card-title{ font-size: 20px; }
+    .emoji-wrap{ width: 64px; height: 64px; font-size: 30px; }
+  }
+</style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <!-- 상단 알림 배지 -->
+    <div class="notice-bar">
+      <span class="icon">📩</span>
+      <span>아이 생일 <b style="color:#4f46e5;">약 20일 전</b>에 미리 발송되는 안내 문자입니다.</span>
+    </div>
+
+    <!-- 메인 카드 -->
+    <div class="card">
+
+      <!-- 헤더 -->
+      <div class="card-header">
+        <div class="emoji-wrap">🎁</div>
+        <h1 class="card-title">생일 선물 선택 안내</h1>
+        <p class="card-sub">아이가 원하는 선물을 직접 고를 수 있어요 ✨</p>
+      </div>
+
+      <!-- 안내 문구 -->
+      <div class="desc-box">
+        유년부에서는 생일을 맞은 친구들이 <b>원하는 선물을 직접 선택</b>할 수 있도록 준비했어요 💖<br><br>
+        선물을 선택해 주시면 유년부에서 미리 준비한 후, 생일 즈음에 아이에게 <b>직접 전달</b>해 드립니다.<br><br>
+        선물 선택을 원하지 않으시면 알려 주세요. 유년부에서 준비한 선물을 대신 전달해 드립니다 😊
+      </div>
+
+      <!-- 이용 방법 -->
+      <p class="steps-label">이용 방법</p>
+      <div class="steps">
+
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">홈페이지 접속</div>
+            <div class="step-desc">
+              아래 버튼을 눌러 홈페이지로 이동해 주세요
+              <!-- <div><span class="url-chip">🌐 www.jamsilkids.com</span></div> -->
+            </div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">로그인</div>
+            <div class="step-desc">계정이 없으시면 <b style="color:#4f46e5;">회원가입</b> 후 로그인해 주세요</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">생일 선물 선택</div>
+            <div class="step-desc">로그인 후 보이는 <b style="color:#4f46e5;">생일선물 선택 페이지</b>에서 원하는 선물을 골라 주세요</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CTA 버튼 -->
+      <div class="cta-wrap">
+        <a class="btn-main" href="http://www.jamsilkids.com" target="_blank" rel="noopener">
+          <span>🎀 홈페이지에서 선물 선택하기</span>
+          <span class="arr">›</span>
+        </a>
+      </div>
+     <!-- 힌트 -->
+      <div class="hint-box">
+        <span class="hi">📌</span>
+        <span>회원가입 시 <b>아이의 실명</b>으로 가입해 주셔야 선물 전달이 정확하게 진행됩니다.</span>
+      </div>
+
+      <!-- 로그인 불편하신 분을 위한 대안 -->
+      <div class="alt-box">
+        <div class="alt-box-head">
+          <span>💡</span>
+          <span>로그인 없이 선물 목록 보기</span>
+          <span class="badge">대안 방법</span>
+        </div>
+        <p class="alt-box-desc">
+          로그인이 불편하시면 아래 링크를 클릭해 선물 목록을 확인하신 후,
+          <b>원하는 선물을 캡처해서 담임 선생님께 보내 주세요.</b>
+          선생님이 대신 선택해 드립니다 😊
+        </p>
+        <a class="btn-alt" href="https://www.jamsilkids.com/Present/ListPresent?productDisplayOpton=birth" target="_blank" rel="noopener">
+          <span class="left-alt">
+            <span>🛍️</span>
+            <span class="url-text">선물 목록 바로 보기 (로그인 불필요)</span>
+          </span>
+          <span class="arr-g">›</span>
+        </a>
+      </div>
+
+ 
+    </div><!-- /card -->
+
+    <!-- 푸터 -->
+    <div class="footer">
+      부모님과 아이가 함께 즐겁게 참여해 주세요 😊
+      <strong>잠실새내교회 유년부</strong>
+    </div>
+
+  </div><!-- /wrap -->
+</body>
+</html>

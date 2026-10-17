@@ -1,0 +1,759 @@
+﻿// Controllers/PresentController.cs
+using BulletinBoard.BusinessLayer;
+using BulletinBoard.Common;
+using BulletinBoard.Enums;
+using BulletinBoard.Models;
+using BulletinBoard.Models.Presents;
+using BulletinBoard.Services;
+using BulletinBoard.Services.Abstract;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Threading.Tasks;
+
+namespace BulletinBoard.Controllers
+{
+    public class PresentController : BaseController
+    {
+        private readonly IPresentPickService _presentPickService;
+        private readonly IHttpContextAccessor _http;
+        private readonly IWebHostEnvironment _hostingEnvironment;
+        private readonly IAuthService _authService;
+        private readonly IAwardItemService _awardItemService;
+        private readonly BulletinBoard.Services.GiftCatalog.IGiftCatalogService _giftCatalog;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly string _connStr;
+
+        // ✅ SourceType 허용값(카카오/쿠팡) - 컨트롤러에서도 방어
+        private static readonly HashSet<string> AllowedSourceTypes = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "카카오",
+            "쿠팡"
+        };
+
+        public PresentController(
+            IAuthService authService,
+            UserManager<ApplicationUser> userManager,
+            IPresentPickService presentPickService,
+            IHttpContextAccessor http,
+            IWebHostEnvironment hostingEnvironment,
+            IAwardItemService awardItemService,
+            BulletinBoard.Services.GiftCatalog.IGiftCatalogService giftCatalog,
+            IConfiguration configuration
+        ) : base(authService, userManager, hostingEnvironment)
+        {
+            _giftCatalog = giftCatalog;
+            _authService = authService;
+            _userManager = userManager;
+            _presentPickService = presentPickService;
+            _http = http;
+            _hostingEnvironment = hostingEnvironment;
+            _awardItemService = awardItemService;
+            _connStr = configuration.GetConnectionString("DefaultConnection")!;
+        }
+
+        /// <summary>
+        /// 관리자용: N일 이내 다가오는 생일자 + 선물 선택/발송 현황
+        /// </summary>
+        [Authorize, HttpGet]
+        public async Task<IActionResult> AdminUpcomingBirthdays(int withinDays = 30, string filter = "all")
+        {
+            if (withinDays <= 0) withinDays = 30;
+
+            var vm = await _presentPickService.GetUpcomingBirthdaysAsync(withinDays, filter , _hostingEnvironment);
+            return View("~/Views/Present/AdminUpcomingBirthdays.cshtml", vm);
+        }
+
+
+
+        [HttpGet]
+        public IActionResult PresentForNewFriend(string message)
+        {
+            return View();
+        }
+
+
+        [HttpGet]
+        public IActionResult PresentForInvitFriend(string message)
+        {
+            return View();
+        }
+
+        [HttpGet, Authorize]
+        public IActionResult BirthGuide(string message)
+        {
+            ViewBag.Message = message ?? "접근할 수 없습니다.";
+            return View();
+        }
+
+        public IActionResult Kind() => View();
+
+        // -----------------------------
+        // Birth (일반 유저) - DB(AwardItem) 마스터 기준
+        // -----------------------------
+        // ✅ 파라미터명을 userId로 통일 (PickBirth/CancelBirth RedirectToAction과 일치)
+        // ✅ [FromQuery] 명시: ?userid= 또는 ?userId= 모두 대소문자 무관하게 바인딩
+        [HttpGet, Authorize]
+        public async Task<IActionResult> Birth([FromQuery] string? userId)
+        {
+            if (await _authService.IsSignedIn(User))
+                await SetUserInfo();
+
+            if (string.IsNullOrWhiteSpace(userId))
+                return RedirectToAction("BirthGuide", "Present", new { message = "생일자 정보를 찾을 수 없습니다. 배너의 선물 선택 버튼을 이용해 주세요." });
+
+            // ✅ 소유권 체크 제거 — 로그인된 사용자라면 누구나 생일자 선물 선택 가능
+
+            // ✅ 대상 사용자 이름 조회 (배너 표시용)
+            string targetFullName = "";
+            try
+            {
+                var manageHR = new ManageHumanResource();
+                var userInfoList = manageHR.getUserInfos(_hostingEnvironment, userId, "", 0, 0, 0, "", "", RankQueryOption.All);
+                var targetInfo = userInfoList?.FirstOrDefault();
+                if (targetInfo != null)
+                    targetFullName = !string.IsNullOrWhiteSpace(targetInfo.FullName)
+                        ? targetInfo.FullName
+                        : $"{targetInfo.LastName}{targetInfo.FirstName}".Trim();
+            }
+            catch { }
+            ViewBag.TargetUserId = userId;
+            ViewBag.TargetUserFullName = targetFullName;
+
+            // ✅ 일반 유저는 숨김 상품 제외
+            var items = await _giftCatalog.GetAsync(new BulletinBoard.Services.GiftCatalog.GiftCatalogQuery
+            {
+                Option = ProductDisplayOpton.birth
+            });
+
+            // ✅ 관리자(Basic · Admin · SuperAdmin)에게만 가격 범위를 알려 준다
+            var signedUser = await _authService.GetSignedUser(User);
+            bool canSeePrice = string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase)
+                               || (signedUser != null &&
+                                   (await _authService.IsInRole(signedUser, nameof(Roles.Admin))
+                                    || await _authService.IsInRole(signedUser, nameof(Roles.SuperAdmin))));
+
+            ViewBag.CanSeePrice = canSeePrice;
+            if (canSeePrice)
+            {
+                var rule = BulletinBoard.Services.GiftCatalog.GiftPriceRule.For(ProductDisplayOpton.birth);
+                ViewBag.PriceRuleMin = rule.Min;                         // 기준 최소
+                ViewBag.PriceRuleMax = rule.Max;                         // 기준 최대(한도)
+                ViewBag.PriceItemMin = items.Count > 0 ? items.Min(i => i.UnitPrice) : 0;   // 실제 목록 최저가
+                ViewBag.PriceItemMax = items.Count > 0 ? items.Max(i => i.UnitPrice) : 0;   // 실제 목록 최고가
+            }
+
+            var vm = new PresentBirthGiftVM
+            {
+                Items = items,
+                MyPick = await _presentPickService.GetMyBirthPickAsync(userId)   // ✅ 생일자의 선택 로드
+            };
+
+            return View(vm); // Views/Present/Birth.cshtml
+        }
+
+        // returnTo=hub 로 들어오면 통합 선물함으로 돌려보낸다 (생일 배너에서 온 경우는 원래대로)
+        private IActionResult BackToBirth(string userId, string? returnTo)
+            => string.Equals(returnTo, "hub", StringComparison.Ordinal)
+               ? Redirect("/StudentPointDashboard4/MyGiftBox3")
+               : RedirectToAction(nameof(Birth), new { userId = userId });
+
+        [HttpPost, ValidateAntiForgeryToken, Authorize]
+        public async Task<IActionResult> PickBirth(int? productId, string? targetUserId, string? returnTo = null)
+        {
+            if (productId == null || productId <= 0)
+                return RedirectToAction("BirthGuide", "Present", new { message = "잘못된 상품 선택입니다." });
+
+            // ✅ targetUserId(선물 받을 생일자) 우선, 없으면 현재 로그인 사용자
+            var userId = !string.IsNullOrWhiteSpace(targetUserId)
+                ? targetUserId
+                : _http.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString());
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            // ✅ 이미 구매완료 처리된 선물은 변경 불가
+            var currentPick = await _presentPickService.GetMyBirthPickAsync(userId);
+            if (currentPick != null && currentPick.IsPurchased)
+            {
+                TempData["PurchaseLockedMessage"] = "선물을 이미 주문했어요. 변경할 수 없습니다.";
+                return BackToBirth(userId, returnTo);
+            }
+
+            // ✅ 서버에서 DB로 다시 조회 (숨김 상품은 일반 유저가 선택 불가)
+            var selected = await _awardItemService.GetByIdAsync(productId.Value, includeHidden: false);
+            if (selected == null)
+                return RedirectToAction("BirthGuide", "Present", new { message = "선택할 수 없는 상품입니다." });
+
+            await _presentPickService.SaveBirthPickAsync(userId, selected);
+
+            return BackToBirth(userId, returnTo);
+        }
+
+        [HttpPost, ValidateAntiForgeryToken, Authorize]
+        public async Task<IActionResult> CancelBirth(string? targetUserId, string? returnTo = null)
+        {
+            // ✅ targetUserId(선물 받을 생일자) 우선, 없으면 현재 로그인 사용자
+            var userId = !string.IsNullOrWhiteSpace(targetUserId)
+                ? targetUserId
+                : _http.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString());
+            if (string.IsNullOrEmpty(userId))
+                return Unauthorized();
+
+            // ✅ 이미 구매완료 처리된 선물은 취소(변경) 불가
+            var currentPick = await _presentPickService.GetMyBirthPickAsync(userId);
+            if (currentPick != null && currentPick.IsPurchased)
+            {
+                TempData["PurchaseLockedMessage"] = "선물을 이미 주문했어요. 변경할 수 없습니다.";
+                return BackToBirth(userId, returnTo);
+            }
+
+            await _presentPickService.CancelBirthPickAsync(userId);
+            return BackToBirth(userId, returnTo);
+        }
+
+        // -----------------------------
+        // 선물 목록(구경) — GiftCatalog 사용
+        // -----------------------------
+        public async Task<IActionResult> ListPresent(string? productDisplayOpton)
+        {
+            ProductDisplayOpton opt = ProductDisplayOpton.none;
+
+            // ✅ Enum.Parse 대신 TryParse (잘못된 값 들어와도 예외 안남)
+            if (!string.IsNullOrWhiteSpace(productDisplayOpton))
+            {
+                Enum.TryParse(productDisplayOpton, true, out opt);
+            }
+
+            var data = await _giftCatalog.GetAsync(new BulletinBoard.Services.GiftCatalog.GiftCatalogQuery
+            {
+                Option = opt
+            });
+
+            ViewBag.ProductDisplayOpton = opt.ToString();
+            if (opt == ProductDisplayOpton.display)
+                ViewBag.ProductDisplayOpton = ProductDisplayOpton.challengeMissionBible.ToString();
+
+            var manageCheckPoint = new ManageCheckPoint();
+            var awardBase = manageCheckPoint.getAwardBase();
+            ViewBag._AwardBase = awardBase;
+
+            return View(data);
+        }
+
+
+        // -----------------------------
+        // 상품 상세(관리자 전용) - Detail 하나로 통일
+        // -----------------------------
+        [HttpGet]
+        public async Task<IActionResult> Detail(int productId, string? productDisplayOpton, string? returnUrl)
+        {
+            //if (await _authService.IsSignedIn(User))
+            //    await SetUserInfo();
+
+            // ✅ 관리자만
+            //var user = await _authService.GetSignedUser(User);
+            //var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            //var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            //if (!isAdmin && !isSuperAdmin)
+            //    return RedirectToAction("BirthGuide", "Present", new { message = "상품 상세는 관리자만 볼 수 있습니다." });
+
+            if (productId <= 0)
+                return Redirect(SafeReturnUrl(returnUrl) ?? "/Present/ListPresent?productDisplayOpton=display");
+
+            ProductDisplayOpton opt = ParseDisplayOption(productDisplayOpton);
+
+            // ✅ 1) 선물 품목 한 건 조회 (GiftCatalog)
+            AwardItem? found = null;
+            try
+            {
+                // 숨김 품목도 관리자 화면에서는 열어 볼 수 있어야 한다
+                found = await _giftCatalog.GetByIdAsync(productId, includeHidden: true);
+            }
+            catch { }
+
+            // ✅ 2) fallback: DB(AwardItem)에서 다시 찾기 (관리자니까 숨김 포함)
+            if (found == null)
+            {
+                try
+                {
+                    found = await _awardItemService.GetByIdAsync(productId, includeHidden: true);
+                }
+                catch { }
+            }
+
+            ViewBag.ReturnUrl = SafeReturnUrl(returnUrl);
+            ViewBag.ProductDisplayOpton = opt.ToString();
+
+            if (found == null)
+            {
+                ViewBag.ErrorMessage = "상품 정보를 찾을 수 없습니다.";
+                return View("~/Views/Present/Detail.cshtml", null);
+            }
+
+            return View("~/Views/Present/Detail.cshtml", found);
+        }
+
+   
+
+        // ✅ 기존 링크 호환: /Present/PresentDetail -> /Present/Detail
+        [HttpGet]
+        public IActionResult PresentDetail(int productId, string? returnUrl, string? productDisplayOpton)
+        {
+            // 기존처럼 returnUrl이 없으면 목록으로 만들어주기
+            if (string.IsNullOrWhiteSpace(returnUrl))
+            {
+                var opt = string.IsNullOrWhiteSpace(productDisplayOpton) ? "display" : productDisplayOpton.Trim();
+                returnUrl = $"/Present/ListPresent?productDisplayOpton={WebUtility.UrlEncode(opt)}";
+            }
+
+            return RedirectToAction(nameof(Detail), new
+            {
+                productId,
+                returnUrl,
+                productDisplayOpton
+            });
+        }
+
+        private ProductDisplayOpton ParseDisplayOption(string? productDisplayOpton)
+        {
+            var opt = ProductDisplayOpton.none;
+            if (string.IsNullOrWhiteSpace(productDisplayOpton)) return opt;
+
+            // display => challengeMissionBible로 매핑했던 정책 유지
+            var p = productDisplayOpton.Trim();
+            if (string.Equals(p, "display", StringComparison.OrdinalIgnoreCase))
+                p = ProductDisplayOpton.challengeMissionBible.ToString();
+
+            if (Enum.TryParse<ProductDisplayOpton>(p, true, out var parsed))
+                opt = parsed;
+
+            return opt;
+        }
+
+        private string SafeReturnUrl(string? returnUrl)
+        {
+            if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return returnUrl;
+
+            return "/";
+        }
+
+        // -----------------------------
+        // Admin: Birth Pick Sent
+        // -----------------------------
+        [HttpPost, ValidateAntiForgeryToken, Authorize]
+        public async Task<IActionResult> AdminBirthPickSetSent(long pickId, bool sent, string? q, bool includeInactive, string? filter, int withinDays = 30)
+        {
+            await _presentPickService.SetBirthPickSentAsync(pickId, sent);
+            return RedirectToAction(nameof(AdminUpcomingBirthdays), new { filter = filter ?? "pending", withinDays });
+        }
+
+        [HttpPost, ValidateAntiForgeryToken, Authorize]
+        public async Task<IActionResult> AdminBirthPickSetPurchased(long pickId, bool purchased, string? q, bool includeInactive, string? filter, int withinDays = 30)
+        {
+            await _presentPickService.SetBirthPickPurchasedAsync(pickId, purchased);
+            return RedirectToAction(nameof(AdminUpcomingBirthdays), new { filter = filter ?? "pending", withinDays });
+        }
+
+        [HttpPost, ValidateAntiForgeryToken, Authorize]
+        public async Task<IActionResult> AdminBirthdaySetSkip(int personId, bool isSkipped, string? filter, int withinDays = 30)
+        {
+            await _presentPickService.SetBirthdaySkipAsync(personId, isSkipped, User?.Identity?.Name);
+            return RedirectToAction(nameof(AdminUpcomingBirthdays), new { filter = filter ?? "pending", withinDays });
+        }
+
+        // -----------------------------
+        // Admin: AwardItem CRUD
+        // -----------------------------
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemAdmin()
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return RedirectToAction("BirthGuide", "Present", new { message = "관리자만 접근 가능합니다." });
+
+            var list = await _awardItemService.GetAllAsync(ProductDisplayOpton.none, includeHidden: true);
+
+            // ✅ PresentItemPick에 존재하는 ProductId는 삭제 금지(UI disable)
+            var pickedIds = await _presentPickService.GetPickedProductIdsAsync();
+            ViewBag.PickedProductIds = pickedIds;
+            return View("~/Views/Present/AwardItemAdmin.cshtml", list);
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemCountByKind()
+        {
+            await SetUserInfo();
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin      = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin) return Unauthorized();
+
+            const string sql = @"
+SELECT ProductName,
+       COUNT(*)                                                          AS Total,
+       SUM(CASE WHEN IsHidden = 0 THEN 1 ELSE 0 END)                    AS Visible,
+       SUM(CASE WHEN IsHidden = 1 THEN 1 ELSE 0 END)                    AS Hidden,
+       MIN(ModifiedDate)                                                 AS MinMod,
+       MAX(ModifiedDate)                                                 AS MaxMod,
+       SUM(CASE WHEN UnitPrice <  5000                        THEN 1 ELSE 0 END) AS P0,
+       SUM(CASE WHEN UnitPrice >= 5000  AND UnitPrice < 10000 THEN 1 ELSE 0 END) AS P1,
+       SUM(CASE WHEN UnitPrice >= 10000 AND UnitPrice < 15000 THEN 1 ELSE 0 END) AS P2,
+       SUM(CASE WHEN UnitPrice >= 15000 AND UnitPrice < 20000 THEN 1 ELSE 0 END) AS P3,
+       SUM(CASE WHEN UnitPrice >= 20000 AND UnitPrice < 25000 THEN 1 ELSE 0 END) AS P4,
+       SUM(CASE WHEN UnitPrice >= 25000                       THEN 1 ELSE 0 END) AS P5
+FROM dbo.AwardItem WITH (NOLOCK)
+GROUP BY ProductName
+ORDER BY ProductName;
+";
+            var rows = new List<(string ProductName, int Total, int Visible, int Hidden, DateTime? MinMod, DateTime? MaxMod, int[] PriceBands)>();
+            using var conn = new SqlConnection(_connStr);
+            using var cmd  = new SqlCommand(sql, conn);
+            await conn.OpenAsync();
+            using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                rows.Add((
+                    ProductName: r.IsDBNull(0) ? "" : r.GetString(0),
+                    Total:       r.GetInt32(1),
+                    Visible:     r.GetInt32(2),
+                    Hidden:      r.GetInt32(3),
+                    MinMod:      r.IsDBNull(4) ? (DateTime?)null : r.GetDateTime(4),
+                    MaxMod:      r.IsDBNull(5) ? (DateTime?)null : r.GetDateTime(5),
+                    PriceBands:  new[] { r.GetInt32(6), r.GetInt32(7), r.GetInt32(8), r.GetInt32(9), r.GetInt32(10), r.GetInt32(11) }
+                ));
+            }
+
+            return View("~/Views/Present/AwardItemCountByKind.cshtml", rows);
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemCountByPrice()
+        {
+            await SetUserInfo();
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin      = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin) return Unauthorized();
+
+            var list = await _awardItemService.GetAllAsync(ProductDisplayOpton.none, includeHidden: true);
+
+            var bands = new (string Label, int Min, int Max)[]
+            {
+                ("5,000원 미만",           0,     4999),
+                ("5,000 ~ 10,000원",    5000,    9999),
+                ("10,000 ~ 15,000원",  10000,   14999),
+                ("15,000 ~ 20,000원",  15000,   19999),
+                ("20,000 ~ 25,000원",  20000,   24999),
+                ("25,000원 이상",       25000, int.MaxValue),
+            };
+
+            var rows = bands
+                .Select(b => (
+                    b.Label,
+                    b.Min,
+                    b.Max,
+                    Total:   list.Count(x => x.UnitPrice >= b.Min && x.UnitPrice <= b.Max),
+                    Visible: list.Count(x => x.UnitPrice >= b.Min && x.UnitPrice <= b.Max && !x.IsHidden),
+                    Hidden:  list.Count(x => x.UnitPrice >= b.Min && x.UnitPrice <= b.Max && x.IsHidden)
+                ))
+                .ToList();
+
+            return View("~/Views/Present/AwardItemCountByPrice.cshtml", rows);
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemAdminByPrice(int min, int max)
+        {
+            await SetUserInfo();
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin      = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin) return Unauthorized();
+
+            var list = await _awardItemService.GetAllAsync(ProductDisplayOpton.none, includeHidden: true);
+            var filtered = list.Where(x => x.UnitPrice >= min && x.UnitPrice <= max).ToList();
+
+            var pickedIds = await _presentPickService.GetPickedProductIdsAsync();
+            ViewBag.PickedProductIds = pickedIds;
+            ViewBag.FilterPrice = $"{min:N0}원 ~ {(max == int.MaxValue ? "이상" : max.ToString("N0") + "원")}";
+            ViewBag.FilterPriceMin = min;
+            ViewBag.FilterPriceMax = max;
+            return View("~/Views/Present/AwardItemAdmin.cshtml", filtered);
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemAdminByName(string name)
+        {
+            await SetUserInfo();
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin      = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin) return Unauthorized();
+
+            var list = await _awardItemService.GetAllAsync(ProductDisplayOpton.none, includeHidden: true);
+            var filtered = string.IsNullOrWhiteSpace(name)
+                ? list
+                : list.Where(x => string.Equals(x.ProductName?.Trim(), name.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+
+            var pickedIds = await _presentPickService.GetPickedProductIdsAsync();
+            ViewBag.PickedProductIds = pickedIds;
+            ViewBag.FilterName = name?.Trim() ?? "";
+            return View("~/Views/Present/AwardItemAdmin.cshtml", filtered);
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemCreate()
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return RedirectToAction("BirthGuide", "Present", new { message = "관리자만 접근 가능합니다." });
+
+            // ✅ 기본값: 쿠팡
+            return View("~/Views/Present/AwardItemEdit.cshtml", new AwardItemEditVM { SourceType = "쿠팡" });
+        }
+
+        // ✅ Create: CroppedBase64 우선 처리 + fallback vm.ImageFile
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
+        public async Task<IActionResult> AwardItemCreate(AwardItemEditVM vm)
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return RedirectToAction("BirthGuide", "Present", new { message = "관리자만 접근 가능합니다." });
+
+            // ✅ SourceType 컨트롤러 방어(POST 변조 방지)
+            var src = (vm.SourceType ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(src)) src = "쿠팡";  // ✅ 기본값: 쿠팡
+            if (!AllowedSourceTypes.Contains(src))
+            {
+                ModelState.AddModelError(nameof(vm.SourceType), "SourceType는 '카카오' 또는 '쿠팡'만 가능합니다.");
+            }
+
+            if (!ModelState.IsValid)
+                return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+
+            // ✅ Crop base64 받기 (AwardItemEdit.cshtml에서 name="CroppedBase64")
+            var croppedBase64 = (Request.Form["CroppedBase64"].ToString() ?? "").Trim();
+
+            // Create는 이미지 필수: base64도 없고 file도 없으면 에러
+            if (string.IsNullOrWhiteSpace(croppedBase64) && (vm.ImageFile == null || vm.ImageFile.Length <= 0))
+            {
+                ModelState.AddModelError("", "상품 이미지를 등록해 주세요. (사진 선택 후 Crop 적용 필요)");
+                return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+            }
+
+            var entity = new AwardItem
+            {
+                ProductName = vm.ProductName ?? "",
+                ProductDescription = vm.ProductDescription,
+                UnitPrice = vm.UnitPrice,
+                IsHidden = vm.IsHidden,
+                SourceType = src,
+                ExternalUrl = string.IsNullOrWhiteSpace(vm.ExternalUrl) ? null : vm.ExternalUrl.Trim()
+            };
+
+            var newId = await _awardItemService.CreateAsync(entity);
+
+            // ✅ base64 우선 저장
+            if (!string.IsNullOrWhiteSpace(croppedBase64))
+            {
+                try
+                {
+                    await SaveCroppedBase64AsJpgAsync(newId, croppedBase64);
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", ex.Message);
+                    return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+                }
+            }
+            else
+            {
+                // fallback: 기존 방식
+                await _awardItemService.SaveImageJpgAsync(newId, vm.ImageFile!, _hostingEnvironment.WebRootPath);
+            }
+
+            return RedirectToAction(nameof(AwardItemAdmin));
+        }
+
+        [HttpGet, Authorize]
+        public async Task<IActionResult> AwardItemEdit(int id)
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return RedirectToAction("BirthGuide", "Present", new { message = "관리자만 접근 가능합니다." });
+
+            var item = await _awardItemService.GetByIdAsync(id, includeHidden: true);
+            if (item == null)
+                return RedirectToAction("BirthGuide", "Present", new { message = "상품 정보를 찾을 수 없습니다." });
+
+            var src = (item.SourceType ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(src)) src = "카카오";
+            if (!AllowedSourceTypes.Contains(src)) src = "카카오"; // ✅ 과거 데이터 방어
+
+            var vm = new AwardItemEditVM
+            {
+                ProductID = item.ProductID,
+                ProductName = item.ProductName,
+                ProductDescription = item.ProductDescription,
+                UnitPrice = item.UnitPrice,
+                IsHidden = item.IsHidden,
+                SourceType = src,
+                ExternalUrl = item.ExternalUrl
+            };
+
+            return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+        }
+
+        // ✅ Edit: base64 있으면 저장, 없으면 ImageFile 있으면 저장, 둘 다 없으면 이미지 유지
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
+        public async Task<IActionResult> AwardItemEdit(AwardItemEditVM vm)
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return RedirectToAction("BirthGuide", "Present", new { message = "관리자만 접근 가능합니다." });
+
+            // ✅ SourceType 컨트롤러 방어(POST 변조 방지)
+            var src = (vm.SourceType ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(src)) src = "카카오";
+            if (!AllowedSourceTypes.Contains(src))
+            {
+                ModelState.AddModelError(nameof(vm.SourceType), "SourceType는 '카카오' 또는 '쿠팡'만 가능합니다.");
+            }
+
+            if (!ModelState.IsValid)
+                return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+
+            var entity = new AwardItem
+            {
+                ProductID = vm.ProductID,
+                ProductName = vm.ProductName ?? "",
+                ProductDescription = vm.ProductDescription,
+                UnitPrice = vm.UnitPrice,
+                IsHidden = vm.IsHidden,
+                SourceType = src,
+                ExternalUrl = string.IsNullOrWhiteSpace(vm.ExternalUrl) ? null : vm.ExternalUrl.Trim()
+            };
+
+            await _awardItemService.UpdateAsync(entity);
+
+            var croppedBase64 = (Request.Form["CroppedBase64"].ToString() ?? "").Trim();
+
+            if (!string.IsNullOrWhiteSpace(croppedBase64))
+            {
+                try
+                {
+                    await SaveCroppedBase64AsJpgAsync(vm.ProductID, croppedBase64);
+                }
+                catch (Exception ex)
+                {
+                    ModelState.AddModelError("", ex.Message);
+                    return View("~/Views/Present/AwardItemEdit.cshtml", vm);
+                }
+            }
+            else if (vm.ImageFile != null && vm.ImageFile.Length > 0)
+            {
+                await _awardItemService.SaveImageJpgAsync(vm.ProductID, vm.ImageFile, _hostingEnvironment.WebRootPath);
+            }
+
+            return RedirectToAction(nameof(AwardItemAdmin));
+        }
+
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
+        public async Task<IActionResult> AwardItemToggleHidden(int id)
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return Unauthorized();
+
+            await _awardItemService.ToggleHiddenAsync(id);
+            return RedirectToAction(nameof(AwardItemAdmin));
+        }
+
+
+        [HttpPost, Authorize, ValidateAntiForgeryToken]
+        public async Task<IActionResult> AwardItemDelete(int id)
+        {
+            await SetUserInfo();
+
+            var user = await _authService.GetSignedUser(User);
+            var isAdmin = await _authService.IsInRole(user, nameof(Roles.Admin));
+            var isSuperAdmin = await _authService.IsInRole(user, nameof(Roles.SuperAdmin));
+            if (!isAdmin && !isSuperAdmin)
+                return Unauthorized();
+
+            await _awardItemService.DeleteAsync(id);
+            await _awardItemService.DeleteImageAsync(id, _hostingEnvironment.WebRootPath);
+
+            return RedirectToAction(nameof(AwardItemAdmin));
+        }
+
+        // -----------------------------
+        // ✅ CroppedBase64 저장 유틸
+        // -----------------------------
+        private async Task SaveCroppedBase64AsJpgAsync(int productId, string croppedBase64)
+        {
+            // "data:image/jpeg;base64,...." 형태면 prefix 제거
+            var comma = croppedBase64.IndexOf(',');
+            var pure = comma >= 0 ? croppedBase64[(comma + 1)..] : croppedBase64;
+
+            // 공백/개행 제거
+            pure = pure.Trim().Replace(" ", "").Replace("\r", "").Replace("\n", "");
+
+            byte[] bytes;
+            try
+            {
+                bytes = Convert.FromBase64String(pure);
+            }
+            catch
+            {
+                throw new InvalidOperationException("이미지 데이터(base64)가 올바르지 않습니다.");
+            }
+
+            // 간단한 사이즈 제한(예: 8MB)
+            if (bytes.Length <= 10)
+                throw new InvalidOperationException("이미지 데이터가 비어 있습니다.");
+            if (bytes.Length > 8 * 1024 * 1024)
+                throw new InvalidOperationException("이미지 용량이 너무 큽니다. (8MB 이하)");
+
+            var dir = Path.Combine(_hostingEnvironment.WebRootPath, "images", "AwardItem");
+            Directory.CreateDirectory(dir);
+
+            var filePath = Path.Combine(dir, $"{productId}.jpg");
+            await System.IO.File.WriteAllBytesAsync(filePath, bytes);
+        }
+    }
+}

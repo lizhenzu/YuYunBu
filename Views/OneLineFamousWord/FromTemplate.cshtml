@@ -1,0 +1,175 @@
+﻿@model IEnumerable<BulletinBoard.Models.QuestionTypeDataObjects>
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+       var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #F9F9F9;
+        }
+
+        .container {
+            width: 375px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 20px;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        h1, h3, h4 {
+            margin: 10px 0;
+        }
+
+        .card {
+            background-color: #E8E8FF;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .card-buttons {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+        }
+
+        .card-button {
+            flex: 1;
+            padding: 10px;
+            margin:  5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .card-button.create {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .card-button.modify {
+                background-color: #FFC107;
+                color: white;
+            }
+
+            .card-button.delete {
+                background-color: #CC0000;
+                color: white;
+            }
+
+        .buttons2 {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+        }
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin: 0 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .button.back {
+                background-color: #E8E8FF;
+            }
+
+            .button.main {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.home {
+                background-color: #4CAF50;
+                color: white;
+            }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>퀴즈 생성</h1>
+            <h3>퀴즈 뱅크로 부터 선택</h3>
+            <h4>생성일자 : @ViewBag.WhenDate</h4>
+        </div>
+        @foreach (var item in Model)
+        {
+
+            <!-- Example cards, replace with actual data -->
+            <div class="card">
+                <div> @item.sequenceNo) @item.QuestionQ</div>
+                @if (@item.QuestionType == "o")
+                {
+                    <div>1) @item.Question1 </div>
+                    <div>2) @item.Question2 </div>
+                    <div>3) @item.Question3 </div>
+                    <div>4) @item.Question4 </div>
+                }
+                <div>정답) @item.CorrectAnswer </div>
+                <div class="card-buttons2">
+                    <div class="card-button create" onclick="createQuizById(@item.Id)">이 퀴즈를 바로 퀴즈로 등록</div>
+                    <div class="card-button modify" onclick="createQuizByBank(@item.Id)">이 퀴즈를 수정해서 퀴즈로 등록</div>
+                    <div class="card-button delete" onclick="deleteQuestion( @item.Id)">이 퀴즈 퀴즈뱅크에서 삭제</div>
+                </div>
+            </div>
+        }
+
+
+        <!-- Navigation buttons -->
+        <div class="buttons2">
+            <div class="button back" onclick="history.back()">이전</div>
+            <div class="button main" onclick="location.href='/Question/Index'">퀴즈메인</div>
+            <div class="button home" onclick="location.href='/'">Home</div>
+        </div>
+    </div>
+
+    <script>
+        function createQuizById(id) {
+            location.href = "/Question/CreateQuizById?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+        }
+
+        function createQuizByBank(id) {
+            location.href = "/Question/CreateQuizByBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+        }
+        function deleteQuestion(id) {
+            location.href = "/Question/DeleteQuestionBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate"; 
+        }
+    </script>
+</body>
+</html>

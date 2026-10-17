@@ -1,0 +1,710 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.BibleYouTuBuEnrollsList>
+
+@{
+    Layout = null;
+
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    bool isOldTestament = ViewBag.ab == "a";
+
+    string pageTitle = isOldTestament ? "구약성경 통독공간" : "신약성경 통독공간";
+    string heroBadge = isOldTestament ? "Old Testament Reading" : "New Testament Reading";
+    string heroGradient = isOldTestament
+        ? "linear-gradient(135deg, #059669 0%, #10b981 48%, #34d399 100%)"
+        : "linear-gradient(135deg, #1d4ed8 0%, #2563eb 48%, #38bdf8 100%)";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@pageTitle</title>
+
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&display=swap');
+
+        :root {
+            --bg: #f4f7fb;
+            --bg-soft: #f8fbff;
+            --surface: rgba(255,255,255,0.92);
+            --surface-strong: #ffffff;
+            --text: #0f172a;
+            --text-soft: #64748b;
+            --text-faint: #94a3b8;
+            --line: #e2e8f0;
+            --line-soft: rgba(226,232,240,0.8);
+            --shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+            --shadow-hover: 0 16px 32px rgba(15, 23, 42, 0.10);
+            --radius-2xl: 26px;
+            --radius-xl: 20px;
+            --radius-lg: 16px;
+            --radius-md: 14px;
+            --green-50: #ecfdf5;
+            --green-100: #d1fae5;
+            --green-600: #059669;
+            --green-700: #047857;
+            --blue-50: #eff6ff;
+            --blue-100: #dbeafe;
+            --blue-600: #2563eb;
+            --blue-700: #1d4ed8;
+            --rose-50: #fff1f2;
+            --rose-100: #ffe4e6;
+            --rose-600: #e11d48;
+            --rose-700: #be123c;
+            --slate-50: #f8fafc;
+            --slate-100: #f1f5f9;
+            --slate-400: #94a3b8;
+            --slate-500: #64748b;
+            --slate-600: #475569;
+            --slate-700: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+            color: var(--text);
+            background: radial-gradient(circle at top left, rgba(37,99,235,0.05), transparent 22%), radial-gradient(circle at top right, rgba(16,185,129,0.06), transparent 18%), linear-gradient(180deg, #fbfdff 0%, #f4f7fb 100%);
+        }
+
+        body {
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .page {
+            width: 100%;
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 16px 14px 34px;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            background: @heroGradient;
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+            color: #fff;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                right: -34px;
+                top: -34px;
+                width: 150px;
+                height: 150px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.10);
+            }
+
+            .hero::after {
+                content: "";
+                position: absolute;
+                left: 42%;
+                bottom: -72px;
+                width: 180px;
+                height: 180px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.08);
+            }
+
+        .hero-inner {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.8fr);
+            gap: 14px;
+            align-items: stretch;
+            padding: 24px 24px;
+        }
+
+        .hero-main {
+            min-width: 0;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+            background: rgba(255,255,255,0.16);
+            border: 1px solid rgba(255,255,255,0.20);
+            margin-bottom: 12px;
+        }
+
+        .hero-title {
+            margin: 0;
+            font-size: clamp(1.8rem, 2.5vw, 2.55rem);
+            line-height: 1.14;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-sub {
+            margin: 10px 0 0;
+            font-size: 0.96rem;
+            line-height: 1.72;
+            color: rgba(255,255,255,0.95);
+            max-width: 700px;
+        }
+
+        .hero-user {
+            margin-top: 12px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.98);
+        }
+
+        .hero-side {
+            align-self: stretch;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-radius: 20px;
+            padding: 18px 18px;
+            background: rgba(255,255,255,0.14);
+            border: 1px solid rgba(255,255,255,0.18);
+            backdrop-filter: blur(10px);
+            min-width: 0;
+        }
+
+        .hero-side-title {
+            font-size: 0.84rem;
+            font-weight: 800;
+            color: rgba(255,255,255,0.88);
+            margin-bottom: 8px;
+        }
+
+        .hero-side-main {
+            font-size: 1.06rem;
+            font-weight: 800;
+            line-height: 1.35;
+            margin-bottom: 8px;
+        }
+
+        .hero-side-desc {
+            font-size: 0.9rem;
+            line-height: 1.62;
+            color: rgba(255,255,255,0.92);
+        }
+
+        .nav-wrap {
+            margin-bottom: 12px;
+        }
+
+        .section {
+            margin-top: 14px;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+            padding: 0 2px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: 1.22rem;
+            line-height: 1.2;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .section-desc {
+            margin: 5px 0 0;
+            font-size: 0.92rem;
+            color: var(--text-soft);
+            line-height: 1.6;
+        }
+
+        .group-box {
+            position: relative;
+            background: var(--surface);
+            border: 1px solid rgba(255,255,255,0.72);
+            border-radius: var(--radius-2xl);
+            padding: 18px 16px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .group-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 13px;
+            border-radius: 999px;
+            font-size: 0.92rem;
+            font-weight: 800;
+            line-height: 1;
+            background: @(isOldTestament ? "var(--green-50)" : "var(--blue-50)");
+            color: @(isOldTestament ? "var(--green-700)" : "var(--blue-700)");
+            border: 1px solid @(isOldTestament ? "var(--green-100)" : "var(--blue-100)");
+        }
+
+        .group-sub {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: var(--text-soft);
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .bible-card {
+            grid-column: span 3;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 152px;
+            padding: 16px;
+            border-radius: 18px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.045);
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+            user-select: none;
+        }
+
+            .bible-card:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--shadow-hover);
+            }
+
+            .bible-card::after {
+                content: "";
+                position: absolute;
+                right: -20px;
+                top: -20px;
+                width: 70px;
+                height: 70px;
+                border-radius: 50%;
+                background: rgba(255,255,255,0.42);
+                pointer-events: none;
+            }
+
+            .bible-card.completed {
+                background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+                border-color: #dbe4ee;
+            }
+
+            .bible-card.progress {
+                background: linear-gradient(180deg, #fff1f2 0%, #fff8f9 100%);
+                border-color: #fecdd3;
+            }
+
+            .bible-card.not-started {
+                background: linear-gradient(180deg, #f0fdf4 0%, #f8fffb 100%);
+                border-color: #bbf7d0;
+            }
+
+        .card-top {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .book-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            background: rgba(255,255,255,0.72);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.52);
+            flex: 0 0 auto;
+        }
+
+        .status-badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.73rem;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+
+        .status-completed {
+            background: #e5e7eb;
+            color: #475569;
+        }
+
+        .status-progress {
+            background: #ffe4e6;
+            color: #be123c;
+        }
+
+        .status-not-started {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .book-title {
+            position: relative;
+            z-index: 2;
+            margin: 0 0 6px;
+            font-size: 1.02rem;
+            font-weight: 800;
+            line-height: 1.34;
+            letter-spacing: -0.015em;
+            color: var(--text);
+            word-break: keep-all;
+        }
+
+        .book-desc {
+            position: relative;
+            z-index: 2;
+            margin: 0 0 12px;
+            min-height: 36px;
+            font-size: 0.84rem;
+            line-height: 1.52;
+            color: var(--text-soft);
+            word-break: keep-all;
+        }
+
+        .progress-label {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 0.81rem;
+            font-weight: 700;
+            color: var(--slate-600);
+        }
+
+        .progress-track {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(148,163,184,0.17);
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .bar-completed {
+            background: linear-gradient(90deg, #94a3b8 0%, #64748b 100%);
+        }
+
+        .bar-progress {
+            background: linear-gradient(90deg, #fb7185 0%, #f43f5e 100%);
+        }
+
+        .bar-not-started {
+            background: linear-gradient(90deg, #34d399 0%, #10b981 100%);
+        }
+
+        .card-bottom {
+            position: relative;
+            z-index: 2;
+            margin-top: 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-faint);
+        }
+
+        .empty-box {
+            padding: 28px 18px;
+            background: #ffffff;
+            border: 1px dashed #cbd5e1;
+            border-radius: 18px;
+            text-align: center;
+            color: var(--text-soft);
+            font-weight: 700;
+            box-shadow: 0 6px 18px rgba(15,23,42,0.035);
+        }
+
+        .bottom-space {
+            height: 6px;
+        }
+
+        @@media (max-width: 1140px) {
+            .page {
+                max-width: 1060px;
+            }
+
+            .bible-card {
+                grid-column: span 4;
+            }
+        }
+
+        @@media (max-width: 860px) {
+            .hero-inner {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-side {
+                padding: 16px;
+            }
+
+            .bible-card {
+                grid-column: span 6;
+            }
+        }
+
+        @@media (max-width: 640px) {
+            .page {
+                padding: 12px 10px 26px;
+            }
+
+            .hero {
+                border-radius: 22px;
+                margin-bottom: 12px;
+            }
+
+            .hero-inner {
+                padding: 18px 16px;
+                gap: 10px;
+            }
+
+            .hero-title {
+                font-size: 1.72rem;
+            }
+
+            .hero-sub {
+                font-size: 0.9rem;
+                line-height: 1.62;
+            }
+
+            .hero-user {
+                font-size: 0.9rem;
+            }
+
+            .hero-side {
+                border-radius: 16px;
+            }
+
+            .section-head {
+                margin-bottom: 10px;
+            }
+
+            .section-title {
+                font-size: 1.08rem;
+            }
+
+            .section-desc {
+                font-size: 0.87rem;
+            }
+
+            .group-box {
+                border-radius: 20px;
+                padding: 14px 12px 12px;
+                margin-bottom: 12px;
+            }
+
+            .group-header {
+                margin-bottom: 12px;
+            }
+
+            .group-title {
+                font-size: 0.86rem;
+                padding: 7px 11px;
+            }
+
+            .group-sub {
+                font-size: 0.78rem;
+            }
+
+            .cards {
+                gap: 10px;
+            }
+
+            .bible-card {
+                grid-column: span 12;
+                min-height: 138px;
+                padding: 14px;
+                border-radius: 16px;
+            }
+
+            .book-title {
+                font-size: 0.98rem;
+            }
+
+            .book-desc {
+                min-height: auto;
+                font-size: 0.82rem;
+            }
+
+            .card-bottom {
+                font-size: 0.76rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+
+        <section class="hero">
+            <div class="hero-inner">
+                <div class="hero-main">
+                    <div class="hero-badge">📖 @heroBadge</div>
+                    <h1 class="hero-title">@pageTitle</h1>
+                    <p class="hero-sub">
+                        말씀을 따라 차근차근 걸어가는 통독 여정입니다.
+                        읽은 성경책의 진행률을 한눈에 확인하고 원하는 책으로 바로 이동해 보세요.
+                    </p>
+                    <div class="hero-user">안녕하세요, <strong>@UserFullName</strong> 님</div>
+                </div>
+
+                <div class="hero-side">
+                    <div class="hero-side-title">통독 안내</div>
+                    <div class="hero-side-main">
+                        @(isOldTestament ? "구약의 큰 흐름을 따라 읽어 보세요" : "신약의 복음과 교회를 따라 읽어 보세요")
+                    </div>
+                    <div class="hero-side-desc">
+                        각 카드에서 진행 상태와 통독률을 확인할 수 있으며,
+                        카드를 누르면 해당 성경 읽기 페이지로 이동합니다.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="nav-wrap">
+            @await Html.PartialAsync("_PublishNavigationButton_Home_Old_New_Board_BR_2")
+        </div>
+
+        @await Html.PartialAsync("_PublishRegionDesc_2")
+
+        <section class="section">
+            <div class="section-head">
+                <div>
+                    <h2 class="section-title">성경 목록</h2>
+                    <p class="section-desc">그룹별로 성경책을 확인하고 현재 통독 상태를 한눈에 살펴보세요.</p>
+                </div>
+            </div>
+
+            @if (Model != null && Model.Any())
+            {
+                foreach (var item in Model)
+                {
+                    <div class="group-box">
+                        <div class="group-header">
+                            <div class="group-title">📚 @item._BibleBibleGroup.kind2Desc</div>
+                            <div class="group-sub">카드를 누르면 해당 성경으로 이동합니다</div>
+                        </div>
+
+                        <div class="cards">
+                            @foreach (var item2 in item._BibleYouTuBuEnrolls)
+                            {
+                                var readPercentage = Math.Round(item2.ReadPercentage, 1);
+                                var roundedWidth = Math.Min(readPercentage, 100);
+
+                                var statusClass = "not-started";
+                                var badgeClass = "status-not-started";
+                                var badgeText = "읽기 전";
+                                var barClass = "bar-not-started";
+                                var descText = "아직 통독을 시작하지 않았어요.";
+
+                                if (Convert.ToInt32(item2.ReadPercentage) == 100)
+                                {
+                                    statusClass = "completed";
+                                    badgeClass = "status-completed";
+                                    badgeText = "완독";
+                                    barClass = "bar-completed";
+                                    descText = "이 성경책의 통독을 완료했어요.";
+                                }
+                                else if (item2.ReadPercentage > 0)
+                                {
+                                    statusClass = "progress";
+                                    badgeClass = "status-progress";
+                                    badgeText = "진행 중";
+                                    barClass = "bar-progress";
+                                    descText = "현재 읽고 있는 성경책이에요.";
+                                }
+
+                                <div class="bible-card @statusClass"
+                                     onclick="window.location.href='/bibleCenter/IndexByID?Id=@item2.Id';">
+                                    <div class="card-top">
+                                        <div class="book-icon">📖</div>
+                                        <div class="status-badge @badgeClass">@badgeText</div>
+                                    </div>
+
+                                    <h3 class="book-title">@item2.BibleText</h3>
+                                    <div class="book-desc">@descText</div>
+
+                                    <div class="progress-label">
+                                        <span>통독률</span>
+                                        <span>@readPercentage%</span>
+                                    </div>
+
+                                    <div class="progress-track">
+                                        <div class="progress-bar @barClass" style="width:@roundedWidth%;"></div>
+                                    </div>
+
+                                    <div class="card-bottom">클릭하여 성경 읽기 페이지로 이동</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="empty-box">
+                    표시할 성경 목록이 없습니다.
+                </div>
+            }
+        </section>
+
+        <div class="nav-wrap">
+            @await Html.PartialAsync("_PublishNavigationButton_Home_Old_New_Board_BR_2")
+        </div>
+
+        <div class="bottom-space"></div>
+    </div>
+</body>
+</html>

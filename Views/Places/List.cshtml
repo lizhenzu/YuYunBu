@@ -1,0 +1,208 @@
+﻿@using BulletinBoard.Models
+
+@model IReadOnlyList<PlaceItem>
+@{
+    Layout = null;
+    var category = (string)ViewBag.Category ?? "맛집";
+    var q = (string?)ViewBag.Q;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>@category 목록</title>
+    <style>
+        :root {
+            --bg: #0e101a;
+            --card: #14182b;
+            --text: #e7e9f1;
+            --muted: #9aa3b2;
+            --accent: #7ee0ff;
+            --border: rgba(255,255,255,.12)
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif
+        }
+
+        header {
+            padding: 20px 16px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .left h1 {
+            margin: 0;
+            font-size: 20px
+        }
+
+        .right {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        input[type=text] {
+            background: #0f1322;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            width: 220px
+        }
+
+        .btn {
+            background: linear-gradient(180deg,var(--accent),#64d1ff);
+            color: #0b1324;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-block
+        }
+
+            .btn.ghost {
+                background: transparent;
+                color: var(--text);
+                border: 1px solid var(--border)
+            }
+
+        .grid {
+            padding: 12px;
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fill,minmax(260px,1fr))
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 10px 24px rgba(0,0,0,.35);
+            transition: .2s
+        }
+
+            .card:hover {
+                transform: translateY(-3px);
+                border-color: rgba(126,224,255,.35)
+            }
+
+        .thumb {
+            position: relative;
+            aspect-ratio: 16/9;
+            background: #0f1322
+        }
+
+            .thumb img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block
+            }
+
+        .body {
+            padding: 12px 14px 14px
+        }
+
+        .name {
+            margin: 0 0 6px;
+            font-size: 17px
+        }
+
+        .addr {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        .tags {
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap
+        }
+
+        .tag {
+            font-size: 12px;
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #1a1f35
+        }
+
+        .actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px
+        }
+
+            .actions a {
+                flex: 1;
+                text-align: center
+            }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="left">
+            <h1>📂 @category 목록</h1>
+        </div>
+        <div class="right">
+            <form method="get" action="/Places/List">
+                <input type="hidden" name="category" value="@category" />
+                <input type="text" name="q" value="@q" placeholder="이름/주소/태그 검색" />
+                <button class="btn" type="submit">검색</button>
+            </form>
+            <a class="btn" href="/Places/Create?category=@category">등록</a>
+            <a class="btn ghost" href="/Places/Main">메인</a>
+        </div>
+    </header>
+
+    <main class="grid">
+        @foreach (var it in Model)
+        {
+            var shot = !string.IsNullOrWhiteSpace(it.ThumbnailUrl)
+            ? it.ThumbnailUrl
+            : $"https://s.wordpress.com/mshots/v1/{System.Net.WebUtility.UrlEncode(it.ExternalUrl)}?w=900";
+            <article class="card" onclick="window.open('@it.ExternalUrl','_blank','noopener')" style="cursor:pointer">
+                <div class="thumb">
+                    <img src="@shot" alt="@it.Name 대표 이미지" loading="lazy" referrerpolicy="no-referrer" />
+                </div>
+                <div class="body">
+                    <h2 class="name">@it.Name</h2>
+                    @if (!string.IsNullOrWhiteSpace(it.Address))
+                    {
+                        <div class="addr">📍 @it.Address</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(it.Tags))
+                    {
+                        <div class="tags">
+                            @foreach (var tag in it.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Trim()))
+                            {
+                                <span class="tag">@tag</span>
+                            }
+                        </div>
+                    }
+                
+                    <div class="actions">
+                        <a class="btn" href="@it.ExternalUrl" target="_blank" rel="noopener" onclick="event.stopPropagation()">바로가기</a>
+                        <a class="btn ghost" href="/Places/Edit/@it.PlaceId" onclick="event.stopPropagation()">수정</a>
+                    </div>
+                </div>
+            </article>
+        }
+    </main>
+</body>
+</html>

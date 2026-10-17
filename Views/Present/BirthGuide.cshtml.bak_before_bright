@@ -1,0 +1,242 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+    ViewData["Title"] = "안내";
+    var msg = (ViewBag.Message as string) ?? "접근할 수 없습니다.";
+
+    // ✅ 관리자 페이지 경로 (원하시는 경로로 바꾸셔도 됩니다)
+    var adminUrl = "/Present/AdminUpcomingBirthdays";
+}
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: #0f1a2e;
+            --text: #eaf1ff;
+            --muted: #a9b7d0;
+            --line: rgba(255,255,255,.10);
+            --accent: #7c5cff;
+            --accent2: #19d3ff;
+            --ok: #22c55e;
+            --danger: #ff4d6d;
+            --shadow: 0 18px 44px rgba(0,0,0,.45);
+            --radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            background: radial-gradient(1200px 700px at 20% 0%, rgba(124,92,255,.20), transparent 55%), radial-gradient(1200px 700px at 80% 20%, rgba(25,211,255,.18), transparent 55%), var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 22px;
+        }
+
+        .wrap {
+            width: min(720px, 100%);
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(15,26,46,.86));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .top {
+            padding: 26px 22px 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .emoji {
+            width: 52px;
+            height: 52px;
+            border-radius: 18px;
+            display: grid;
+            place-items: center;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12);
+            font-size: 26px;
+        }
+
+        .title {
+            font-size: 20px;
+            font-weight: 1000;
+            margin: 0;
+            line-height: 1.1;
+        }
+
+        .subtitle {
+            margin-top: 6px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .body {
+            padding: 20px 22px 24px;
+        }
+
+        .msg {
+            font-size: 18px;
+            font-weight: 900;
+            line-height: 1.55;
+            margin: 0;
+            padding: 16px 14px;
+            border-radius: 18px;
+            border: 1px dashed rgba(255,255,255,.18);
+            background: rgba(255,255,255,.04);
+        }
+
+        .hint {
+            margin: 14px 2px 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 18px;
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            border-radius: 16px;
+            padding: 12px 16px;
+            font-weight: 1000;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-home {
+            background: linear-gradient(135deg, var(--ok), #86efac);
+            color: #052e16;
+            box-shadow: 0 12px 26px rgba(34,197,94,.24);
+        }
+
+        .btn-back {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,.18);
+        }
+
+        /* ✅ 관리자 버튼 */
+        .btn-admin {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #07101a;
+            box-shadow: 0 12px 26px rgba(124,92,255,.22);
+        }
+
+        .btn:hover {
+            opacity: .94
+        }
+
+        .footer {
+            padding: 14px 22px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.04);
+            font-weight: 900;
+            color: #c7d2fe;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="card">
+            <div class="top">
+                <div class="emoji">🎂</div>
+                <div>
+                    <h1 class="title">안내</h1>
+                    <div class="subtitle">생일 선물 선택 페이지 접근 안내</div>
+                </div>
+            </div>
+
+            <div class="body">
+                <p class="msg">@msg</p>
+
+                <div class="hint">
+                    • 본인 계정으로 로그인한 상태에서만 생일 선물 선택이 가능합니다.<br />
+                    • 대상자가 아니라면 안내 페이지로 이동됩니다.
+                </div>
+
+                <div class="actions">
+                    <a class="btn btn-home" href="/">🏠 홈으로 가기</a>
+                    <button class="btn btn-back" type="button" onclick="history.back()">⬅ 이전으로</button>
+                    @if (isSuperAdmin || isAdmin)
+                    {
+                        <!-- ✅ 관리자 버튼 추가 -->
+                        <a class="btn btn-admin" onclick="window.location.href='/Present/AdminUpcomingBirthdays';">🛠 관리자 화면</a>
+                    }
+                </div>
+            </div>
+
+            <div class="footer">
+                <span class="badge">🔒 로그인 인증 확인</span>
+                <span>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

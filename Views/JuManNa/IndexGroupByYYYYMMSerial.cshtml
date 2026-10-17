@@ -1,0 +1,154 @@
+@model IEnumerable<BulletinBoard.Models.JuManNas>
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 말씀 정리 — 영상 구간 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · 구간 버튼(URL ~ URL5)을 누르면 화면 안 영상 창에서 그 구간만 재생 → 구간 끝에서 멈춤 (wwwroot/js/jumanna-yt.js)
+    · 원본 유튜브 링크 · 보기(IndexByID) · 수정(ModifyJuManNa) 주소는 예전 그대로
+    · 이전 화면은 IndexGroupByYYYYMMSerial.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var list = (Model ?? Enumerable.Empty<BulletinBoard.Models.JuManNas>()).ToList();
+    string ym = ViewBag.YYYYMM as string ?? (list.Count > 0 ? list[0].ExposeDate.ToString("yyyy-MM") : "");
+    string monthLabel = DateTime.TryParse(ym + "-01", out var firstDay) ? $"{firstDay.Year}년 {firstDay.Month}월" : "";
+
+    // 유튜브 ID 추출 (ID 만 오든, 전체 주소가 오든)
+    string YtId(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "";
+        var s = input.Trim();
+        if (!s.Contains("/") && !s.Contains("?") && !s.Contains("&")) return s;
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"[?&]v=([^&#]+)|youtu\.be/([^?&#/]+)|/(?:embed|shorts|live)/([^?&#/]+)");
+        if (!m.Success) return s;
+        return m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
+    }
+    int Sec(int mm, int ss) => Math.Max(0, mm) * 60 + Math.Max(0, ss);
+
+    // 한 날에 구간이 여러 개(URL ~ URL5) — 주소가 있는 것만 순서대로
+    List<(string Url, string Id, int S, int E, string Label)> Segs(BulletinBoard.Models.JuManNas it)
+    {
+        var raw = new (string Url, int SMM, int SSS, int EMM, int ESS)[]
+        {
+            (it.URL,  it.YouTuBuStartMM,  it.YouTuBuStartSS,  it.YouTuBuEndMM,  it.YouTuBuEndSS),
+            (it.URL2, it.YouTuBuStartMM2, it.YouTuBuStartSS2, it.YouTuBuEndMM2, it.YouTuBuEndSS2),
+            (it.URL3, it.YouTuBuStartMM3, it.YouTuBuStartSS3, it.YouTuBuEndMM3, it.YouTuBuEndSS3),
+            (it.URL4, it.YouTuBuStartMM4, it.YouTuBuStartSS4, it.YouTuBuEndMM4, it.YouTuBuEndSS4),
+            (it.URL5, it.YouTuBuStartMM5, it.YouTuBuStartSS5, it.YouTuBuEndMM5, it.YouTuBuEndSS5),
+        };
+        var r = new List<(string, string, int, int, string)>();
+        foreach (var x in raw)
+        {
+            var id = YtId(x.Url);
+            if (string.IsNullOrWhiteSpace(id)) continue;
+            int s = Sec(x.SMM, x.SSS), e = Sec(x.EMM, x.ESS);
+            if (e <= s) e = 0;
+            r.Add((x.Url, id, s, e, $"{x.SMM}:{x.SSS:D2} ~ {x.EMM}:{x.ESS:D2}"));
+        }
+        return r;
+    }
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>영상 구간</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><span class="sep">›</span>@(string.IsNullOrEmpty(monthLabel) ? "영상 구간" : monthLabel)</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">@(string.IsNullOrEmpty(monthLabel) ? "DAILY WORD" : monthLabel) · 영상 구간</div>
+    <h1 class="qb-h1">영상 구간</h1>
+    <div class="qb-sub">구간을 누르면 이 화면에서 바로 재생돼요</div>
+
+    @if (!string.IsNullOrEmpty(ym))
+    {
+        <div class="jm-chips">
+            <a href="/JuManNa/IndexQueryByYYYYMM?option=Minimal&YYYYMM=@ym">본문만</a>
+            <a href="/JuManNa/IndexQueryByYYYYMM?option=Rough&YYYYMM=@ym">주제까지</a>
+            <a href="/JuManNa/IndexQueryByYYYYMM?option=Detail&YYYYMM=@ym">전체 내용</a>
+            <a class="on" href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@ym">영상 구간</a>
+        </div>
+    }
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">이 달에 등록된 말씀이 없어요</div>
+    }
+
+    @foreach (var item in list)
+    {
+        string janZul = SharedComm.MakeBibleSerialJangZul(item.BibleText, item.FromJang, item.FromZul, item.ToJang, item.ToZul);
+        string title = $"{item.BibleText} {janZul}";
+        bool sun = item.ExposeDate.DayOfWeek == DayOfWeek.Sunday;
+        var segs = Segs(item);
+        bool multi = segs.Count > 1;
+        bool multiVideo = segs.Select(s => s.Id).Distinct().Count() > 1;
+
+        <div class="jm-day">
+            <span class="jm-dt @(sun ? "sun" : "")"><small>@(item.ExposeDate.Month)월</small><b>@item.ExposeDate.Day</b><i>@item.WeekDayKor</i></span>
+            <div class="c">
+                <div class="ref">@title</div>
+                @if (!string.IsNullOrWhiteSpace(item.BibleSubject))
+                {
+                    <div class="sj">@item.BibleSubject</div>
+                }
+
+                <div class="jm-seg">
+                    @if (segs.Count == 0)
+                    {
+                        <span class="jm-pill off">영상 없음</span>
+                    }
+                    @for (int i = 0; i < segs.Count; i++)
+                    {
+                        var sg = segs[i];
+                        <button type="button" class="jm-pill p"
+                                data-yt-url="@sg.Url" data-start="@sg.S" data-end="@sg.E"
+                                data-title="@(multi ? $"{title} · 구간 {i + 1}" : title)">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z" /></svg>@(multi ? $"{i + 1} · " : "")@sg.Label
+                        </button>
+                    }
+                    @if (segs.Count > 0)
+                    {
+                        if (multiVideo)
+                        {
+                            for (int i = 0; i < segs.Count; i++)
+                            {
+                                <a class="jm-pill" href="https://www.youtube.com/watch?v=@segs[i].Id" target="_blank" rel="noopener">유튜브 @(i + 1) ↗</a>
+                            }
+                        }
+                        else
+                        {
+                            <a class="jm-pill" href="https://www.youtube.com/watch?v=@segs[0].Id" target="_blank" rel="noopener">유튜브 ↗</a>
+                        }
+                    }
+                </div>
+
+                <div class="jm-ac">
+                    <a class="jm-pill s" href="/JuManNa/IndexByID?Id=@item.Id">보기</a>
+                    <a class="jm-pill" href="/JuManNa/ModifyJuManNa?Id=@item.Id">수정</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>영상 구간</span>
+        <span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/jumanna-yt.js" asp-append-version="true"></script>
+</body>
+</html>

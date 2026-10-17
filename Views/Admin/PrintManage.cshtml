@@ -1,0 +1,223 @@
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Services.Abstract;
+@using Microsoft.AspNetCore.Http;
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>출력관리 — @ChurchName @DepartmentName</title>
+    <style>
+        :root {
+            --bg:     #f3f8ff;
+            --card:   rgba(255,255,255,.90);
+            --ink:    #0b1630;
+            --muted:  #5b6b86;
+            --line:   rgba(15,23,42,.10);
+            --shadow: 0 18px 60px rgba(12,28,60,.12);
+            --r:      28px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            min-height: 100vh;
+            font-family: ui-sans-serif, system-ui, -apple-system, 'Noto Sans KR', sans-serif;
+            background: radial-gradient(900px 600px at 18% 12%, rgba(59,130,246,.22), transparent 60%),
+                        radial-gradient(900px 600px at 85% 25%, rgba(16,185,129,.18), transparent 55%),
+                        radial-gradient(900px 600px at 60% 92%, rgba(99,102,241,.14), transparent 55%),
+                        linear-gradient(180deg, var(--bg), #fff);
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+            display: flex; align-items: center; justify-content: center;
+            padding: clamp(16px,4vw,40px);
+        }
+        a { color: inherit; text-decoration: none; }
+
+        .shell {
+            width: min(700px, 100%);
+            display: flex; flex-direction: column; gap: 20px;
+        }
+
+        /* HEADER */
+        .hero {
+            position: relative;
+            border: 1px solid var(--line);
+            border-radius: var(--r);
+            background: rgba(255,255,255,.72);
+            box-shadow: var(--shadow);
+            padding: clamp(20px,3.6vw,32px);
+            overflow: hidden;
+            text-align: center;
+        }
+        .hero::before {
+            content: "";
+            position: absolute; inset: -2px;
+            background: radial-gradient(700px 240px at 15% 0%, rgba(59,130,246,.22), transparent 55%),
+                        radial-gradient(500px 220px at 90% 20%, rgba(16,185,129,.18), transparent 55%);
+            pointer-events: none;
+        }
+        .hero-inner { position: relative; }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 12px; border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.72);
+            font-size: 11px; font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .hero-badge .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #2563eb; box-shadow: 0 0 0 4px rgba(37,99,235,.15);
+        }
+        .hero h1 {
+            font-size: clamp(22px,3vw,30px);
+            font-weight: 900; letter-spacing: -.5px;
+            margin-bottom: 8px;
+        }
+        .hero p {
+            font-size: 14px; color: var(--muted); font-weight: 600;
+        }
+
+        /* GRADE BUTTONS */
+        .grade-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+        @@media (max-width: 480px) {
+            .grade-grid { grid-template-columns: 1fr; }
+        }
+
+        .grade-btn {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 14px;
+            padding: 28px 16px;
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: var(--card);
+            box-shadow: 0 10px 30px rgba(12,28,60,.10);
+            cursor: pointer;
+            transition: transform .14s cubic-bezier(.34,1.56,.64,1), box-shadow .14s;
+            position: relative; overflow: hidden;
+            text-decoration: none; color: var(--ink);
+        }
+        .grade-btn::before {
+            content: "";
+            position: absolute; inset: -2px;
+            opacity: .8; pointer-events: none;
+        }
+        .grade-btn:nth-child(1)::before { background: radial-gradient(320px 180px at 20% 0%, rgba(255,107,53,.20), transparent 60%); }
+        .grade-btn:nth-child(2)::before { background: radial-gradient(320px 180px at 20% 0%, rgba(34,197,94,.18), transparent 60%); }
+        .grade-btn:nth-child(3)::before { background: radial-gradient(320px 180px at 20% 0%, rgba(168,85,247,.18), transparent 60%); }
+
+        .grade-btn:hover  { transform: translateY(-5px) scale(1.02); box-shadow: 0 18px 48px rgba(12,28,60,.16); }
+        .grade-btn:active { transform: translateY(0) scale(.97); }
+
+        .grade-icon {
+            position: relative;
+            width: 72px; height: 72px;
+            border-radius: 22px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 36px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.80);
+            box-shadow: 0 8px 20px rgba(12,28,60,.10);
+        }
+        .grade-btn:nth-child(1) .grade-icon { background: rgba(255,107,53,.10); border-color: rgba(255,107,53,.22); }
+        .grade-btn:nth-child(2) .grade-icon { background: rgba(34,197,94,.10);  border-color: rgba(34,197,94,.22); }
+        .grade-btn:nth-child(3) .grade-icon { background: rgba(168,85,247,.10); border-color: rgba(168,85,247,.22); }
+
+        .grade-text { text-align: center; position: relative; }
+        .grade-label {
+            font-size: 22px; font-weight: 900; letter-spacing: -.4px;
+            display: block; margin-bottom: 4px;
+        }
+        .grade-sub {
+            font-size: 12px; color: var(--muted); font-weight: 700;
+            display: flex; align-items: center; justify-content: center; gap: 5px;
+        }
+        .grade-sub::before { content: "🖨️"; font-size: 13px; }
+
+        /* BACK BUTTON */
+        .back-row {
+            text-align: center;
+        }
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 22px; border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.70);
+            font-size: 13px; font-weight: 800; color: var(--muted);
+            box-shadow: 0 4px 14px rgba(12,28,60,.07);
+            cursor: pointer; transition: all .14s;
+            text-decoration: none;
+        }
+        .back-btn:hover { background: rgba(255,255,255,.95); color: var(--ink); }
+
+        .foot {
+            text-align: center; font-size: 12px; color: var(--muted); font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+
+    <section class="hero">
+        <div class="hero-inner">
+            <div class="hero-badge"><span class="dot"></span>유년부 교사 전용</div>
+            <h1>🖨️ 출력관리</h1>
+            <p>학년을 선택하면 반편성표가 새 탭으로 열립니다.</p>
+        </div>
+    </section>
+
+    <div class="grade-grid">
+        <a class="grade-btn" href="/Admin/PrintByGrade?grade=1" target="_blank" rel="noopener">
+            <div class="grade-icon">📗</div>
+            <div class="grade-text">
+                <span class="grade-label">1학년 출력</span>
+                <span class="grade-sub">A3 반편성표</span>
+            </div>
+        </a>
+
+        <a class="grade-btn" href="/Admin/PrintByGrade?grade=2" target="_blank" rel="noopener">
+            <div class="grade-icon">📘</div>
+            <div class="grade-text">
+                <span class="grade-label">2학년 출력</span>
+                <span class="grade-sub">A3 반편성표</span>
+            </div>
+        </a>
+
+        <a class="grade-btn" href="/Admin/PrintByGrade?grade=3" target="_blank" rel="noopener">
+            <div class="grade-icon">📙</div>
+            <div class="grade-text">
+                <span class="grade-label">3학년 출력</span>
+                <span class="grade-sub">A3 반편성표</span>
+            </div>
+        </a>
+    </div>
+
+    <div class="back-row">
+        <a class="back-btn" href="/Admin/TeacherOnly">← 교사 메뉴로 돌아가기</a>
+    </div>
+
+    <div class="foot">
+        © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+    </div>
+</div>
+</body>
+</html>

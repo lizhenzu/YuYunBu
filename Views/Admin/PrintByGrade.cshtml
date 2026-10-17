@@ -1,0 +1,493 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.ViewModels.Attendance;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using Microsoft.AspNetCore.Http;
+
+@model List<AttendanceSundayClassCardVM>
+
+@{
+    Layout = null;
+
+    var grade    = (int)ViewBag.Grade;
+    var gradeStr = (string)ViewBag.GradeStr;
+    var sunday   = (DateTime)ViewBag.Sunday;
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
+    // 가장 많은 학생 수 = 행 수 결정
+    int maxStudents = Model.Any() ? Model.Max(c => c.Students.Count) : 0;
+
+    // 학년별 컬러 테마
+    string headerColor = grade switch
+    {
+        1 => "#7ec87e",   // 초록
+        2 => "#6db3e8",   // 파랑
+        3 => "#e8886d",   // 주황
+        _ => "#9ed47d"
+    };
+    string accentColor = grade switch
+    {
+        1 => "#d6f1cd",
+        2 => "#cce5f8",
+        3 => "#fde4db",
+        _ => "#e8f7df"
+    };
+    string titleColor = grade switch
+    {
+        1 => "#2e6e30",
+        2 => "#1a4f7a",
+        3 => "#7a3020",
+        _ => "#3a5c20"
+    };
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@gradeStr 반편성 — @ChurchName @DepartmentName</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        :root {
+            --page-width:    297mm;
+            --page-height:   420mm;
+            --safe-padding:  14mm;
+            --header-color:  @headerColor;
+            --accent-color:  @accentColor;
+            --title-color:   @titleColor;
+            --grid-border:   #aab4bb;
+        }
+
+        html, body {
+            margin: 0; padding: 0;
+            background: #eef3f7;
+            font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+
+        @@page {
+            size: A3 portrait;
+            margin: 0;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 10mm;
+        }
+
+        /* ── 모바일: body 패딩 제거, 스케일러가 높이 담당 ── */
+        @@media (max-width: 1130px) {
+            body {
+                padding: 0;
+                display: block;
+                overflow-x: hidden;
+            }
+        }
+
+        /* 스케일러: JS가 height를 동적으로 주입 */
+        .page-scaler {
+            width: 100%;
+        }
+
+        .page {
+            width: var(--page-width);
+            height: var(--page-height);       /* min-height → height: 페이지 꽉 채움 */
+            background: #fff;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4mm 10mm rgba(0,0,0,.10);
+        }
+
+        /* 배경 그라디언트 장식 */
+        .page::before {
+            content: "";
+            position: absolute; inset: 0;
+            background:
+                radial-gradient(circle at  9% 10%, rgba(255,214,220,.90) 0 26mm, transparent 26.5mm),
+                radial-gradient(circle at 90% 10%, rgba(210,238,255,.90) 0 28mm, transparent 28.5mm),
+                radial-gradient(circle at 11% 89%, rgba(255,240,188,.90) 0 29mm, transparent 29.5mm),
+                radial-gradient(circle at 90% 87%, rgba(220,245,214,.90) 0 30mm, transparent 30.5mm),
+                radial-gradient(circle at 50%  7%, rgba(255,226,243,.60) 0 14mm, transparent 14.5mm),
+                radial-gradient(circle at 50% 94%, rgba(224,235,255,.65) 0 16mm, transparent 16.5mm),
+                linear-gradient(180deg, rgba(255,255,255,.94), rgba(255,255,255,.94));
+            z-index: 0;
+        }
+
+        .content {
+            position: relative; z-index: 2;
+            padding: var(--safe-padding);
+            height: 100%;
+            display: flex; flex-direction: column;
+        }
+
+        /* ── 장식 요소 ─────────────────────── */
+        .deco { position: absolute; z-index: 1; pointer-events: none; }
+
+        .cloud {
+            width: 30mm; height: 12mm;
+            background: #fff; border-radius: 999px;
+            box-shadow: 0 1.2mm 3mm rgba(0,0,0,.05);
+        }
+        .cloud::before, .cloud::after {
+            content: ""; position: absolute;
+            background: #fff; border-radius: 50%;
+        }
+        .cloud::before { width: 12mm; height: 12mm; left: 4mm;  top: -5mm; }
+        .cloud::after  { width: 15mm; height: 15mm; right: 5mm; top: -6mm; }
+
+        .star {
+            width: 8mm; height: 8mm;
+            background: #ffd76a;
+            clip-path: polygon(50% 0%,61% 36%,98% 36%,68% 57%,79% 92%,50% 70%,21% 92%,32% 57%,2% 36%,39% 36%);
+            filter: drop-shadow(0 1mm 1mm rgba(0,0,0,.08));
+        }
+
+        .heart {
+            width: 8mm; height: 8mm;
+            background: #ff8ba8;
+            transform: rotate(-45deg);
+            border-radius: 1.2mm;
+        }
+        .heart::before, .heart::after {
+            content: ""; position: absolute;
+            width: 8mm; height: 8mm;
+            background: #ff8ba8; border-radius: 50%;
+        }
+        .heart::before { top: -4mm; left: 0; }
+        .heart::after  { top: 0;    left: 4mm; }
+
+        .dot-deco { width: 4.5mm; height: 4.5mm; border-radius: 50%; }
+        .dot-pink   { background: #ffc4d4; }
+        .dot-blue   { background: #c9e8ff; }
+        .dot-green  { background: #d6f1cd; }
+        .dot-yellow { background: #ffe8a5; }
+
+        .rainbow {
+            width: 42mm; height: 24mm;
+            border-radius: 42mm 42mm 0 0;
+            overflow: hidden;
+        }
+        .rainbow::before {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(180deg,
+                #ff9fb4  0  20%,
+                #ffd36f 20% 40%,
+                #a8e28a 40% 60%,
+                #99d3ff 60% 80%,
+                #c8b3ff 80% 100%);
+            border-radius: 42mm 42mm 0 0;
+        }
+        .rainbow::after {
+            content: ""; position: absolute;
+            left: 6mm; right: 6mm; top: 6mm; bottom: 0;
+            background: rgba(255,255,255,.96);
+            border-radius: 30mm 30mm 0 0;
+        }
+
+        /* ── 타이틀 ──────────────────────── */
+        .sub-title {
+            text-align: center;
+            font-size: 11mm; font-weight: 800;
+            letter-spacing: .3mm; color: #444;
+            margin-top: 4mm;
+            text-shadow: .4mm .4mm 0 #fff;
+            flex-shrink: 0;
+        }
+
+        .main-title {
+            text-align: center;
+            font-size: 26mm; font-weight: 900;
+            letter-spacing: 1mm;
+            color: var(--title-color);
+            margin: 8mm 0 10mm;
+            line-height: 1.05;
+            text-shadow: .7mm .7mm 0 #fff;
+            flex-shrink: 0;
+        }
+
+        .title-accent {
+            color: #ff7fa0;
+            font-size: 10mm;
+            vertical-align: middle;
+            margin: 0 2mm;
+        }
+
+        /* ── 날짜 표시 ───────────────────── */
+        .date-badge {
+            text-align: center;
+            margin-bottom: 6mm;
+            font-size: 6mm; font-weight: 700;
+            color: #666;
+            letter-spacing: .2mm;
+            flex-shrink: 0;
+        }
+
+        /* ── 표 ──────────────────────────── */
+        .board-wrap {
+            background: rgba(255,255,255,.84);
+            border-radius: 8mm;
+            padding: 5mm;
+            box-shadow: inset 0 0 0 .3mm rgba(255,255,255,.9);
+            flex: 1;
+            display: flex; flex-direction: column;
+            min-height: 0;
+        }
+
+        table {
+            width: 100%;
+            height: 100%;
+            border-collapse: collapse;
+            background: rgba(255,255,255,.98);
+            table-layout: fixed;
+            border-radius: 6mm;
+            overflow: hidden;
+        }
+
+        th, td {
+            border: .35mm solid var(--grid-border);
+            text-align: center;
+            vertical-align: middle;
+            padding: 3mm 2mm;
+            font-size: 8.5mm;
+            color: #2f3940;
+            word-break: keep-all;
+        }
+
+        /* 학생 행 높이 — 학생 수에 따라 자동 */
+        td { height: 22mm; font-weight: 700; }
+
+        th {
+            background: var(--header-color);
+            color: #fff;
+            font-size: 11mm; font-weight: 900;
+            height: 20mm; padding: 2mm 1mm;
+        }
+
+        /* 교사 행 */
+        .teacher-row td {
+            background: var(--accent-color);
+            font-size: 7mm;
+            line-height: 1.5;
+            font-weight: 800;
+            height: 20mm;
+            color: #2f3940;
+        }
+
+        /* 빈 셀 */
+        td.empty { background: rgba(240,240,240,.40); }
+
+        /* 새친구 표시 */
+        .newcomer { color: black; font-weight: 900; }
+        .newcomer::after { content: ""; font-size: 5mm; vertical-align: super; }
+
+        /* 인쇄 가이드 */
+        .print-guide {
+            text-align: center; color: #6c7680;
+            font-size: 4.2mm; margin-top: 3mm;
+            flex-shrink: 0;
+        }
+
+        /* 인쇄 버튼 (화면에서만 표시) */
+        .print-btn-wrap {
+            position: fixed;
+            bottom: 16px; right: 16px;
+            display: flex; gap: 10px;
+            z-index: 999;
+        }
+        .print-btn, .close-btn {
+            padding: 12px 22px;
+            border-radius: 12px;
+            border: none; cursor: pointer;
+            font-size: 14px; font-weight: 800;
+            font-family: "Malgun Gothic", sans-serif;
+            box-shadow: 0 4px 14px rgba(0,0,0,.18);
+            transition: transform .12s;
+        }
+        .print-btn { background: #2563eb; color: #fff; }
+        .print-btn:hover { transform: translateY(-2px); }
+        .close-btn { background: #f3f4f6; color: #374151; }
+        .close-btn:hover { transform: translateY(-2px); }
+
+        @@media print {
+            body { padding: 0; background: #fff; display: block; }
+            .page-scaler { height: auto !important; }
+            .page {
+                box-shadow: none;
+                width: 297mm !important;
+                min-height: 420mm !important;
+                transform: none !important;
+            }
+            .print-guide { display: none; }
+            .print-btn-wrap { display: none; }
+
+            /* ✅ 배경색·배경이미지 강제 출력 */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="page-scaler" id="pageScaler">
+    <div class="page">
+        <!-- 장식 요소 -->
+        <div class="deco rainbow" style="top:8mm; left:8mm;"></div>
+        <div class="deco cloud"   style="top:18mm; left:48mm;"></div>
+        <div class="deco cloud"   style="top:14mm; right:12mm;"></div>
+
+        <div class="deco star" style="top:42mm; left:14mm;"></div>
+        <div class="deco star" style="top:42mm; right:18mm;"></div>
+        <div class="deco star" style="bottom:16mm; left:16mm;"></div>
+        <div class="deco star" style="bottom:18mm; right:16mm;"></div>
+
+        <div class="deco heart" style="top:46mm; right:40mm;"></div>
+        <div class="deco heart" style="bottom:26mm; left:30mm; transform:rotate(-45deg) scale(.88);"></div>
+
+        <div class="deco dot-deco dot-pink"   style="top:62mm; left:18mm;"></div>
+        <div class="deco dot-deco dot-blue"   style="top:76mm; left:10mm;"></div>
+        <div class="deco dot-deco dot-green"  style="top:70mm; right:10mm;"></div>
+        <div class="deco dot-deco dot-yellow" style="top:84mm; right:22mm;"></div>
+        <div class="deco dot-deco dot-pink"   style="bottom:34mm; right:10mm;"></div>
+        <div class="deco dot-deco dot-blue"   style="bottom:26mm; left:10mm;"></div>
+
+        <div class="content">
+            <div class="sub-title">@ChurchName&nbsp;&nbsp;@DepartmentName <span class="title-accent">♥</span></div>
+            <div class="main-title">@gradeStr 반편성</div>
+            <div class="date-badge">📅 @sunday.ToString("yyyy년 MM월 dd일") 기준</div>
+
+            @if (!Model.Any())
+            {
+                <p style="text-align:center; font-size:7mm; color:#888; margin-top:10mm;">
+                    해당 학년 데이터가 없습니다.
+                </p>
+            }
+            else
+            {
+                <div class="board-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                @foreach (var cls in Model)
+                                {
+                                    <th>@(cls.ClassYear)-@(cls.ClassBan)</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- 교사 행 -->
+                            <tr class="teacher-row">
+                                @foreach (var cls in Model)
+                                {
+                                    <td>
+                                        @{
+                                            var teachers = (cls.TeacherName ?? "")
+                                                .Split(new[]{ "/", "／" }, StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(t => t.Trim())
+                                                .Where(t => !string.IsNullOrEmpty(t))
+                                                .ToList();
+                                        }
+                                        @if (teachers.Any())
+                                        {
+                                            @foreach (var t in teachers)
+                                            {
+                                                <text>@t 선생님<br /></text>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <text>—</text>
+                                        }
+                                    </td>
+                                }
+                            </tr>
+
+                            <!-- 학생 행 (가나다순, 빈 칸은 empty) -->
+                            @for (int row = 0; row < maxStudents; row++)
+                            {
+                                <tr>
+                                    @foreach (var cls in Model)
+                                    {
+                                        if (row < cls.Students.Count)
+                                        {
+                                            var stu = cls.Students[row];
+                                            if (stu.IsNewComer)
+                                            {
+                                                <td class="newcomer">@stu.StudentName</td>
+                                            }
+                                            else
+                                            {
+                                                <td>@stu.StudentName</td>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <td class="empty"></td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="print-guide">
+                    ★ 표시는 새친구입니다 &nbsp;|&nbsp;
+                    인쇄 시 용지 크기 A3, 여백 없음으로 설정하면 가장 예쁘게 출력됩니다.
+                </div>
+            }
+        </div>
+    </div>
+
+    </div><!-- /.page -->
+</div><!-- /.page-scaler -->
+
+    <!-- 화면에서만 보이는 인쇄 버튼 -->
+    <div class="print-btn-wrap">
+        <button class="print-btn" onclick="window.print()">🖨️ 인쇄하기</button>
+        <button class="close-btn" onclick="window.close()">✕ 닫기</button>
+    </div>
+
+    <!-- 모바일 반응형 스케일링 -->
+    <script>
+        (function () {
+            // A3 297mm → 96dpi 기준 픽셀 (1mm ≈ 3.7795px)
+            var A3_PX = Math.round(297 * 3.7795); // ≈ 1122px
+
+            var scaler = document.getElementById('pageScaler');
+            var page   = scaler ? scaler.querySelector('.page') : null;
+
+            function applyScale() {
+                if (!page || !scaler) return;
+
+                var vw = window.innerWidth;
+
+                if (vw < A3_PX) {
+                    var s = vw / A3_PX;
+                    page.style.transform       = 'scale(' + s + ')';
+                    page.style.transformOrigin = 'top left';
+                    // 스케일된 높이를 scaler 에 주입 → 스크롤 범위 정확하게
+                    scaler.style.height = Math.ceil(page.scrollHeight * s) + 'px';
+                } else {
+                    page.style.transform       = '';
+                    page.style.transformOrigin = '';
+                    scaler.style.height        = '';
+                }
+            }
+
+            // 초기 실행
+            applyScale();
+            // 폰트/이미지 완전 로드 후 재계산
+            window.addEventListener('load',   applyScale);
+            window.addEventListener('resize', applyScale);
+        })();
+    </script>
+
+</body>
+</html>

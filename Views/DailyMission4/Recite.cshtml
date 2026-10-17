@@ -1,0 +1,306 @@
+﻿@using System
+@using System.Globalization
+@using System.Reflection
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using BulletinBoard.Models.DailyMission2
+@{
+    Layout = "_Layout_Mission3";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var dPretty = Model.SelectedDate.ToString("yyyy.MM.dd", CultureInfo.InvariantCulture)
+                  + " " + Model.SelectedDate.ToString("ddd", new CultureInfo("en-US")).ToUpperInvariant();
+    var toast = (ViewBag.Toast ?? "").ToString();
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+
+    ViewBag.DM2Page = "recite";
+    ViewBag.DM2Done = Model.DayStatus?.ReciteDone ?? false;
+
+    var weeklyDetail = ViewBag.WeeklyWordDetail as WeeklyWordDetailResult;
+    var ww = weeklyDetail?.WeeklyWordToReadData;
+}
+
+@functions {
+    int GetVerseNo(object v)
+    {
+        if (v == null) return 0;
+
+        string[] candidates = new[]
+        {
+            "Zul","zul","ZUL","BibleZul","BibleZUL","bibleZul",
+            "ZulNo","ZulNO","Verse","verse","VerseNo","VerseNO",
+            "No","NO","Seq","SEQ","OrderNo","OrderNO","Idx","Index"
+        };
+
+        var t = v.GetType();
+        foreach (var name in candidates)
+        {
+            var p = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            var val = p.GetValue(v);
+            if (val == null) continue;
+            try { return Convert.ToInt32(val); } catch { }
+        }
+        return 0;
+    }
+
+    string GetVerseText(object v)
+    {
+        if (v == null) return "";
+
+        string[] candidates = new[]
+        {
+            "BibleText","bibleText","Text","text","BibleData",
+            "VerseText","verseText","Content","content","Sentence","sentence"
+        };
+
+        var t = v.GetType();
+        foreach (var name in candidates)
+        {
+            var p = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            var val = p.GetValue(v);
+            var s = val?.ToString();
+            if (!string.IsNullOrWhiteSpace(s)) return s;
+        }
+        return v.ToString() ?? "";
+    }
+
+    bool GetDoneFlag(object o, params string[] names)
+    {
+        if (o == null) return false;
+        var t = o.GetType();
+        foreach (var n in names)
+        {
+            var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            var val = p.GetValue(o);
+            if (val == null) continue;
+            try { return Convert.ToBoolean(val); } catch { }
+        }
+        return false;
+    }
+}
+
+@{
+    bool canAct = Model.IsActionable;
+    var reciteBible = weeklyDetail?.WeekeBiblesDataToRecite;
+
+    int weeklyId = 0;
+    if (Model?.Content?.WeeklyWordToReadId != null) weeklyId = Model.Content.WeeklyWordToReadId.Value;
+    else if (ww != null) weeklyId = ww.Id;
+
+    var dayStatusObj = (object)Model?.DayStatus;
+    bool reciteDone = GetDoneFlag(dayStatusObj,
+        "ReciteDone", "WeeklyReciteDone", "Recite_Done", "WeeklyWordDone", "WeeklyDone", "Recite");
+
+    // 암송 구절은 한글로만 보여 준다. (컨트롤러에서 lang="ko" 고정)
+
+    var reciteRef = (ww == null) ? "" :
+        $"{ww.BibleTextToRecite} {ww.BibleTextToReciteFromJang}:{ww.BibleTextToReciteFromZul} – {ww.BibleTextToReciteToJang}:{ww.BibleTextToReciteToZul}";
+}
+
+@*  ══════════════════════════════════════════════════════════════
+    암송 미션 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정 · 말씀 · 퀴즈 · 기도 화면과 같은 옷)
+      제목 → 01 외울 구절(크고 진하게) → 02 이번 주 공과 요점(접힘) → 03 외웠나요?(한 줄)
+    · 카드 · 테두리 없이 연한 회색 줄로만 나눈다.  강조색은 맑은 파랑, 다 한 것은 초록.
+    · "암송했어요" 1점 (ReciteDone)
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    bool hasVerses = reciteBible?.eBibleDatas != null && reciteBible.eBibleDatas.Count > 0;
+    bool hasGuide  = ww != null && (!string.IsNullOrWhiteSpace(ww.OnePoint) || !string.IsNullOrWhiteSpace(ww.LearningObjectives1) || !string.IsNullOrWhiteSpace(ww.LearningObjectives2));
+    int _sn = 0;
+    string RNo() { return (++_sn).ToString("00"); }
+}
+
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* ── 밝은 흰색 버전 : 이 화면만 (공통 bone.css 위에 덮어쓴다) ── */
+    body { background: #FFFFFF; }
+    .qz.rd { --rBlue: #2F80ED; --rGreen: #16A34A; --rGreenD: #15803D; --rInk: #111827; --rTx: #374151; --rDim: #9CA3AF; --rDim2: #6B7280; --rLine: #EEF0F3; --rSoft: #F4F6F9;
+             background: #FFFFFF; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; }
+    .qz.rd .qzBody { background: #FFFFFF; }
+    .qz.rd .qzBar { border-bottom-color: var(--rLine); }
+    .qz.rd .qzProg { display: none; }
+    .qz.rd .qzLock { background: #F3F7FD; color: var(--rDim2); border: 0; }
+
+    .qz.rd .rK { font-size: 12px; font-weight: 800; color: var(--rBlue); margin-top: 18px; letter-spacing: .02em; }
+    .qz.rd .rTtl { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
+    .qz.rd .rTtl h2 { margin: 0; font-size: 23px; font-weight: 800; line-height: 1.35; color: var(--rInk); letter-spacing: -.02em; word-break: keep-all; }
+    .qz.rd .rRef { font-size: 13px; color: var(--rDim2); margin-top: 4px; }
+    .qz.rd .rEmpty { margin-top: 26px; padding: 26px 0; text-align: center; color: var(--rDim2); font-size: 14px; border-top: 1px solid var(--rLine); border-bottom: 1px solid var(--rLine); }
+
+    /* 01 · 02 · 03 칸 — 연한 회색 줄로만 나눈다 (숫자는 제목 줄에만, 아래 내용은 왼쪽 끝부터) */
+    .qz.rd .rSec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: baseline; padding: 18px 0 16px; border-top: 1px solid var(--rLine); }
+    .qz.rd .rSec > div { display: contents; }
+    .qz.rd .rSec > div > :not(.rH) { grid-column: 1 / -1; }
+    .qz.rd .rTtl + .rSec { margin-top: 26px; }
+    .qz.rd .rNo { font-weight: 900; font-size: 17px; color: #7FA3DB; letter-spacing: .02em; }
+    .qz.rd .rSec.done .rNo { color: #6FBF8B; }
+    .qz.rd .rH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 16px; font-weight: 800; color: var(--rInk); }
+    .qz.rd .rH small { font-size: 11.5px; font-weight: 600; color: var(--rDim); white-space: nowrap; }
+
+    /* 01 외울 구절 — 이 화면의 주인공. 가장 크고 진하게, 절 번호는 흐린 파랑 글자 */
+    .qz.rd .rVerse { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 6px; margin-top: 10px; }
+    .qz.rd .rVerse i { font-style: normal; font-size: 12px; font-weight: 800; color: #7FA3DB; text-align: right; padding-top: 7px; font-variant-numeric: tabular-nums; }
+    .qz.rd .rVerse p { margin: 0; font-size: 19px; line-height: 1.95; font-weight: 700; color: #1F2937; word-break: keep-all; }
+
+    /* 02 공과 요점 — 접어 두었다가 "요점 보기 ＋"로 펼친다 */
+    .qz.rd .rFold { justify-self: start; margin-top: 6px; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--rBlue); cursor: pointer; }
+    .qz.rd .rGl { margin: 10px 0 0; padding-left: 12px; border-left: 3px solid #D6E4FA; font-size: 15px; line-height: 1.85; color: var(--rTx); word-break: keep-all; white-space: pre-line; }
+    .qz.rd .rGl b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 800; color: #7FA3DB; letter-spacing: .02em; }
+    .qz.rd .rGl + .rGl { margin-top: 12px; }
+
+    /* 03 외웠나요? — 한 줄 (말씀 · 기도 화면 03과 같은 모양) */
+    .qz.rd .rPick { margin-top: 10px; }
+    .qz.rd .rPick form { margin: 0; }
+    .qz.rd .rPk { width: 100%; display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 0; border-radius: 14px; background: #EAF7EF;
+                  font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s; }
+    .qz.rd .rPk:active { background: #DDF1E4; }
+    .qz.rd .rPk b { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 800; color: #1F2937; }
+    .qz.rd .rPk .pt { flex: none; font-size: 12.5px; font-weight: 800; color: var(--rBlue); white-space: nowrap; }
+    .qz.rd .rPk.on { background: var(--rSoft); cursor: default; }
+    .qz.rd .rPk.on b { color: var(--rDim2); }
+    .qz.rd .rPk.on .pt { color: var(--rGreenD); }
+    .qz.rd .rPk[disabled]:not(.on) { opacity: .5; cursor: default; }
+    @@media (prefers-reduced-motion: reduce) { .qz.rd .rPk { transition: none; } }
+</style>
+
+<div class="qz rd">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a></div>
+            @await Html.PartialAsync("~/Views/DailyMission4/Partials/_FontSizeCtl.cshtml")
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        @if (!canAct)
+        {
+            <div class="qzLock"><b>다른 날짜의 미션이에요</b><br>오늘 · 어제 · 그저께만 할 수 있어요</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="qzLock">@toast</div>
+        }
+
+        @if (ww == null)
+        {
+            <div class="rEmpty">이 날짜(@d)가 들어가는 주간 공과가 없어요</div>
+        }
+        else
+        {
+            <div class="rK">이번 주 암송 구절</div>
+            <div class="rTtl">
+                @await Html.PartialAsync("~/Views/DailyMission4/Partials/_DateChip.cshtml", Model.SelectedDate)
+                <div>
+                    <h2>@ww.BibleTitle</h2>
+                    <div class="rRef">@reciteRef</div>
+                </div>
+            </div>
+
+            @* ── 01 외울 구절 ── *@
+            <div class="rSec @(reciteDone ? "done" : "")">
+                <span class="rNo">@RNo()</span>
+                <div>
+                    <div class="rH">외울 구절</div>
+                    @if (!hasVerses)
+                    {
+                        <p class="rRef" style="margin-top:10px">암송 본문을 불러오지 못했어요</p>
+                    }
+                    else
+                    {
+                        foreach (var v in reciteBible.eBibleDatas)
+                        {
+                            int verseNo = 0;
+                            string verseText = "";
+
+                            try { verseNo = Convert.ToInt32(((dynamic)v).zul); } catch { verseNo = GetVerseNo(v); }
+                            try { verseText = Convert.ToString(((dynamic)v).BibleData) ?? ""; } catch { verseText = GetVerseText(v); }
+                            if (string.IsNullOrWhiteSpace(verseText)) { continue; }
+
+                            <div class="rVerse"><i>@(verseNo > 0 ? verseNo.ToString() : "")</i><p>@verseText</p></div>
+                        }
+                    }
+                </div>
+            </div>
+
+            @* ── 02 이번 주 공과 요점 (접힘) ── *@
+            <div class="rSec @(reciteDone ? "done" : "")">
+                <span class="rNo">@RNo()</span>
+                <div>
+                    <div class="rH">이번 주 공과 요점<small>@($"{ww.WeekTitle_GUA}과")</small></div>
+                    @if (hasGuide)
+                    {
+                        <button type="button" class="rFold" data-fold="foldGua" aria-expanded="false" aria-controls="foldGua">요점 보기 ＋</button>
+                        <div id="foldGua" hidden>
+                            @if (!string.IsNullOrWhiteSpace(ww.OnePoint))
+                            {
+                                <p class="rGl"><b>한 줄 요점</b>@ww.OnePoint</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(ww.LearningObjectives1))
+                            {
+                                <p class="rGl"><b>학습 요점</b>@ww.LearningObjectives1</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(ww.LearningObjectives2))
+                            {
+                                <p class="rGl"><b>적용</b>@ww.LearningObjectives2</p>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            @* ── 03 외웠나요? ── *@
+            @if (weeklyId > 0)
+            {
+                <div class="rSec @(reciteDone ? "done" : "")">
+                    <span class="rNo">@RNo()</span>
+                    <div>
+                        <div class="rH">외웠나요?<small>@(reciteDone ? "눌렀어요" : "눌러서 알려 주세요")</small></div>
+                        <div class="rPick">
+                            <form method="post" action="/DailyMission4/SaveRecite">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="date" value="@d" />
+                                <input type="hidden" name="weeklyWordToReadId" value="@weeklyId" />
+                                <button type="submit" class="rPk @(reciteDone ? "on" : "")" @((canAct && !reciteDone) ? "" : "disabled")>
+                                    <b>암송했어요</b><span class="pt">@(reciteDone ? "✓ 완료 +1점" : "1점")</span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @await Html.PartialAsync("~/Views/DailyMission4/Partials/_Dm2Nav.cshtml", Model)
+</div>
+
+@{
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_OkPopup.cshtml",
+    new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+
+<script>
+    (function () {
+        // 공과 요점 — "요점 보기 ＋"를 누르면 펼치고 다시 누르면 접는다
+        document.querySelectorAll('.qz [data-fold]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var box = document.getElementById(b.dataset.fold);
+                if (!box) return;
+                box.hidden = !box.hidden;
+                b.textContent = box.hidden ? '요점 보기 ＋' : '요점 접기 －';
+                b.setAttribute('aria-expanded', box.hidden ? 'false' : 'true');
+            });
+        });
+    })();
+</script>

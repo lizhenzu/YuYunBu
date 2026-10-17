@@ -1,0 +1,166 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using System
+@using System.Linq
+@using System.Collections.Generic
+@model List<BoardPost>
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    var board = ViewBag.Board as BoardContext;
+    ViewBag.Title = board?.BoardName ?? "게시판";
+
+    int page = (int)(ViewBag.Page ?? 1);
+    int pageSize = (int)(ViewBag.PageSize ?? 15);
+    int total = (int)(ViewBag.Total ?? 0);
+    int totalPages = (int)Math.Ceiling(total / (double)pageSize);
+
+    string q = (ViewBag.Q ?? "").ToString();
+
+    // ✅ 공지/일반 분리
+    var notices = (Model ?? new List<BoardPost>()).Where(x => x != null && x.IsNotice).ToList();
+    var normals = (Model ?? new List<BoardPost>()).Where(x => x != null && !x.IsNotice).ToList();
+
+    // ✅ 역순 번호(일반글만)
+    int startNo = total - ((page - 1) * pageSize);
+
+    // ✅ NEW 기준(24시간)
+    var now = DateHelper.GetKoreaNow();
+
+    // ✅ (옵션) 속성 존재 여부 상관없이 안전하게 읽기 (댓글/첨부 등)
+    int? TryGetInt(object obj, string prop)
+    {
+        if (obj == null) return null;
+        var pi = obj.GetType().GetProperty(prop);
+        if (pi == null) return null;
+        var v = pi.GetValue(obj);
+        if (v == null) return null;
+        try { return Convert.ToInt32(v); } catch { return null; }
+    }
+
+    bool isNoticeBoard = board?.PostTable == "NoticeBoard";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@ViewBag.Title</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/board-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "Home")">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Notice/Branch">소통공간</a></span>
+            <span class="hdAct">
+                <a class="nbtn" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable })" title="새로고침">↻</a>
+                <a class="nbtn pri" href="@Url.Action("Create", "ReplayBoard", new { tableName = board!.PostTable })">글쓰기</a>
+            </span>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">@board!.BoardName</h1>
+        <form class="sr" method="get" action="@Url.Action("Index","ReplayBoard")">
+            <input type="hidden" name="tableName" value="@board.PostTable" />
+            <input type="text" name="q" value="@q" placeholder="제목 또는 내용 검색" />
+            <button type="submit">검색</button>
+        </form>
+    </header>
+
+    <main class="sh">
+        <section class="sec" aria-label="게시판 목록">
+            <div class="secH">
+                <span class="secT">@(string.IsNullOrWhiteSpace(q) ? "전체 글" : $"‘{q}’ 검색 결과")</span>
+                <span class="secN">@total.ToString("N0")건</span>
+            </div>
+
+            @if ((Model == null) || (Model.Count == 0))
+            {
+                <div class="empty">등록된 글이 없습니다.</div>
+            }
+            else
+            {
+                // ✅ 공지 먼저
+                foreach (var p in notices)
+                {
+                    var isNew = (now - p.CreatedAt).TotalHours <= 24;
+                    var cc = TryGetInt(p, "CommentCount") ?? TryGetInt(p, "ReplyCount");
+                    var ac = TryGetInt(p, "AttachmentCount") ?? TryGetInt(p, "FileCount");
+
+                    <a class="nr pin" href="@Url.Action("Details", "ReplayBoard", new { tableName = board.PostTable, id = p.Id })">
+                        <span class="nrNo k">공지</span>
+                        <span class="nrTx">
+                            <span class="nrT">
+                                @if (isNoticeBoard && p.IsPinned) { <span class="tag">고정</span> }
+                                @p.Title
+                                @if (isNew) { <span class="tag line">NEW</span> }
+                            </span>
+                            <span class="nrM">@p.Writer<i>·</i>@p.CreatedAt.ToString("yyyy.MM.dd HH:mm")<i>·</i>조회 @p.ViewCount@if (cc.HasValue && cc.Value > 0) {<i>·</i><text>댓글 @cc.Value</text>}@if (ac.HasValue && ac.Value > 0) {<i>·</i><text>첨부 @ac.Value</text>}</span>
+                        </span>
+                    </a>
+                }
+
+                // ✅ 일반글(역순 번호)
+                int idx = 0;
+                foreach (var p in normals)
+                {
+                    var rowNo = startNo - idx;
+                    idx++;
+
+                    var isNew = (now - p.CreatedAt).TotalHours <= 24;
+                    var cc = TryGetInt(p, "CommentCount") ?? TryGetInt(p, "ReplyCount");
+                    var ac = TryGetInt(p, "AttachmentCount") ?? TryGetInt(p, "FileCount");
+
+                    <a class="nr" href="@Url.Action("Details", "ReplayBoard", new { tableName = board.PostTable, id = p.Id })">
+                        <span class="nrNo">@rowNo.ToString("00")</span>
+                        <span class="nrTx">
+                            <span class="nrT">
+                                @if (isNoticeBoard && p.IsPinned) { <span class="tag">고정</span> }
+                                @p.Title
+                                @if (isNew) { <span class="tag line">NEW</span> }
+                            </span>
+                            <span class="nrM">@p.Writer<i>·</i>@p.CreatedAt.ToString("yyyy.MM.dd HH:mm")<i>·</i>조회 @p.ViewCount@if (cc.HasValue && cc.Value > 0) {<i>·</i><text>댓글 @cc.Value</text>}@if (ac.HasValue && ac.Value > 0) {<i>·</i><text>첨부 @ac.Value</text>}</span>
+                        </span>
+                    </a>
+                }
+            }
+        </section>
+
+        <!-- Paging -->
+        @if (totalPages > 1)
+        {
+            int prevPage = page > 1 ? page - 1 : 1;
+            int nextPage = page < totalPages ? page + 1 : totalPages;
+
+            int win = 3;
+            int start = Math.Max(1, page - win);
+            int end = Math.Min(totalPages, page + win);
+
+            <nav class="pg" aria-label="페이지 이동">
+                <a class="@(page==1 ? "off" : "")" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable, page = 1, pageSize, q })" aria-label="처음">«</a>
+                <a class="@(page==1 ? "off" : "")" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable, page = prevPage, pageSize, q })" aria-label="이전">‹</a>
+                @for (int i = start; i <= end; i++)
+                {
+                    <a class="@(i == page ? "on" : "")" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable, page = i, pageSize, q })">@i</a>
+                }
+                <a class="@(page==totalPages ? "off" : "")" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable, page = nextPage, pageSize, q })" aria-label="다음">›</a>
+                <a class="@(page==totalPages ? "off" : "")" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable, page = totalPages, pageSize, q })" aria-label="끝">»</a>
+            </nav>
+        }
+
+        <div class="ft">
+            <span>© 유년부 · @board.BoardName</span>
+            <span><a href="/Notice/Branch">소통공간</a> · <a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a></span>
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,214 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>퀴즈 유형 선택 — @ChurchName @DepartmentName</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;800&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg: #f4f6fb;
+            --surface: #ffffff;
+            --primary: #4f46e5;
+            --primary-light: #eef2ff;
+            --primary-dark: #3730a3;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 14px;
+            --shadow: 0 4px 20px rgba(0,0,0,.06);
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .page-wrap {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+
+        .quiz-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: var(--radius);
+            padding: 24px 20px;
+            color: #fff;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .quiz-header-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .quiz-header-icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            background: rgba(255,255,255,.18);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+        }
+        .quiz-header h1 {
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .quiz-header-sub {
+            font-size: 13px;
+            color: rgba(255,255,255,.75);
+        }
+
+        .type-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            color: var(--text);
+            transition: all .2s;
+            box-shadow: var(--shadow);
+        }
+        .type-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 6px 24px rgba(79,70,229,.12);
+            transform: translateY(-2px);
+        }
+        .type-card:active {
+            transform: translateY(0);
+        }
+        .type-icon {
+            width: 52px; height: 52px;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 26px;
+            flex-shrink: 0;
+        }
+        .type-icon-obj { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+        .type-icon-sub { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .type-icon-ox  { background: linear-gradient(135deg, #ec4899, #db2777); }
+
+        .type-info h3 {
+            font-size: 17px;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+        .type-info p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .type-arrow {
+            margin-left: auto;
+            font-size: 18px;
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .nav-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .btn-nav {
+            flex: 1;
+            padding: 12px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            transition: all .2s;
+        }
+        .btn-nav:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        @@media (max-width: 480px) {
+            .page-wrap { padding: 10px; }
+            .quiz-header { padding: 20px 16px; border-radius: 12px; }
+            .type-card { padding: 16px; }
+            .type-icon { width: 46px; height: 46px; font-size: 22px; border-radius: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+    <div class="quiz-header">
+        <div class="quiz-header-top">
+            <div class="quiz-header-icon">🎯</div>
+            <h1>퀴즈 유형 선택</h1>
+        </div>
+        <div class="quiz-header-sub">출제할 퀴즈 유형을 선택해 주세요</div>
+    </div>
+
+    <a class="type-card" href="/Question/CreateQuizBlank?QuestionType=o&WhenDate=@ViewBag.WhenDate">
+        <div class="type-icon type-icon-obj">📋</div>
+        <div class="type-info">
+            <h3>객관식 퀴즈</h3>
+            <p>4개의 보기 중 정답을 선택하는 문제</p>
+        </div>
+        <div class="type-arrow">→</div>
+    </a>
+
+    @* 주관식, OX 퀴즈 — 필요시 주석 해제
+    <a class="type-card" href="/Question/CreateQuizBlank?QuestionType=s&WhenDate=@ViewBag.WhenDate">
+        <div class="type-icon type-icon-sub">✍️</div>
+        <div class="type-info">
+            <h3>주관식 퀴즈</h3>
+            <p>직접 답을 입력하는 서술형 문제</p>
+        </div>
+        <div class="type-arrow">→</div>
+    </a>
+
+    <a class="type-card" href="/Question/CreateQuizBlank?QuestionType=a&WhenDate=@ViewBag.WhenDate">
+        <div class="type-icon type-icon-ox">⭕</div>
+        <div class="type-info">
+            <h3>O/X 퀴즈</h3>
+            <p>맞다 또는 틀리다를 판단하는 문제</p>
+        </div>
+        <div class="type-arrow">→</div>
+    </a>
+    *@
+
+    <div class="nav-row">
+        <a class="btn-nav" href="/">🏠 홈</a>
+        <a class="btn-nav" href="/Question/Index">📅 퀴즈달력</a>
+        <a class="btn-nav" href="#" onclick="window.history.back(); return false;">← 뒤로</a>
+    </div>
+
+</div>
+
+</body>
+</html>

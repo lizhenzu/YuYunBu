@@ -1,0 +1,798 @@
+﻿@model IEnumerable<BulletinBoard.Models.AwardItem>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var UserId = HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    List<AwardBase> _AwardBase = ViewBag._AwardBase as List<AwardBase>;
+
+    var option = (ViewBag.ProductDisplayOpton + "").Trim();
+    var optionLower = option.ToLowerInvariant();
+
+    bool isChallenge = optionLower == ProductDisplayOpton.challengeMissionBible.ToString().ToLowerInvariant();
+    bool isBirth = optionLower == ProductDisplayOpton.birth.ToString().ToLowerInvariant();
+    bool isNewComer = optionLower == ProductDisplayOpton.newComer.ToString().ToLowerInvariant();
+
+    string pageTitle =
+        isChallenge ? @ConstatsCommon.MainKeyTitle :
+        isBirth ? "생일 선물" :
+        isNewComer ? "새친구 선물" :
+        "선물 목록";
+
+    string heroTitle =
+        isChallenge ? $"{@ConstatsCommon.MainKeyTitle} 선물 컬렉션" :
+        isBirth ? "생일 선물 컬렉션" :
+        isNewComer ? "새친구 환영 선물 컬렉션" :
+        "선물 컬렉션";
+
+    string heroSubText =
+        isChallenge
+            ? $"포인트를 쌓으면 ‘{@ConstatsCommon.MainKeyTitle}’ 화면에서 선물을 선택할 수 있어요."
+            : isBirth
+                ? "생일이 다가오면 여기서 선물을 선택할 수 있어요. 바뀌면 다시 선택도 가능해요."
+                : isNewComer
+                    ? "처음 온 친구들을 위한 환영 선물이에요. 안내에 따라 선택하거나 구경할 수 있어요."
+                    : "원하는 선물을 미리 확인해 보세요.";
+
+    bool showChallengeUnlockGuide = isChallenge;
+    bool showPointChip = isChallenge;
+    bool showMissionNav = isChallenge;
+
+    string returnUrl = (Context?.Request?.Path ?? "/") + (Context?.Request?.QueryString.ToString() ?? "");
+    var safeReturnUrl = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl;
+
+    // 테마 키(완전 새 디자인)
+    string themeKey = isChallenge ? "challenge" : isBirth ? "birth" : isNewComer ? "newcomer" : "default";
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    // ✅ 변경: 상세는 이제 "아무나" 가능
+    bool canOpenDetail = true;
+
+    string productDisplayOpton = optionLower;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+
+    <style>
+        /* =========================================================
+                                   Present List - Brand New UI (2026)
+                                   - 기존 디자인 전부 무시
+                                   - 밝고 프리미엄한 "스토어" 느낌
+                                   - 히어로 + 스티키 탭 + 카드(데스크탑) / 1열(모바일)
+                                   ========================================================= */
+
+        :root {
+            --max: 1180px;
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --text: #0f172a;
+            --muted: rgba(15,23,42,.62);
+            --line: rgba(15,23,42,.10);
+            --shadow: 0 18px 55px rgba(15,23,42,.10);
+            --shadow2: 0 10px 26px rgba(15,23,42,.08);
+            --r0: 22px;
+            --r1: 16px;
+            --r2: 12px;
+            /* theme vars will be overridden by [data-theme] */
+            --accent: #2563eb;
+            --accent2: #22c55e;
+            --accentSoft: rgba(37,99,235,.10);
+            --badge: rgba(37,99,235,.12);
+        }
+
+        /* themes */
+        body[data-theme="challenge"] {
+            --accent: #0ea5e9;
+            --accent2: #f59e0b;
+            --accentSoft: rgba(14,165,233,.10);
+            --badge: rgba(245,158,11,.14);
+        }
+
+        body[data-theme="birth"] {
+            --accent: #ec4899;
+            --accent2: #22c55e;
+            --accentSoft: rgba(236,72,153,.10);
+            --badge: rgba(34,197,94,.14);
+        }
+
+        body[data-theme="newcomer"] {
+            --accent: #22c55e;
+            --accent2: #0ea5e9;
+            --accentSoft: rgba(34,197,94,.10);
+            --badge: rgba(14,165,233,.14);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(1200px 500px at 10% 0%, rgba(14,165,233,.10), transparent 60%), radial-gradient(900px 420px at 90% 10%, rgba(34,197,94,.10), transparent 55%), radial-gradient(900px 520px at 45% 95%, rgba(245,158,11,.08), transparent 60%), var(--bg);
+            color: var(--text);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .container {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 18px 14px 44px;
+        }
+
+        /* Top app bar */
+        .appbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 6px 14px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 200px;
+        }
+
+        .logoDot {
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            box-shadow: 0 10px 22px rgba(0,0,0,.12);
+        }
+
+        .brandText {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+        .brandTitle {
+            font-weight: 1000;
+            letter-spacing: -.02em;
+        }
+
+        .brandSub {
+            font-size: .84rem;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .quickActions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .qbtn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.72);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow2);
+            text-decoration: none;
+            font-weight: 950;
+            color: rgba(15,23,42,.88);
+            transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+            white-space: nowrap;
+        }
+
+            .qbtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 18px 45px rgba(15,23,42,.12);
+                background: rgba(255,255,255,.90);
+            }
+
+        /* Hero */
+        .hero {
+            border-radius: calc(var(--r0) + 8px);
+            background: linear-gradient(135deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+            border: 1px solid rgba(255,255,255,.50);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .heroInner {
+            padding: 18px 16px 14px;
+            display: grid;
+            gap: 12px;
+        }
+
+        .heroTop {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            background: var(--badge);
+            border: 1px solid rgba(15,23,42,.10);
+            font-weight: 1100;
+            letter-spacing: -.01em;
+        }
+
+            .tag .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--accent), var(--accent2));
+            }
+
+        .heroTitle {
+            margin: 0;
+            font-size: 1.55rem;
+            font-weight: 1150;
+            letter-spacing: -.02em;
+        }
+
+        .heroSub {
+            margin: 0;
+            color: var(--muted);
+            font-weight: 850;
+            line-height: 1.55;
+        }
+
+        .noticeRow {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.04);
+            border: 1px solid rgba(15,23,42,.10);
+            font-weight: 950;
+            font-size: .86rem;
+            color: rgba(15,23,42,.78);
+            white-space: nowrap;
+        }
+
+            .pill.accent {
+                background: var(--accentSoft);
+                border-color: rgba(15,23,42,.08);
+            }
+
+        /* Unlock guide */
+        .unlock {
+            border-radius: var(--r0);
+            border: 1px solid rgba(15,23,42,.10);
+            background: linear-gradient(180deg, rgba(15,23,42,.02), rgba(15,23,42,.00));
+            padding: 12px 12px;
+        }
+
+        .unlockTitle {
+            margin: 0 0 8px;
+            font-weight: 1100;
+            letter-spacing: -.01em;
+        }
+
+        .unlockList {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0;
+            margin: 0;
+            list-style: none;
+        }
+
+            .unlockList li {
+                padding: 7px 10px;
+                border-radius: 999px;
+                background: rgba(255,255,255,.85);
+                border: 1px solid rgba(15,23,42,.10);
+                font-weight: 1000;
+                color: rgba(15,23,42,.82);
+                box-shadow: 0 10px 22px rgba(15,23,42,.06);
+                white-space: nowrap;
+            }
+
+        /* Sticky tab bar */
+        .tabs {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            margin-top: 14px;
+            padding: 10px 0;
+            backdrop-filter: blur(10px);
+            background: linear-gradient(180deg, rgba(245,247,251,.92), rgba(245,247,251,.62));
+            border-bottom: 1px solid rgba(15,23,42,.08);
+        }
+
+        .tabsInner {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 0 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tabGroup {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.80);
+            box-shadow: 0 10px 22px rgba(15,23,42,.06);
+            text-decoration: none;
+            font-weight: 1050;
+            color: rgba(15,23,42,.86);
+            transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+            white-space: nowrap;
+        }
+
+            .tab:hover {
+                transform: translateY(-1px);
+                background: rgba(255,255,255,.95);
+                box-shadow: 0 18px 45px rgba(15,23,42,.10);
+            }
+
+            .tab.active {
+                border-color: rgba(15,23,42,.12);
+                background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,255,255,.78));
+                box-shadow: 0 18px 45px rgba(15,23,42,.12);
+            }
+
+            .tab .miniDot {
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--accent), var(--accent2));
+            }
+
+        /* Count + permission */
+        .rightInfo {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.72);
+            font-weight: 1050;
+            color: rgba(15,23,42,.82);
+            white-space: nowrap;
+        }
+
+        /* Grid */
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid rgba(15,23,42,.10);
+            border-radius: var(--r0);
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+            transition: transform .14s ease, box-shadow .14s ease;
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 22px 60px rgba(15,23,42,.12);
+            }
+
+        .thumbWrap {
+            position: relative;
+            background: linear-gradient(180deg, rgba(15,23,42,.02), rgba(15,23,42,.00));
+            padding: 12px;
+        }
+
+        .thumb {
+            border-radius: calc(var(--r0) - 6px);
+            overflow: hidden;
+            border: 1px solid rgba(15,23,42,.10);
+            background: #eef2ff;
+            aspect-ratio: 1/1;
+            box-shadow: 0 12px 28px rgba(15,23,42,.08);
+            display: block;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform .14s ease, filter .14s ease;
+        }
+
+            .thumb img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+        .thumbWrap:hover .thumb {
+            transform: translateY(-1px);
+            filter: brightness(1.02);
+        }
+
+        .overlayTop {
+            position: absolute;
+            left: 18px;
+            top: 18px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            z-index: 2;
+        }
+
+        .badge2 {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.88);
+            font-weight: 1100;
+            font-size: .82rem;
+            color: rgba(15,23,42,.82);
+            white-space: nowrap;
+        }
+
+            .badge2.accent {
+                background: var(--accentSoft);
+                border-color: rgba(15,23,42,.08);
+            }
+
+        /* ✅ 이미지 클릭 안내 메시지 */
+        .thumbHint {
+            position: absolute;
+            left: 50%;
+            bottom: 14px;
+            transform: translateX(-50%);
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.86);
+            color: #fff;
+            font-weight: 1050;
+            font-size: .84rem;
+            box-shadow: 0 16px 34px rgba(15,23,42,.18);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .14s ease, transform .14s ease;
+            white-space: nowrap;
+        }
+
+        .thumbWrap:hover .thumbHint {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-2px);
+        }
+
+        @@media (hover: none) and (pointer: coarse) {
+            .thumbHint
+
+        {
+            opacity: 1;
+            background: rgba(15,23,42,.74);
+        }
+
+        }
+
+        /* Content */
+        .content {
+            padding: 12px 14px 14px;
+        }
+
+        .chipRow {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .pchip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(255,255,255,.92);
+            box-shadow: 0 10px 22px rgba(15,23,42,.06);
+            max-width: 100%;
+        }
+
+            .pchip.primary {
+                background: linear-gradient(135deg, rgba(255,255,255,.96), rgba(255,255,255,.82));
+            }
+
+            .pchip .k {
+                font-weight: 1100;
+                color: rgba(15,23,42,.78);
+                white-space: nowrap;
+            }
+
+            .pchip .v {
+                font-weight: 1100;
+                color: rgba(15,23,42,.92);
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                max-width: 260px;
+            }
+
+            .pchip.source {
+                background: var(--accentSoft);
+                border-color: rgba(15,23,42,.10);
+            }
+
+                .pchip.source .k {
+                    color: rgba(15,23,42,.70);
+                }
+
+                .pchip.source .v {
+                    color: rgba(15,23,42,.86);
+                }
+
+        .noData {
+            margin-top: 16px;
+            border-radius: var(--r0);
+            padding: 18px 16px;
+            background: rgba(255,255,255,.78);
+            border: 1px solid rgba(15,23,42,.10);
+            box-shadow: var(--shadow2);
+            text-align: center;
+            font-weight: 1100;
+            color: rgba(15,23,42,.80);
+        }
+
+        /* Mobile */
+        @@media (max-width: 980px) {
+            .grid {
+                grid-template-columns: repeat(2, minmax(0,1fr));
+            }
+        }
+
+        @@media (max-width: 560px) {
+            .heroTitle {
+                font-size: 1.28rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .thumbWrap {
+                padding: 10px;
+            }
+
+            .content {
+                padding: 12px 12px 12px;
+            }
+        }
+    </style>
+</head>
+
+<body data-theme="@themeKey">
+    <div class="container">
+
+        <div class="appbar">
+            <div class="brand">
+                <span class="logoDot" aria-hidden="true"></span>
+                <div class="brandText">
+                    <div class="brandTitle">@pageTitle</div>
+                    <div class="brandSub">미리보기 / 안내용 목록</div>
+                </div>
+            </div>
+
+            <div class="quickActions">
+                <a class="qbtn" href="/">🏠 홈</a>
+                @if (showMissionNav)
+                {
+                    <a class="qbtn" href="/DailyMission2/index">📌 @ConstatsCommon.MainKeyTitle</a>
+                }
+            </div>
+        </div>
+
+        <section class="hero" aria-label="상단 안내">
+            <div class="heroInner">
+                <div class="heroTop">
+                    <div class="tag">
+                        <span class="dot" aria-hidden="true"></span>
+                        <span>@heroTitle</span>
+                    </div>
+
+                    <div class="noticeRow">
+                        <span class="pill">👀 이 화면은 구경만 가능</span>
+                        <span class="pill accent">🖱️ 이미지 클릭 시 상세</span>
+                    </div>
+                </div>
+
+                <h1 class="heroTitle">@heroTitle</h1>
+                <p class="heroSub">@heroSubText</p>
+
+                @if (showChallengeUnlockGuide)
+                {
+                    <div class="unlock">
+                        <div class="unlockTitle">✅ 선물 선택 조건(포인트)</div>
+                        <ul class="unlockList">
+                            @foreach (var va in (_AwardBase ?? new List<AwardBase>()))
+                            {
+                                <li>@(va.AwardLevel.ToString("N0"))점</li>
+                            }
+                        </ul>
+
+                        <div style="margin-top:10px; color:rgba(15,23,42,.70); font-weight:900; line-height:1.55;">
+                            위 점수에 도달하면 "<b>@ConstatsCommon.MainKeyTitle</b>" 화면에서 선물을 선택할 수 있어요.
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <div class="tabs" aria-label="카테고리 이동">
+            <div class="tabsInner">
+                <div class="tabGroup">
+                    <a class="tab @(isChallenge ? "active" : "")" href="/Present/ListPresent?productDisplayOpton=display">
+                        <span class="miniDot" aria-hidden="true"></span>📌 @ConstatsCommon.MainKeyTitle
+                    </a>
+
+                    <a class="tab @(isBirth ? "active" : "")" href="/Present/ListPresent?productDisplayOpton=birth">
+                        <span class="miniDot" aria-hidden="true"></span>🎉 생일
+                    </a>
+
+                    <a class="tab @(isNewComer ? "active" : "")" href="/Present/ListPresent?productDisplayOpton=newComer">
+                        <span class="miniDot" aria-hidden="true"></span>🎈 새친구
+                    </a>
+                </div>
+
+                <div class="rightInfo">
+                    <span class="stat">
+                        📦 상품 수:
+                        <b>@(Model?.Count() ?? 0)</b>
+                    </span>
+                    <span class="stat">✅ 상세 보기 가능</span>
+                </div>
+            </div>
+        </div>
+
+        @if (Model == null || !Model.Any())
+        {
+            <div class="noData">📭 선물상품 정보가 데이터가 없습니다.</div>
+        }
+        else
+        {
+            int loopCount = 1;
+
+            <section class="grid" aria-label="선물 목록">
+                @foreach (var item in Model)
+                {
+                    // 기존 로직 유지: 일반사용자에게 UnitPrice<=0 숨김
+                    if (!isSuperAdmin && item.UnitPrice <= 0)
+                    {
+                        continue;
+                    }
+
+                    <article class="card">
+                        <div class="thumbWrap">
+                            <div class="overlayTop">
+                                @if (showPointChip && !string.IsNullOrWhiteSpace(item.PointRequirement))
+                                {
+                                    <span class="badge2 accent">✨ @item.PointRequirement</span>
+                                }
+                                <span class="badge2">#@loopCount · @item.ProductID</span>
+                            </div>
+
+                            <a class="thumb"
+                               href="/Present/PresentDetail?productId=@item.ProductID&returnUrl=@Uri.EscapeDataString(safeReturnUrl)&productDisplayOpton=@Uri.EscapeDataString(option)"
+                               title="눌러서 상세 보기">
+                                <img src="/images/AwardItem/@(@item.ProductID).jpg"
+                                     alt="상품 이미지"
+                                     loading="lazy"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                            </a>
+
+                            <div class="thumbHint">🖱️ 눌러서 상세 보기</div>
+                        </div>
+
+                        <div class="content">
+                            <div class="chipRow">
+                                <span class="pchip primary" title="@item.ProductName">
+                                    <span class="k">🎁 상품</span>
+                                    <span class="v">@item.ProductName</span>
+                                </span>
+
+                                @if (isSuperAdmin)
+                                {
+                                <span class="pchip primary" title="@item.ProductName">
+                                    <span class="k">🎁 가격 </span>
+                                        <span class="v">@item.UnitPrice.ToString("N0")</span>
+                                </span>
+                                }
+                                <span class="pchip source" title="@item.SourceType">
+                                    <span class="k">🏷️ Source</span>
+                                    <span class="v">@item.SourceType</span>
+                                </span>
+                            </div>
+                        </div>
+                    </article>
+
+                    loopCount++;
+                }
+            </section>
+        }
+
+        <div style="margin-top:18px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+            <a class="qbtn" href="/">🏠 홈으로</a>
+            @if (showMissionNav)
+            {
+                <a class="qbtn" href="/Home/MissionMainBoard">📌 @ConstatsCommon.MainKeyTitle</a>
+            }
+        </div>
+
+    </div>
+</body>
+</html>

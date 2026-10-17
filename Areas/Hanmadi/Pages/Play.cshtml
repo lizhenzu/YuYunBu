@@ -1,0 +1,294 @@
+@page "/hanmadi/play/{code}"
+@model BulletinBoard.Areas.Hanmadi.Pages.PlayModel
+@{
+    Layout = null;
+    ViewData["Title"] = "한마디";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>한마디</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f1f5f9; color: #0f172a;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .waiting {
+    text-align: center;
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 22px; padding: 48px 32px;
+    max-width: 360px; width: 100%;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+    flex-direction: column; align-items: center;
+  }
+  .waiting .icon { font-size: 52px; margin-bottom: 16px; display: block;
+    animation: pulse 2s ease-in-out infinite; }
+  @@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  .waiting h2 { font-size: 20px; font-weight: 900; color: #1e293b; margin-bottom: 8px; }
+  .waiting p  { font-size: 14px; color: #94a3b8; }
+
+  .q-wrap { width: 100%; max-width: 480px; }
+  .q-card {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 20px; padding: 26px 22px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+  }
+  .q-type {
+    font-size: 11px; font-weight: 700; color: #6366f1;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .q-title { font-size: 19px; font-weight: 400; line-height: 1.4; color: #0f172a; margin-bottom: 20px; white-space: pre-wrap; }
+
+  textarea {
+    width: 100%; padding: 12px 14px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: 12px; color: #0f172a;
+    font-size: 15px; resize: none; min-height: 80px;
+    font-family: inherit; outline: none; transition: border-color .2s;
+  }
+  textarea:focus { border-color: #6366f1; background: #fff; }
+
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt-btn {
+    padding: 13px 16px; border-radius: 12px;
+    border: 1.5px solid #e2e8f0; background: #f8fafc;
+    color: #334155; font-size: 14px; font-weight: 600;
+    text-align: left; cursor: pointer; transition: all .15s;
+  }
+  .opt-btn:hover { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+  .opt-btn.selected { border-color: #6366f1; background: #ede9fe; color: #4f46e5; font-weight: 700; }
+
+  .scale-row { display: flex; gap: 8px; justify-content: center; }
+  .scale-btn {
+    width: 54px; height: 54px; border-radius: 14px;
+    border: 1.5px solid #e2e8f0; background: #f8fafc;
+    color: #334155; font-size: 20px; font-weight: 900;
+    cursor: pointer; transition: all .15s;
+  }
+  .scale-btn:hover  { border-color: #6366f1; background: #ede9fe; color: #4f46e5; }
+  .scale-btn.selected { border-color: #6366f1; background: #6366f1; color: #fff; }
+
+  .submit-btn {
+    width: 100%; padding: 14px; border-radius: 12px;
+    font-size: 15px; font-weight: 700; cursor: pointer; border: none;
+    background: #6366f1; color: #fff; margin-top: 18px;
+    transition: background .15s;
+  }
+  .submit-btn:hover { background: #4f46e5; }
+  .submit-btn:disabled { background: #c7d2fe; cursor: not-allowed; }
+
+  .closed-bar {
+    background: #fef2f2; border: 1px solid #fecaca;
+    border-radius: 10px; padding: 10px 14px;
+    color: #dc2626; font-size: 13px; font-weight: 700;
+    margin-bottom: 14px; text-align: center; display: none;
+  }
+
+  .done-card {
+    text-align: center;
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 22px; padding: 40px 32px;
+    max-width: 380px; width: 100%;
+    box-shadow: 0 4px 20px rgba(0,0,0,.06);
+    display: none;
+    flex-direction: column; align-items: center;
+  }
+  .done-card .icon { font-size: 56px; margin-bottom: 14px; display: block; }
+  .done-card h2 { font-size: 20px; font-weight: 900; color: #16a34a; margin-bottom: 8px; }
+  .done-card p  { font-size: 14px; color: #94a3b8; margin-bottom: 24px; }
+  .nav-btns { display: flex; flex-direction: column; gap: 10px; }
+  .nav-btn {
+    display: block; padding: 13px 16px; border-radius: 12px;
+    font-size: 14px; font-weight: 700; text-decoration: none;
+    text-align: center; transition: all .15s;
+  }
+  .nav-btn-result { background: #6366f1; color: #fff; }
+  .nav-btn-result:hover { background: #4f46e5; }
+  .nav-btn-home { background: #f1f5f9; color: #475569; border: 1.5px solid #e2e8f0; }
+  .nav-btn-home:hover { background: #ede9fe; color: #5b5bd6; border-color: #c4b5fd; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1e293b; color: #f8fafc;
+    padding: 10px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    opacity: 0; transition: opacity .3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="waiting" class="waiting" style="display:@(Model.HasActiveQuestion ? "none" : "flex")">
+  <span class="icon">⏳</span>
+  <h2>잠시 기다려주세요</h2>
+  <p>출제자가 문항을 준비 중이에요</p>
+</div>
+
+<div id="q-wrap" class="q-wrap" style="display:@(Model.HasActiveQuestion ? "block" : "none")">
+  <div id="closed-bar" class="closed-bar">⛔ 이 문항은 마감되었습니다</div>
+  <div class="q-card">
+    <div class="q-type" id="q-type"></div>
+    <div class="q-title" id="q-title"></div>
+    <div id="q-input"></div>
+    <button class="submit-btn" id="submit-btn" onclick="submitAnswer()">제출하기</button>
+  </div>
+</div>
+
+<div id="done-card" class="done-card">
+  <span class="icon">✅</span>
+  <h2>제출 완료!</h2>
+  <p>다음 문항을 기다려주세요</p>
+  <div class="nav-btns">
+    <a id="result-link" href="/hanmadi/results/@Model.Code" class="nav-btn nav-btn-result">📊 실시간 결과 보기</a>
+    <a href="/hanmadi" class="nav-btn nav-btn-home">🏠 홈으로 돌아가기</a>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/lib/signalr/signalr.min.js"></script>
+<script>
+const CODE  = "@Model.Code";
+const TOKEN = getCookie("hm_token_" + CODE) || "";
+const typeNames = { 1:"💬 단답형", 2:"☑️ 객관식", 3:"⭐ 척도", 4:"📝 자유서술" };
+
+let currentQ = null, selectedOpt = null, selectedScale = null, answered = false;
+
+const conn = new signalR.HubConnectionBuilder()
+  .withUrl("/hanmadi-hub").withAutomaticReconnect().build();
+
+conn.on("QuestionOpened", q => {
+  currentQ = q; answered = false; selectedOpt = null; selectedScale = null;
+  renderQuestion(q);
+  show("q-wrap"); hide("waiting"); hide("done-card");
+  document.getElementById("closed-bar").style.display = "none";
+  enableSubmit(true);
+});
+
+conn.on("QuestionClosed", id => {
+  if (currentQ?.id === id) {
+    show("closed-bar");
+    enableSubmit(false);
+  }
+});
+
+conn.on("AnswerAccepted", () => {
+  answered = true;
+  hide("q-wrap");
+  show("done-card", "flex");
+  // 방금 답한 문항 ID를 결과 링크에 붙임
+  if (currentQ) {
+    const link = document.getElementById("result-link");
+    if (link) link.href = "/hanmadi/results/" + CODE + "?q=" + currentQ.id;
+  }
+});
+
+conn.on("SessionEnded", () => {
+  const code = CODE;
+  document.body.innerHTML = `
+    <div style="text-align:center;padding:48px 24px;font-family:-apple-system,sans-serif;
+                color:#0f172a;background:#f1f5f9;min-height:100vh;
+                display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0">
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:22px;padding:40px 32px;
+                  max-width:380px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.06)">
+        <div style="font-size:52px;margin-bottom:14px">🙏</div>
+        <h2 style="font-size:20px;font-weight:900;margin-bottom:8px;color:#1e293b">세션이 종료되었습니다</h2>
+        <p style="font-size:14px;color:#94a3b8;margin-bottom:24px">참여해주셔서 감사합니다!</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <a href="/hanmadi/results/${code}"
+             style="display:block;padding:13px 16px;border-radius:12px;font-size:14px;font-weight:700;
+                    text-decoration:none;text-align:center;background:#6366f1;color:#fff">
+            📊 실시간 결과 보기
+          </a>
+          <a href="/hanmadi"
+             style="display:block;padding:13px 16px;border-radius:12px;font-size:14px;font-weight:700;
+                    text-decoration:none;text-align:center;background:#f1f5f9;color:#475569;
+                    border:1.5px solid #e2e8f0">
+            🏠 홈으로 돌아가기
+          </a>
+        </div>
+      </div>
+    </div>`;
+});
+
+conn.on("Error", msg => toast(msg));
+
+conn.start().then(() => conn.invoke("JoinSession", CODE, TOKEN));
+
+function renderQuestion(q) {
+  document.getElementById("q-type").textContent  = typeNames[q.type] || "";
+  document.getElementById("q-title").textContent = q.title;
+  const inp = document.getElementById("q-input");
+  inp.innerHTML = "";
+
+  if (q.type === 1 || q.type === 4) {
+    const ta = document.createElement("textarea");
+    ta.placeholder = q.type === 1 ? "한 단어나 짧은 문장으로 입력하세요" : "자유롭게 작성하세요";
+    ta.id = "text-input";
+    inp.appendChild(ta);
+  } else if (q.type === 2) {
+    const div = document.createElement("div"); div.className = "options";
+    (q.options||[]).forEach(opt => {
+      const btn = document.createElement("button");
+      btn.className = "opt-btn"; btn.textContent = opt.text;
+      btn.onclick = () => {
+        document.querySelectorAll(".opt-btn").forEach(b=>b.classList.remove("selected"));
+        btn.classList.add("selected"); selectedOpt = opt.id;
+      };
+      div.appendChild(btn);
+    });
+    inp.appendChild(div);
+  } else if (q.type === 3) {
+    const row = document.createElement("div"); row.className = "scale-row";
+    for (let i=1;i<=5;i++) {
+      const btn = document.createElement("button");
+      btn.className="scale-btn"; btn.textContent=i;
+      const v=i;
+      btn.onclick=()=>{
+        document.querySelectorAll(".scale-btn").forEach(b=>b.classList.remove("selected"));
+        btn.classList.add("selected"); selectedScale=v;
+      };
+      row.appendChild(btn);
+    }
+    inp.appendChild(row);
+  }
+}
+
+function submitAnswer() {
+  if (!currentQ||answered) return;
+  let rawText=null,scaleValue=null,optionIds=null;
+  if (currentQ.type===1||currentQ.type===4) {
+    rawText = document.getElementById("text-input")?.value?.trim()||"";
+    if (!rawText) { toast("답변을 입력해주세요"); return; }
+  } else if (currentQ.type===2) {
+    if (!selectedOpt) { toast("선택지를 골라주세요"); return; }
+    optionIds = JSON.stringify([selectedOpt]);
+  } else if (currentQ.type===3) {
+    if (!selectedScale) { toast("점수를 선택해주세요"); return; }
+    scaleValue = selectedScale;
+  }
+  enableSubmit(false);
+  conn.invoke("SubmitAnswer", currentQ.id, TOKEN, rawText||"", scaleValue, optionIds);
+}
+
+function enableSubmit(on) { document.getElementById("submit-btn").disabled = !on; }
+function show(id, d) { document.getElementById(id).style.display = d || "block"; }
+function hide(id)    { document.getElementById(id).style.display = "none"; }
+function toast(msg) {
+  const el=document.getElementById("toast");
+  el.textContent=msg; el.classList.add("show");
+  setTimeout(()=>el.classList.remove("show"),2500);
+}
+function getCookie(name) {
+  return document.cookie.split("; ").find(r=>r.startsWith(name+"="))?.split("=")[1]||"";
+}
+</script>
+</body>
+</html>

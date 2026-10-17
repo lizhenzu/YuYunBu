@@ -1,0 +1,56 @@
+﻿@inject IAuthService AuthService
+
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Common
+@model BulletinBoard.Models.TodayCollectWeeklyWordToReadContainer
+
+@{
+    bool imageExits = false;
+
+
+
+     @foreach (UploadData uploadData in Model.todayCollectWeeklyWordToRead.UploadDatas)
+    {
+        string[] words = uploadData.URLData.Split('.');
+        string fileExt = words[words.Length - 1];
+        string fileName = words[words.Length - 2];
+        string guid = Guid.NewGuid().ToString();
+        if (@uploadData.checkData && uploadData.CategoryData == Model.category.ToString())
+        {
+            if (fileExt.ToLower() == "jpeg" || fileExt.ToLower() == "jpg" || fileExt.ToLower() == "webp" || fileExt.ToLower() == "gif" || fileExt.ToLower() == "png")
+            {
+                imageExits = true;
+            }
+        }
+    }
+
+}
+
+@if (imageExits)
+{
+    <p class="muted">(아래 사진을 누르면 큰 사진을 볼 수 있어요.)</p>
+}
+
+
+<div class="gallery" role="list">
+    @foreach (UploadData uploadData in Model.todayCollectWeeklyWordToRead.UploadDatas)
+    {
+        string[] words = uploadData.URLData.Split('.');
+        string fileExt = words[words.Length - 1];
+        string fileName = words[words.Length - 2];
+        string guid = Guid.NewGuid().ToString();
+
+        if (@uploadData.checkData && uploadData.CategoryData == Model.category.ToString())
+        {
+            if (fileExt.ToLower() == "jpeg" || fileExt.ToLower() == "jpg" || fileExt.ToLower() == "webp" || fileExt.ToLower() == "gif" || fileExt.ToLower() == "png")
+            {
+                <figure class="thumb" role="listitem">
+                    <img src="@uploadData.URLData" alt="관련 이미지 2" loading="lazy" data-full="@uploadData.URLData">
+                </figure>
+@*                <img src="" alt="Your Image Description" class="thumbnail" id="@guid" onclick="openImageModal(this.src)" />*@
+            }
+        }
+    }
+</div>
+

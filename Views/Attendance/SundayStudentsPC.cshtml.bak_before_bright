@@ -1,0 +1,322 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Linq
+@model BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentsVM
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css) · 인쇄하면 흰 종이만 A4 가로
+    // 주일 출결 보고서 (PC) — 학년별 요약 + 반 블록(학년별 세로 3줄)
+    ViewData["AttTab"] = "more";
+
+    var sunday = Model.SundayDate.Date;
+    var dateStr = sunday.ToString("yyyy-MM-dd");
+
+    var classes = Model.Classes ?? new();
+    var allStudents = classes.SelectMany(c => c.Students ?? new()).ToList();
+    int totalStudents = allStudents.Count;
+    int presentStudents = allStudents.Count(s => s.IsPresent);
+    int absentStudents = totalStudents - presentStudents;
+    int Pct(int p, int t) => t == 0 ? 0 : (int)Math.Round(p * 100.0 / t);
+
+    // ✅ 출석률 분모(올해 누적 주일 수)
+    var denom = (Model.WeeksCount <= 0) ? 1 : Model.WeeksCount;
+
+    // 학년별 요약
+    var byYear = classes
+        .GroupBy(c => c.ClassYear)
+        .OrderBy(g => g.Key)
+        .Select(g => new
+        {
+            Year = g.Key,
+            Classes = g.OrderBy(x => x.ClassBan).ToList(),
+            Total = g.SelectMany(x => x.Students ?? new()).Count(),
+            Present = g.SelectMany(x => x.Students ?? new()).Count(s => s.IsPresent)
+        })
+        .ToList();
+
+    // ✅ 학생별 올해 출석률
+    int RateOf(BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentRowVM s)
+    {
+        if (s == null) return 0;
+        var rate = (int)Math.Round((s.YearPresentCount / (double)denom) * 100.0);
+        return Math.Max(0, Math.Min(100, rate));
+    }
+    // 기존 학생 → 출석률 % / 새친구 1~4회 → "새 N회" / 새친구 5회 이상 → 출석률 %
+    bool IsFresh(BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentRowVM s) => s.IsNewComer && s.NewComerVisitCount < 5;
+    string RateText(BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentRowVM s) => IsFresh(s) ? $"새 {s.NewComerVisitCount}회" : $"{RateOf(s)}%";
+    string RateCss(BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentRowVM s)
+    {
+        if (IsFresh(s)) return "nw";
+        var r = RateOf(s);
+        return r >= 80 ? "g" : (r >= 50 ? "m" : "b");
+    }
+
+    // ==========================================================
+    // ✅ 주일 고르기: 올해(=Model 연도) 주일 중 미래 주일 제외
+    // ==========================================================
+    var year = sunday.Year;
+    var yearStart = new DateTime(year, 1, 1);
+    var yearEnd = new DateTime(year, 12, 31);
+    var lastSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    var maxAllowedSunday = (lastSunday < yearStart) ? yearStart : (lastSunday > yearEnd ? yearEnd : lastSunday);
+    int daysToSunday = ((int)DayOfWeek.Sunday - (int)yearStart.DayOfWeek + 7) % 7;
+    var firstSunday = yearStart.AddDays(daysToSunday);
+    var sundayList = Enumerable.Range(0, 60)
+        .Select(i => firstSunday.AddDays(7 * i))
+        .TakeWhile(d => d <= maxAllowedSunday)
+        .OrderByDescending(d => d)
+        .ToList();
+    bool atLatest = sunday >= lastSunday;
+    string Self(DateTime d) => $"/Attendance/SundayStudentsPC?sunday={d:yyyy-MM-dd}";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    @* 휴대폰에서도 데스크탑 모습 그대로 — 종이 한 장을 통째로 펼쳐 보고, 손가락으로 확대 *@
+    <title>주일 출결 보고서 · @sunday.ToString("M월 d일")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .sh { max-width: 1080px; }
+        .hd .sh { padding-top: 16px; padding-bottom: 22px; }
+        .row1 { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+        .row1 .hdK { margin-top: 0; }
+        .row1 .hdT { margin-top: 4px; font-size: 28px; }
+        .dn { display: flex; align-items: center; gap: 6px; }
+        .dn a, .dn span.off { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #3A3C40; color: var(--headk); font-family: "Inter", sans-serif; font-size: 18px; }
+        .dn a:hover { border-color: var(--headk); }
+        .dn span.off { opacity: .3; }
+        .dn select { height: 38px; padding: 0 12px; background: #1F2125; color: var(--headtx); border: 1px solid #3A3C40; font-family: "Inter", sans-serif; font-size: 14px; border-radius: 0; cursor: pointer; }
+        .st { display: flex; gap: 28px; margin-top: 18px; flex-wrap: wrap; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+        .st .lo b { color: #E08A72; }
+        .acts { display: flex; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+        .acts a, .acts button { font-family: inherit; font-size: 13px; padding: 9px 14px; border: 1px solid #3A3C40; background: none; color: var(--headtx); cursor: pointer; }
+        .acts a:hover, .acts button:hover { border-color: var(--headk); color: var(--headk); }
+        .acts .pri { background: var(--headk); border-color: var(--headk); color: #16181C; font-weight: 600; }
+        .acts .pri:hover { color: #16181C; }
+
+        /* 보고서 종이 */
+        .paper { background: var(--card); border: 1px solid var(--rule); margin: 22px 0 30px; padding: 30px 32px 26px; }
+        .pH { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid var(--tx); flex-wrap: wrap; }
+        .pH .org { font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .24em; color: var(--acc); font-weight: 600; }
+        .pH h2 { margin: 4px 0 0; font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 24px; }
+        .pH .dt { font-family: "Noto Serif KR", serif; font-size: 15px; color: var(--dim2); text-align: right; }
+        .pH .dt small { display: block; font-family: "Gothic A1", sans-serif; font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+        .pK { font-family: "Inter", sans-serif; font-size: 10.5px; letter-spacing: .2em; color: var(--acc); font-weight: 600; margin-top: 22px; }
+        .pT { font-family: "Noto Serif KR", serif; font-size: 17px; margin: 2px 0 10px; }
+
+        .sumW { overflow-x: auto; }
+        table.sum { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+        .sum th, .sum td { padding: 9px 10px; text-align: center; border-bottom: 1px solid var(--line); font-size: 14px; white-space: nowrap; }
+        .sum thead th { font-size: 12px; font-weight: 600; color: var(--dim); border-bottom: 1px solid var(--tx); }
+        .sum td:first-child, .sum th:first-child { text-align: left; color: var(--dim2); font-size: 13px; width: 90px; }
+        .sum .tot { background: var(--mark); font-weight: 600; }
+        .sum .ok { color: var(--ok); font-weight: 600; }
+        .sum .x { color: var(--danger); }
+        .sum .bar { display: inline-block; width: 60px; height: 4px; background: var(--line); vertical-align: middle; margin-left: 8px; }
+        .sum .bar i { display: block; height: 4px; background: var(--ok); }
+
+        .cols { display: grid; grid-template-columns: repeat(var(--yc), minmax(0, 1fr)); gap: 18px; align-items: start; }
+        .gH { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px; border-bottom: 1px solid var(--tx); }
+        .gH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 16px; }
+        .gH span { font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim2); }
+        .gH span em { font-style: normal; color: var(--ok); font-weight: 600; font-size: 14px; }
+        .blk { margin-top: 12px; border: 1px solid var(--rule); break-inside: avoid; page-break-inside: avoid; }
+        .bH { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 8px 10px; background: var(--bg); border-bottom: 1px solid var(--rule); }
+        .bH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 14.5px; white-space: nowrap; }
+        .bH small { font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .s1 { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+        .s1:last-child { border-bottom: 0; }
+        .s1 .no { width: 16px; flex: none; font-family: "Inter", sans-serif; font-size: 11px; color: var(--dim); text-align: right; }
+        .s1 .nm { flex: 1; min-width: 0; color: var(--dim2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .s1.on .nm { color: var(--tx); font-weight: 600; }
+        .s1 .r { flex: none; font-family: "Inter", sans-serif; font-size: 11px; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+        .r.g { color: var(--ok); } .r.m { color: var(--dim2); } .r.b { color: var(--danger); }
+        .r.nw { color: #fff; background: var(--acc); padding: 1px 5px; font-family: "Gothic A1", sans-serif; font-weight: 600; min-width: 0; }
+        .s1 .mk { flex: none; width: 14px; height: 14px; border-radius: 50%; margin: 0 3px; }
+        .s1.on .mk { background: var(--ok); } /* 출석 = 색 동그라미 · 결석 = 빈칸 */
+        .bF { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--rule); font-size: 12px; color: var(--dim2); font-variant-numeric: tabular-nums; }
+        .bF b { color: var(--ok); font-family: "Inter", sans-serif; font-size: 14px; font-weight: 600; }
+        .bF .x { color: var(--danger); }
+        .bF .bar { flex: 1; height: 3px; background: var(--line); }
+        .bF .bar i { display: block; height: 3px; background: var(--ok); }
+        .noKid { padding: 10px; font-size: 12.5px; color: var(--dim); }
+
+        .lgd { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--dim); }
+        .lgd i { font-style: normal; }
+        .lgd .on { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--ok); vertical-align: -2px; margin-right: 4px; }
+        .lgd .nwS { color: #fff; background: var(--acc); padding: 1px 5px; font-weight: 600; }
+        .sign { display: flex; justify-content: flex-end; margin-top: 18px; }
+        .sign div { width: 90px; border: 1px solid var(--rule); text-align: center; font-size: 11.5px; color: var(--dim); }
+        .sign div + div { border-left: 0; }
+        .sign div span { display: block; padding: 4px 0; border-bottom: 1px solid var(--rule); background: var(--bg); }
+        .sign div i { display: block; height: 44px; }
+        .none { padding: 40px 0; text-align: center; font-size: 14px; color: var(--dim); }
+
+        /* 인쇄 — 흰 종이만 A4 가로 */
+        @@page { size: A4 landscape; margin: 10mm; }
+        @@media print {
+            :root { --bg: #F7F6F3; --tx: #16181C; --card: #fff; --rule: #DAD6CE; --line: #ECE9E3; --dim: #8A8780; --dim2: #5E5C57; --mark: #EDE5D8; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            body { background: #fff; padding: 0 !important; }
+            .hd, .attTabs { display: none !important; }
+            .sh { max-width: none; padding: 0; }
+            .paper { margin: 0; border: 0; padding: 0; }
+            .cols { grid-template-columns: repeat(var(--yc), minmax(0, 1fr)) !important; gap: 10px; }
+            .pK { margin-top: 12px; }
+            .s1 { padding: 2px 8px; font-size: 12px; }
+            .s1 .mk { width: 11px; height: 11px; }
+            .bH { padding: 4px 8px; }
+            .bF { padding: 4px 8px; }
+            .blk { margin-top: 8px; }
+            .sum th, .sum td { padding: 5px 8px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/AdminTrend3Weeks?date=@dateStr">전체 출석현황</a><span class="sep">›</span>주일 보고서</span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="row1">
+                <div>
+                    <div class="hdK">REPORT · 유년부</div>
+                    <h1 class="hdT">@sunday.ToString("M월 d일") 주일 출결 보고서</h1>
+                </div>
+                <form class="dn" method="get" action="/Attendance/SundayStudentsPC">
+                    <a href="@Self(sunday.AddDays(-7))" aria-label="지난 주일">‹</a>
+                    <select name="sunday" onchange="this.form.submit()" aria-label="주일 고르기">
+                        @if (!sundayList.Contains(sunday)) { <option value="@dateStr" selected>@dateStr</option> }
+                        @foreach (var d in sundayList)
+                        {
+                            var v = d.ToString("yyyy-MM-dd");
+                            <option value="@v" selected="@(v == dateStr ? "selected" : null)">@v</option>
+                        }
+                    </select>
+                    @if (atLatest) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Self(sunday.AddDays(7))" aria-label="다음 주일">›</a> }
+                </form>
+            </div>
+            <div class="st">
+                <div>출석률<b>@(Pct(presentStudents, totalStudents))%</b></div>
+                <div class="k">출석<b>@presentStudents</b></div>
+                <div class="lo">결석<b>@absentStudents</b></div>
+                <div>재적<b>@totalStudents</b></div>
+                <div>반<b>@classes.Count</b></div>
+            </div>
+            <div class="acts">
+                <button type="button" class="pri" onclick="window.print()">인쇄하기</button>
+                <a href="/Attendance/SundayStudentsMobile?sunday=@dateStr">명단 (모바일)</a>
+                <a href="/Attendance/AdminTrendSundayDetail?sunday=@dateStr">반별 출석</a>
+                <a href="/Attendance/Index?date=@dateStr">출석 고치기</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <div class="paper">
+            <div class="pH">
+                <div><div class="org">JAMSIL SAENAE CHURCH</div><h2>잠실새내교회 유년부 출결 보고서</h2></div>
+                <div class="dt">@sunday.ToString("yyyy년 M월 d일") 주일<small>올해 누적 @(denom)주 기준 출석률</small></div>
+            </div>
+
+            @if (!byYear.Any())
+            {
+                <div class="none">이 주일 명단이 없습니다.</div>
+            }
+            else
+            {
+                <div class="pK">SUMMARY</div>
+                <div class="pT">학년별 출석 요약</div>
+                <div class="sumW">
+                    <table class="sum">
+                        <thead>
+                            <tr>
+                                <th>구분</th>
+                                @foreach (var g in byYear) { <th>@(g.Year)학년</th> }
+                                <th class="tot">합계</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>재적</td>
+                                @foreach (var g in byYear) { <td>@g.Total</td> }
+                                <td class="tot">@totalStudents</td>
+                            </tr>
+                            <tr>
+                                <td>출석</td>
+                                @foreach (var g in byYear) { <td class="ok">@g.Present</td> }
+                                <td class="tot ok">@presentStudents</td>
+                            </tr>
+                            <tr>
+                                <td>결석</td>
+                                @foreach (var g in byYear) { <td class="x">@(g.Total - g.Present)</td> }
+                                <td class="tot x">@absentStudents</td>
+                            </tr>
+                            <tr>
+                                <td>출석률</td>
+                                @foreach (var g in byYear)
+                                {
+                                    var gp = Pct(g.Present, g.Total);
+                                    <td>@(gp)%<span class="bar"><i style="width:@(gp)%"></i></span></td>
+                                }
+                                <td class="tot">@(Pct(presentStudents, totalStudents))%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="pK">CLASSES</div>
+                <div class="pT">반별 출결 상황</div>
+                <div class="cols" style="--yc:@byYear.Count">
+                    @foreach (var g in byYear)
+                    {
+                        <div>
+                            <div class="gH"><b>@(g.Year)학년</b><span><em>@g.Present</em> / @(g.Total)명</span></div>
+                            @foreach (var cls in g.Classes)
+                            {
+                                var kids = (cls.Students ?? new()).OrderBy(x => x.VisibleOrder).ToList();
+                                int cp = kids.Count(s => s.IsPresent);
+                                <div class="blk">
+                                    <div class="bH">
+                                        <b>@(cls.ClassBan)반</b>
+                                        <small>@(string.IsNullOrWhiteSpace(cls.TeacherName) ? "담임 미지정" : cls.TeacherName + " 선생님")</small>
+                                    </div>
+                                    @if (kids.Count == 0)
+                                    {
+                                        <div class="noKid">배정된 아이가 없어요.</div>
+                                    }
+                                    @for (int i = 0; i < kids.Count; i++)
+                                    {
+                                        var s = kids[i];
+                                        <div class="s1 @(s.IsPresent ? "on" : "")">
+                                            <span class="no">@(i + 1)</span>
+                                            <span class="nm">@s.StudentName</span>
+                                            <span class="r @RateCss(s)">@RateText(s)</span>
+                                            <span class="mk" aria-label="@(s.IsPresent ? "출석" : "결석")"></span>
+                                        </div>
+                                    }
+                                    <div class="bF">출석 <b>@cp</b><span class="x">결석 @(kids.Count - cp)</span><span class="bar"><i style="width:@(Pct(cp, kids.Count))%"></i></span></div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="lgd">
+                <span><span class="on"></span>출석 · 빈칸 = 결석</span>
+                <span>오른쪽 % = 올해 출석률 (<i style="color:var(--ok)">80% 이상</i> · <i style="color:var(--danger)">50% 미만</i>)</span>
+                <span><i class="nwS">새 2회</i> 새친구 1~4회째</span>
+            </div>
+            <div class="sign"><div><span>담당</span><i></i></div><div><span>부장</span><i></i></div><div><span>교역자</span><i></i></div></div>
+        </div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+</body>
+</html>

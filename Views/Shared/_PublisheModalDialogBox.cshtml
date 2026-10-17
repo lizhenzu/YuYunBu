@@ -1,0 +1,70 @@
+﻿<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<link rel="stylesheet" href="/css/modalDialog.css">
+
+
+<style>
+
+    .textNo {
+        font-size: 20px;
+        text-align: right;
+    }
+
+    .textPhrase {
+        font-size: 20px;
+    }
+
+
+</style>
+<!-- Modal -->
+<div class="modal fade" id="detailsModal_N47474" tabindex="-1" role="dialog" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content" style="width:98% !important;">
+            <div class="modal-header">
+                <h4 class="modal-title" id="dummy">성경말씀</h4>
+                <button type="button" class="close-button" data-dismiss="modal" aria-label="Close">
+                    닫기
+                </button>
+            </div>
+            <div class="modal-body" style="width:98%;">
+                <h4 class="modal-title" id="modalLabel_N1789">Details</h4>
+                <table class="table">
+                    <tbody id="data_table_body_G4464">
+                        <!-- Data will be loaded here -->
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+    </div>
+</div>
+ 
+  
+ 
+    <script>
+
+    function openModialgPopup_N1789(bibleText, fromJang, fromZul, toJang, toZul) {
+   
+                $.ajax({
+                    url: '@Url.Action("GetDetails", "WeeklyReport")',
+                    type: 'GET',
+                    data: { bibleText: bibleText, fromJang: fromJang , fromZul: fromZul , toJang: toJang , toZul: toZul },
+                    success: function (response) {
+                        console.log('response, ', response);
+                        var tableBody = $('#data_table_body_G4464');
+                        tableBody.empty();
+                        $("#modalLabel_N1789").text(response.bibleText + " " + response.fromJang + "장" + response.fromZul + "절 ~ " + response.toZul + "절");
+                        response.eBibleDatas.forEach(function (item) {   // eBibleDatas
+                            var row = '<tr>' +
+                                '<td class="textNo">' + item.zul + "." + item.bibleData + '</td>' +
+                                '</tr>';
+                            tableBody.append(row);
+                        });
+                       $("#detailsModal_N47474").modal('show');
+                    }
+                });
+           
+            }
+
+    </script>
+ 

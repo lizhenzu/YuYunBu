@@ -1,0 +1,154 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.PraiseContents>
+
+@*  ══════════════════════════════════════════════════════════════
+    찬양 목록 (?kind=conti · blessing · hymn · ccm · bible · private)
+    · 2026-10-04 시안 확정 — DailyMission4 밝은 흰색 · 찬양 메뉴(/PraiseHome/IndexBranch)와 같은 결
+    · 종류 칩으로 바로 넘어가기 · 썸네일 · 제목을 누르면 유튜브 새 창 (예전과 같음)
+    · 수정 · 삭제 · 등록은 SuperAdmin 에게만 (주소 예전 그대로)
+    · 이전 화면은 IndexQuery.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    string kind = (ViewBag.Kind as string ?? "").Trim();
+    string kindName = kind switch
+    {
+        "conti"    => "찬양 (주일학교)",
+        "blessing" => "축복송",
+        "hymn"     => "찬송가",
+        "ccm"      => "CCM",
+        "bible"    => "기독영상",
+        "private"  => "개인영상",
+        _          => "기타",
+    };
+    string kindShort = kind == "conti" ? "찬양" : kindName;
+
+    var tabs = new[] { ("conti", "찬양"), ("blessing", "축복송"), ("hymn", "찬송가"), ("ccm", "CCM") };
+
+    bool isSuperAdmin = await AuthService.IsSignedIn(User)
+                        && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.PraiseContents>();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@kindShort · @ChurchName</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; --red: #D9534F; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px 36px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--dim2); }
+        .hdTop > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdTop > span:last-child { flex: none; color: var(--dim); letter-spacing: .04em; }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 6px 0 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .hdT small { font-size: 13px; font-weight: 400; letter-spacing: 0; color: var(--dim2); }
+
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; }
+        .chips a { font-size: 12.5px; font-weight: 700; padding: 7px 12px; border-radius: 999px; background: var(--grey); color: var(--dim2); white-space: nowrap; }
+        .chips a:hover { color: var(--blue); }
+        .chips a.on { background: var(--blue); color: #fff; }
+
+        .list { margin-top: 14px; border-top: 1px solid var(--line); }
+        .it { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+        .th { flex: none; position: relative; display: block; width: 120px; max-width: 38%; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--grey); }
+        .th img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+        .th::after { content: ""; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; background: rgba(255,255,255,.92); z-index: 1; }
+        .th::before { content: ""; position: absolute; left: 50%; top: 50%; margin: -6px 0 0 -3px; border-left: 9px solid var(--blue); border-top: 6px solid transparent; border-bottom: 6px solid transparent; z-index: 2; }
+        .tx { flex: 1; min-width: 0; }
+        .tx .n { font-size: 11.5px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+        .tx .tt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 1px; font-size: 14.5px; font-weight: 800; line-height: 1.4; color: var(--ink); word-break: keep-all; }
+        .tx .tt:hover { color: var(--blue); }
+        .tx small { display: block; margin-top: 2px; font-size: 12px; color: var(--dim2); }
+        .adm { display: flex; gap: 6px; margin-top: 6px; }
+        .adm a { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--grey); color: var(--dim2); }
+        .adm a:hover { color: var(--blue); }
+        .adm a.d { background: #FDEEEE; color: var(--red); }
+        .empty { padding: 36px 0; text-align: center; font-size: 13px; color: var(--dim); }
+
+        .new { display: grid; place-items: center; margin-top: 16px; height: 46px; border-radius: 14px; background: var(--soft); color: var(--blue); font-size: 14px; font-weight: 800; }
+        .new:hover { background: #DCEAFB; }
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--dim); }
+        .ft a { color: var(--dim2); font-weight: 700; margin-left: 10px; }
+        .ft a:hover { color: var(--blue); }
+    </style>
+</head>
+<body>
+<div class="sh">
+
+    <div class="hdTop">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/PraiseHome/IndexBranch">찬양</a><span class="sep">›</span>@kindShort</span>
+        <span>PRAISE</span>
+    </div>
+    <div class="hdK">PRAISE · @kindShort</div>
+    <h1 class="hdT">@kindName<small>@(list.Count)곡</small></h1>
+
+    <div class="chips">
+        @foreach (var t in tabs)
+        {
+            <a class="@(t.Item1 == kind ? "on" : "")" href="/PraiseHome/IndexQuery?kind=@t.Item1">@t.Item2</a>
+        }
+    </div>
+
+    <div class="list">
+        @if (list.Count == 0)
+        {
+            <div class="empty">아직 등록된 곡이 없어요</div>
+        }
+        @foreach (var item in list)
+        {
+            string yt = $"https://www.youtube.com/watch?v={item.contentsURL}";
+            string thumb = $"https://img.youtube.com/vi/{item.contentsURL}/hqdefault.jpg";
+            <div class="it">
+                <a class="th" href="@yt" target="_blank" rel="noopener" aria-label="@item.contentsText 유튜브로 보기">
+                    <img src="@thumb" alt="" loading="lazy" onerror="this.remove()" />
+                </a>
+                <div class="tx">
+                    <div class="n">@item.sequenceNo</div>
+                    <a class="tt" href="@yt" target="_blank" rel="noopener">@item.contentsText</a>
+                    @if (!string.IsNullOrWhiteSpace(item.Singer)) { <small>@item.Singer</small> }
+                    @if (isSuperAdmin)
+                    {
+                        <div class="adm">
+                            <a href="/PraiseHome/ModifyView?Id=@item.Id&Kind=@kind">수정</a>
+                            <a class="d" href="/PraiseHome/DeleteView?Id=@item.Id&Kind=@kind">삭제</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isSuperAdmin)
+    {
+        <a class="new" href="/PraiseHome/EnrollView?Kind=@kind">@kindShort 등록 (관리자)</a>
+    }
+
+    <div class="ft">
+        <span>@ChurchName · @DepartmentName</span>
+        <span><a href="/PraiseHome/IndexBranch">찬양 메뉴</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+
+</div>
+</body>
+</html>

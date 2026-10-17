@@ -1,0 +1,551 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model UserInfo
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>기본 정보 변경</title>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.3/dist/jquery.validate.min.js"></script>
+
+    <style>
+        :root {
+            --bg0:#0b1220;
+            --bg1:#0f1b33;
+            --text:#eaf0ff;
+            --muted:rgba(234,240,255,.72);
+            --stroke:rgba(255,255,255,.14);
+
+            --cardA:rgba(255,255,255,.10);
+            --cardB:rgba(255,255,255,.06);
+
+            --shadowBig: 0 26px 70px rgba(0,0,0,.40);
+            --shadow: 0 10px 22px rgba(0,0,0,.18);
+
+            --radius:24px;
+            --radiusSm:14px;
+
+            --blueA:#2563eb;
+            --blueB:#1d4ed8;
+
+            --greenA:#16a34a;
+            --greenB:#008000;
+
+            --redA:#ef4444;
+            --redB:#dc2626;
+        }
+
+        *{ box-sizing:border-box; }
+        html, body{ height:100%; margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif; }
+
+        body{
+            min-height:100%;
+            color:var(--text);
+            background:
+                radial-gradient(900px 600px at 20% 15%, rgba(124,58,237,.22), transparent 60%),
+                radial-gradient(900px 600px at 80% 20%, rgba(34,197,94,.16), transparent 55%),
+                radial-gradient(1200px 900px at 50% 110%, rgba(59,130,246,.12), transparent 60%),
+                linear-gradient(180deg, var(--bg0), var(--bg1));
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:22px;
+        }
+
+        .page{
+            width:min(980px, 100%);
+            display:grid;
+            grid-template-columns: 1.1fr .9fr;
+            gap:18px;
+            align-items:stretch;
+        }
+
+        .hero{
+            border:1px solid var(--stroke);
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+            border-radius: var(--radius);
+            padding:26px;
+            box-shadow: var(--shadowBig);
+            position:relative;
+            overflow:hidden;
+        }
+        .hero::before{
+            content:"";
+            position:absolute;
+            inset:-80px -120px auto auto;
+            width:260px;height:260px;
+            background: radial-gradient(circle at 30% 30%, rgba(59,130,246,.40), rgba(59,130,246,0) 60%);
+            transform: rotate(20deg);
+        }
+        .hero::after{
+            content:"";
+            position:absolute;
+            inset:auto auto -120px -140px;
+            width:320px;height:320px;
+            background: radial-gradient(circle at 45% 45%, rgba(34,197,94,.24), rgba(34,197,94,0) 60%);
+            transform: rotate(-10deg);
+        }
+
+        .heroTop{
+            position:relative;
+            z-index:1;
+            display:flex;
+            gap:12px;
+            align-items:center;
+        }
+        .badgeIcon{
+            width:46px;height:46px;
+            border-radius:16px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:22px;
+            background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(34,197,94,.80));
+            box-shadow: 0 12px 24px rgba(0,0,0,.22);
+        }
+        .heroTop b{ font-size:18px; letter-spacing:-.2px; }
+        .heroTop div{ color:var(--muted); font-size:13px; margin-top:2px; }
+
+        .hero h1{
+            position:relative;
+            z-index:1;
+            margin:18px 0 10px;
+            font-size:30px;
+            letter-spacing:-.6px;
+            line-height:1.15;
+        }
+        .hero p{
+            position:relative;
+            z-index:1;
+            margin:0;
+            color:var(--muted);
+            font-size:14px;
+            line-height:1.65;
+        }
+        .tips{
+            position:relative;
+            z-index:1;
+            margin-top:16px;
+            display:flex;
+            flex-wrap:wrap;
+            gap:10px;
+        }
+        .tip{
+            padding:10px 12px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            color: rgba(234,240,255,.86);
+            font-size:12.5px;
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+
+        .card{
+            border:1px solid var(--stroke);
+            background: linear-gradient(180deg, var(--cardA), var(--cardB));
+            border-radius: var(--radius);
+            padding:22px;
+            box-shadow: var(--shadowBig);
+            backdrop-filter: blur(10px);
+        }
+
+        .cardHead{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            margin-bottom:14px;
+        }
+        .cardHead h2{
+            margin:0;
+            font-size:18px;
+            letter-spacing:-.2px;
+        }
+        .cardHead small{
+            display:block;
+            margin-top:4px;
+            color:var(--muted);
+            font-size:12.5px;
+            line-height:1.4;
+        }
+
+        .profileRow{
+            display:flex;
+            align-items:center;
+            gap:14px;
+            margin: 6px 0 12px;
+            padding: 12px;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(10,14,25,.28);
+        }
+
+        .avatar{
+            width:64px;height:64px;
+            border-radius:50%;
+            object-fit:cover;
+            border: 3px solid rgba(255,255,255,.92);
+            box-shadow: 0 10px 22px rgba(0,0,0,.35);
+            flex:0 0 auto;
+            background: rgba(255,255,255,.18);
+        }
+
+        .profileMeta{ min-width:0; }
+        .profileMeta b{
+            display:block;
+            font-size:14px;
+            letter-spacing:-.2px;
+        }
+        .profileMeta span{
+            display:block;
+            margin-top:4px;
+            color: var(--muted);
+            font-size:12.5px;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        hr{
+            border:0;
+            height:1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.18), transparent);
+            margin: 14px 0;
+        }
+
+        .text-danger{
+            color:#fecaca;
+            font-size:12.5px;
+        }
+
+        .gridForm{
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1px;
+        }
+
+        .field{
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+
+        .field label{
+            color: rgba(234,240,255,.84);
+            font-size: 12.5px;
+            font-weight: 800;
+        }
+
+        input.form-control,
+        input[type="email"],
+        select.form-control{
+            width:100%;
+            padding:12px 12px;
+            border-radius: var(--radiusSm);
+            border:1px solid rgba(255,255,255,.14);
+            background: rgba(10,14,25,.35);
+            color: var(--text);
+            outline:none;
+            font-size:15px;
+            transition: .15s ease;
+        }
+
+        input.form-control::placeholder{ color: rgba(234,240,255,.45); }
+
+        input.form-control:focus,
+        input[type="email"]:focus,
+        select.form-control:focus{
+            border-color: rgba(59,130,246,.55);
+            box-shadow: 0 0 0 4px rgba(59,130,246,.18);
+            background: rgba(10,14,25,.42);
+        }
+
+        input[readonly]{
+            background: rgba(255,255,255,.08) !important;
+            color: rgba(234,240,255,.70) !important;
+            border-color: rgba(255,255,255,.16) !important;
+        }
+
+        .span2{ grid-column: span 2; }
+
+        /* ✅ 생일 월/일 한 줄 */
+        .birthRow{
+            display:flex;
+            gap:10px;
+        }
+        .birthRow .form-control{
+            flex:1;
+            text-align:right;
+        }
+
+        /* ✅ 생일 (월/일/공개여부) 전부 한 줄 */
+        .birthLine{
+            display:flex;
+            gap:12px;
+            align-items:flex-end;
+        }
+        .birthLine .birthRow{ flex:2; }
+        .birthLine .publishBox{ flex:1; }
+
+        .btnRow{
+            margin-top: 14px;
+            display:grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        button{
+            width:100%;
+            border:none;
+            border-radius: 18px;
+            padding: 13px 14px;
+            cursor:pointer;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing:-.2px;
+            transition: transform .08s ease, filter .15s ease, box-shadow .15s ease;
+            box-shadow: var(--shadow);
+        }
+        button:active{ transform: translateY(1px); }
+        button:hover{ filter: brightness(1.03); }
+
+        .btnBack{
+            background: linear-gradient(180deg, #bbf7d0, #86efac); /* 연한 풀색 그라데이션 */
+            color: #14532d; /* 진한 초록 글씨 (가독성) */
+            box-shadow: 0 14px 30px rgba(34,197,94,.25); /* 그린 계열 그림자 */
+        }
+
+        .btnSave{
+            background: linear-gradient(180deg, var(--greenA), var(--greenB));
+            color:#f0fdf4;
+            border: 1px solid rgba(0,128,0,.45);
+            box-shadow: 0 14px 30px rgba(0,128,0,.18);
+        }
+
+        button:focus{
+            outline: 3px solid rgba(59,130,246,.25);
+            outline-offset: 3px;
+        }
+
+        #loadingOverlay{
+            display:none;
+            position:fixed;
+            inset:0;
+            background: rgba(2,6,23,.55);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            align-items:center;
+            justify-content:center;
+        }
+        .loadingBox{
+            width:min(360px, 92vw);
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.10);
+            box-shadow: 0 20px 60px rgba(0,0,0,.35);
+            padding: 18px;
+            text-align:center;
+            color: rgba(234,240,255,.90);
+        }
+        .spinner{
+            width:38px;height:38px;
+            border-radius:50%;
+            border: 4px solid rgba(255,255,255,.20);
+            border-top-color: rgba(59,130,246,.90);
+            margin: 2px auto 12px;
+            animation: spin 1s linear infinite;
+        }
+        @@keyframes spin{ to{ transform: rotate(360deg); } }
+
+        @@media (max-width: 860px){
+            .page{ grid-template-columns: 1fr; }
+            .hero{ display:none; }
+            .gridForm{ grid-template-columns: 1fr; }
+            .span2{ grid-column: span 1; }
+            .btnRow{ grid-template-columns: 1fr; }
+            body{ padding: 16px; }
+
+            /* ✅ 모바일에서는 한 줄이 너무 빡빡하면 자동 줄바꿈 */
+            .birthLine{ flex-wrap:wrap; }
+            .birthLine .birthRow,
+            .birthLine .publishBox{ flex: 1 1 100%; }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loadingOverlay">
+        <div class="loadingBox">
+            <div class="spinner"></div>
+            처리 중이에요… 잠시만 기다려 주세요.
+        </div>
+    </div>
+
+    <div class="page">
+
+        <section class="hero" aria-hidden="true">
+            <div class="heroTop">
+                <div class="badgeIcon">👤</div>
+                <div>
+                    <b>Profile</b>
+                    <div>기본 정보를 최신 상태로 유지해 주세요</div>
+                </div>
+            </div>
+
+            <h1>기본 정보 변경</h1>
+            <p>
+                이름, 연락처, 생일 정보를 수정할 수 있어요.<br />
+                이메일은 로그인 계정이므로 변경할 수 없습니다.
+            </p>
+
+            <div class="tips">
+                <div class="tip">🔒 이메일은 고정</div>
+                <div class="tip">📞 연락처 확인</div>
+                <div class="tip">🎂 생일 설정</div>
+            </div>
+        </section>
+
+        <main class="card">
+            <div class="cardHead">
+                <div>
+                    <h2>기본 정보 변경</h2>
+                    <small>필수 정보를 확인하고 저장해 주세요.</small>
+                </div>
+            </div>
+
+            <div class="profileRow">
+                <img id="myImage" class="avatar" src="@Model.ProfilePicturePath" alt="Profile Picture" loading="lazy" />
+                <div class="profileMeta">
+                    <b>@(string.IsNullOrWhiteSpace(Model.LastName) && string.IsNullOrWhiteSpace(Model.FirstName) ? "프로필" : $"{Model.LastName} {Model.FirstName}")</b>
+                    <span>@Model.Email</span>
+                </div>
+            </div>
+
+            <form action="/HumanResource/ChangeUserInfoProcess" method="POST" onsubmit="showLoading();">
+                <div asp-validation-summary="All" class="text-danger"></div>
+
+                <div class="gridForm">
+
+                    <div class="field">
+                        <label asp-for="@Model.LastName"></label>
+                        <input asp-for="LastName" placeholder=@Html.DisplayNameFor(model => model.LastName) class="form-control" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+
+                    <div class="field">
+                        <label asp-for="@Model.FirstName"></label>
+                        <input asp-for="FirstName" placeholder=@Html.DisplayNameFor(model => model.FirstName) class="form-control" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+
+                    <div class="field span2">
+                        <label asp-for="@Model.PhoneNumber"></label>
+                        <input asp-for="PhoneNumber" placeholder=@Html.DisplayNameFor(model => model.PhoneNumber) class="form-control" />
+                        <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                    </div>
+
+                    <!-- ✅ 추가: PhoneNumber2 -->
+                    <div class="field span2">
+                        <label asp-for="@Model.PhoneNumber2"></label>
+                        <input asp-for="PhoneNumber2" placeholder=@Html.DisplayNameFor(model => model.PhoneNumber2) class="form-control" />
+                        <span asp-validation-for="PhoneNumber2" class="text-danger"></span>
+                    </div>
+
+                    <!-- ✅ 생일 (월/일/공개여부) 전부 한 줄 -->
+                    <div class="field span2">
+                        <label>생일 (월 / 일 / 공개여부)</label>
+
+                        <div class="birthLine">
+
+                            <!-- 월 / 일 -->
+                            <div class="birthRow">
+                                <input asp-for="bMonth"
+                                       placeholder="월"
+                                       class="form-control" />
+
+                                <input asp-for="bDay"
+                                       placeholder="일"
+                                       class="form-control" />
+                            </div>
+
+                            <!-- 공개 여부 -->
+                            <div class="publishBox">
+                                <select asp-for="birthDay_PublishYN" class="form-control">
+                                    <option value="y">공개</option>
+                                    <option value="h">비공개</option>
+                                </select>
+                            </div>
+
+                        </div>
+
+                        <span asp-validation-for="bMonth" class="text-danger"></span>
+                        <span asp-validation-for="bDay" class="text-danger"></span>
+                        <span asp-validation-for="birthDay_PublishYN" class="text-danger"></span>
+                    </div>
+
+                </div>
+
+                <div class="btnRow">
+                    <button type="button"
+                            class="btnBack"
+                            onclick="window.location.href='/HumanResource/ManageUserInfo?UserId=@Model.UserId&PersonId=@Model.PersonId';">
+                        이전 화면
+                    </button>
+
+                    <button type="submit" class="btnSave">
+                        저장
+                    </button>
+                </div>
+
+                <input type="hidden" id="UserId" name="UserId" value="@Model.UserId" />
+                <input type="hidden" id="PersonId" name="PersonId" value="@Model.PersonId" />
+            </form>
+        </main>
+
+    </div>
+
+    <script>
+        function showLoading() {
+            var el = document.getElementById('loadingOverlay');
+            if (el) el.style.display = 'flex';
+            document.body.style.pointerEvents = 'none';
+        }
+
+        function hideLoading() {
+            var el = document.getElementById('loadingOverlay');
+            if (el) el.style.display = 'none';
+            document.body.style.pointerEvents = 'auto';
+        }
+    </script>
+
+    <script>
+        function loadLatestImage() {
+            const imageElement = document.getElementById('myImage');
+            if (!imageElement) return;
+            const timestamp = new Date().getTime();
+            const base = "@Model.ProfilePicturePath";
+            imageElement.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 't=' + timestamp;
+        }
+        window.onload = loadLatestImage;
+    </script>
+
+</body>
+</html>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}

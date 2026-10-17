@@ -1,0 +1,289 @@
+﻿@using System
+@using System.Globalization
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@{
+    Layout = "_Layout_Mission3";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var dPretty = Model.SelectedDate.ToString("yyyy.MM.dd", CultureInfo.InvariantCulture)
+                  + " " + Model.SelectedDate.ToString("ddd", new CultureInfo("en-US")).ToUpperInvariant();
+    var toast = (ViewBag.Toast ?? "").ToString();
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+
+    bool canAct = Model.IsActionable;
+
+    bool doneToMe           = Model.DayStatus?.Pray_ToMe ?? false;
+    bool doneToParent       = Model.DayStatus?.Pray_ToParent ?? false;
+    bool doneToFriend       = Model.DayStatus?.Pray_ToFriend ?? false;
+    bool doneParentOrFriend = doneToParent || doneToFriend;
+
+    ViewBag.DM2Page = "pray";
+    ViewBag.DM2Done = Model.DayStatus?.PrayDone ?? false;
+}
+
+@functions {
+    string S(object v) { try { return v == null ? "" : v.ToString(); } catch { return ""; } }
+
+    object G(dynamic o, params string[] names)
+    {
+        if (o == null) return null;
+        var t = (object)o;
+        var tp = t.GetType();
+        foreach (var n in names)
+        {
+            var p = tp.GetProperty(n);
+            if (p != null) return p.GetValue(t);
+        }
+        return null;
+    }
+
+    string GetRangeLabel(eBibles b)
+    {
+        if (b == null) return "";
+        var s = !string.IsNullOrWhiteSpace(b.JanZulString) ? b.JanZulString : b.JanZulStringOnly;
+        return s ?? "";
+    }
+
+    string GetWholeBibleText(eBibles b)
+    {
+        if (b == null) return "";
+        return b.BibleText ?? "";
+    }
+}
+
+@{
+    dynamic prayRow  = ViewBag.TodayPrayPhraseRow;
+    eBibles _eBibles = ViewBag.TodayWordToReadRow as eBibles;
+
+    var rangeLabel = GetRangeLabel(_eBibles);
+    var verses     = _eBibles?.eBibleDatas;
+    var wholeText  = GetWholeBibleText(_eBibles);
+
+    bool hasPrayId = Model.Content?.PrayPhraseId != null;
+
+    string prayTitle = "", prayBody = "";
+    if (prayRow != null && prayRow?.PrayPhraseData != null)
+    {
+        prayTitle = S(G(prayRow.PrayPhraseData, "PrayTitle", "Title"));
+        // c2(자녀가 자기 자신을 위해 드리는 기도)는 화면에 내보내지 않는다.
+        prayBody  = S(G(prayRow.PrayPhraseData, "PrayContent1", "Content1", "Body1"));
+    }
+}
+
+@*  ══════════════════════════════════════════════════════════════
+    기도 미션 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정 · 말씀 · 퀴즈 화면과 같은 옷)
+      제목 → 01 오늘의 성경 본문(접힘) → 02 오늘의 기도문 → 03 누구를 위해 기도했나요?(위아래 두 줄)
+    · 카드 · 테두리 없이 연한 회색 줄로만 나눈다.  강조색은 맑은 파랑, 다 한 것은 초록.
+    · "나를 위해" · "가족·친구를 위해" 각 1점 — 하나만 해도 기도 미션 완료 (PrayDone = ToMe || ToParent || ToFriend)
+    · 성경 본문이 없으면 번호가 01(기도문)부터 다시 매겨진다.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    bool hasBody   = hasPrayId && !string.IsNullOrWhiteSpace(prayBody);
+    bool hasVerses = (verses != null && verses.Count > 0) || !string.IsNullOrWhiteSpace(wholeText);
+    bool anyDone   = doneToMe || doneParentOrFriend;
+    int _sn = 0;
+    string PNo() { return (++_sn).ToString("00"); }
+}
+
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* ── 밝은 흰색 버전 : 이 화면만 (공통 bone.css 위에 덮어쓴다) ── */
+    body { background: #FFFFFF; }
+    .qz.pd { --pBlue: #2F80ED; --pGreen: #16A34A; --pGreenD: #15803D; --pInk: #111827; --pTx: #374151; --pDim: #9CA3AF; --pDim2: #6B7280; --pLine: #EEF0F3; --pSoft: #F4F6F9;
+             background: #FFFFFF; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; }
+    .qz.pd .qzBody { background: #FFFFFF; }
+    .qz.pd .qzBar { border-bottom-color: var(--pLine); }
+    .qz.pd .qzProg { display: none; }
+    .qz.pd .qzLock { background: #F3F7FD; color: var(--pDim2); border: 0; }
+
+    .qz.pd .pK { font-size: 12px; font-weight: 800; color: var(--pBlue); margin-top: 18px; letter-spacing: .02em; }
+    .qz.pd .pTtl { display: flex; gap: 14px; align-items: flex-start; margin-top: 10px; }
+    .qz.pd .pTtl h2 { margin: 0; font-size: 23px; font-weight: 800; line-height: 1.35; color: var(--pInk); letter-spacing: -.02em; word-break: keep-all; }
+    .qz.pd .pRef { font-size: 13px; color: var(--pDim2); margin-top: 4px; }
+    .qz.pd .pEmpty { margin-top: 26px; padding: 26px 0; text-align: center; color: var(--pDim2); font-size: 14px; border-top: 1px solid var(--pLine); border-bottom: 1px solid var(--pLine); }
+
+    /* 01 · 02 · 03 칸 — 연한 회색 줄로만 나눈다 (숫자는 제목 줄에만, 아래 내용은 왼쪽 끝부터) */
+    .qz.pd .pSec { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; align-items: baseline; padding: 18px 0 16px; border-top: 1px solid var(--pLine); }
+    .qz.pd .pSec > div { display: contents; }
+    .qz.pd .pSec > div > :not(.pH) { grid-column: 1 / -1; }
+    .qz.pd .pTtl + .pSec { margin-top: 26px; }
+    .qz.pd .pNo { font-weight: 900; font-size: 17px; color: #7FA3DB; letter-spacing: .02em; }
+    .qz.pd .pSec.done .pNo { color: #6FBF8B; }
+    .qz.pd .pH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 16px; font-weight: 800; color: var(--pInk); }
+    .qz.pd .pH small { font-size: 11.5px; font-weight: 600; color: var(--pDim); white-space: nowrap; }
+
+    /* 01 성경 본문 — 접어 두었다가 "본문 보기 ＋"로 펼친다 */
+    .qz.pd .pFold { justify-self: start; margin-top: 6px; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--pBlue); cursor: pointer; }
+    .qz.pd .pBible { margin-top: 4px; }
+    .qz.pd .pVerse { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 6px; margin-top: 4px; font-size: 14.5px; line-height: 1.85; color: var(--pDim2); }
+    .qz.pd .pVerse i { font-style: normal; font-size: 11px; font-weight: 800; color: #7FA3DB; text-align: right; padding-top: 4px; font-variant-numeric: tabular-nums; }
+    .qz.pd .pVerse p { margin: 0; word-break: keep-all; }
+
+    /* 02 기도문 — 크게, 줄 간격 넓게.  이름 자리(**…**)는 연한 노랑 밑줄 (헬퍼가 직접 넣은 색을 덮어쓴다) */
+    .qz.pd .pPray { margin: 8px 0 0; font-size: 17px; line-height: 2.05; color: #1F2937; word-break: keep-all; white-space: pre-line; }
+    .qz.pd .pPray + .pPray { margin-top: 10px; }
+    .qz.pd .pPray .nm { color: #1D5FBF !important; font-weight: 800 !important; background: linear-gradient(transparent 62%, #FFF1BF 62%) !important; border-radius: 0 !important; padding: 0 2px !important; }
+
+    /* 03 누구를 위해 기도했나요? — 위아래 두 줄 (말씀 화면 03과 같은 모양) */
+    .qz.pd .pPick { display: grid; gap: 8px; margin-top: 10px; }
+    .qz.pd .pPick form { margin: 0; }
+    .qz.pd .pPk { width: 100%; display: flex; align-items: center; gap: 10px; padding: 13px 14px; border: 0; border-radius: 14px; background: #EAF7EF;
+                  font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background .15s; }
+    .qz.pd .pPk:active { background: #DDF1E4; }
+    .qz.pd .pPk b { flex: 1; min-width: 0; font-size: 15.5px; font-weight: 800; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .qz.pd .pPk .pt { flex: none; font-size: 12.5px; font-weight: 800; color: var(--pBlue); white-space: nowrap; }
+    .qz.pd .pPk.on { background: var(--pSoft); cursor: default; }
+    .qz.pd .pPk.on b { color: var(--pDim2); }
+    .qz.pd .pPk.on .pt { color: var(--pGreenD); }
+    .qz.pd .pPk[disabled]:not(.on) { opacity: .5; cursor: default; }
+    .qz.pd .pNote { margin-top: 8px; font-size: 12px; color: var(--pDim); text-align: center; }
+    @@media (prefers-reduced-motion: reduce) { .qz.pd .pPk { transition: none; } }
+</style>
+
+<div class="qz pd">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a></div>
+            @await Html.PartialAsync("~/Views/DailyMission4/Partials/_FontSizeCtl.cshtml")
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        @if (!canAct)
+        {
+            <div class="qzLock"><b>다른 날짜의 미션이에요</b><br>오늘 · 어제 · 그저께만 할 수 있어요</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="qzLock">@toast</div>
+        }
+
+        @if (!hasPrayId)
+        {
+            <div class="pEmpty">이 날짜(@d)에는 기도문이 없어요</div>
+        }
+        else if (!hasBody)
+        {
+            <div class="pEmpty">기도문 내용을 불러오지 못했어요</div>
+        }
+        else
+        {
+            <div class="pK">오늘의 성품기도</div>
+            <div class="pTtl">
+                @await Html.PartialAsync("~/Views/DailyMission4/Partials/_DateChip.cshtml", Model.SelectedDate)
+                <div>
+                    <h2>@(!string.IsNullOrWhiteSpace(prayTitle) ? prayTitle : "오늘의 기도")</h2>
+                    @if (!string.IsNullOrWhiteSpace(rangeLabel)) { <div class="pRef">@rangeLabel</div> }
+                </div>
+            </div>
+
+            @* ── 성경 본문 (접힘 · 있을 때만) ── *@
+            @if (hasVerses)
+            {
+                <div class="pSec @(anyDone ? "done" : "")">
+                    <span class="pNo">@PNo()</span>
+                    <div>
+                        <div class="pH">오늘의 성경 본문</div>
+                        <button type="button" class="pFold" data-fold="foldBible" aria-expanded="false" aria-controls="foldBible">본문 보기 ＋</button>
+                        <div class="pBible" id="foldBible" hidden>
+                            @if (verses != null && verses.Count > 0)
+                            {
+                                foreach (var vv in verses)
+                                {
+                                    var no = vv.zul;
+                                    var tx = vv.BibleData;
+                                    if (string.IsNullOrWhiteSpace(tx)) { continue; }
+                                    <div class="pVerse"><i>@(no > 0 ? no.ToString() : "")</i><p>@tx</p></div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="pVerse"><i></i><p>@wholeText</p></div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ── 기도문 ── *@
+            <div class="pSec @(anyDone ? "done" : "")">
+                <span class="pNo">@PNo()</span>
+                <div>
+                    <div class="pH">오늘의 기도문</div>
+                    @* 빈 줄로 나뉜 문단마다 한 칸씩 — 빈 줄이 그대로 큰 공백이 되지 않게 문단 사이는 한 번만 띄운다 *@
+                    @foreach (var para in System.Text.RegularExpressions.Regex.Split(prayBody.Replace("\r\n", "\n").Trim(), @"\n\s*\n"))
+                    {
+                        if (string.IsNullOrWhiteSpace(para)) { continue; }
+                        <div class="pPray">@BulletinBoard.Helpers.PrayTextHelper.MarkNamesInline(para.Trim())</div>
+                    }
+                </div>
+            </div>
+
+            @* ── 누구를 위해 기도했나요? — 각 1점, 하나만 해도 완료 ── *@
+            <div class="pSec @(anyDone ? "done" : "")">
+                <span class="pNo">@PNo()</span>
+                <div>
+                    <div class="pH">누구를 위해 기도했나요?<small>@(anyDone ? "눌렀어요" : "눌러서 알려 주세요")</small></div>
+                    <div class="pPick">
+                        <form method="post" action="/DailyMission4/SavePray">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="date" value="@d" />
+                            <input type="hidden" name="prayPhraseId" value="@Model.Content.PrayPhraseId.Value" />
+                            <input type="hidden" name="toMe" value="true" />
+                            <button type="submit" class="pPk @(doneToMe ? "on" : "")" @((canAct && !doneToMe) ? "" : "disabled")>
+                                <b>나를 위해 기도했어요</b><span class="pt">@(doneToMe ? "✓ 완료 +1점" : "1점")</span>
+                            </button>
+                        </form>
+
+                        @* 가족 · 친구 — 어느 쪽이든 toParent 로 저장한다. *@
+                        <form method="post" action="/DailyMission4/SavePray">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="date" value="@d" />
+                            <input type="hidden" name="prayPhraseId" value="@Model.Content.PrayPhraseId.Value" />
+                            <input type="hidden" name="toParent" value="true" />
+                            <button type="submit" class="pPk @(doneParentOrFriend ? "on" : "")" @((canAct && !doneParentOrFriend) ? "" : "disabled")>
+                                <b>가족·친구를 위해 기도했어요</b><span class="pt">@(doneParentOrFriend ? "✓ 완료 +1점" : "1점")</span>
+                            </button>
+                        </form>
+                    </div>
+                    @* 완료 뒤에는 안내 문구를 두지 않는다 — 누른 줄의 "✓ 완료 +1점"만 남긴다 *@
+                    @if (!anyDone)
+                    {
+                        <div class="pNote">둘 중 하나만 눌러도 미션 완료예요 · 둘 다 하면 2점</div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    @await Html.PartialAsync("~/Views/DailyMission4/Partials/_Dm2Nav.cshtml", Model)
+</div>
+
+@{
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+
+<script>
+    (function () {
+        // 성경 본문 — "본문 보기 ＋"를 누르면 펼치고 다시 누르면 접는다
+        document.querySelectorAll('.qz [data-fold]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var box = document.getElementById(b.dataset.fold);
+                if (!box) return;
+                box.hidden = !box.hidden;
+                b.textContent = box.hidden ? '본문 보기 ＋' : '본문 접기 －';
+                b.setAttribute('aria-expanded', box.hidden ? 'false' : 'true');
+            });
+        });
+    })();
+</script>

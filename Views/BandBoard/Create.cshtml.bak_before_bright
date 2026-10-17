@@ -1,0 +1,124 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    var UserFullName   = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    string boardTableName = ViewBag.BoardTableName as string ?? "BandPosts";
+    string boardName      = ViewBag.BoardName      as string ?? "게시판";
+
+    bool isLost       = boardTableName.Contains("LostAndFound", StringComparison.OrdinalIgnoreCase);
+    string placeholder= isLost
+        ? "분실물 정보를 적어 주세요. 습득 장소, 물품 특징, 연락처 등을 함께 남기면 더 빨리 찾을 수 있어요."
+        : "내용을 입력하세요.";
+    string listUrl = $"/BandBoard/Index?boardTableName={boardTableName}&boardName={Uri.EscapeDataString(boardName)}";
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>새 @boardName 등록</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+<link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+<style>
+/* 사진 올리기 */
+.upload-area { position: relative; padding: 26px 16px; text-align: center; border: 1px dashed var(--acc); background: var(--card); cursor: pointer; transition: background .15s; }
+.upload-area:hover, .upload-area.drag { background: var(--mark); }
+.upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-icon { font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; line-height: 1; color: var(--acc); }
+.upload-text { margin-top: 8px; font-size: 13.5px; color: var(--dim2); }
+.upload-text b { font-weight: 600; color: var(--acc); }
+.preview-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.preview-thumb { width: 76px; height: 76px; object-fit: cover; border: 1px solid var(--rule); display: none; }
+textarea.fIn { min-height: 200px; }
+</style>
+</head>
+<body>
+
+<header class="hd">
+    <div class="sh">
+        <div class="hdTop">
+            <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="@listUrl">@boardName</a></span>
+        </div>
+        <div class="hdK">@(isLost ? "LOST & FOUND" : "WRITE")</div>
+        <h1 class="hdT">@(isLost ? "분실물 등록 / 습득 신고" : $"새 {boardName} 등록")</h1>
+        <div class="hdS">사진은 여러 장 함께 올릴 수 있어요.</div>
+    </div>
+</header>
+
+<main class="sh">
+    <form asp-action="Create" asp-controller="BandBoard"
+          method="post" enctype="multipart/form-data" id="writeForm" class="fm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="boardTableName" value="@boardTableName" />
+        <input type="hidden" name="boardName"      value="@boardName" />
+
+        <div class="fRow">
+            <label class="fLbl" for="content">내용</label>
+            <textarea id="content" name="content" class="fIn" rows="6" placeholder="@placeholder"></textarea>
+        </div>
+
+        <div class="fRow">
+            <label class="fLbl" for="writerName">작성자</label>
+            @if (!string.IsNullOrWhiteSpace(UserFullName))
+            {
+                <input type="text" id="writerName" name="writerName" class="fIn" value="@UserFullName" readonly />
+            }
+            else
+            {
+                <input type="text" id="writerName" name="writerName" class="fIn" placeholder="이름 (선택)" />
+            }
+        </div>
+
+        <div class="fRow">
+            <span class="fLbl">사진</span>
+            <div class="upload-area" id="uploadArea">
+                <input type="file" name="imageFiles" id="imageFiles" accept="image/*" multiple />
+                <div class="upload-icon">＋</div>
+                <div class="upload-text"><b>사진 첨부</b> · 여러 장 가능 · 누르거나 끌어다 놓기</div>
+            </div>
+            <div class="preview-row" id="previewRow"></div>
+        </div>
+
+        <div class="fAct">
+            <a class="nbtn" href="@listUrl">취소</a>
+            <button type="submit" class="nbtn pri">등록하기</button>
+        </div>
+    </form>
+
+    <div class="ft"><span>© 유년부 · @boardName</span></div>
+</main>
+
+<script>
+(function() {
+    const input = document.getElementById('imageFiles');
+    const row   = document.getElementById('previewRow');
+    const area  = document.getElementById('uploadArea');
+
+    area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag'));
+    area.addEventListener('drop',      e => { e.preventDefault(); area.classList.remove('drag'); });
+
+    input.addEventListener('change', function() {
+        row.innerHTML = '';
+        Array.from(this.files).forEach(file => {
+            const img = document.createElement('img');
+            img.className = 'preview-thumb';
+            img.style.display = 'block';
+            const reader = new FileReader();
+            reader.onload = e2 => { img.src = e2.target.result; };
+            reader.readAsDataURL(file);
+            row.appendChild(img);
+        });
+    });
+})();
+</script>
+
+</body>
+</html>

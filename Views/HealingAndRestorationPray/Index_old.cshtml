@@ -1,0 +1,358 @@
+﻿@model BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray
+@using BulletinBoard.Helpers
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    int total    = ViewBag.TotalCount is int _t ? _t : 0;
+    int rotNo    = ViewBag.RotationNo is int _r ? _r : 0;
+    DateTime kNow = ViewBag.TodayKst is DateTime _k ? _k : DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow:yyyy년 M월 d일} {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // ── 카카오톡·메신저 공유 미리보기 (Open Graph) ─────────────
+    //    카카오는 og:image 를 절대 주소로만 읽는다. 상대 경로면 미리보기가 비어 나온다.
+    string ogDomain = (ViewBag.Domain as string ?? "").TrimEnd('/');
+    string ogUrl    = ViewBag.FullURL as string ?? $"{ogDomain}/HealingAndRestorationPray/Index";
+    string ogImage  = $"{ogDomain}/images/og/healing-restoration-pray.png";
+
+    string ogTitle = "치유와 회복을 위한 기도문";
+    // 오늘 기도문이 있으면 제목을 함께 보여 준다 (없으면 기본 안내 문구)
+    string ogDesc  = Model != null && !string.IsNullOrWhiteSpace(Model.Title)
+        ? $"오늘의 기도 · {Model.Title}"
+        : "아픈 이를 위해 오늘도 함께 기도해요";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F4FAF7" />
+    <title>@ogTitle</title>
+    <meta name="description" content="@ogDesc" />
+
+    @* ── 공유 미리보기 (카카오톡 · 페이스북 등) ───────────────── *@
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="@ogTitle" />
+    <meta property="og:title"       content="@ogTitle" />
+    <meta property="og:description" content="@ogDesc" />
+    <meta property="og:url"         content="@ogUrl" />
+    <meta property="og:image"       content="@ogImage" />
+    <meta property="og:image:secure_url" content="@ogImage" />
+    <meta property="og:image:type"  content="image/png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="@ogTitle" />
+    <meta property="og:locale"      content="ko_KR" />
+
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="@ogTitle" />
+    <meta name="twitter:description" content="@ogDesc" />
+    <meta name="twitter:image"       content="@ogImage" />
+
+    <link rel="canonical" href="@ogUrl" />
+
+    @await Html.PartialAsync("_Nature")
+    <style>
+    .hero{ padding:34px 0 20px; text-align:center; }
+    .hero-badge{ margin-bottom:15px; }
+    .hero-h1{
+        font-size:clamp(23px,5.6vw,33px); font-weight:900; letter-spacing:-.03em;
+        line-height:1.28; margin:0; color:var(--ink); text-wrap:balance;
+    }
+    .hero-sub{ margin-top:11px; font-size:13px; font-weight:700; color:var(--muted); }
+    .hero-rule{
+        margin:20px auto 0; width:58px; height:4px; border-radius:999px;
+        background:linear-gradient(90deg,var(--leaf),var(--water));
+    }
+    .today-card{ position:relative; }
+    .today-card .ncard-bd{ padding:22px 20px 20px; }
+
+    /* ── 함께 기도했어요 (좋아요) ───────────────── */
+    .like-row{ margin-top:22px; padding-top:18px; border-top:1px solid var(--line); text-align:center; }
+    .like-btn{
+        display:inline-flex; align-items:center; gap:9px;
+        height:46px; padding:0 20px; border-radius:999px;
+        background:var(--card); border:1.5px solid var(--leaf-mid);
+        color:var(--leaf-dk); font-family:var(--f-ui); font-size:14px; font-weight:800;
+        cursor:pointer; box-shadow:var(--shadow-s);
+        transition:transform .14s, box-shadow .16s, background .16s, border-color .16s;
+        -webkit-tap-highlight-color:transparent;
+    }
+    .like-btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-m); border-color:var(--leaf); }
+    .like-btn:active{ transform:translateY(0); }
+    .like-ico{ font-size:17px; line-height:1; transition:transform .2s; }
+    .like-count{
+        min-width:26px; height:24px; padding:0 8px; border-radius:999px;
+        background:var(--leaf-sf); color:var(--leaf-dk);
+        display:inline-grid; place-items:center;
+        font-size:12.5px; font-weight:900; font-variant-numeric:tabular-nums;
+    }
+
+    /* 이미 누른 상태 */
+    .like-btn.on{ background:var(--leaf); border-color:var(--leaf); color:#fff; cursor:default; }
+    .like-btn.on:hover{ transform:none; box-shadow:var(--shadow-s); }
+    .like-btn.on .like-count{ background:rgba(255,255,255,.24); color:#fff; }
+
+    /* 누르는 순간 잠깐 커지는 반응 */
+    .like-btn.pop .like-ico{ transform:scale(1.35); }
+
+    .like-btn[disabled]{ opacity:.6; cursor:progress; }
+
+    .like-msg{ margin-top:9px; min-height:17px; font-size:12px; font-weight:700; color:var(--leaf-dk); }
+
+    /* 조회수 · 좋아요 수치 (슈퍼 유저 전용) */
+    .stat-line{ margin-top:12px; display:flex; justify-content:center; gap:7px; flex-wrap:wrap; }
+    .stat-chip{
+        display:inline-flex; align-items:center; gap:5px;
+        height:26px; padding:0 11px; border-radius:999px;
+        background:var(--card-2); border:1px solid var(--line);
+        font-size:11.5px; font-weight:700; color:var(--muted);
+        font-variant-numeric:tabular-nums; line-height:1;
+    }
+    .stat-chip b{ font-weight:900; color:var(--ink2); }
+
+    /* ── 오타·수정 알려 주기 ───────────────────── */
+    .fixnote{
+        margin-top:26px; padding:20px 18px; text-align:center;
+        background:var(--card); border:1px dashed var(--line-2);
+        border-radius:18px;
+    }
+    .fixnote-ico{ font-size:22px; line-height:1; }
+    .fixnote-tt{
+        margin-top:9px; font-size:13.5px; font-weight:800; color:var(--ink2);
+        word-break:keep-all;
+    }
+    .fixnote-sub{ margin-top:5px; font-size:12px; color:var(--muted); word-break:keep-all; }
+    .fixnote-btn{
+        display:inline-flex; align-items:center; gap:7px; margin-top:14px;
+        height:40px; padding:0 18px; border-radius:999px;
+        background:var(--leaf-sf); border:1px solid var(--leaf-mid);
+        font-size:13px; font-weight:800; color:var(--leaf-dk);
+        transition:.15s;
+    }
+    .fixnote-btn:hover{ background:var(--leaf); border-color:var(--leaf); color:#fff; }
+    .fixnote-btn:active{ transform:scale(.98); }
+
+    @@media (prefers-reduced-motion:reduce){
+        .like-btn, .like-ico{ transition:none !important; }
+    }
+</style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        <a class="nb-btn" href="/">🏠 홈</a>
+        <div class="nb-mid">@dateStr</div>
+        <div class="fsgrp" role="group" aria-label="기도문 글자 크기">
+            <button type="button" id="pfsS" onclick="setPFs('s')" aria-label="작게">가</button>
+            <button type="button" id="pfsM" onclick="setPFs('m')" aria-label="보통">가</button>
+            <button type="button" id="pfsL" onclick="setPFs('l')" aria-label="크게">가</button>
+        </div>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="hero">
+        <div class="hero-badge"><span class="chip chip-leaf">🌿 오늘의 기도</span></div>
+        <h1 class="hero-h1">치유와 회복을 위한 기도문</h1>
+        <div class="hero-sub">
+            @if (total > 0)
+            {
+                <text>매일 한 편씩</text>
+            }
+            else
+            {
+                <text>아픈 이를 위해 함께 기도해요</text>
+            }
+        </div>
+        <div class="hero-rule"></div>
+    </section>
+
+    @if (Model == null)
+    {
+        <div class="ncard">
+            <div class="empty">
+                <div class="empty-ico">🌱</div>
+                <div class="empty-tt">아직 등록된 기도문이 없어요</div>
+                <div class="empty-sub">
+                    @if (isSuper)
+                    {
+                        <text>아래 버튼으로 첫 기도문을 등록해 주세요.</text>
+                    }
+                    else
+                    {
+                        <text>곧 준비될 예정입니다.</text>
+                    }
+                </div>
+                @if (isSuper)
+                {
+                    <div style="margin-top:18px;">
+                        <a class="btn btn-leaf" href="/HealingAndRestorationPray/Create">✚ 기도문 등록</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <article class="ncard today-card">
+            <div class="ncard-hd">
+                <div class="ncard-ico">🙏</div>
+                <span class="ncard-tt">오늘의 기도문</span>
+                <span class="ncard-sub">@rotNo / @total</span>
+            </div>
+            <div class="ncard-bd">
+                <h2 class="pray-title">@Model.Title</h2>
+
+                <div style="margin-top:16px;">
+                    <p class="pray-body">@PrayTextHelper.MarkNames(Model.PrayText)</p>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(Model.BibleText) || !string.IsNullOrWhiteSpace(Model.BibleRef))
+                {
+                    <div class="verse-box">
+                        @if (!string.IsNullOrWhiteSpace(Model.BibleRef))
+                        {
+                            <div class="verse-ref">📖 @Model.BibleRef</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.BibleText))
+                        {
+                            <p class="verse-text">@Model.BibleText</p>
+                        }
+                    </div>
+                }
+
+                @* ── 조회수 · 좋아요 ────────────────────────────
+                   슈퍼 유저(SuperAdmin · basic) 에게만 보여 줍니다.
+                   조회수는 슈퍼 유저의 방문을 빼고 세므로 실제 읽은 사람 수입니다. *@
+                @if (isSuper)
+                {
+                    <div class="like-row">
+                        <button type="button" id="likeBtn" class="like-btn"
+                                data-prayid="@Model.PrayId"
+                                aria-pressed="false"
+                                aria-label="이 기도문에 함께 기도했어요">
+                            <span class="like-ico" aria-hidden="true">🙏</span>
+                            <span class="like-label">함께 기도했어요</span>
+                            <span class="like-count" id="likeCount">@Model.LikeCount.ToString("N0")</span>
+                        </button>
+
+                        <div class="stat-line">
+                            <span class="stat-chip" title="이 기도문을 읽은 수 (관리자 방문 제외)">
+                                👀 조회 <b>@Model.ClickCount.ToString("N0")</b>
+                            </span>
+                            <span class="stat-chip" title="함께 기도한 수">
+                                🙏 기도 <b id="likeCountEcho">@Model.LikeCount.ToString("N0")</b>
+                            </span>
+                        </div>
+
+                        <div class="like-msg" id="likeMsg" aria-live="polite"></div>
+                    </div>
+                }
+            </div>
+        </article>
+
+        @* 펼쳐 보기 — 슈퍼 유저(SuperAdmin · basic) 에게만
+           일반 사용자는 이 화면에서 오늘의 기도문을 그대로 읽습니다 *@
+        @if (isSuper)
+        {
+            <div class="btn-row" style="margin-bottom:16px;">
+                <a class="btn" href="/HealingAndRestorationPray/Detail?PrayId=@Model.PrayId">🙏 이 기도문 펼쳐 보기</a>
+            </div>
+        }
+    }
+
+    @* 오타·수정 제보 — 익명 게시판으로 보냅니다 *@
+    <section class="fixnote">
+        <div class="fixnote-ico">✍️</div>
+        <div class="fixnote-tt">기도문에 오타나 고칠 곳이 있나요?</div>
+        <div class="fixnote-sub">알려 주시면 살펴보고 고치겠습니다. 이름을 남기지 않아도 됩니다.</div>
+        <a class="fixnote-btn" href="/Board/Create2?boardName=Anonymous">💬 알려 주기</a>
+    </section>
+
+    @if (isSuper)
+    {
+        <div class="btn-row" style="margin-top:16px;">
+            <a class="btn" href="/HealingAndRestorationPray/List">📂 기도문 관리</a>
+            <a class="btn" href="/HealingAndRestorationPray/Create">✚ 새 기도문</a>
+        </div>
+    }
+
+</div>
+
+<script>
+/* 함께 기도했어요 — 한 기도문에 한 번만 */
+(function () {
+    var btn = document.getElementById('likeBtn');
+    if (!btn) return;
+
+    var cntEl = document.getElementById('likeCount');
+    var msgEl = document.getElementById('likeMsg');
+    var prayId = btn.getAttribute('data-prayid');
+    var storeKey = 'hrpLiked:' + prayId;
+
+    function say(text) {
+        if (!msgEl) return;
+        msgEl.textContent = text || '';
+    }
+
+    function markDone(text) {
+        btn.classList.add('on');
+        btn.setAttribute('aria-pressed', 'true');
+        btn.disabled = false;          // 눌린 상태지만 포커스는 살려 둔다
+        btn.style.pointerEvents = 'none';
+        say(text);
+    }
+
+    /* 이미 누른 기기면 처음부터 눌린 모습으로 */
+    try {
+        if (localStorage.getItem(storeKey) === '1') {
+            markDone('오늘 함께 기도하셨어요');
+        }
+    } catch (e) { /* 저장소를 못 쓰는 환경이면 그냥 진행 */ }
+
+    btn.addEventListener('click', function () {
+        if (btn.classList.contains('on') || btn.disabled) return;
+
+        btn.disabled = true;
+        say('');
+
+        /* 누른 느낌을 먼저 준다 */
+        btn.classList.add('pop');
+        setTimeout(function () { btn.classList.remove('pop'); }, 220);
+
+        var body = new URLSearchParams();
+        body.append('prayId', prayId);
+
+        fetch('/HealingAndRestorationPray/Like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+            credentials: 'same-origin'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d || !d.ok) {
+                btn.disabled = false;
+                say((d && d.msg) ? d.msg : '잠시 후 다시 눌러 주세요.');
+                return;
+            }
+            var shown = Number(d.count).toLocaleString('ko-KR');
+            if (cntEl) cntEl.textContent = shown;
+            var echo = document.getElementById('likeCountEcho');
+            if (echo) echo.textContent = shown;
+            try { localStorage.setItem(storeKey, '1'); } catch (e) { }
+            markDone(d.already ? '이미 함께 기도하셨어요' : '함께 기도해 주셔서 고맙습니다');
+        })
+        .catch(function () {
+            btn.disabled = false;
+            say('연결이 불안정해요. 다시 눌러 주세요.');
+        });
+    });
+})();
+</script>
+
+</body>
+</html>

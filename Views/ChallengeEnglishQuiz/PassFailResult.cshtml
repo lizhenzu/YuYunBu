@@ -1,0 +1,238 @@
+﻿@model BulletinBoard.Models.EnglishBibleQuiz
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Bible Quiz</title>
+    <style>
+        /*      * {
+                    box-sizing: border-box;
+                    margin: 0;
+                    padding: 0;
+                }*/
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+   .header {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            padding-top: 40px;
+            padding-bottom: 40px;
+            text-align: center;
+            font-size: 2.5em;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .headerCompleted {
+            background-color: #9e1a20;
+            color: #ecf0f1;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .headerDateString {
+            background-color: #A2AAAD;
+            color: black;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: 700;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .body-content {
+            padding-top: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .quiz-container {
+            width: 98%;
+            max-width: 1200px;
+            background: #ffffff;
+            border-radius: 20px;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .question {
+            margin: 25px 0;
+        }
+
+        .question-title {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            color: #00796b;
+            padding-bottom: 10px;
+            text-align: left;
+        }
+
+        .options {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .option {
+            margin: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            border: 1px solid #b2dfdb;
+            background-color: #f1f8e9;
+            cursor: pointer;
+            font-size: 1.0em;
+            color: #333;
+            text-align: left;
+            display: flex;
+            align-items: center;
+        }
+
+            .option::before {
+                content: "☐";
+                font-size: 1.2em;
+                margin-right: 12px;
+                color: #00796b;
+                transition: color 0.3s ease;
+            }
+
+            .option.selected::before {
+                content: "☑";
+                color: #00796b;
+            }
+
+            .option:hover {
+                background-color: #b2dfdb;
+                transform: scale(1.03);
+            }
+
+        .blink {
+            animation: blink 0.7s linear infinite;
+        }
+
+        @@keyframes blink {
+            0%, 100% {
+                background-color: #00796b;
+                color: #ffffff;
+            }
+
+            50% {
+                background-color: #004d40;
+                color: #ffffff;
+            }
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+            .button-container button {
+                flex: 1;
+                max-width: 130px;
+                padding: 10px 15px;
+                margin: 0 10px;
+                font-size: 1em;
+                color: #ffffff;
+                background-color: #00796b;
+                border: none;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: background-color 0.3s ease, transform 0.2s ease;
+                font-weight: 500;
+            }
+
+                .button-container button:hover {
+                    background-color: #004d40;
+                    transform: translateY(-2px);
+                }
+
+        .toggle-translation {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .translation-toggle {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+            .translation-toggle:hover {
+                background-color: #1a252f;
+                transform: translateY(-2px);
+            }
+
+        .translation {
+            display: none;
+            font-size: 1.1em;
+            color: #555;
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 2px solid #e0f2f1;
+            text-align: left;
+        }
+    </style>
+    
+</head>
+<body>
+    <div class="header">English Bible Quiz</div>
+
+    <div class="headerDateString" >Today's Mission accomplished.</div>
+
+    @if (@ViewBag.MissionSuccess > 0)
+    {
+        <div class="headerCompleted" style="background-color:#006633;">You successfully completed today’s mission!</div>
+    }
+    else
+    {
+        <div class="headerCompleted" style="background-color : orangered ; color:black;">You failed to complete today’s mission!</div>
+    }
+
+
+    <div class="body-content">
+        <div class="quiz-container">
+            <div class="button-container">
+                <button type="button" onclick="window.location.href='/ChallengeEnglishQuiz/Index'">Back</button>
+                <button type="button" onclick="window.location.href='/'">Home</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

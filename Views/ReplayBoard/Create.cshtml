@@ -1,0 +1,165 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Security.Claims
+@using BulletinBoard.Models
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    var board = ViewBag.Board as BoardContext;
+    ViewBag.Title = $"{board!.BoardName} - 글쓰기";
+    string error = (ViewBag.Error ?? "").ToString();
+
+    // ✅ 기본 작성자(로그인 사용자) 자동 세팅
+    string defaultWriter =
+        User?.FindFirstValue(ClaimTypes.Name) ??
+        User?.FindFirstValue("name") ??
+        User?.FindFirstValue(ClaimTypes.GivenName) ??
+        User?.Identity?.Name ??
+        "Guest";
+
+    bool isAdmin = (ViewBag.IsAdmin as bool? ?? false);
+    bool isNoticeBoard = (board?.PostTable == "NoticeBoard");
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@ViewBag.Title</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/board-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "Home")">← @ConstatsCommon.ToHome</a><span class="sep">·</span><a href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable })">@board!.BoardName</a></span>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">글쓰기</h1>
+        <div class="hdS">작성자 <b>@defaultWriter</b> 이름으로 올라갑니다.</div>
+    </header>
+
+    <main class="sh">
+        <form method="post"
+              action="@Url.Action("Create","ReplayBoard")"
+              enctype="multipart/form-data"
+              class="fm">
+
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="tableName" value="@board!.PostTable" />
+            <!-- ✅ 서버로 반드시 전송 -->
+            <input type="hidden" name="writer" value="@defaultWriter" />
+
+            @if (!string.IsNullOrWhiteSpace(error))
+            {
+                <div class="alert">@error</div>
+            }
+
+            <div class="fRow">
+                <label class="fLbl" for="title">제목 · 필수</label>
+                <input class="fIn" id="title" name="title" required autocomplete="off" placeholder="예) 겨울성경학교 안내 / 새물결 기도회 공지" />
+                <div class="fHint">제목은 목록에서 가장 크게 보입니다.</div>
+            </div>
+
+            <div class="fRow">
+                <label class="fLbl" for="content">내용 · 필수</label>
+                <textarea class="fIn" id="content" name="content" required
+                          placeholder="내용을 입력해 주세요.&#10;&#10;• 핵심을 먼저 쓰면 읽기 좋아요.&#10;• 날짜/시간/장소가 있으면 꼭 포함해 주세요."></textarea>
+                <div class="fHint">휴대폰에서도 읽기 좋게 줄바꿈을 적절히 넣어 주세요.</div>
+            </div>
+
+            <div class="fGrid">
+                <div class="fRow">
+                    <span class="fLbl">작성자 · 자동</span>
+                    <input class="fIn" value="@defaultWriter" readonly aria-readonly="true" />
+                    <div class="fHint">로그인 정보로 자동 입력되며 바꿀 수 없습니다.</div>
+                </div>
+
+                <div class="fRow">
+                    <label class="fLbl" for="files">첨부파일 · 선택</label>
+                    <input class="fIn" type="file" id="files" name="files" multiple />
+                    <div class="fHint">여러 개 선택 가능 · 이미지 / PDF / 문서 / zip 등</div>
+                </div>
+            </div>
+
+            @* ✅ NoticeBoard 전용: 상단고정/팝업 *@
+            @if (isNoticeBoard && isAdmin)
+            {
+                <div class="fRow">
+                    <span class="fLbl">상단고정 / 팝업 · 관리자</span>
+                    <label class="fChk">
+                        <input id="isPinned" type="checkbox" name="isPinned" value="true" />
+                        상단 고정 + 팝업 사용
+                    </label>
+                    <!-- ✅ disabled 금지: 전송 안 됨 -->
+                    <input id="popupUntil" class="fIn" type="date" name="popupUntil" readonly autocomplete="off" />
+                    <div class="fHint">체크하면 팝업 종료일을 고를 수 있습니다. (비워 두면 종료일 없음)</div>
+                </div>
+            }
+
+            <div class="fAct">
+                <a class="nbtn" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable })">취소</a>
+                <button class="nbtn pri" type="submit">등록</button>
+            </div>
+        </form>
+
+        <div class="ft"><span>© 유년부 · @board.BoardName</span></div>
+    </main>
+
+<script>
+(function () {
+    const pin = document.getElementById('isPinned');
+    const until = document.getElementById('popupUntil');
+    if (!pin || !until) return;
+
+    const setEditable = (editable) => {
+        // ✅ readonly 토글을 확실하게 (속성 제거/추가)
+        if (editable) {
+            until.removeAttribute('readonly');
+        } else {
+            until.setAttribute('readonly', 'readonly');
+        }
+    };
+
+    const sync = () => {
+        const on = !!pin.checked;
+        setEditable(on);
+
+        // UX: 체크 안 됐으면 값 비우기
+        if (!on) until.value = '';
+    };
+
+    const openPicker = () => {
+        if (until.hasAttribute('readonly')) return;
+        if (typeof until.showPicker === 'function') {
+            until.showPicker();
+        } else {
+            until.focus();
+        }
+    };
+
+    pin.addEventListener('change', () => {
+        sync();
+    });
+
+    until.addEventListener('click', openPicker);
+    until.addEventListener('focus', openPicker);
+
+    // ✅ (편의) 체크 안 된 상태에서 클릭하면 체크 먼저 하고 팝업 열기
+    until.addEventListener('mousedown', (e) => {
+        if (!pin.checked) {
+            e.preventDefault();
+            pin.checked = true;
+            sync();
+            setTimeout(openPicker, 0);
+        }
+    });
+
+    sync();
+})();
+</script>
+</body>
+</html>

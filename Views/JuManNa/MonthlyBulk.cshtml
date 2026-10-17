@@ -1,0 +1,189 @@
+@model BulletinBoard.Models.JuManNaMonthly
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 말씀 정리 — 월별 일괄 입력 — 2026-10-16 시안 3판 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · 하루 묶음은 수정 화면(ModifyJuManNa)과 같은 모양: 주제 / 본문 › 성경 / 장 · 절
+    · 있는 날 → 값을 바꾼 날만 저장(바뀜 표시).  표에 없는 날 → 저장할 때 새로 넣음(영상 구간은 0)
+    · 저장 주소 ProcessMonthlyBulk.  다른 칸(요약 · 줄거리 · 영상 구간)은 건드리지 않는다
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    DateTime first = DateTime.ParseExact(Model.YYYYMM + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string monthLabel = $"{first.Year}년 {first.Month}월";
+    string prevYm = first.AddMonths(-1).ToString("yyyy-MM");
+    string nextYm = first.AddMonths(1).ToString("yyyy-MM");
+    int have = Model.Days.Count(d => d.Id > 0);
+    int fresh = Model.Days.Count - have;
+    string[] week = { "주일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일" };
+    string saved = TempData["MonthlySaved"] as string;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>월별 일괄 입력</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>저장하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><span class="sep">›</span>월별 일괄</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">MONTHLY · @monthLabel</div>
+    <h1 class="qb-h1">
+        월별 일괄 입력
+        @if (have == 0)
+        {
+            <span class="jm-mode new">신규 추가 · @(fresh)일</span>
+        }
+        else if (fresh == 0)
+        {
+            <span class="jm-mode">수정 모드 · @(have)일 있음</span>
+        }
+        else
+        {
+            <span class="jm-mode">수정 모드 · @(have)일 있음 · @(fresh)일 새로</span>
+        }
+    </h1>
+    <div class="qb-sub">
+        @if (have == 0)
+        {
+            @:이 달은 아직 없어요. 저장하면 1일부터 @(Model.Days.Count)일까지 새로 만들어져요.
+        }
+        else
+        {
+            @:바뀐 날은 파랗게 보이고, 그날만 저장돼요.
+        }
+    </div>
+
+    <div class="jm-chips">
+        <a href="/JuManNa/MonthlyBulk?YYYYMM=@prevYm">← @(first.AddMonths(-1).Month)월</a>
+        <a href="/JuManNa/MonthlyBulk?YYYYMM=@nextYm">@(first.AddMonths(1).Month)월 →</a>
+        @if (have > 0)
+        {
+            <a href="/JuManNa/IndexQueryByYYYYMM?option=Rough&YYYYMM=@Model.YYYYMM">주제까지 보기</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(saved))
+    {
+        <div class="jm-ok">@saved</div>
+    }
+
+    <form asp-action="ProcessMonthlyBulk" method="post" id="bulkForm">
+        <input type="hidden" name="YYYYMM" value="@Model.YYYYMM" />
+
+        @for (int i = 0; i < Model.Days.Count; i++)
+        {
+            var d = Model.Days[i];
+            bool sun = d.ExposeDate.DayOfWeek == DayOfWeek.Sunday;
+            bool isNew = d.Id == 0;
+
+            <div class="jm-bk @(isNew ? "new" : "")">
+                <div class="hd">
+                    <b class="@(sun ? "sun" : "")">@(d.ExposeDate.Month)월 @(d.ExposeDate.Day)일</b><small>@week[(int)d.ExposeDate.DayOfWeek]</small>
+                    @if (isNew)
+                    {
+                        <em class="nw">새로 추가</em>
+                    }
+                    else if (string.IsNullOrWhiteSpace(d.BibleSubject))
+                    {
+                        <em class="ms">주제 없음</em>
+                    }
+                    <em class="ch">바뀜</em>
+                </div>
+
+                <input type="hidden" name="Days[@i].Id" value="@d.Id" />
+                <input type="hidden" name="Days[@i].ExposeDate" value="@d.ExposeDate.ToString("yyyy-MM-dd")" />
+                <input type="hidden" name="Days[@i].Changed" value="false" class="jm-chg" />
+
+                <div class="qb-f">
+                    <label for="s@(i)">주제</label>
+                    <input id="s@(i)" name="Days[@i].BibleSubject" value="@d.BibleSubject" class="qb-in" autocomplete="off" />
+                </div>
+
+                <div class="jm-bk-sec">본문</div>
+
+                <div class="qb-f">
+                    <label for="t@(i)">성경</label>
+                    <input id="t@(i)" name="Days[@i].BibleText" value="@d.BibleText" class="qb-in" autocomplete="off" />
+                </div>
+
+                <div class="qb-f">
+                    <span class="lbl">장 · 절</span>
+                    <div class="jm-rng">
+                        <div class="pair">
+                            <input type="number" min="1" name="Days[@i].FromJang" value="@d.FromJang" class="qb-in" inputmode="numeric" aria-label="@(d.ExposeDate.Day)일 시작 장" /><span>장</span>
+                            <input type="number" min="1" name="Days[@i].FromZul" value="@d.FromZul" class="qb-in" inputmode="numeric" aria-label="@(d.ExposeDate.Day)일 시작 절" /><span>절</span>
+                        </div>
+                        <i>~</i>
+                        <div class="pair">
+                            <input type="number" min="1" name="Days[@i].ToJang" value="@d.ToJang" class="qb-in" inputmode="numeric" aria-label="@(d.ExposeDate.Day)일 끝 장" /><span>장</span>
+                            <input type="number" min="1" name="Days[@i].ToZul" value="@d.ToZul" class="qb-in" inputmode="numeric" aria-label="@(d.ExposeDate.Day)일 끝 절" /><span>절</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="jm-bar stk">
+            <span class="cnt" id="chgCount">@(have == 0 ? $"새로 {fresh}일" : "바뀐 날 0개")</span>
+            <a href="/JuManNa/IndexGroupByYYYYMM">취소</a>
+            <button type="submit">@(have == 0 ? "한 달 추가하기" : "한 달 저장하기")</button>
+        </div>
+    </form>
+
+    <div class="qb-ft">
+        <span>월별 일괄 입력</span>
+        <span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var fresh = @fresh, haveAny = @(have > 0 ? "true" : "false");
+        var blocks = document.querySelectorAll('.jm-bk');
+        var count = document.getElementById('chgCount');
+        var dirty = false;
+
+        blocks.forEach(function (bk) {
+            var ins = bk.querySelectorAll('.qb-in');
+            ins.forEach(function (el) { el.dataset.org = el.value; });
+            bk.addEventListener('input', function () {
+                var changed = false;
+                ins.forEach(function (el) { if (el.value !== el.dataset.org) changed = true; });
+                bk.classList.toggle('ch', changed);
+                bk.querySelector('.jm-chg').value = changed ? 'true' : 'false';
+                refresh();
+            });
+        });
+
+        function refresh() {
+            var n = document.querySelectorAll('.jm-bk.ch:not(.new)').length;
+            dirty = document.querySelectorAll('.jm-bk.ch').length > 0;
+            count.textContent = haveAny ? ('바뀐 날 ' + n + '개' + (fresh > 0 ? ' · 새로 ' + fresh + '일' : '')) : ('새로 ' + fresh + '일');
+        }
+        if (haveAny && fresh > 0) refresh();
+
+        document.getElementById('bulkForm').addEventListener('submit', function () {
+            dirty = false;
+            document.getElementById('loadingOverlay').classList.add('on');
+        });
+        window.addEventListener('beforeunload', function (e) { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+        window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+    })();
+</script>
+</body>
+</html>

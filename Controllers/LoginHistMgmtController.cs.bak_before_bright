@@ -1,0 +1,48 @@
+﻿using BulletinBoard.BusinessLayer;
+using BulletinBoard.Models;
+using BulletinBoard.Services.Abstract;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+
+namespace BulletinBoard.Controllers
+{
+    [LogActionFilter]
+    public class LoginHistMgmtController : BaseController
+    {
+        private readonly IAuthService _authService;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IWebHostEnvironment _hostingEnvironment;
+ 
+        public LoginHistMgmtController(IAuthService authService,
+      UserManager<ApplicationUser> userManager,
+      IWebHostEnvironment hostingEnvironment) : base(authService, userManager, hostingEnvironment)
+        {
+            _authService = authService;
+            _userManager = userManager;
+            _hostingEnvironment = hostingEnvironment;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            ManageLoginHistory manageLoginHistory = new ManageLoginHistory();
+
+            return View(manageLoginHistory.getLoginHistory(_hostingEnvironment));
+        }          
+
+        public async Task<IActionResult> DeleteLoginHistory(string UserName)
+        {
+            ManageLoginHistory manageLoginHistory = new ManageLoginHistory();
+
+            manageLoginHistory.DeleteLoginHistory(UserName);
+
+            return RedirectToAction("Index");
+        }
+
+  
+
+    }
+}
+
+

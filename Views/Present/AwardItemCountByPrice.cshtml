@@ -1,0 +1,102 @@
+@model List<(string Label, int Min, int Max, int Total, int Visible, int Hidden)>
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Services
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+}
+
+@{
+    Layout = null;
+    var rows = Model ?? new();
+    // SuperAdmin이 아니면 숨김 항목을 집계에서 제외
+    if (!isSuperAdmin)
+        rows = rows.Select(r => (r.Label, r.Min, r.Max, Total: r.Visible, Visible: r.Visible, Hidden: 0)).ToList();
+    int total   = rows.Sum(r => r.Total);
+    int visible = rows.Sum(r => r.Visible);
+    int hidden  = rows.Sum(r => r.Hidden);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>가격대별 카운트</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/present-bright.css" asp-append-version="true">
+</head>
+<body>
+<div class="pw">
+
+    <div class="pbar">
+        <a href="/">← @ConstatsCommon.ToHome</a>
+        <span class="adBar">
+            <a href="/Present/AwardItemCountByKind">종류별</a>
+            <a href="/Present/AwardItemAdmin">전체 목록</a>
+        </span>
+    </div>
+
+    <div class="pK">잠실새내 유년부 입니다.</div>
+    <h1 class="pT">가격대별 카운트</h1>
+
+    <div class="adSum">
+        <span>전체 <b>@total</b>개</span>
+        <span class="v">표시 <b>@visible</b>개</span>
+        <span class="h">숨김 <b>@hidden</b>개</span>
+    </div>
+
+    <div class="adList">
+        @{
+            int maxCnt = rows.Any() ? rows.Max(r => r.Total) : 1;
+            if (maxCnt == 0) maxCnt = 1;
+        }
+        @for (int i = 0; i < rows.Count; i++)
+        {
+            var row      = rows[i];
+            int pct      = (int)Math.Round(row.Total * 100.0 / maxCnt);
+            string href  = row.Total > 0
+                ? $"/Present/AwardItemAdminByPrice?min={row.Min}&max={row.Max}"
+                : "#";
+
+            <a class="adRow @(row.Total == 0 ? "zero" : "")" href="@href">
+                <div class="adMain"><span class="adName">@row.Label</span></div>
+                <div class="adRight">
+                    <div class="adTrack"><div class="adFill" style="width:@pct%"></div></div>
+                    <span class="adCnt">@row.Total</span>
+                    <div class="adChips">
+                        <span class="adChip">표시 @row.Visible</span>
+                        @if (row.Hidden > 0)
+                        {
+                            <span class="adChip h">숨김 @row.Hidden</span>
+                        }
+                    </div>
+                    <span class="adGo">›</span>
+                </div>
+            </a>
+        }
+        @if (rows.Count == 0)
+        {
+            <div class="adNone">데이터가 없습니다.</div>
+        }
+    </div>
+
+    <div class="pft"><span>© 유년부 · 선물 관리</span><a href="/Present/AwardItemAdmin">전체 목록</a></div>
+</div>
+</body>
+</html>

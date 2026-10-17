@@ -1,0 +1,137 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.eBibles
+@{
+    int? currentJang = null;
+    string LangCDMethod = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.LangCD.ToString()) as String;
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+
+}
+
+@if (!string.IsNullOrEmpty(Model.BibleText) && Model.eBibleDatas.Count > 0)
+{
+    @foreach (var va in Model.eBibleDatas)
+    {
+        string readDoneStrng = string.Empty;
+        string readDoneStrng2 = string.Empty;
+        if (va.readDone == "t")
+        {
+            readDoneStrng = "read";
+        }
+        if (va.readDone == "t")
+        {
+            //  readDoneStrng2 = "(읽음😄)";
+        }
+        if (Model.FromJang != Model.ToJang && currentJang != va.Jang)
+        {
+            currentJang = va.Jang;
+            <div style="text-align : center ;font-weight:bold;font-size: 1.35rem;">@Model.BibleText @($"{@va.Jang}장")</div>
+        }
+
+        @if (@ControllerSource == "RhapsodyOfReality" && @ActionSource == "DetailWords")
+        {
+
+        }
+        else
+        {
+            if (!string.IsNullOrEmpty(va.BibleKeyWord))
+            {
+                string ss = SharedComm.MakeBibleSerialJangZul(va.BibleText, va.FromJang, va.FromZul, va.ToJang, va.ToZul);
+                if (va.LangCD == "ko")
+                {
+                    <h5 style="text-align : center ;padding-top:20px;"><span style=" color : Blue; font-weight:bold;">@va.BibleKeyWord</span><br><span style="font-size: 14px;">(@ss)</span></h5>
+                    <p style="text-align : center ; color : #006600; font-weight:bold;">@va.BibleSummary</p>
+                }
+            }
+        }
+        if ((LangCDMethod == "ko" || LangCDMethod == "en"))
+        {
+
+           // if (va.LangCD == LangCDMethod)
+            {
+                <div class="bible-card @readDoneStrng pressable" data-id="v1">
+                    <div class="bible-container">
+                        <span class="bible-line">
+                            <span class="verse-number">
+                                @(
+                                    $"{@va.zul}절"
+                                    )
+                            </span>
+                            @va.BibleData @readDoneStrng2
+                        </span>
+                        @if (await AuthService.IsSignedIn(User))
+                        {
+                            <span class="action-inline">
+                                @if (@va.readDone == "t")
+                                {
+                                    <button class="action-btn" title="읽음 표시" onclick="toggleRead(this, '@va.Id', '@UserId')">📖</button>
+                                }
+                                else
+                                {
+                                    <button class="action-btn" title="읽음 표시" onclick="toggleRead(this, '@va.Id', '@UserId')">📗</button>
+                                }
+
+                                @if (@va.bookmarkDone == "t")
+                                {
+                                    <button class="action-btn" title="북마크로 이동" onclick="location.href='/bibleCenter/bibleBookMarkDetail?VerseId=@va.Id'">📚</button>
+                                }
+                                else
+                                {
+                                    <button class="action-btn" title="북마크 하기" onclick="addBookmark(this, '@va.Id', '@UserId')">🔖</button>
+                                }
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="bible-card @readDoneStrng pressable" data-id="v1">
+                <div class="bible-container">
+                    <span class="bible-line">
+                        <span class="verse-number">@($"{@va.zul}절")</span>
+                        @va.BibleData @readDoneStrng2
+                    </span>
+                    @if (await AuthService.IsSignedIn(User))
+                    {
+                        <span class="action-inline">
+                            @if (@va.readDone == "t")
+                            {
+                                <button class="action-btn" title="읽음 표시" onclick="toggleRead(this, '@va.Id', '@UserId')">📖</button>
+                            }
+                            else
+                            {
+                                <button class="action-btn" title="읽음 표시" onclick="toggleRead(this, '@va.Id', '@UserId')">📗</button>
+                            }
+                            @if (@va.bookmarkDone == "t")
+                            {
+                                <button class="action-btn" title="북마크로 이동" onclick="location.href='/bibleCenter/bibleBookMarkDetail?VerseId=@va.Id'">📚</button>
+                            }
+                            else
+                            {
+                                <button class="action-btn" title="북마크 하기" onclick="addBookmark(this, '@va.Id', '@UserId')">🔖</button>
+                            }
+                        </span>
+                    }
+                </div>
+            </div>
+            @* <div data-id="@va.Id" data-url="/DailyMission/GetDivData" data-userID="@UserId" class="bible-text-line pressable">@va.zul. @va.BibleData @readDoneStrng</div>*@
+        }
+    }
+}
+else
+{
+    <p><strong>참고성경</strong></p>
+    <ul>
+        <li><a href="http://m.holybible.or.kr/mobile/B_RHV/">HolyBible</a></li>
+    </ul>
+}

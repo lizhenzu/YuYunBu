@@ -1,0 +1,141 @@
+@model BulletinBoard.Models.Jubo.JuboListViewModel
+@using BulletinBoard.Models.Jubo
+@{
+    ViewData["Title"] = "주일학교 주보 관리";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<link rel="stylesheet" href="~/css/jubo.css" />
+
+<div class="jubo-page">
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show"
+             style="border-radius:14px; border:none; background:linear-gradient(90deg,#D1FAE5,#A7F3D0); color:#065F46; font-weight:600;"
+             role="alert">
+            @TempData["Success"]
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+        </div>
+    }
+
+    <!-- Header -->
+    <div class="jubo-admin-header">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <div class="jubo-admin-title">📋 주일학교 주보 관리</div>
+                <div class="jubo-admin-subtitle">아이들을 위한 아름다운 주보를 만들어요! 🌈</div>
+            </div>
+            <a href="/Jubo/Create" class="btn-jubo btn-jubo-create">
+                ✨ 새 주보 만들기
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="jubo-stats">
+        <div class="jubo-stat-card sky">
+            <div class="jubo-stat-emoji">📋</div>
+            <div class="jubo-stat-num">@Model.TotalCount</div>
+            <div class="jubo-stat-label">전체 주보</div>
+        </div>
+        <div class="jubo-stat-card mint">
+            <div class="jubo-stat-emoji">✅</div>
+            <div class="jubo-stat-num">@Model.PublishedCount</div>
+            <div class="jubo-stat-label">발행됨</div>
+        </div>
+        <div class="jubo-stat-card yellow">
+            <div class="jubo-stat-emoji">📅</div>
+            <div class="jubo-stat-num">@Model.ThisMonthCount</div>
+            <div class="jubo-stat-label">이번 달</div>
+        </div>
+        <div class="jubo-stat-card pink">
+            <div class="jubo-stat-emoji">🌟</div>
+            <div class="jubo-stat-num">@(Model.TotalCount - Model.PublishedCount)</div>
+            <div class="jubo-stat-label">작성 중</div>
+        </div>
+    </div>
+
+    <!-- Card Grid -->
+    @if (!Model.Items.Any())
+    {
+        <div class="text-center py-5">
+            <div style="font-size:5rem; margin-bottom:1rem;">📝</div>
+            <h4 style="color:#94A3B8; font-weight:600;">아직 주보가 없어요!</h4>
+            <p style="color:#CBD5E0;">새 주보를 만들어 아이들에게 전달해보세요.</p>
+            <a href="/Jubo/Create" class="btn-jubo btn-jubo-create mt-2">✨ 첫 주보 만들기</a>
+        </div>
+    }
+    else
+    {
+        <div class="jubo-card-grid">
+            @foreach (var item in Model.Items)
+            {
+                var tplClass = item.TemplateType.ToLower();
+                <div class="jubo-card @tplClass">
+                    <div class="jubo-card-header @tplClass">
+                        <span class="jubo-date-badge @tplClass">
+                            📅 @item.JuboDate.ToString("yyyy.MM.dd")
+                        </span>
+                        @if (!string.IsNullOrEmpty(item.Season))
+                        {
+                            <span class="jubo-season-badge">🌸 @item.Season</span>
+                        }
+                        <span class="jubo-template-badge">
+                            @JuboTemplateTypes.GetEmoji(item.TemplateType)
+                            @JuboTemplateTypes.GetKoreanName(item.TemplateType)
+                        </span>
+                    </div>
+                    <div class="jubo-card-body">
+                        <span class="jubo-published-badge @(item.IsPublished ? "published" : "draft")">
+                            @(item.IsPublished ? "✅ 발행됨" : "✏️ 작성 중")
+                        </span>
+                        <div class="jubo-card-title">@item.Title</div>
+                        <div class="jubo-card-meta">
+                            @if (item.LastModifiedAt.HasValue)
+                            {
+                                <span>🕐 @item.LastModifiedAt.Value.ToString("MM/dd HH:mm")</span>
+                            }
+                            @if (!string.IsNullOrEmpty(item.LastModifiedBy))
+                            {
+                                <span>👤 @item.LastModifiedBy</span>
+                            }
+                            <span>🧩 블록 @(item.BlockCount)개</span>
+                        </div>
+                    </div>
+                    <div class="jubo-card-actions">
+                        <a href="/Jubo/Edit/@item.Id" class="btn-jubo btn-jubo-edit">✏️ 편집</a>
+                        <a href="/Jubo/Preview/@item.Id?half=top" class="btn-jubo btn-jubo-preview" target="_blank">👁 미리보기 上</a>
+                        <a href="/Jubo/Preview/@item.Id?half=bottom" class="btn-jubo btn-jubo-preview" target="_blank" style="background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff;">👁 미리보기 下</a>
+                        <a href="/Jubo/Print/@item.Id" class="btn-jubo btn-jubo-print" target="_blank">🖨 출력</a>
+                        <a href="/Jubo/Attendance/@item.Id" class="btn-jubo btn-jubo-attend">📊 출석</a>
+                        <button type="button" class="btn-jubo btn-jubo-danger"
+                                onclick="confirmDelete(@item.Id, '@Html.Raw(item.Title.Replace("'","\'"))')">🗑</button>
+
+                        <form id="deleteForm_@item.Id" asp-action="Delete" asp-route-id="@item.Id"
+                              method="post" style="display:none;">
+                            @Html.AntiForgeryToken()
+                        </form>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Pagination -->
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="mt-4 d-flex justify-content-center">
+            <ul class="pagination" style="gap:0.3rem;">
+                @for (int p = 1; p <= Model.TotalPages; p++)
+                {
+                    <li class="page-item @(p == Model.CurrentPage ? "active" : "")">
+                        <a class="page-link" href="/Jubo/Index?page=@p"
+                           style="border-radius:50px; border:2px solid #E2E8F0; font-weight:600;">@p</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+</div>
+
+<script src="~/js/jubo.js"></script>

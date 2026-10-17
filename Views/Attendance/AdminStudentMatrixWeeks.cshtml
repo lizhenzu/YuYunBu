@@ -1,0 +1,286 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using System.Globalization
+@model BulletinBoard.ViewModels.Attendance.AttendanceAdminStudentMatrixVM
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 아이별 주별 출석표(52주) — 이름은 왼쪽 고정 · 주일마다 "3/29" 날짜와 출석 수 · 옆으로 밀어 지난 주일
+    ViewData["AttTab"] = "more";
+
+    string keyOf(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var sundays = Model.Sundays ?? new List<DateTime>();
+    int weeks = Math.Max(1, sundays.Count);
+    var keys = sundays.Select(keyOf).ToList();
+
+    int Present(BulletinBoard.ViewModels.Attendance.AttendanceAdminStudentMatrixVM.Row r)
+        => keys.Count(k => r.PresentMap.TryGetValue(k, out var ok) && ok);
+    int Pct(int p) => (int)Math.Round(p * 100.0 / weeks);
+
+    var rows = Model.Rows.Select(r => new { Row = r, P = Present(r) }).ToList();
+    var weekTotals = keys.Select(k => Model.Rows.Count(r => r.PresentMap.TryGetValue(k, out var ok) && ok)).ToList();
+    int maxWeek = Math.Max(1, weekTotals.DefaultIfEmpty(0).Max());
+    int kids = rows.Count;
+    int avg = kids == 0 ? 0 : (int)Math.Round(rows.Average(x => x.P) * 100.0 / weeks);
+    int perfect = rows.Count(x => x.P >= weeks);
+    var grades = rows.Where(x => x.Row.ClassYear > 0).Select(x => x.Row.ClassYear).Distinct().OrderBy(x => x).ToList();
+
+    // 달 머리 — 그 달 첫 주일 칸에 "9월"
+    var months = new List<(int Col, int Span, string Label)>();
+    for (int i = 0; i < sundays.Count; i++)
+    {
+        if (i == 0 || sundays[i].Month != sundays[i - 1].Month)
+        {
+            int span = 1;
+            while (i + span < sundays.Count && sundays[i + span].Month == sundays[i].Month) span++;
+            months.Add((i + 1, span, $"{sundays[i].Month}월"));
+        }
+    }
+    bool MonthStart(int i) => i > 0 && sundays[i].Month != sundays[i - 1].Month;
+
+    var end = Model.EndSunday;
+    var thisSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    string Url(DateTime d, int w) => $"/Attendance/AdminStudentMatrixWeeks?date={d:yyyy-MM-dd}&weeks={w}";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>아이별 주별 출석표 · @(weeks)주</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --wk: @weeks; --cellH: 12px; --gap: 2px; }
+        .sh { max-width: 980px; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .dn { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; color: var(--headdim); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+        .dn a { color: var(--headdim); border-bottom: 1px solid #E1E6EE; }
+        .dn a:hover, .dn a.on { color: var(--headk); border-color: var(--headk); }
+        .st { display: flex; gap: 22px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+
+        /* 주일별 출석 수 막대 */
+        .wkChart { margin-top: 18px; padding: 14px 12px 8px; background: var(--card); border: 1px solid var(--rule); }
+        .wkChart .t { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); margin-bottom: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(var(--wk), minmax(0, 1fr)); column-gap: var(--gap); }
+        .bars { height: 60px; align-items: end; }
+        .bars a { display: block; background: var(--acc); min-height: 2px; }
+        .bars a:hover { background: var(--tx); }
+        .bars a.now { background: var(--tx); }
+        .mo { margin-top: 5px; font-size: 10.5px; color: var(--dim); }
+        .mo span { white-space: nowrap; overflow: visible; border-left: 1px solid var(--rule); padding-left: 3px; }
+        .mo span:first-child { border-left: 0; padding-left: 0; }
+
+        /* 도구 */
+        .tools { background: var(--card); border-bottom: 1px solid var(--rule); } /* 표가 자기 머리(날짜)를 고정하므로 도구는 붙이지 않음 */
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .tRow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .tRow + .tRow { margin-top: 8px; }
+        .chips { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+        .chips button, .seg button { font-family: inherit; font-size: 13px; padding: 8px 11px; border: 1px solid var(--rule); background: var(--card); color: var(--dim2); cursor: pointer; white-space: nowrap; }
+        .chips button.on { background: var(--tx); border-color: var(--tx); color: var(--bg); font-weight: 600; }
+        .seg { display: flex; }
+        .seg button + button { border-left: 0; }
+        .seg button.on { background: var(--mark); color: var(--tx); font-weight: 600; }
+        .srch { flex: 1; min-width: 120px; height: 38px; padding: 0 10px; border: 1px solid var(--rule); background: var(--bg); font-family: inherit; font-size: 15px; color: var(--tx); outline: none; border-radius: 0; }
+        .srch:focus { border-color: var(--tx); }
+        .right { margin-left: auto; }
+
+        /* 주별 표 — 이름은 왼쪽 고정, 날짜는 옆으로 밀기, 머리(달·날짜·출석 수)는 위에 고정 */
+        .shW { max-width: 1440px; margin: 0 auto; padding: 0 16px; }
+        .hint { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; flex-wrap: wrap; margin-top: 12px; font-size: 11.5px; color: var(--dim); }
+        .lg i { display: inline-block; width: 12px; height: 9px; border: 1px solid var(--rule); vertical-align: -1px; margin: 0 3px 0 8px; }
+        .lg i.p { background: var(--acc); border-color: var(--acc); }
+        .lg i.x3 { border-color: var(--danger); }
+        .mxW { margin-top: 6px; overflow: auto; max-height: calc(100vh - 120px); max-height: calc(100dvh - 120px); border: 1px solid var(--rule); background: var(--bg); overscroll-behavior-x: contain; }
+        table.wk { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+        .wk th, .wk td { padding: 0; }
+        .wk .nm { position: sticky; left: 0; z-index: 2; background: var(--bg); min-width: 112px; max-width: 112px; padding: 7px 8px 7px 12px; text-align: left; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--line); }
+        .wk .nm b { display: block; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wk .nm small { display: block; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); white-space: nowrap; margin-top: 1px; }
+        .wk .nm small em { font-style: normal; font-size: 11.5px; font-weight: 500; color: var(--tx); }
+        .wk tr.lo .nm small em { color: var(--danger); }
+        .wk thead th { position: sticky; z-index: 3; background: var(--bg); }
+        .wk thead th.nm { top: 0; z-index: 4; vertical-align: bottom; font-size: 10.5px; font-weight: 600; color: var(--dim); border-bottom: 1px solid var(--tx); }
+        .wk .r1 th { top: 0; height: 18px; }
+        .wk .r2 th { top: 18px; height: 22px; }
+        .wk .r3 th { top: 40px; height: 18px; border-bottom: 1px solid var(--tx); }
+        .wk .mh { font-size: 10.5px; font-weight: 600; text-align: left; padding-left: 4px; white-space: nowrap; }
+        .wk .dh { min-width: 34px; width: 34px; text-align: center; }
+        .wk .dh a { display: block; font-family: "Inter", sans-serif; font-size: 11px; font-weight: 500; color: var(--dim2); line-height: 22px; }
+        .wk .dh a:hover { color: var(--acc); }
+        .wk .tn { font-family: "Inter", sans-serif; font-size: 10px; font-weight: 600; color: var(--acc); text-align: center; white-space: nowrap; }
+        .wk .m1 { border-left: 1px solid var(--dim); }
+        .wk .now { background: var(--mark); }
+        .wk td.c { text-align: center; border-bottom: 1px solid var(--line); }
+        .wk td.c i { display: inline-block; width: 22px; height: 14px; border: 1px solid var(--rule); vertical-align: middle; }
+        .wk td.c i.p { background: var(--acc); border-color: var(--acc); }
+        .wk td.c i.x3 { border-color: var(--danger); }
+        @@media (min-width: 1200px) {
+            .wk .dh { min-width: 28px; width: 28px; }
+            .wk td.c i { width: 18px; }
+        }
+        .none { padding: 30px 0; text-align: center; color: var(--dim); font-size: 14px; }
+        .hidden { display: none !important; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/att-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/Index">출석부</a><span class="sep">›</span><a href="/Attendance/More">더보기</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdK">RECORD · @end.Year</div>
+            <h1 class="hdT">아이별 주별 출석표(52주)</h1>
+            <div class="dn">
+                <span>@Model.StartSunday.ToString("M.d") ~ @end.ToString("M.d") · @(weeks)주</span>
+                <span>·</span>
+                <a href="@Url(end, 4)" class="@(weeks == 4 ? "on" : "")">최근 4주</a>
+                <a href="@Url(end, 13)" class="@(weeks == 13 ? "on" : "")">13주</a>
+                <a href="@Url(end, 26)" class="@(weeks == 26 ? "on" : "")">26주</a>
+            </div>
+            <div class="st">
+                <div>아이<b>@kids</b></div>
+                <div>평균 출석률<b>@(avg)%</b></div>
+                <div class="k">개근<b>@perfect</b></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="sh">
+        @* 주일별 출석 수 — 막대를 누르면 그 주일 명단 *@
+        <div class="wkChart">
+            <div class="t"><span>주일별 출석 수</span><span>가장 많은 주 @(maxWeek)명</span></div>
+            <div class="grid bars">
+                @for (int i = 0; i < sundays.Count; i++)
+                {
+                    var h = (int)Math.Round(weekTotals[i] * 60.0 / maxWeek);
+                    <a href="/Attendance/SundayStudentsPC?sunday=@keys[i]" class="js-roster @(i == sundays.Count - 1 ? "now" : "")" data-mobile="/Attendance/SundayStudentsMobile?sunday=@keys[i]"
+                       style="height:@(h)px" title="@sundays[i].ToString("M/d", CultureInfo.InvariantCulture) · @(weekTotals[i])명 출석"></a>
+                }
+            </div>
+            <div class="grid mo">
+                @foreach (var m in months) { <span style="grid-column:@m.Col / span @m.Span">@m.Label</span> }
+            </div>
+        </div>
+    </div>
+
+    <div class="tools" style="margin-top:14px">
+        <div class="sh">
+            <div class="tRow">
+                <div class="chips" aria-label="학년">
+                    <button type="button" data-g="0" class="on">전체</button>
+                    @foreach (var g in grades) { <button type="button" data-g="@g">@(g)학년</button> }
+                </div>
+            </div>
+            <div class="tRow">
+                <input class="srch" id="q" type="search" placeholder="이름 찾기" aria-label="이름 찾기" />
+                <div class="seg" aria-label="정렬">
+                    <button type="button" data-s="class" class="on">반</button>
+                    <button type="button" data-s="name">이름</button>
+                    <button type="button" data-s="rate">출석률</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="shW">
+        <div class="hint">
+            <span>← 밀면 지난 주일 · 날짜 누르면 명단</span>
+            <span class="lg"><i class="p"></i>출석<i></i>결석<i class="x3"></i>연속 결석</span>
+        </div>
+        <div class="mxW" id="mxW">
+            <table class="wk">
+                <thead>
+                    <tr class="r1">
+                        <th class="nm" rowspan="3">이름 · 출석률</th>
+                        @foreach (var m in months)
+                        {
+                            <th class="mh @(m.Col > 1 ? "m1" : "")" colspan="@m.Span">@m.Label</th>
+                        }
+                    </tr>
+                    <tr class="r2">
+                        @for (int i = 0; i < sundays.Count; i++)
+                        {
+                            <th class="dh @(MonthStart(i) ? "m1" : "") @(i == sundays.Count - 1 ? "now" : "")">
+                                <a href="/Attendance/SundayStudentsPC?sunday=@keys[i]" class="js-roster" data-mobile="/Attendance/SundayStudentsMobile?sunday=@keys[i]" title="@sundays[i].ToString("M월 d일") 명단">@sundays[i].ToString("M/d", CultureInfo.InvariantCulture)</a>
+                            </th>
+                        }
+                    </tr>
+                    <tr class="r3">
+                        @for (int i = 0; i < sundays.Count; i++)
+                        {
+                            <th class="tn @(MonthStart(i) ? "m1" : "") @(i == sundays.Count - 1 ? "now" : "")">@(weekTotals[i])명</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody id="list">
+                    @foreach (var x in rows)
+                    {
+                        var r = x.Row;
+                        int pct = Pct(x.P);
+                        // 마지막 3주 이상 연속 결석은 빨간 테두리
+                        int tail = 0; for (int i = keys.Count - 1; i >= 0 && !(r.PresentMap.TryGetValue(keys[i], out var q) && q); i--) tail++;
+                        <tr class="@(pct < 50 ? "lo" : "")" data-g="@r.ClassYear" data-class="@(r.ClassYear * 1000 + r.ClassBan)" data-name="@r.StudentName" data-rate="@pct" data-p="@x.P">
+                            <td class="nm" title="@r.StudentName · @r.ClassLabel · @x.P/@weeks"><b>@r.StudentName</b><small>@(r.ClassYear > 0 ? $"{r.ClassYear}학년 {r.ClassBan}반" : "-") · <em>@(pct)%</em></small></td>
+                            @for (int i = 0; i < keys.Count; i++)
+                            {
+                                bool ok = r.PresentMap.TryGetValue(keys[i], out var v) && v;
+                                bool x3 = !ok && tail >= 3 && i >= keys.Count - tail;
+                                <td class="c @(MonthStart(i) ? "m1" : "") @(i == keys.Count - 1 ? "now" : "")"><i class="@(ok ? "p" : "") @(x3 ? "x3" : "")" title="@sundays[i].ToString("M/d", CultureInfo.InvariantCulture) @(ok ? "출석" : "결석")"></i></td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="none hidden" id="noHit">찾는 아이가 없어요.</div>
+        <div class="ft"><span>칸 하나 = 주일 하나 · 맨 오른쪽(색칠된 줄)이 가장 최근 주일</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    let grade = '0', sort = 'class', dir = 1, q = '';
+    const list = document.getElementById('list');
+    const cmp = (a, b) => {
+        const n = (x, k) => parseInt(x.dataset[k] || '0', 10), s = (x) => x.dataset.name || '';
+        if (sort === 'name')  return s(a).localeCompare(s(b), 'ko') * dir || n(a, 'class') - n(b, 'class');
+        if (sort === 'rate')  return (n(a, 'rate') - n(b, 'rate')) * dir || s(a).localeCompare(s(b), 'ko');
+        return (n(a, 'class') - n(b, 'class')) * dir || s(a).localeCompare(s(b), 'ko');
+    };
+    function apply() {
+        let hits = 0;
+        Array.from(list.children).sort(cmp).forEach(el => {
+            const show = (grade === '0' || el.dataset.g === grade) && (!q || (el.dataset.name || '').includes(q));
+            el.classList.toggle('hidden', !show);
+            if (show) hits++;
+            list.appendChild(el);
+        });
+        document.getElementById('noHit').classList.toggle('hidden', hits > 0);
+    }
+    document.querySelectorAll('.chips button').forEach(b => b.addEventListener('click', () => {
+        grade = b.dataset.g; document.querySelectorAll('.chips button').forEach(x => x.classList.toggle('on', x === b)); apply();
+    }));
+    document.querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => {
+        if (sort === b.dataset.s) dir = -dir; else { sort = b.dataset.s; dir = sort === 'rate' ? -1 : 1; }
+        document.querySelectorAll('[data-s]').forEach(x => { x.classList.toggle('on', x === b); x.textContent = x.textContent.replace(/ [▲▼]$/, ''); });
+        b.textContent += dir === 1 ? ' ▲' : ' ▼';
+        apply();
+    }));
+    document.getElementById('q').addEventListener('input', e => { q = e.target.value.trim(); apply(); });
+    // 막대 → 명단: 휴대폰이면 모바일 명단
+    if (window.matchMedia('(max-width: 759px)').matches)
+        document.querySelectorAll('.js-roster').forEach(a => { a.href = a.dataset.mobile; });
+    apply();
+    // 처음엔 가장 최근 주일(오른쪽 끝)부터
+    const w = document.getElementById('mxW'); w.scrollLeft = w.scrollWidth;
+})();
+</script>
+</body>
+</html>

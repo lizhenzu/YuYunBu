@@ -1,0 +1,351 @@
+﻿@model BulletinBoard.Models.OpicData
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Interview</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+
+        header {
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding-top: 50px;
+            padding-bottom: 50px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            margin-bottom: 70px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: left;
+            transition: transform 0.3s ease-in-out;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+            .card:hover {
+                transform: scale(1.05);
+            }
+
+        .card-title {
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: #282c34;
+        }
+
+        .card-content {
+            font-size: 17px;
+            margin-bottom: 20px;
+        }
+
+        .card-buttons {
+            display: flex;
+            justify-content: space-evenly;
+            gap: 5px;
+        }
+
+            .card-buttons button {
+                padding: 8px 12px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                color: white;
+                font-size: 0.9rem;
+            }
+
+
+
+
+        .edit-button {
+            background-color: #007bff;
+        }
+
+        .mark-button {
+            background-color: #28a745;
+        }
+
+        .answer-button {
+            background-color: #00704A;
+        }
+
+        .delete-button {
+            background-color: #CC0000;
+        }
+
+        .login-button {
+            background-color: #9e1a20;
+        }
+
+        .list-button {
+            background-color: #008080;
+        }
+
+        .home-button {
+            background-color: #16a085;
+        }
+
+
+        footer {
+            background-color: #282c34;
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+
+        .formatted-text {
+            white-space: pre-wrap; /* 유지된 공백 및 줄바꿈 */
+            word-wrap: break-word; /* 너무 긴 단어를 자동으로 줄바꿈 */
+        }
+
+
+        @@media (max-width: 768px) {
+            header {
+                font-size: 2rem;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .card-title {
+                font-size: 1.25rem;
+                font-weight: bold;
+            }
+
+            .card-buttons button {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+    <script src="/js/common2.js"></script>
+</head>
+<body>
+
+    <header>
+        English Interview (Detail)
+    </header>
+
+    <div class="container">
+        <h2>
+            Question part
+        </h2>
+        <div class="card">
+            <div class="card-title">@Model.PageNo</div>
+            <div class="card-content">
+                <p>@Model.Question</p>
+            </div>
+        </div>
+
+        <h2>
+            Answer part
+        </h2>
+
+        @if (!string.IsNullOrEmpty(Model.KeyWord1))
+        {
+            <div class="card">
+                <div class="card-title">@Model.KeyWord1</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.KeyWord1Desc</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.KeyWord2))
+        {
+            <div class="card">
+                <div class="card-title">@Model.KeyWord2</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.KeyWord2Desc</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.KeyWord3))
+        {
+            <div class="card">
+                <div class="card-title">@Model.KeyWord3</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.KeyWord3Desc</p>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.KeyWord4))
+        {
+            <div class="card">
+                <div class="card-title">@Model.KeyWord4</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.KeyWord4Desc</p>
+                </div>
+            </div>
+        }
+
+        @if (string.IsNullOrEmpty(Model.KeyWord1))
+        {
+            @if (!string.IsNullOrEmpty(Model.BodyContents))
+            {
+                <div class="card">
+                    <div class="card-title">BodyContents</div>
+                    <div class="card-content">
+                        <p class="formatted-text">@Model.BodyContents</p>
+                    </div>
+                </div>
+            }
+        }
+
+        @if (!string.IsNullOrEmpty(Model.Vocabulary))
+        {
+            <div class="card">
+                <div class="card-title">Vocabulary</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.Vocabulary</p>
+                </div>
+            </div>
+        }
+
+
+        @if (!string.IsNullOrEmpty(Model.Memo))
+        {
+            <div class="card">
+                <div class="card-title">Memo</div>
+                <div class="card-content">
+                    <p class="formatted-text">@Model.Memo</p>
+                </div>
+            </div>
+        }
+
+
+
+
+
+        @if (await AuthService.IsSignedIn(User) &&
+        (
+        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+        )
+        {
+            @if (!string.IsNullOrEmpty(Model.BodyContents))
+            {
+                <div class="card">
+                    <div class="card-title">BodyContents</div>
+                    <div class="card-content">
+                        <p class="formatted-text">@Model.BodyContents</p>
+                    </div>
+                </div>
+            }
+        }
+
+
+
+
+        <div class="card">
+            <div class="card-buttons">
+                <button class="home-button" onclick="location.href='/'">Home</button>
+                <button class="list-button" onclick="location.href='/LearningCenter/List'">List</button>
+
+                @if (await AuthService.IsSignedIn(User)) 
+                {
+                }
+                else
+                {
+                    <button class="login-button" onclick="location.href='/Identity/Account/Login'">Login</button>
+                }
+
+
+                @if (await AuthService.IsSignedIn(User) &&
+                (
+                await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+                )
+                {
+                    <button class="edit-button" onclick="location.href='/LearningCenter/EditView?Id=@Model.Id'">Edit</button>
+                    <button class="mark-button" onclick="location.href='/LearningCenter/MarkView?Id=@Model.Id'">Verified</button>
+                   @* <button class="delete-button" onclick="processDelete(@Model.Id)">Del</button>*@
+                }
+
+
+
+            </div>
+        </div>
+
+
+    </div>
+
+    <footer>
+        &copy; 2024 Learning Platform
+    </footer>
+
+    <script>
+
+        async function processDelete(varId) {
+
+            try {
+
+                let result = await confirmMessage(true, [varId, '이 문서를 삭제 할까요?'], null, '진행'); // 취소 버튼 표시
+                if (result === 'y') {
+
+                    $.get('/LearningCenter/DeleteView', { Id: varId }, function () {
+                        location.reload();
+                    });
+
+                } else if (result === 'c') {
+                    //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                    // 작업 취소 로직
+                    return;
+                }
+
+            } catch (error) {
+                // "취소" 버튼을 누르면 여기서 멈춤
+                return;
+            }
+        }
+        function goToPage(url) {
+            window.location.href = url;
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+@model IEnumerable<BulletinBoard.Models.MismatchClickHistoryForQuestions>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 답변 정정 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 예전 _Layout_Mission 대신 단독 화면.  보정 주소(CorrectMismatchClickHistoryForQuestion)는 그대로, 누르기 전에 확인창을 거친다.
+    · 이전 화면은 MismatchClickHistoryForQuestion.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    bool isSuper = await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.MismatchClickHistoryForQuestions>();
+    int no = 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>퀴즈 답변 정정</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .mm-row { display: flex; gap: 12px; padding: 16px 2px; border-bottom: 1px solid var(--line); }
+        .mm-row .n { flex: none; width: 28px; font-size: 16px; font-weight: 800; color: #7FA3DB; }
+        .mm-row .t { flex: 1; min-width: 0; }
+        .mm-who { font-size: 15px; font-weight: 800; color: var(--ink); }
+        .mm-who small { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--dim2); }
+        .mm-cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .mm-cmp div { border-radius: 12px; padding: 9px 12px; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+        .mm-cmp i { display: block; margin-bottom: 2px; font-style: normal; font-size: 11px; font-weight: 800; }
+        .mm-cmp .a { background: var(--redbg); color: var(--red); }
+        .mm-cmp .c { background: var(--okbg); color: var(--ok); }
+        .mm-when { margin-top: 8px; font-size: 12px; color: var(--dim2); }
+        .mm-ac { margin-top: 10px; }
+        .mm-ac button { border: 0; font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 6px 16px; background: var(--blue); color: #fff; cursor: pointer; }
+        .mm-ac button:hover { background: #1F6FDB; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>답변 정정</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k">MISMATCH</div>
+    <h1 class="qb-h1">퀴즈 답변 정정<small>@(list.Count)건</small></h1>
+    <div class="qb-sub">답변 기록과 정답이 맞지 않는 건을 바로잡아요.</div>
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">맞지 않는 기록이 없어요</div>
+    }
+
+    @foreach (var item in list)
+    {
+        no++;
+        <div class="mm-row">
+            <span class="n">@no.ToString("00")</span>
+            <div class="t">
+                <div class="mm-who">@item.FullName<small>@item.UserName</small></div>
+                <div class="mm-cmp">
+                    <div class="a"><i>답변</i>@item.AnswerQ</div>
+                    <div class="c"><i>정답</i>@item.CorrectAnswer</div>
+                </div>
+                <div class="mm-when">클릭 @item.ClickDate.ToString("yyyy-MM-dd HH:mm:ss") · 이력 @item.InsertDT.ToString("yyyy-MM-dd HH:mm:ss")</div>
+                @if (isSuper)
+                {
+                    <div class="mm-ac">
+                        <button type="button" data-fix="/CheckPoint/CorrectMismatchClickHistoryForQuestion?Id=@item.Id&QuestionId=@item.QuestionId&UserName=@Uri.EscapeDataString(item.UserName ?? "")" data-who="@item.FullName (@item.UserName)">보정</button>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>답변 정정 @(list.Count)건</span>
+        <span><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/common2.js"></script>
+<script>
+    // 보정 — 데이터를 바꾸는 동작이라 확인창을 거친다.
+    document.addEventListener('click', async function (e) {
+        var b = e.target.closest('[data-fix]');
+        if (!b) return;
+        var msg = b.getAttribute('data-who') + ' 님의 답변 기록을 정답에 맞춰 보정 할까요?';
+        var go = true;
+        if (typeof confirmMessage === 'function') {
+            go = (await confirmMessage(true, [msg], null, '진행')) === 'y';
+        } else {
+            go = confirm(msg);
+        }
+        if (go) location.href = b.getAttribute('data-fix');
+    });
+</script>
+</body>
+</html>

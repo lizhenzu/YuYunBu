@@ -1,0 +1,146 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model IEnumerable<BulletinBoard.Models.CodeData>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Information Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            /*   background-color: #fff;*/
+            padding: 20px;
+            border-radius: 8px;
+            /*   box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);*/
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .profile-pic {
+            width: 170px;
+            height: 170px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            object-fit: cover;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+            .buttons button {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+            }
+    </style>
+</head>
+<body>
+    @{
+        string deptString = $"{@ViewData["DeptNM"]}를 선택 하셨어요.";
+    }
+    <div class="container">
+        <h2>주일학교부서 정보변경</h2>
+@*
+        <div>
+            <img id="myImage" src="@ViewData["ProfilePicturePath"]" alt="Profile Picture" class="profile-picture" style="width: 170px; height: 170px; border-radius: 50%; object-fit: cover;border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);">
+
+        </div>*@
+
+        <h3>이름 : @__UserInfos.FullName</h3>
+     
+
+        <h4>@deptString</h4>
+        <div class="buttons" style="flex-wrap: wrap;">
+            @foreach (var item in Model)
+            {
+                <button type="button" style="background-color:#00C853;" onclick="window.location.href='/HumanResource/ChangeUseRoleMainProcess?UserId=@__UserInfos.UserId&DeptCode=@ViewData["DeptCode"]&DeptNM=@ViewData["DeptNM"]&RoleCode=@item.MinorCD&RoleNM=@item.MinorNM';">@item.MinorNM 인가요?</button>
+            }
+            @*            <button type="button" style="background-color:#00BCD4;" onclick="window.location.href='/HumanResource/ChangeUserDeptInfoProcess?UserId=@Model.UserId&UserDept=456';">초등부(교사/교역자)인가요?</button>
+            <button type="button" style="background-color:#00704A;" onclick="window.location.href='/HumanResource/ChangeUserClassInfo?UserId=@Model.UserId';">학생(유년부/초등부)인가요?</button>
+            *@
+        </div>
+
+        <div class="buttons">
+            <button type="button" onclick="window.location.href='/';">Home</button>
+            <button type="button" onclick="window.location.href='/HumanResource/ChangeUserDeptInfoMain?UserId=@__UserInfos.UserId';">이전화면</button>
+@*            <button type="button" onclick="document.querySelector('form').submit();">로그아웃</button>
+*@        </div>
+    </div>
+    <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" style="display: none;">
+        <button type="submit" class="mission-button ">이동</button>
+    </form>
+
+    <script>
+        function loadLatestImage() {
+            const imageElement = document.getElementById('myImage');
+            const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+            imageElement.src = `@__UserInfos.ProfilePicturePath?${timestamp}`;
+        }
+
+        // 페이지 로드 시 실행 또는 필요할 때 호출
+        window.onload = loadLatestImage;
+                // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+    </script>
+
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+        function goBack() {
+            window.history.back();
+        }
+
+    </script>
+</body>
+</html>

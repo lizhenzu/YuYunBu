@@ -1,0 +1,479 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@inject IAuthService AuthService
+
+@using System.Globalization
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+
+@{
+    var selected = Model.SelectedDate.Date;
+    var today = DateHelper.GetKoreaNow();
+
+    var monthFirst = new DateTime(selected.Year, selected.Month, 1);
+
+    int startOffset = (int)monthFirst.DayOfWeek; // Sunday=0
+    var gridStart = monthFirst.AddDays(-startOffset);
+
+    const int totalCells = 42;
+
+    Func<DateTime, bool> isActionable = (d) =>
+    {
+        int diff = (today - d.Date).Days;
+        return diff >= 0 && diff <= 2; // 오늘/어제/그저께만
+    };
+
+    var prevMonth = monthFirst.AddMonths(-1);
+    var nextMonth = monthFirst.AddMonths(1);
+
+    string fmt(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    string keyOf(DateTime d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    // ✅ 완료 스탬프 이미지 (요청 경로)
+    var doneStampUrl = "/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_05.png";
+}
+
+@* ✅ 접기/펼치기 래퍼 (처음에는 접힘: open 속성 없음) *@
+<details class="calFold"  open  aria-label="미션 달력 접기/펼치기">
+    <summary class="calFoldSummary" aria-label="미션 달력 펼치기/접기">
+      <span class="calFoldLeft">
+    <span class="titleRow">
+        <span class="calFoldIcon">📅</span>
+        <span class="calFoldTitle">@monthFirst.ToString("yyyy년 M월") 미션 달력</span>
+    </span>
+    <div class="hint">날짜를 누르면 그날 미션으로 이동해요</div>
+</span>
+
+        <span class="calFoldRight">
+            <span class="calFoldHint">눌러서 접기</span>
+            <span class="calFoldChevron" aria-hidden="true">▾</span>
+        </span>
+    </summary>
+
+    <div class="calWrap" aria-label="미션 달력">
+
+        <div class="calHead">
+            <div class="calMonth">
+                <span class="calMonthTitle">📅 @monthFirst.ToString("yyyy년 M월")</span>
+            </div>
+
+            <div class="calNav">
+                <a class="calNavBtn" href="/DailyMission2?date=@fmt(prevMonth)" aria-label="이전 달">◀</a>
+                <a class="calNavBtn ghost" href="/DailyMission2?date=@fmt(today)" aria-label="오늘로">오늘</a>
+                <a class="calNavBtn" href="/DailyMission2?date=@fmt(nextMonth)" aria-label="다음 달">▶</a>
+            </div>
+        </div>
+
+        <div class="calDow" role="row" aria-label="요일">
+            <div class="dow sun">일</div>
+            <div class="dow">월</div>
+            <div class="dow">화</div>
+            <div class="dow">수</div>
+            <div class="dow">목</div>
+            <div class="dow">금</div>
+            <div class="dow sat">토</div>
+        </div>
+
+        <div class="calGrid" role="grid" aria-label="날짜 선택">
+            @for (int i = 0; i < totalCells; i++)
+            {
+                var day = gridStart.AddDays(i).Date;
+
+                bool inMonth = (day.Month == monthFirst.Month && day.Year == monthFirst.Year);
+                bool isToday = (day == today);
+                bool isSelected = (day == selected);
+
+                bool actionable = isActionable(day);
+                bool oldLocked = (today - day).Days > 2;
+                bool futureLocked = day > today;
+
+                string cls = "cell";
+                if (!inMonth) cls += " out";
+                if (isToday) cls += " today";
+                if (isSelected) cls += " selected";
+                if (actionable) cls += " actionable";
+                if (oldLocked || futureLocked) cls += " locked";
+
+                string label = day.ToString("yyyy-MM-dd") +
+                (isToday ? " (오늘)" : "") +
+                (isSelected ? " (선택됨)" : "");
+
+                var k = keyOf(day);
+
+                int dayPoint = 0;
+                bool hasPoint = false;
+
+                try
+                {
+                    var map = Model.GetType().GetProperty("CalendarDayPointMap")?.GetValue(Model) as System.Collections.IDictionary;
+                    if (map != null && map.Contains(k))
+                    {
+                        var pv = map[k];
+                        if (pv != null)
+                        {
+                            dayPoint = Convert.ToInt32(pv);
+                            hasPoint = true;
+                        }
+                    }
+                }
+                catch { /* ignore */ }
+
+                bool doneAny = (hasPoint && dayPoint > 0);
+
+                if (!doneAny && Model.CalendarAllDoneMap != null && Model.CalendarAllDoneMap.TryGetValue(k, out var v))
+                    doneAny = v;
+
+                <a role="gridcell"
+                   class="@cls"
+                   href="/DailyMission2?date=@fmt(day)"
+                   aria-label="@label">
+
+                    <div class="dayTop">
+                        <span class="dayNum">@day.Day</span>
+
+                        @if (hasPoint && dayPoint > 0)
+                        {
+                            <span class="dayPoint" title="일자별 토털 점수">@dayPoint</span>
+                        }
+                    </div>
+
+                    @if (doneAny)
+                    {
+                        <img class="doneStamp"
+                             src="@doneStampUrl"
+                             alt="수행 완료 스탬프"
+                             loading="lazy" />
+                    }
+
+                    <div class="dayHint">
+                        @if (futureLocked || oldLocked)
+                        {
+                            <span class="hintText lock">잠금</span>
+                        }
+                        else if (actionable)
+                        {
+                            <span class="hintText go">가능</span>
+                        }
+                        else
+                        {
+                            <span class="hintText">&nbsp;</span>
+                        }
+                    </div>
+
+                </a>
+            }
+        </div>
+
+    </div>
+</details>
+
+<style>
+    /* ✅ 접기/펼치기 래퍼 */
+    .calFold {
+        border: 0;
+        margin: 0;
+    }
+
+    .calFoldSummary {
+        list-style: none;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(2,6,23,.10);
+        background: rgba(255,255,255,.78);
+        box-shadow: 0 12px 30px rgba(2,6,23,.06);
+     @*    margin-bottom: 8px; *@
+    }
+
+    /* 기본 삼각형 마커 제거 */
+    .calFoldSummary::-webkit-details-marker { display: none; }
+    .calFoldSummary::marker { content: ""; }
+
+.calFoldLeft {
+    display: flex;              /* inline-flex → flex */
+    flex-direction: column;    /* 세로 정렬 */
+    align-items: flex-start;   /* 왼쪽 정렬 */
+    gap: 2px;                   /* 줄 간격 */
+    font-weight: 900;
+}
+
+    .calFoldIcon { font-size: 16px; }
+
+    .calFoldTitle {
+        font-size: 14px;
+        letter-spacing: -.2px;
+    }
+
+    .calFoldRight {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        opacity: .85;
+        font-weight: 900;
+        font-size: 12px;
+    }
+
+    .calFoldChevron {
+        display: inline-block;
+        transition: transform .16s ease;
+        transform-origin: center;
+    }
+
+    /* ✅ 열렸을 때 화살표 회전 + 안내 문구 변경 */
+    details[open] .calFoldChevron { transform: rotate(180deg); }
+    details[open] .calFoldHint { content: ""; }
+
+    /* 열렸을 때 summary 아래 여백 */
+    details[open] .calFoldSummary { margin-bottom: 10px; }
+
+    /* ✅ 기존 달력 스타일(원본 유지) */
+    .calWrap {
+        background: rgba(255,255,255,.76);
+        border: 1px solid rgba(2,6,23,.10);
+        box-shadow: 0 18px 45px rgba(2,6,23,.08);
+        padding: 12px;
+    }
+
+    .calHead {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+    }
+
+    .calMonthTitle {
+        font-weight: 900;
+        letter-spacing: -.2px;
+        font-size: 16px;
+        display: inline-block;
+    }
+
+    .calNav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .calNavBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid rgba(2,6,23,.10);
+        background: rgba(255,255,255,.85);
+        font-weight: 800;
+        font-size: 13px;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .calNavBtn:hover {
+        background: #fff;
+        border-color: rgba(2,6,23,.16);
+    }
+
+    .calNavBtn.ghost {
+        background: rgba(59,130,246,.10);
+        border-color: rgba(59,130,246,.18);
+    }
+
+    .calDow {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .dow {
+        text-align: center;
+        font-size: 12px;
+        font-weight: 900;
+        opacity: .75;
+        padding: 6px 0;
+        border-radius: 10px;
+        background: rgba(255,255,255,.55);
+        border: 1px solid rgba(2,6,23,.06);
+    }
+
+    .dow.sun { color: rgba(239,68,68,.92); }
+    .dow.sat { color: rgba(59,130,246,.92); }
+
+    .calGrid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+    }
+
+    .cell {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        min-height: 56px;
+        border-radius: 1px;
+        padding: 8px 8px 6px;
+        border: 1px solid rgba(2,6,23,.08);
+        background: rgba(255,255,255,.92);
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        overflow: hidden;
+        transition: transform .08s ease, box-shadow .08s ease;
+    }
+
+    .cell:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 22px rgba(2,6,23,.10);
+    }
+
+    .cell.out {
+        opacity: .45;
+        background: rgba(255,255,255,.55);
+    }
+
+    .dayTop {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        z-index: 2;
+    }
+
+    .dayNum {
+        font-weight: 900;
+        font-size: 14px;
+        z-index: 2;
+    }
+
+    .dayPoint {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 17px;
+        min-width: 22px;
+        padding: 0 4px;
+        border-radius: 6px;
+        font-weight: 900;
+        font-size: 10px;
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        color: #7c2d12;
+        border: none;
+        box-shadow: 0 1px 4px rgba(245,158,11,.35);
+        z-index: 2;
+        letter-spacing: -.3px;
+    }
+
+    .cell.selected {
+        outline: 2px solid rgba(59,130,246,.55);
+        border-color: rgba(59,130,246,.25);
+        background: rgba(59,130,246,.06);
+    }
+
+    .cell.today {
+        border-color: rgba(34,197,94,.35);
+        background: rgba(34,197,94,.06);
+    }
+
+    .cell.actionable {
+        border-color: rgba(59,130,246,.25);
+    }
+
+    .cell.locked {
+        opacity: .72;
+        filter: grayscale(.15);
+    }
+
+    .dayHint {
+        display: flex;
+        margin-top: 6px;
+        min-height: 14px;
+        z-index: 2;
+    }
+
+    .hintText {
+        font-size: 10px;
+        font-weight: 900;
+        opacity: .75;
+    }
+
+    .hintText.go { color: rgba(34,197,94,.95); }
+    .hintText.lock { color: rgba(239,68,68,.9); }
+
+    .doneStamp {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        width: 22px;
+        height: auto;
+        opacity: .85;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    @@media (min-width: 900px) {
+        .cell { min-height: 64px; }
+        .calMonthTitle { font-size: 18px; }
+        .dayPoint { height: 20px; font-size: 12px; }
+        .doneStamp { width: 28px; }
+        .calFoldTitle { font-size: 15px; }
+    }
+
+    @@media (max-width: 520px) {
+        .calNav { width: 100%; justify-content: flex-end; }
+        .cell { min-height: 54px; padding: 6px 5px 5px; border-radius: 14px; }
+        .calDow { gap: 6px; }
+        .calGrid { gap: 1px; }
+        .doneStamp { width: 16px; right: 3px; bottom: 3px; }
+        .calFoldSummary { padding: 10px 10px; }
+        .calFoldHint { display: none; }
+
+        /* ── 모바일: 날짜 작게 · 점수 크게 ── */
+        .dayTop { gap: 3px; flex-wrap: wrap; align-items: center; }
+
+        /* 날짜 번호 — 보조 정보, 눈에 띄지 않게 */
+        .dayNum {
+            font-size: 9px;
+            font-weight: 700;
+            opacity: .60;
+            line-height: 1;
+        }
+
+        /* 점수 뱃지 — 주요 정보, 크고 선명하게 */
+        .dayPoint {
+            font-size: 13px;
+            font-weight: 900;
+            height: 22px;
+            min-width: 30px;
+            padding: 0 5px;
+            border-radius: 7px;
+            letter-spacing: -.4px;
+        }
+
+        /* 하단 힌트(가능/잠금) — 공간 절약 */
+        .dayHint { margin-top: 3px; min-height: 11px; }
+        .hintText { font-size: 9px; }
+    }
+
+    /* ✅ 달력 힌트 문구 스타일 */
+.calFoldLeft .hint {
+    font-size: 11px;        /* 작은 글씨 */
+    font-weight: 500;      /* 두껍지 않게 */
+    opacity: .65;          /* 은은하게 */
+    margin-top: 2px;
+    letter-spacing: -.2px;
+    line-height: 1.2;
+}
+.calFoldLeft .titleRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+</style>

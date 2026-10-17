@@ -1,0 +1,245 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    string styleHeaderColor = "color: black;";
+    string styleHeaderBackGroundColor = "background-color: #ffffff; " + styleHeaderColor;
+
+    string styleFooterColor = "color: black;";
+    string styleFooterBackgroundColor = "background-color: #ffeb3b; " + styleFooterColor;
+
+    if (ViewBag.BoardName == BoardCategory.Anonymous.ToString())
+    {
+        styleHeaderColor = "color: white;";
+        styleHeaderBackGroundColor = "background-color: #006633;" + styleHeaderColor;
+    }
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+@model Board
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Job Listings for AI, Software Development, and Marketing">
+    <meta name="keywords" content="jobs, AI, development, design, marketing">
+    <title>@ChurchName · @DepartmentName</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" />
+
+    <style>
+        /* 기본 폰트 크기 및 레이아웃 설정 */
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* Header */
+        header {
+            background-color: #27ae60;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        header h1 {
+            font-size: 2.0em;
+            margin: 0;
+        }
+
+        .card-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0px;
+        }
+
+        .card-body {
+            margin-bottom: 20px;
+        }
+
+        .comment-card {
+            margin-left: 20px;
+        }
+
+        .reply-button {
+            margin-top: 10px;
+        }
+
+        .reply-area {
+            display: none;
+            margin-top: 10px;
+        }
+        /* Footer */
+        footer {
+            background-color: #27ae60;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-weight:bold;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .footer-links a:hover {
+            /* 모바일 화면을 위한 반응형 설정 */
+            @@media (max-width: 768px) {
+
+                header h1 {
+                    font-size: 2em;
+                }
+
+                .card-container {
+                    width: 100%; /* 모바일에서 카드가 화면 전체를 차지하도록 */
+                    padding: 0px;
+                }
+
+                .card-header h2 {
+                    font-size: 18px; /* 모바일에서 게시글 제목 크기 조정 */
+                }
+
+                .card-body p {
+                    font-size: 16px; /* 모바일에서 본문 내용 폰트 크기 */
+                }
+
+                textarea {
+                    font-size: 14px; /* 모바일에서 텍스트 입력 폰트 크기 */
+                }
+
+                .comment-card {
+                    margin-left: 10px; /* 모바일에서 대댓글의 여백 조정 */
+                }
+
+                .btn {
+                    font-size: 14px; /* 모바일 버튼의 폰트 크기 조정 */
+                    padding: 8px 12px;
+                }
+            }
+    </style>
+
+ @*   <style>
+        .title-banner {
+            background-color: #b29b75;
+            padding: 10px;
+            margin-bottom: 0px;
+            text-align: center;
+            border-radius: 0px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .board-title {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Arial', sans-serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+    </style>*@
+    
+    <style>
+        /* 고정형 footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+        }
+
+        .footer .footer-link {
+            margin: 0 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .footer .footer-link:hover {
+            text-decoration: underline;
+        }
+
+        body {
+            margin-bottom: 60px; /* Footer 공간 확보 */
+        }
+    </style>
+    <script src="/js/common2.js"></script>
+</head>
+
+<body>
+
+    <!-- Header Section -->
+    <div class="container card-container">
+        <header style="@styleHeaderBackGroundColor">
+            @if (@ViewBag.BoardName == BoardCategory.Anonymous.ToString())
+            {
+                <h1>@ConstatsCommon.AnonymousBoardName</h1>
+            }
+            else if (@ViewBag.BoardName == BoardCategory.HelpDesk.ToString())
+            {
+                <h1>개선(수정)사항</h1>
+            }
+            else
+            {
+                <h1>게시판 명명 필요</h1>
+            }
+        </header>
+
+        <!-- Post Form Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>게시글 작성</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" action="@Url.Action("Create", "Board")" enctype="application/x-www-form-urlencoded">
+                    <div class="form-group">
+                        <label for="postTitle">제목</label>
+                        <input type="text" class="form-control" id="Title" name="Title" placeholder="제목을 입력하세요" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="postContent">내용</label>
+                        <textarea class="form-control" id="Content" name="Content" rows="6" placeholder="내용을 입력하세요" required></textarea>
+                    </div>
+                    <input type="hidden" id="boardName" name="boardName" value="@ViewBag.BoardName" />
+                    <div class="form-group text-right">
+                        <button type="submit" class="btn btn-primary">저장</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.history.back();">취소</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,870 @@
+﻿@model BulletinBoard.Models.DailyMission2.FamilyAdminVM
+@{
+    ViewData["Title"] = "가족팀 관리";
+    Layout = null;
+
+    string Safe(string? s) => (s ?? "").Trim();
+
+    var err = ViewBag.Error as string;
+    var info = ViewBag.Info as string;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        :root {
+            --bg0: #f6f8ff;
+            --bg1: #eef3ff;
+            --card: rgba(255,255,255,.92);
+            --card2: rgba(255,255,255,.70);
+            --line: rgba(15,23,42,.12);
+            --txt: rgba(15,23,42,.92);
+            --muted: rgba(15,23,42,.56);
+            --pri: rgba(79,124,255,.95);
+            --good: rgba(34,197,94,.95);
+            --bad: rgba(239,68,68,.95);
+            --warn: rgba(245,158,11,.95);
+            --shadow: 0 16px 38px rgba(15,23,42,.10);
+            --shadow2: 0 10px 26px rgba(15,23,42,.08);
+            --r: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+            color: var(--txt);
+            background: radial-gradient(900px 520px at 12% 8%, rgba(79,124,255,.16), transparent 60%), radial-gradient(900px 520px at 88% 0%, rgba(34,197,94,.10), transparent 55%), linear-gradient(180deg,var(--bg0),var(--bg1));
+        }
+
+        .wrap {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 18px 14px 30px;
+        }
+
+        /* Top header */
+        .topbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 14px;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        .titleBox {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+            .titleBox h1 {
+                margin: 0;
+                font-size: 18px;
+                letter-spacing: -.2px;
+            }
+
+            .titleBox .sub {
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 800;
+            }
+
+        .topActions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .btnLink {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.85);
+            box-shadow: var(--shadow2);
+            text-decoration: none;
+            color: var(--txt);
+            font-weight: 900;
+            user-select: none;
+            transition: transform .12s ease;
+        }
+
+            .btnLink:hover {
+                transform: translateY(-1px);
+            }
+
+        .msg {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.90);
+            box-shadow: var(--shadow2);
+            font-weight: 900;
+            font-size: 13px;
+        }
+
+            .msg.err {
+                border-color: rgba(239,68,68,.28);
+                background: rgba(239,68,68,.08);
+            }
+
+            .msg.info {
+                border-color: rgba(34,197,94,.26);
+                background: rgba(34,197,94,.08);
+            }
+
+        /* Layout */
+        .grid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 420px 1fr;
+            gap: 12px;
+        }
+
+        @@media (max-width: 980px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Card */
+        .card {
+            border: 1px solid var(--line);
+            border-radius: var(--r);
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .cardHead {
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.55);
+        }
+
+            .cardHead b {
+                letter-spacing: -.2px;
+            }
+
+        .cardBody {
+            padding: 14px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(15,23,42,.04);
+            font-size: 12px;
+            font-weight: 900;
+            color: rgba(15,23,42,.88);
+            white-space: nowrap;
+        }
+
+            .pill.on {
+                background: rgba(34,197,94,.10);
+                border-color: rgba(34,197,94,.22);
+            }
+
+            .pill.off {
+                background: rgba(239,68,68,.08);
+                border-color: rgba(239,68,68,.22);
+                opacity: .9;
+            }
+
+        /* Inputs */
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 160px;
+            flex: 1 1 180px;
+        }
+
+            .field label {
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 900;
+            }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            outline: none;
+            color: var(--txt);
+            font-weight: 800;
+        }
+
+            input:focus, select:focus {
+                border-color: rgba(79,124,255,.35);
+                box-shadow: 0 0 0 4px rgba(79,124,255,.10);
+            }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.92);
+            box-shadow: var(--shadow2);
+            font-weight: 900;
+            cursor: pointer;
+            user-select: none;
+            min-height: 42px;
+            transition: transform .12s ease;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+            }
+
+            .btn.pri {
+                background: rgba(79,124,255,.12);
+                border-color: rgba(79,124,255,.28);
+            }
+
+            .btn.good {
+                background: rgba(34,197,94,.12);
+                border-color: rgba(34,197,94,.28);
+            }
+
+            .btn.bad {
+                background: rgba(239,68,68,.10);
+                border-color: rgba(239,68,68,.22);
+            }
+
+        .muted {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.5;
+        }
+
+        /* Team list */
+        .teamList {
+            display: grid;
+            gap: 10px;
+        }
+
+        .teamItem {
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 12px 12px;
+            background: rgba(255,255,255,.80);
+            box-shadow: var(--shadow2);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            transition: transform .12s ease;
+        }
+
+            .teamItem:hover {
+                transform: translateY(-1px);
+            }
+
+        .teamLeft {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(79,124,255,.10);
+            border: 1px solid rgba(79,124,255,.18);
+            font-weight: 900;
+            flex: 0 0 auto;
+        }
+
+        .teamMid {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .teamName {
+            font-weight: 900;
+            letter-spacing: -.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .teamMemo {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .teamRight {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: flex-end;
+            flex: 0 0 auto;
+        }
+
+        .selectedGlow {
+            outline: 3px solid rgba(79,124,255,.18);
+            box-shadow: 0 18px 40px rgba(79,124,255,.12);
+        }
+
+        /* Member cards */
+        .membersGrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        @@media (max-width: 980px) {
+            .membersGrid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .memberCard {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+        }
+
+        .memberHead {
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.55);
+        }
+
+        .memberTitle {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+            .memberTitle .u {
+                font-weight: 900;
+                letter-spacing: -.2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .memberTitle .tags {
+                display: flex;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+        .memberBody {
+            padding: 14px;
+        }
+
+        .splitActions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+            .splitActions form {
+                margin: 0;
+            }
+
+        .tinyNote {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 16px;
+            border: 1px dashed rgba(15,23,42,.18);
+            background: rgba(255,255,255,.70);
+            font-weight: 800;
+            color: var(--muted);
+        }
+
+        /* Search */
+        .searchBox {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 8px 10px;
+            background: rgba(255,255,255,.88);
+            box-shadow: var(--shadow2);
+            flex: 1 1 auto;
+        }
+
+            .searchBox input {
+                border: 0;
+                padding: 6px 8px;
+                border-radius: 999px;
+                min-width: 220px;
+                background: transparent;
+                outline: 0;
+                box-shadow: none;
+                font-weight: 800;
+            }
+
+        @@media (max-width:560px) {
+            .searchBox {
+                width: 100%;
+            }
+
+                .searchBox input {
+                    min-width: 0;
+                    width: 100%;
+                }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <div class="topbar">
+            <div class="titleBox">
+                <h1>👨‍👩‍👧‍👦 가족팀 관리</h1>
+                <div class="sub">DM2_FamilyTeam / DM2_FamilyMember 관리 (카드형 반응형)</div>
+            </div>
+            <div class="topActions">
+                <a class="btnLink" href="/">🏠 홈</a>
+                <a class="btnLink" href="/DailyMission2/Participants">📋 참여자 목록</a>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(err))
+        {
+            <div class="msg err">⚠️ @err</div>
+        }
+        else if (!string.IsNullOrWhiteSpace(info))
+        {
+            <div class="msg info">✅ @info</div>
+        }
+
+        <div class="grid">
+
+            <!-- LEFT -->
+            <div style="display:grid; gap:12px;">
+                <!-- Team Search + List -->
+                <div class="card">
+                    <div class="cardHead">
+                        <b>가족팀 목록</b>
+                        <span class="pill">팀 선택</span>
+                    </div>
+                    <div class="cardBody">
+                        <div class="row" style="justify-content:space-between;">
+                            <div class="searchBox" title="팀명/메모 검색">
+                                🔎 <input id="teamQ" type="text" placeholder="팀명/메모 검색" />
+                            </div>
+                            <span class="pill">@((Model.Teams?.Count ?? 0)) 개</span>
+                        </div>
+
+                        <div id="teamList" class="teamList" style="margin-top:12px;">
+                            @foreach (var t in Model.Teams)
+                            {
+                                var isSel = Model.SelectedTeamId.HasValue && Model.SelectedTeamId.Value == t.FamilyTeamId;
+                                var statusPill = t.IsActive ? "pill on" : "pill off";
+                                <a class="teamItem @(isSel ? "selectedGlow" : "")"
+                                   href="/DailyMission2FamilyAdmin?teamId=@t.FamilyTeamId"
+                                   data-name="@($"{Safe(t.TeamName)} {Safe(t.Memo)}".ToLowerInvariant())">
+                                    <div class="teamLeft">@t.FamilyTeamId</div>
+                                    <div class="teamMid">
+                                        <div class="teamName">@t.TeamName</div>
+                                        @if (!string.IsNullOrWhiteSpace(t.Memo))
+                                        {
+                                            <div class="teamMemo">@t.Memo</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="teamMemo">메모 없음</div>
+                                        }
+                                    </div>
+                                    <div class="teamRight">
+                                        <span class="@statusPill">@((t.IsActive) ? "ON" : "OFF")</span>
+                                        @if (isSel)
+                                        {
+                                            <span class="pill">선택됨</span>
+                                        }
+                                    </div>
+                                </a>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Team -->
+                <div class="card">
+                    <div class="cardHead">
+                        <b>+ 팀 추가</b>
+                        <span class="pill">Create</span>
+                    </div>
+                    <div class="cardBody">
+                        <form method="post" action="/DailyMission2FamilyAdmin/CreateTeam">
+                            <div class="row">
+                                <div class="field">
+                                    <label>팀명</label>
+                                    <input name="teamName" placeholder="예: 반유주 가족" />
+                                </div>
+                                <div class="field">
+                                    <label>메모(선택)</label>
+                                    <input name="memo" placeholder="예: 3남매" />
+                                </div>
+                            </div>
+                            <div class="row" style="margin-top:12px;">
+                                <button class="btn good" type="submit">✅ 팀 추가</button>
+                                <span class="muted">추가 후 자동으로 선택 화면으로 이동합니다.</span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT -->
+            <div style="display:grid; gap:12px;">
+                @if (Model.SelectedTeam == null)
+                {
+                    <div class="card">
+                        <div class="cardHead">
+                            <b>팀 상세 / 구성원</b>
+                            <span class="pill">선택 필요</span>
+                        </div>
+                        <div class="cardBody">
+                            <div class="tinyNote">
+                                왼쪽에서 팀을 선택하면, 팀 정보 수정 + 구성원 추가/수정이 가능합니다.
+                            </div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Team Edit -->
+                    <div class="card">
+                        <div class="cardHead">
+                            <b>팀 정보</b>
+                            <span class="pill">@Model.SelectedTeam.TeamName</span>
+                        </div>
+                        <div class="cardBody">
+                            <form method="post" action="/DailyMission2FamilyAdmin/UpdateTeam">
+                                <input type="hidden" name="teamId" value="@Model.SelectedTeam.FamilyTeamId" />
+                                <div class="row">
+                                    <div class="field">
+                                        <label>팀명</label>
+                                        <input name="teamName" value="@Model.SelectedTeam.TeamName" />
+                                    </div>
+                                    <div class="field">
+                                        <label>메모(선택)</label>
+                                        <input name="memo" value="@Safe(Model.SelectedTeam.Memo)" placeholder="메모" />
+                                    </div>
+                                    <div class="field" style="flex:0 0 180px;">
+                                        <label>상태</label>
+                                        <select name="isActive">
+                                            <option value="true" selected="@(Model.SelectedTeam.IsActive ? "selected" : null)">활성(ON)</option>
+                                            <option value="false" selected="@(!Model.SelectedTeam.IsActive ? "selected" : null)">비활성(OFF)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row" style="margin-top:12px;">
+                                    <button class="btn pri" type="submit">💾 팀 저장</button>
+                                    <span class="muted">팀명/메모/활성 상태를 저장합니다.</span>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Add Member -->
+                    <div class="card">
+                        <div class="cardHead">
+                            <b>+ 구성원 추가</b>
+                            <span class="pill">Member</span>
+                        </div>
+                        <div class="cardBody">
+                            <form method="post" action="/DailyMission2FamilyAdmin/AddMember" class="js-add-form">
+                                <input type="hidden" name="teamId" value="@Model.SelectedTeam.FamilyTeamId" />
+
+                                <div class="row">
+                                    <div class="field">
+                                        <label>UserName</label>
+                                        <input name="userName" placeholder="예: jycherish" />
+                                    </div>
+
+                                    <div class="field" style="flex:0 0 200px;">
+                                        <label>RoleCode</label>
+                                        <select name="roleCode" class="js-add-role">
+                                            <option value="0">0 학생</option>
+                                            <option value="1">1 엄마</option>
+                                            <option value="2">2 아빠</option>
+                                            <option value="3">3 할머니</option>
+                                            <option value="4">4 할아버지</option>
+                                            <option value="9">9 기타</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="field" style="flex:0 0 220px;">
+                                        <label>RelationCode (학생만)</label>
+                                        <select name="relationCode" class="js-add-rel">
+                                            <option value="9" selected>9 미설정</option>
+                                            <option value="0">0 본인</option>
+                                            <option value="1">1 형</option>
+                                            <option value="2">2 동생</option>
+                                            <option value="3">3 언니</option>
+                                            <option value="4">4 누나</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="field" style="flex:0 0 140px;">
+                                        <label>SortNo</label>
+                                        <input name="sortNo" type="number" value="10" />
+                                    </div>
+                                </div>
+
+                                <div class="row" style="margin-top:12px;">
+                                    <button class="btn good" type="submit">➕ 추가</button>
+                                    <span class="muted">RelationCode는 학생(RoleCode=0)일 때만 선택 가능합니다.</span>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Members -->
+                    <div class="card">
+                        <div class="cardHead">
+                            <b>구성원 목록</b>
+                            <span class="pill">@((Model.Members?.Count ?? 0)) 명</span>
+                        </div>
+                        <div class="cardBody">
+
+                            <div class="muted">
+                                • RelationCode는 <b>학생(RoleCode=0)</b>에게만 의미가 있습니다. 학생이 아니면 저장 시 자동으로 <b>9(미설정)</b> 처리됩니다.<br />
+                                • 한 팀에 <b>본인(0)</b>은 1명만 설정하세요.
+                            </div>
+
+                            <div class="membersGrid" style="margin-top:12px;">
+                                @foreach (var m in Model.Members)
+                                {
+                                    var isStudent = (m.RoleCode == 0);
+                                    var statusPill = m.IsActive ? "pill on" : "pill off";
+                                    var rowKey = $"m_{m.FamilyTeamId}_{m.UserName}"; // ✅ 컴파일 에러 방지
+
+                                    <div class="memberCard" data-row="@rowKey">
+                                        <div class="memberHead">
+                                            <div class="memberTitle">
+                                                <div class="u">@m.UserName</div>
+                                                <div class="tags">
+                                                    <span class="@statusPill">@((m.IsActive) ? "활성" : "비활성")</span>
+                                                    @if (isStudent && m.RelationCode == 0)
+                                                    {
+                                                        <span class="pill" style="background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.22);">⭐ 본인</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <span class="pill">Team #@m.FamilyTeamId</span>
+                                        </div>
+
+                                        <div class="memberBody">
+                                            <div class="row">
+                                                <div class="field" style="flex:0 0 190px;">
+                                                    <label>RoleCode</label>
+                                                    <select class="js-role">
+                                                        <option value="0" selected="@(m.RoleCode == 0 ? "selected" : null)">0 학생</option>
+                                                        <option value="1" selected="@(m.RoleCode == 1 ? "selected" : null)">1 엄마</option>
+                                                        <option value="2" selected="@(m.RoleCode == 2 ? "selected" : null)">2 아빠</option>
+                                                        <option value="3" selected="@(m.RoleCode == 3 ? "selected" : null)">3 할머니</option>
+                                                        <option value="4" selected="@(m.RoleCode == 4 ? "selected" : null)">4 할아버지</option>
+                                                        <option value="9" selected="@(m.RoleCode == 9 ? "selected" : null)">9 기타</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="field" style="flex:0 0 220px;">
+                                                    <label>RelationCode (학생만)</label>
+                                                    <select class="js-rel">
+                                                        <option value="9" selected="@(m.RelationCode == 9 ? "selected" : null)">9 미설정</option>
+                                                        <option value="0" selected="@(m.RelationCode == 0 ? "selected" : null)">0 본인</option>
+                                                        <option value="1" selected="@(m.RelationCode == 1 ? "selected" : null)">1 형</option>
+                                                        <option value="2" selected="@(m.RelationCode == 2 ? "selected" : null)">2 동생</option>
+                                                        <option value="3" selected="@(m.RelationCode == 3 ? "selected" : null)">3 언니</option>
+                                                        <option value="4" selected="@(m.RelationCode == 4 ? "selected" : null)">4 누나</option>
+                                                    </select>
+                                                </div>
+
+                                                <div class="field" style="flex:0 0 140px;">
+                                                    <label>SortNo</label>
+                                                    <input class="js-sort" type="number" value="@m.SortNo" />
+                                                </div>
+
+                                                <div class="field" style="flex:0 0 160px;">
+                                                    <label>상태</label>
+                                                    <select class="js-active">
+                                                        <option value="true" selected="@(m.IsActive ? "selected" : null)">활성</option>
+                                                        <option value="false" selected="@(!m.IsActive ? "selected" : null)">비활성</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div class="splitActions">
+                                                <form method="post" action="/DailyMission2FamilyAdmin/UpdateMember" class="js-save-form">
+                                                    <input type="hidden" name="teamId" value="@m.FamilyTeamId" />
+                                                    <input type="hidden" name="userName" value="@m.UserName" />
+
+                                                    <input type="hidden" name="roleCode" value="@m.RoleCode" class="js-role-h" />
+                                                    <input type="hidden" name="relationCode" value="@m.RelationCode" class="js-rel-h" />
+                                                    <input type="hidden" name="sortNo" value="@m.SortNo" class="js-sort-h" />
+                                                    <input type="hidden" name="isActive" value="@(m.IsActive ? "true" : "false")" class="js-active-h" />
+
+                                                    <button class="btn pri" type="submit">💾 저장</button>
+                                                </form>
+
+                                                <form method="post" action="/DailyMission2FamilyAdmin/DeleteMember">
+                                                    <input type="hidden" name="teamId" value="@m.FamilyTeamId" />
+                                                    <input type="hidden" name="userName" value="@m.UserName" />
+                                                    <button class="btn bad" type="submit" onclick="return confirm('비활성 처리할까요?')">🗑️ 삭제(비활성)</button>
+                                                </form>
+                                            </div>
+
+                                            <div class="tinyNote">
+                                                학생(RoleCode=0)이 아니면 RelationCode는 자동으로 9(미설정)로 저장됩니다.
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // =========================
+            // Team search
+            // =========================
+            const teamQ = document.getElementById('teamQ');
+            const teamItems = Array.from(document.querySelectorAll('#teamList .teamItem'));
+            function applyTeamFilter() {
+                const term = (teamQ?.value || '').trim().toLowerCase();
+                teamItems.forEach(a => {
+                    const hay = (a.dataset.name || '');
+                    a.style.display = (!term || hay.includes(term)) ? '' : 'none';
+                });
+            }
+            teamQ && teamQ.addEventListener('input', applyTeamFilter);
+            applyTeamFilter();
+
+            // =========================
+            // Add form: RoleCode != 0 => RelationCode disabled + 9 forced
+            // =========================
+            const addRole = document.querySelector('.js-add-role');
+            const addRel = document.querySelector('.js-add-rel');
+
+            function syncAddRel() {
+                if (!addRole || !addRel) return;
+                const isStudent = (addRole.value === '0');
+                addRel.disabled = !isStudent;
+                if (!isStudent) addRel.value = '9';
+            }
+            addRole && addRole.addEventListener('change', syncAddRel);
+            syncAddRel();
+
+            // =========================
+            // Member cards: sync visible controls => hidden inputs
+            // RoleCode != 0 => RelationCode disabled + 9 forced
+            // =========================
+            document.querySelectorAll('.memberCard').forEach(card => {
+                const role = card.querySelector('.js-role');
+                const rel = card.querySelector('.js-rel');
+                const sort = card.querySelector('.js-sort');
+                const active = card.querySelector('.js-active');
+
+                const roleH = card.querySelector('.js-role-h');
+                const relH = card.querySelector('.js-rel-h');
+                const sortH = card.querySelector('.js-sort-h');
+                const activeH = card.querySelector('.js-active-h');
+
+                function sync() {
+                    const roleVal = role ? role.value : '';
+                    const isStudent = (roleVal === '0');
+
+                    if (roleH) roleH.value = roleVal;
+
+                    if (rel) {
+                        rel.disabled = !isStudent;
+                        if (!isStudent) rel.value = '9';
+                    }
+                    if (relH) relH.value = rel ? rel.value : '9';
+
+                    if (sortH) sortH.value = sort ? (sort.value || '0') : '0';
+                    if (activeH) activeH.value = active ? active.value : 'true';
+                }
+
+                sync();
+
+                role && role.addEventListener('change', sync);
+                rel && rel.addEventListener('change', sync);
+                sort && sort.addEventListener('input', sync);
+                active && active.addEventListener('change', sync);
+
+                const saveForm = card.querySelector('.js-save-form');
+                saveForm && saveForm.addEventListener('submit', sync);
+            });
+        })();
+    </script>
+
+</body>
+</html>

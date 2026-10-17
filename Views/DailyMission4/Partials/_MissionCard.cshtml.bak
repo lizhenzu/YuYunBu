@@ -1,0 +1,235 @@
+@model dynamic
+@using System
+@using System.Reflection
+@using System.Net
+
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+
+    object G(object o, params string[] names)
+    {
+        if (o == null) return null;
+        var t = o.GetType();
+        foreach (var n in names)
+        {
+            var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            return p.GetValue(o);
+        }
+        return null;
+    }
+
+    string GS(object o, params string[] names) => S(G(o, names));
+    bool GB(object o, params string[] names) => B(G(o, names));
+
+    string CleanHref(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href)) return "";
+        href = WebUtility.HtmlDecode(href).Trim();
+        href = href.Trim().Trim('"').Trim('\'').Trim('\u201c').Trim('\u201d').Trim('\u2018').Trim('\u2019');
+        href = href.Trim().Trim('"').Trim('\'').Trim('\u201c').Trim('\u201d').Trim('\u2018').Trim('\u2019');
+
+        if (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("tel:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+            return href;
+
+        if (!href.StartsWith("/")) href = "/" + href;
+        return href;
+    }
+}
+
+@{
+    var o = (object)Model;
+
+    var emoji = GS(o, "Emoji");
+    var title = GS(o, "Title");
+    var pillClass = GS(o, "PillClass");
+    var pillText = GS(o, "PillText");
+    var sticker = GS(o, "Sticker");
+    var desc = GS(o, "Desc");
+
+    var btnClass = GS(o, "BtnClass");
+    var btnIcon = GS(o, "BtnIcon");
+    var btnText = GS(o, "BtnText");
+    var hrefRaw = GS(o, "Href");
+
+    var disabled = GB(o, "Disabled");
+    var isDone = GB(o, "IsDone");
+
+    var hasContent = GB(o, "HasContent");
+    var dateText = GS(o, "DateText");
+    var noContentMsg = GS(o, "NoContentMsg");
+    var lockReason = GS(o, "LockReason");
+
+    bool showNoContent = (!hasContent && !string.IsNullOrWhiteSpace(noContentMsg));
+    bool showLocked = (disabled && !isDone && !string.IsNullOrWhiteSpace(lockReason));
+
+    var href = CleanHref(hrefRaw);
+
+    bool allowNavigate = (!showNoContent);
+    var safeHref = (allowNavigate && !string.IsNullOrWhiteSpace(href)) ? href : null;
+
+    bool cardClickable = (safeHref != null);
+    bool disableButton = (safeHref == null);
+
+    var ariaDisabled = disableButton ? "true" : "false";
+    var tabIndex = disableButton ? "-1" : "0";
+    var disabledLabel = showNoContent ? "콘텐츠 없음" : "비활성화됨";
+
+    bool isViewBtn = (!string.IsNullOrWhiteSpace(btnText) && btnText.Contains("(다시보기)"));
+    var viewClass = isViewBtn ? "grayView" : "";
+}
+
+<style>
+    .mcard {
+        position: relative;
+        border: 3px solid #fff !important;
+        border-radius: 20px;
+        background: rgba(255,255,255,.92);
+        box-shadow: 2px 2px 10px rgba(0,0,0,.16) !important;
+        overflow: visible;
+    }
+
+    .mcard.isLink { cursor: pointer; }
+
+    .mcardLinkOverlay {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        z-index: 1;
+        text-indent: -9999px;
+        overflow: hidden;
+        white-space: nowrap;
+    }
+
+    .mcard .mhead, .mcard .sticker, .mcard .desc, .mcard .mActions, .mcard .msgBox {
+        position: relative;
+        z-index: 2;
+    }
+
+    .mcard.word   { background: linear-gradient(135deg, rgba(56,189,248,.12), rgba(255,255,255,.92)); border-color: rgba(56,189,248,.18) !important; }
+    .mcard.quiz   { background: linear-gradient(135deg, rgba(139,92,246,.10), rgba(255,255,255,.92)); border-color: rgba(139,92,246,.16) !important; }
+    .mcard.pray   { background: linear-gradient(135deg, rgba(16,185,129,.10), rgba(255,255,255,.92)); border-color: rgba(16,185,129,.16) !important; }
+    .mcard.recite { background: linear-gradient(135deg, rgba(251,146,60,.11), rgba(255,255,255,.92)); border-color: rgba(251,146,60,.16) !important; }
+
+    .mcard .msgBox {
+        margin-top: 10px;
+        border-radius: 16px;
+        padding: 12px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(241,245,249,.72);
+        font-weight: 900;
+        font-size: 12.5px;
+        line-height: 1.35;
+        color: rgba(15,23,42,.88);
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+    }
+    .mcard .msgIcon {
+        width: 28px; height: 28px;
+        border-radius: 12px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.80);
+        flex: 0 0 auto; font-size: 16px; margin-top: 1px;
+    }
+
+    .mcard .btn.mBtn {
+        display: inline-flex !important;
+        align-items: center; justify-content: center;
+        gap: 6px;
+        width: auto !important; min-width: unset !important;
+        height: auto !important; min-height: unset !important;
+        padding: 10px 12px !important;
+        line-height: 1.2 !important;
+        font-size: 13px; font-weight: 950;
+        border-radius: 12px;
+        white-space: nowrap;
+        border: 3px solid rgba(255,255,255,.92) !important;
+        text-decoration: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+        box-shadow: 0 6px 16px rgba(15,23,42,.18) !important;
+    }
+    .mcard .btn.mBtn .ico { font-size: 15px; }
+    .mcard .btn.mBtn .txt { font-size: 13px; }
+
+    .mcard .mActions {
+        display: flex; justify-content: center;
+        padding: 10px 12px; margin-top: 10px;
+        border-radius: 18px; border: none;
+        background: transparent; box-shadow: none;
+    }
+    .mcard .mActions .btn.mBtn { width: 90% !important; justify-content: center; }
+
+    .mcard .btn.mBtn.boxBorder { background: linear-gradient(135deg, rgba(16,185,129,.92), rgba(34,197,94,.86)) !important; color: #053b2a !important; border-color: rgba(16,185,129,.20) !important; }
+    .mcard .btn.mBtn.boxBorder.word:not(.grayView):not(.isDone):not(.disabled) { background: linear-gradient(135deg, rgba(56,189,248,.92), rgba(59,130,246,.86)) !important; color: #fff !important; border-color: rgba(56,189,248,.22) !important; }
+    .mcard .btn.mBtn.boxBorder.quiz:not(.grayView):not(.isDone):not(.disabled) { background: linear-gradient(135deg, rgba(139,92,246,.90), rgba(99,102,241,.86)) !important; color: #fff !important; border-color: rgba(139,92,246,.22) !important; }
+    .mcard .btn.mBtn.boxBorder.pray:not(.grayView):not(.isDone):not(.disabled) { background: linear-gradient(135deg, rgba(16,185,129,.92), rgba(34,197,94,.86)) !important; color: #053b2a !important; border-color: rgba(16,185,129,.20) !important; }
+    .mcard .btn.mBtn.boxBorder.recite:not(.grayView):not(.isDone):not(.disabled) { background: linear-gradient(135deg, rgba(251,146,60,.92), rgba(249,115,22,.86)) !important; color: #3b1b00 !important; border-color: rgba(251,146,60,.20) !important; }
+    .mcard .btn.mBtn.boxBorder:not(.grayView):not(.isDone):not(.disabled):hover { transform: translateY(-1px) !important; box-shadow: 0 14px 28px rgba(15,23,42,.14) !important; filter: saturate(1.05); }
+    .mcard .btn.mBtn.grayView { background: rgba(241,245,249,.92) !important; border-color: rgba(148,163,184,.70) !important; color: rgba(30,41,59,.92) !important; }
+    .mcard .btn.mBtn.disabled, .mcard .btn.mBtn[aria-disabled="true"] { opacity: .55 !important; filter: grayscale(.2); pointer-events: none; box-shadow: none !important; transform: none !important; }
+    .mcard .btn.mBtn.isDone { background: rgba(241,245,249,.92) !important; border-color: rgba(148,163,184,.65) !important; color: rgba(30,41,59,.90) !important; cursor: default; }
+    .mcard .btn.mBtn.isDone:hover { transform: none !important; box-shadow: none !important; filter: none; }
+</style>
+
+<div class="mcard @btnClass @(cardClickable ? "isLink" : "")">
+    @if (cardClickable)
+    {
+        <a class="mcardLinkOverlay" href="@safeHref" aria-label="@title"></a>
+    }
+
+    <div class="mhead">
+        <div class="ml">
+            <div class="emoji">@emoji</div>
+            <div class="mtitleRow">
+                <div class="mtitle">@title</div>
+                <div class="@pillClass">@pillText</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sticker">@sticker</div>
+    <div class="desc">@desc</div>
+
+    <div class="mActions">
+        <a class="btn mBtn boxBorder @btnClass @viewClass @(isDone ? "isDone" : "") @(disableButton ? "disabled" : "")"
+           href="@(safeHref ?? "javascript:void(0)")"
+           role="button"
+           aria-disabled="@ariaDisabled"
+           tabindex="@tabIndex"
+           title="@(disableButton? disabledLabel : btnText)"
+           onclick="event.stopPropagation();">
+            <span class="ico">@btnIcon</span>
+            <span class="txt">@btnText</span>
+        </a>
+    </div>
+
+    @if (showNoContent)
+    {
+        <div class="msgBox" style="border-color: rgba(245,158,11,.28); background: rgba(254,243,199,.45);">
+            <div class="msgIcon">⚠️</div>
+            <div class="msgText">
+                <b>콘텐츠가 없어요</b>
+                <span>이 날짜(@dateText)에 해당하는 @noContentMsg</span>
+            </div>
+        </div>
+    }
+    else if (showLocked)
+    {
+        <div class="msgBox">
+            <div class="msgIcon">🔒</div>
+            <div class="msgText">
+                <b>지금은 저장할 수 없어요</b>
+                <span>@lockReason</span>
+            </div>
+        </div>
+    }
+</div>

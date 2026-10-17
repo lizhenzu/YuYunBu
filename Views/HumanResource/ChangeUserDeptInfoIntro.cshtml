@@ -1,0 +1,59 @@
+@using BulletinBoard.Common;
+@model BulletinBoard.Models.DeptRoleUserAssoc
+
+@*  ══════════════════════════════════════════════════════════════
+    부서 정보 변경 ① 인트로 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 이동 주소는 그대로.  로그아웃 버튼 · 쓰이지 않던 프로필 사진 스크립트는 뺐다.
+    · 이전 화면은 ChangeUserDeptInfoIntro.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+    string nm = __UserInfos.FullName ?? "";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>부서 정보 변경</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo?UserId=@__UserInfos.UserId">정보 관리</a><span class="sep">›</span>부서 정보</span>
+        <span>DEPT</span>
+    </div>
+
+    <div class="qb-k">DEPARTMENT</div>
+    <h1 class="qb-h1">부서 정보 변경</h1>
+
+    <div class="dp-who"><div class="av">@(nm.Length > 0 ? nm.Substring(0, 1) : "?")</div><div><b>@nm</b><small>부서 정보를 바꿀 사람</small></div></div>
+
+    @if (!string.IsNullOrEmpty(__UserInfos.DeptCode))
+    {
+        @await Html.PartialAsync("_Display_Dept_Info", __UserInfos)
+        <div class="dp-ask">부서 정보를 변경 하시겠어요?</div>
+    }
+    else
+    {
+        <div class="dp-warn">부서 정보가 아직 없어요.<br />부서 정보를 입력 하시겠어요?</div>
+    }
+
+    <div class="qb-btns">
+        <a class="qb-btn g" href="/HumanResource/ManageUserInfo?UserId=@__UserInfos.UserId">아니오</a>
+        <a class="qb-btn p" href="/HumanResource/ChangeUserDeptInfoMain?UserId=@__UserInfos.UserId">예</a>
+    </div>
+
+    <div class="qb-ft">
+        <span>1 / 4</span>
+        <span><a href="/HumanResource/ManageUserInfo?UserId=@__UserInfos.UserId">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+</body>
+</html>

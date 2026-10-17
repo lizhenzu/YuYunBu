@@ -1,0 +1,78 @@
+@using BulletinBoard.Models
+@using BulletinBoard.Helpers
+@using System.Net
+@using System.Text.RegularExpressions
+
+@*  ══════════════════════════════════════════════════════════════
+    홈 "최신 게시" 카드 — 2026-10-05 A안 확정 (번호 목록 · 흰 카드 · 8px · 가는 테두리)
+    · 어두운 남색 그라데이션 상자 + 반투명 카드 + 이모지를 걷어냈다.  글이 몇 개든 같은 번호 줄로 늘어난다
+    · 주소는 그대로: 글 /ReplayBoard/Details/{Id}?tableName=NoticeBoard · 목록 /ReplayBoard/Index?tableName=NoticeBoard
+    · 글이 없으면 카드를 그리지 않는 것도 그대로
+    · 7일 이내에 올라온 글에는 NEW 꼬리표
+    · 미리보기는 HTML 을 걷어 낸 글자만 (예전엔 Html.Raw 로 글 내용을 그대로 찍었다)
+    · 2026-10-05 추가 수정: 번호(01)와 그 자리를 뺐다 — 글이 카드 좌우 폭 전체를 쓴다
+    · 이전 화면은 _Banner_NoticeBoardTops.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    var posts = ViewBag.NoticeBoardTopPosts as List<BoardPost>;
+    var nbNow = DateHelper.GetKoreaNow();
+
+    // 글 내용 → 글자만 (태그 제거 · 엔티티 풀기 · 공백 정리)
+    string Plain(string? html)
+    {
+        if (string.IsNullOrWhiteSpace(html)) return "";
+        var t = Regex.Replace(html, @"<\s*br\s*/?\s*>|</\s*(p|div|li)\s*>", " ", RegexOptions.IgnoreCase);
+        t = Regex.Replace(t, "<[^>]+>", "");
+        t = WebUtility.HtmlDecode(t);
+        return Regex.Replace(t, @"\s+", " ").Trim();
+    }
+}
+
+@if (posts != null && posts.Any())
+{
+    <section class="nbWrap" aria-label="최신 게시">
+        <style>
+            .nbWrap { margin: 10px 0; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; text-align: left; }
+            .nbCard { padding: 4px 16px; background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 1px 6px rgba(0,0,0,.06); }
+            .nbHd { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 6px; }
+            .nbHd b { font-size: 16px; font-weight: 800; color: #111827; }
+            .nbMore { flex: none; padding: 4px 12px; border-radius: 999px; background: #EAF2FD; color: #2F80ED; font-size: 12.5px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+            .nbMore:hover { background: #DCEAFB; }
+            .nbRow { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid #EEF0F3; color: #374151; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+            .nbHd + .nbRow { border-top: 0; }
+            .nbT { flex: 1; min-width: 0; }
+            .nbT b { display: block; font-size: 15px; font-weight: 800; line-height: 1.4; color: #111827; word-break: keep-all; transition: color .15s; }
+            .nbNew { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: #FBEFE7; color: #B4531F; font-size: 10px; font-weight: 800; vertical-align: 2px; }
+            .nbMeta { display: block; margin-top: 3px; font-size: 12px; color: #6B7280; font-variant-numeric: tabular-nums; }
+            .nbMeta i { margin: 0 4px; font-style: normal; color: #D1D5DB; }
+            .nbEx { margin-top: 6px; font-size: 13px; line-height: 1.6; color: #374151; word-break: keep-all; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+            .nbG { flex: none; align-self: center; font-size: 18px; font-weight: 300; color: #7FA3DB; }
+            .nbRow:hover .nbT b, .nbRow:focus-visible .nbT b { color: #2F80ED; }
+            .nbRow:focus-visible { outline: 2px solid #2F80ED; outline-offset: -2px; border-radius: 6px; }
+        </style>
+
+        <div class="nbCard">
+            <div class="nbHd">
+                <b>최신 게시</b>
+                <a class="nbMore" href="/ReplayBoard/Index?tableName=NoticeBoard" title="공지게시판 목록으로">게시목록 ›</a>
+            </div>
+
+            @foreach (var p in posts)
+            {
+                bool isNew = (nbNow - p.CreatedAt).TotalDays <= 7 && (nbNow - p.CreatedAt).TotalDays >= -1;
+                string ex = Plain(p.Content);
+                <a class="nbRow" href="/ReplayBoard/Details/@p.Id?tableName=NoticeBoard" title="상세 보기">
+                    <span class="nbT">
+                        <b>@p.Title@if (isNew) {<span class="nbNew">NEW</span>}</b>
+                        <span class="nbMeta" title="작성일">@p.CreatedAt.ToString("yyyy.MM.dd")<i>·</i>@p.Writer<i>·</i>조회 @p.ViewCount.ToString("N0")회</span>
+                        @if (ex.Length > 0)
+                        {
+                            <span class="nbEx" style="display:-webkit-box">@ex</span>
+                        }
+                    </span>
+                    <span class="nbG" aria-hidden="true">›</span>
+                </a>
+            }
+        </div>
+    </section>
+}

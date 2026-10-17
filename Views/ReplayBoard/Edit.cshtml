@@ -1,0 +1,207 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.Models.BoardPost
+@using BulletinBoard.Models
+@using System
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+
+    var board = ViewBag.Board as BoardContext;
+    ViewBag.Title = $"{board!.BoardName} - 수정";
+    string error = (ViewBag.Error ?? "").ToString();
+
+    var files = ViewBag.Files as List<BoardFile> ?? new();
+
+    bool IsImage(string name)
+    {
+        var ext = (System.IO.Path.GetExtension(name) ?? "").ToLowerInvariant();
+        return ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp";
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@ViewBag.Title</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link href="~/css/board-bright.css" rel="stylesheet" asp-append-version="true" />
+</head>
+
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable })">‹ @board!.BoardName</a><span class="sep">·</span><a href="@Url.Action("Details", "ReplayBoard", new { tableName = board!.PostTable, id = Model.Id })">상세</a></span>
+            <span>No. @Model.Id</span>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">글 수정</h1>
+        <div class="hdS">작성자 <b>@Model.Writer</b></div>
+    </header>
+
+    <main class="sh">
+        <div class="tb">
+            <a class="nbtn" href="@Url.Action("Details", "ReplayBoard", new { tableName = board!.PostTable, id = Model.Id })">상세</a>
+            <a class="nbtn" href="@Url.Action("Index", "ReplayBoard", new { tableName = board!.PostTable })">목록</a>
+            <span class="grow"></span>
+            <form method="post" action="@Url.Action("Delete","ReplayBoard")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tableName" value="@board!.PostTable" />
+                <input type="hidden" name="id" value="@Model.Id" />
+                <button class="nbtn dan" type="submit" onclick="return confirm('정말 삭제할까요?');">글 삭제</button>
+            </form>
+        </div>
+
+        <form method="post" action="@Url.Action("Edit","ReplayBoard")" enctype="multipart/form-data" class="fm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="tableName" value="@board!.PostTable" />
+            <input type="hidden" name="id" value="@Model.Id" />
+
+            @if (!string.IsNullOrWhiteSpace(error))
+            {
+                <div class="alert">@error</div>
+            }
+
+            <div class="fRow">
+                <label class="fLbl" for="title">제목 · 필수</label>
+                <input class="fIn" id="title" name="title" value="@Model.Title" required />
+            </div>
+
+            <div class="fRow">
+                <label class="fLbl" for="content">내용 · 필수</label>
+                <textarea class="fIn" id="content" name="content" required>@Model.Content</textarea>
+            </div>
+
+            @* ✅ NoticeBoard 전용: 상단고정/팝업 *@
+            @if (board?.PostTable == "NoticeBoard")
+            {
+                var isAdmin = (ViewBag.IsAdmin as bool? ?? false);
+                var popupVal = Model.PopupUntil.HasValue ? Model.PopupUntil.Value.ToString("yyyy-MM-dd") : "";
+                <div class="fRow">
+                    <span class="fLbl">상단고정 / 팝업 · @(isAdmin ? "관리자" : "읽기 전용")</span>
+                    <label class="fChk">
+                        <input id="isPinned" type="checkbox" name="isPinned" value="true"
+                               @(Model.IsPinned ? "checked" : "")
+                               @(isAdmin ? "" : "disabled") />
+                        상단 고정 + 팝업 사용
+                    </label>
+                    <!-- ✅ disabled 금지: 전송 안 됨. readonly는 전송됨 -->
+                    <input id="popupUntil" class="fIn" type="date" name="popupUntil" value="@popupVal" readonly autocomplete="off" />
+                    <div class="fHint">체크하면 팝업 종료일을 고를 수 있습니다. (비워 두면 종료일 없음)</div>
+                </div>
+
+                @* ✅ JS에서 관리자 여부를 읽기 위한 플래그 *@
+                <input type="hidden" id="__isAdmin" value="@(isAdmin ? "1" : "0")" />
+            }
+
+            <div class="fRow">
+                <label class="fLbl" for="files">첨부파일 추가 · 선택</label>
+                <input class="fIn" type="file" id="files" name="files" multiple />
+                <div class="fHint">새로 고른 파일은 기존 첨부에 더해집니다.</div>
+            </div>
+
+            @if (files.Count > 0)
+            {
+                <div class="fRow">
+                    <span class="fLbl">기존 첨부파일 · @files.Count 개</span>
+                    <ul class="fl">
+                        @foreach (var f in files)
+                        {
+                            <li>
+                                <span class="l">
+                                    @if (IsImage(f.OriginalFileName))
+                                    {
+                                        <img class="th" src="@f.RelativePath" alt="@f.OriginalFileName" />
+                                    }
+                                    else
+                                    {
+                                        <span class="th">↓</span>
+                                    }
+                                    <a class="n" href="@Url.Action("DownloadFile", "ReplayBoard", new { tableName = board.PostTable, fileId = f.Id })" title="@f.OriginalFileName">@f.OriginalFileName</a>
+                                </span>
+                                <span class="r">
+                                    <span class="s">@(Math.Round(f.FileSize / 1024.0)) KB</span>
+                                    @* 폼 안에 폼을 둘 수 없어서, 아래 별도 폼(df-{id})으로 보낸다 *@
+                                    <button class="nbtn sm dan" type="submit" form="df-@f.Id" onclick="return confirm('첨부파일을 삭제할까요?');">삭제</button>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                    <div class="fHint">파일 삭제는 저장과 상관없이 바로 적용됩니다.</div>
+                </div>
+            }
+
+            <div class="fAct">
+                <a class="nbtn" href="@Url.Action("Details", "ReplayBoard", new { tableName = board.PostTable, id = Model.Id })">취소</a>
+                <button class="nbtn pri" type="submit">저장</button>
+            </div>
+        </form>
+
+        @* 첨부파일 삭제용 폼 — 수정 폼 바깥에 둔다 *@
+        @foreach (var f in files)
+        {
+            <form id="df-@f.Id" method="post" action="@Url.Action("DeleteFile","ReplayBoard")" style="display:none">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tableName" value="@board.PostTable" />
+                <input type="hidden" name="postId" value="@Model.Id" />
+                <input type="hidden" name="fileId" value="@f.Id" />
+            </form>
+        }
+
+        <div class="ft"><span>© 유년부 · @board.BoardName</span></div>
+    </main>
+
+    <script>
+        (function () {
+            const pin = document.getElementById('isPinned');
+            const until = document.getElementById('popupUntil');
+            if (!pin || !until) return;
+
+            const isAdmin = document.getElementById('__isAdmin')?.value === '1';
+
+            const openPicker = () => {
+                if (until.readOnly) return;
+                if (typeof until.showPicker === 'function') {
+                    until.showPicker();
+                } else {
+                    until.focus();
+                }
+            };
+
+            const sync = () => {
+                if (!isAdmin) return;
+
+                const on = !!pin.checked;
+
+                // ✅ disabled 대신 readonly 사용 (readonly는 submit에 포함됨)
+                until.readOnly = !on;
+
+                if (!on) until.value = '';
+            };
+
+            if (isAdmin) {
+                pin.addEventListener('change', () => {
+                    sync();
+                });
+
+                until.addEventListener('click', openPicker);
+                until.addEventListener('focus', openPicker);
+
+                // ✅ 체크 안 된 상태에서 날짜칸 클릭하면 자동 체크 후 팝업
+                until.addEventListener('mousedown', (e) => {
+                    if (!pin.checked) {
+                        e.preventDefault();
+                        pin.checked = true;
+                        sync();
+                        setTimeout(openPicker, 0);
+                    }
+                });
+
+                sync();
+            }
+        })();
+    </script>
+</body>
+</html>

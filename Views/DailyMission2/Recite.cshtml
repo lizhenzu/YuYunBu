@@ -1,0 +1,593 @@
+﻿@using System
+@using System.Globalization
+@using System.Reflection
+@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using BulletinBoard.Models.DailyMission2
+
+<link rel="stylesheet" href="/css/mission2/missionButtons.css" />
+
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var toast = (ViewBag.Toast ?? "").ToString();
+
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+ 
+
+    // ✅ 네비(공용)용 상태 세팅
+    ViewBag.DM2Page = "recite";
+    ViewBag.DM2Done = Model.DayStatus?.ReciteDone ?? false;
+
+    var weeklyDetail = ViewBag.WeeklyWordDetail as WeeklyWordDetailResult;
+    var ww = weeklyDetail?.WeeklyWordToReadData;
+}
+
+<style>
+    .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+    }
+
+    header .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .logo {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+   /*      font-weight: 1000; */
+        background: rgba(99,102,241,.12);
+        border: 1px solid rgba(99,102,241,.18);
+        user-select: none;
+    }
+
+    .btxt .t1 {
+     /*    font-weight: 1000; */
+        font-size: 14px;
+        color: rgba(2,6,23,.78);
+    }
+
+    .btxt .t2 {
+     /*    font-weight: 1000; */
+        font-size: 15px;
+    }
+
+    .btnRow {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+      /*   font-weight: 950; */
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        white-space: nowrap;
+    }
+
+    .btnPrimary {
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+        border-color: rgba(16,185,129,.25);
+    }
+
+    .btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
+    .btnDone {
+        opacity: .45;
+        filter: grayscale(0.35);
+    }
+
+        .btnDone:disabled {
+            cursor: not-allowed;
+        }
+
+    .toast {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+      /*   font-weight: 900; */
+    }
+
+    .hero {
+        margin-top: 14px;
+        border-radius: 22px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.88);
+        overflow: hidden;
+    }
+
+    .heroInner {
+        padding: 16px 16px 14px;
+    }
+
+    .heroTitle {
+        font-size: 18px;
+     /*    font-weight: 1000; */
+        letter-spacing: -.2px;
+    }
+
+    .heroSub {
+        margin-top: 6px;
+      /*   font-weight: 1000; */
+        color: rgba(2,6,23,.72);
+    }
+
+    .heroGrid {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .miniCard {
+        border-radius: 18px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        padding: 12px 12px;
+    }
+
+        .miniCard h3 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 1000;
+        }
+
+        .miniCard p {
+            margin: 8px 0 0;
+         /*    font-weight: 900; */
+            color: rgba(2,6,23,.70);
+            line-height: 1.4;
+        }
+
+    .card {
+        margin-top: 14px;
+        border-radius: 22px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.88);
+        overflow: hidden;
+    }
+
+    .cardHd {
+        padding: 14px 16px;
+        border-bottom: 1px solid rgba(226,232,240,.8);
+     /*    font-weight: 1000; */
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .cardBd {
+        padding: 14px 16px;
+    }
+
+    .warn {
+        color: #b45309;
+      /*   font-weight: 1000; */
+        margin-top: 10px;
+    }
+
+    .muted {
+        color: rgba(2,6,23,.62);
+       /*  font-weight: 900; */
+    }
+
+    .verse {
+        padding: 10px 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        margin-bottom: 10px;
+    }
+
+    .verseTop {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .ref {
+      /*   font-weight: 1000; */
+    }
+
+    .vtxt {
+        margin-top: 6px;
+     /*    font-weight: 900; */
+        line-height: 1.55;
+        color: rgba(2,6,23,.78);
+    }
+
+    @@media (max-width: 760px) {
+        .heroGrid {
+            grid-template-columns: 1fr;
+        }
+
+        .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+        }
+    }
+
+    /* =========================================================
+           ✅ "이번주 공과 요점 보기" 접기/펼치기
+           - 기본: 접힘
+           ========================================================= */
+    .heroFoldWrap {
+        margin-top: 14px;
+    }
+
+    .heroToggleBtn {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+       /*  font-weight: 1000; */
+        cursor: pointer;
+        user-select: none;
+        text-decoration: none;
+        color: rgba(2,6,23,.86);
+    }
+
+        .heroToggleBtn:active {
+            transform: translateY(1px);
+        }
+
+        .heroToggleBtn .chev {
+            transition: transform .18s ease;
+            opacity: .7;
+          /*   font-weight: 1000; */
+        }
+
+        .heroToggleBtn.isOpen .chev {
+            transform: rotate(180deg);
+        }
+
+    /* 내용 접힘/펼침 애니메이션 */
+    .heroFoldBody {
+        margin-top: 10px;
+        overflow: hidden;
+        display: grid;
+        grid-template-rows: 1fr;
+        transition: grid-template-rows .22s ease, opacity .18s ease;
+    }
+
+        .heroFoldBody.isClosed {
+            grid-template-rows: 0fr;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .heroFoldBody > .inner {
+            min-height: 0;
+        }
+</style>
+
+<div class="wrap">
+
+    @{
+        // ✅ 암송 구절은 한글로만 보여 줍니다.
+        //    언어는 컨트롤러(DailyMission2Controller.Recite)에서 "ko" 로 고정하므로
+        //    이 화면에는 언어 전환 버튼을 두지 않습니다.
+        var listenUrl = (ww?.YoJulSongURL ?? "").Trim();
+    }
+
+    <header>
+        <div class="top">
+            <div class="brand">
+                <div class="logo">HB</div>
+                <div class="btxt">
+                    <div class="t1">주일공과(하나바이블)</div>
+                    <div class="t2">@((ww == null) ? "이번 주 요점" : (ww.OnePoint ?? ""))</div>
+                </div>
+            </div>
+
+            @* 언어 전환(English) 버튼은 없앴습니다 — 한글로만 보여 줍니다 *@
+            @if (!Model.IsActionable)
+            {
+                <div class="btnRow" style="margin-top:0;">
+                    <span class="btn" title="수행 불가 날짜">🔒</span>
+                </div>
+            }
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="toast">@toast</div>
+    }
+
+    @if (ww == null)
+    {
+        <section class="card">
+            <div class="cardHd">
+                <div>🧠 암송</div>
+                <div>@d</div>
+            </div>
+            <div class="cardBd">
+                <div style="font-weight:1000;">이번 주 공과(WeeklyWordToRead) 데이터가 없습니다.</div>
+                <div class="muted" style="margin-top:6px;">
+                    DateFrom ~ DateTo 사이에 선택일(@d)이 포함되는 주간 데이터가 있어야 합니다.
+                </div>
+            </div>
+        </section>
+    }
+    else
+    {
+        <!-- ✅ "이번주 공과 요점 보기" 버튼 + 접기/펼치기(기본 접힘) -->
+        <div class="heroFoldWrap">
+            <button type="button"
+                    class="heroToggleBtn"
+                    id="heroToggleBtn"
+                    aria-controls="heroFoldBody"
+                    aria-expanded="false">
+                📌 이번주 공과 요점 보기
+                <span class="chev">▾</span>
+            </button>
+
+            <div class="heroFoldBody isClosed" id="heroFoldBody">
+                <div class="inner">
+                    <section class="hero">
+                        <div class="heroInner">
+                            <div class="heroTitle">@($"{ww.WeekTitle_GUA}과") · @ww.BibleTitle</div>
+                            <div class="heroSub">“@ww.OnePoint”</div>
+
+                            <div class="heroGrid">
+                                <div class="miniCard">
+                                    <h3>✍️ 학습 요점</h3>
+                                    <p>@ww.LearningObjectives1</p>
+                                </div>
+                                <div class="miniCard">
+                                    <h3>📌 적용</h3>
+                                    <p>@ww.LearningObjectives2</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    }
+
+    @functions {
+        int GetVerseNo(object v)
+        {
+            if (v == null) return 0;
+
+            string[] candidates = new[]
+            {
+        "Zul","zul","ZUL",
+        "BibleZul","BibleZUL","bibleZul",
+        "ZulNo","ZulNO",
+        "Verse","verse",
+        "VerseNo","VerseNO",
+        "No","NO",
+        "Seq","SEQ",
+        "OrderNo","OrderNO",
+        "Idx","Index"
+        };
+
+            var t = v.GetType();
+            foreach (var name in candidates)
+            {
+                var p = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p == null) continue;
+
+                var val = p.GetValue(v);
+                if (val == null) continue;
+
+                try { return Convert.ToInt32(val); } catch { }
+            }
+            return 0;
+        }
+
+        string GetVerseText(object v)
+        {
+            if (v == null) return "";
+
+            string[] candidates = new[]
+            {
+        "BibleText","bibleText",
+        "Text","text","BibleData",
+        "VerseText","verseText",
+        "Content","content",
+        "Sentence","sentence"
+        };
+
+            var t = v.GetType();
+            foreach (var name in candidates)
+            {
+                var p = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p == null) continue;
+
+                var val = p.GetValue(v);
+                var s = val?.ToString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+
+            return v.ToString() ?? "";
+        }
+
+        bool GetDoneFlag(object o, params string[] names)
+        {
+            if (o == null) return false;
+            var t = o.GetType();
+
+            foreach (var n in names)
+            {
+                var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (p == null) continue;
+
+                var val = p.GetValue(o);
+                if (val == null) continue;
+
+                try { return Convert.ToBoolean(val); } catch { }
+            }
+            return false;
+        }
+    }
+
+    @{
+        bool canAct = Model.IsActionable;
+        var reciteBible = weeklyDetail?.WeekeBiblesDataToRecite;
+
+        int weeklyId = 0;
+        if (Model?.Content?.WeeklyWordToReadId != null) weeklyId = Model.Content.WeeklyWordToReadId.Value;
+        else if (ww != null) weeklyId = ww.Id;
+
+        var dayStatusObj = (object)Model?.DayStatus;
+        bool reciteDone =
+        GetDoneFlag(dayStatusObj, "ReciteDone", "WeeklyReciteDone", "Recite_Done", "WeeklyWordDone", "WeeklyDone", "Recite");
+    }
+
+    @if (ww != null)
+    {
+        <section class="card">
+            <div class="cardHd">
+                <div>🧠 이번 주 암송 구절</div>
+                <div class="muted">
+                    @ww.BibleTextToRecite @($"{ww.BibleTextToReciteFromJang}:{ww.BibleTextToReciteFromZul} ~ {ww.BibleTextToReciteToJang}:{ww.BibleTextToReciteToZul}")
+                </div>
+            </div>
+
+            <div class="cardBd">
+
+                @if (reciteBible?.eBibleDatas == null || reciteBible.eBibleDatas.Count == 0)
+                {
+                    <div style="font-weight:1000;">암송 본문(eBibles) 데이터가 비어 있습니다.</div>
+                    <div class="muted" style="margin-top:6px;">
+                        ManageeBible.geteBible2() 결과를 확인해 주세요. (책/장/절 범위, langCD, UserId)
+                    </div>
+                }
+                else
+                {
+                    foreach (var v in reciteBible.eBibleDatas)
+                    {
+                        int verseNo = 0;
+                        string verseText = "";
+
+                        try { verseNo = Convert.ToInt32(((dynamic)v).zul); } catch { verseNo = GetVerseNo(v); }
+                        try { verseText = Convert.ToString(((dynamic)v).BibleData) ?? ""; } catch { verseText = GetVerseText(v); }
+
+                        <div class="verse">
+                            <div class="verseTop">
+                                <div class="ref">@($"{verseNo}절")</div>
+                            </div>
+                            <div class="vtxt">@verseText</div>
+                        </div>
+                    }
+                }
+
+                <hr style="border:none; border-top:1px solid rgba(226,232,240,.9); margin:14px 0;" />
+
+                @if (weeklyId <= 0)
+                {
+                    <div style="font-weight:1000;">weeklyWordToReadId를 찾지 못했습니다.</div>
+                    <div class="muted" style="margin-top:6px;">
+                        Model.Content.WeeklyWordToReadId 또는 WeeklyWordToReadData.Id가 필요합니다.
+                    </div>
+                }
+                else
+                {
+                    <form method="post" action="/DailyMission2/SaveRecite" class="missionForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="date" value="@d" />
+                        <input type="hidden" name="weeklyWordToReadId" value="@weeklyId" />
+
+                        <button class="missionBtn @(reciteDone ? "isDone" : "")"
+                                type="submit"
+                                @((canAct && !reciteDone) ? "" : "disabled")>
+                            @(reciteDone ? "✅ 암송 완료됨" : "암송 했어요")
+                        </button>
+
+                        @if (!reciteDone && !canAct)
+                        {
+                            <div class="warn">오늘/어제/그저께만 수행할 수 있어요.</div>
+                        }
+                    </form>
+                }
+
+            </div>
+        </section>
+    }
+
+    @await Html.PartialAsync("~/Views/DailyMission2/Partials/_Dm2Nav.cshtml", Model)
+
+</div>
+
+@{
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+
+@await Html.PartialAsync(
+"~/Views/DailyMission2/Partials/_OkPopup.cshtml",
+    new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" }
+)
+
+<script>
+    // ✅ "이번주 공과 요점 보기" 접기/펼치기
+    (function () {
+        const btn = document.getElementById("heroToggleBtn");
+        const body = document.getElementById("heroFoldBody");
+        if (!btn || !body) return;
+
+        function setOpen(open) {
+            btn.classList.toggle("isOpen", open);
+            body.classList.toggle("isClosed", !open);
+            btn.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+
+        // 기본: 접힘 (HTML에서도 isClosed로 선언해둠)
+        setOpen(false);
+
+        btn.addEventListener("click", () => {
+            const closed = body.classList.contains("isClosed");
+            setOpen(closed);
+        });
+    })();
+</script>

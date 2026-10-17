@@ -1,0 +1,197 @@
+@using BulletinBoard.Common;
+@using System.Web
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.QuestionTypeDataObjects>
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈뱅크에서 선택 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 성경 본문(_PublisheBible43)이 _Layout_Quiz 의 스타일 · 스크립트를 쓰므로 레이아웃은 그대로 두고 겉모양만 덮어쓴다.
+    · 등록 3가지(수정없이 · 수정해서 · 뱅크에서 삭제) · 성경구절 보기 · "알려 드려요" 팝업(쿠키) 주소와 동작은 그대로
+    · 이전 화면은 FromTemplate.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = "_Layout_Quiz";
+
+    TodayWordToReads todayWordToReads = ViewBag.TodayWordToReads as TodayWordToReads;
+    eBibles _eBibles = ViewBag._eBibles as eBibles;
+
+    string whenRaw = ViewBag.WhenDate as string ?? "";
+    DateTime when;
+    bool hasWhen = DateTime.TryParse(whenRaw, out when);
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.QuestionTypeDataObjects>();
+    string TypeName(string? t) => (t ?? "").ToLower() switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
+    string TypeCls(string? t)  => (t ?? "").ToLower() switch { "o" => "o", "a" => "x", _ => "" };
+}
+
+<link rel="stylesheet" href="/css/bibleOneByOne.css">
+<link rel="stylesheet" href="/css/ProcessBar.css">
+<link rel="stylesheet" href="/css/ButtonBase7.css">
+<link rel="stylesheet" href="/css/ColorBase7.css">
+<link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+<style>
+    /* _Layout_Quiz 의 가운데 정렬 · 회색 바탕 · 그림자 상자를 흰 화면으로 */
+    body { display: block !important; background: #FFFFFF !important; }
+    .qb-bible { margin-top: 10px; padding: 12px 14px; border-radius: 14px; background: #F4F6F9; }
+    .qb-bible > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; font-size: 13.5px; font-weight: 800; color: #111827; }
+    .qb-bible > summary::-webkit-details-marker { display: none; }
+    .qb-bible > summary span { font-size: 12px; font-weight: 700; color: #2F80ED; }
+    .qb-bible > summary span::after { content: "펼쳐 보기 ⌄"; }
+    .qb-bible[open] > summary span::after { content: "접기 ⌃"; }
+    .qb-bible .in { margin-top: 10px; }
+    .qb-bank { margin-top: 10px; padding: 14px; border-radius: 14px; background: #fff; box-shadow: inset 0 0 0 1px #E8ECF2; }
+    .qb-bank .qb-q { padding: 0; border: 0; }
+    .qb-bank .acts { display: grid; gap: 6px; margin-top: 12px; }
+    .qb-bank .acts button { height: 42px; border: 0; border-radius: 12px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: #EAF2FD; color: #2F80ED; }
+    .qb-bank .acts button.p { background: #2F80ED; color: #fff; }
+    .qb-bank .acts button.g { background: #F4F6F9; color: #6B7280; }
+    .qb-bank .acts button.d { background: #FDEEEE; color: #D9534F; }
+    .qb-bank .acts button:hover { filter: brightness(.97); }
+</style>
+
+<script src="/js/ProcessBar73.js"></script>
+<script src="/js/bibleOneByOne.js"></script>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>처리하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+<div id="processingBox" style="display:none"></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/Index">퀴즈</a><span class="sep">›</span>퀴즈뱅크</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k">QUIZ BANK@(hasWhen ? " · " + when.ToString("M월 d일") : "")</div>
+    <h1 class="qb-h1">퀴즈뱅크에서 선택<small>@(list.Count)문제</small></h1>
+
+    @if (todayWordToReads != null)
+    {
+        <div class="qb-scr">
+            <i>오늘의 말씀</i>
+            <b>@todayWordToReads.BibleSubject</b>
+            <small>@todayWordToReads.BibleText @(todayWordToReads.FromJang)장 @(todayWordToReads.FromZul)절 ~ @(todayWordToReads.ToJang)장 @(todayWordToReads.ToZul)절</small>
+        </div>
+    }
+
+    @if (_eBibles != null)
+    {
+        <details class="qb-bible">
+            <summary>성경 본문<span></span></summary>
+            <div class="in">@await Html.PartialAsync("_PublisheBible43", @_eBibles)</div>
+        </details>
+    }
+
+    <div class="qb-sec">퀴즈뱅크 문제<small>골라서 등록해요</small></div>
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">이 날 퀴즈뱅크에 문제가 없어요</div>
+    }
+
+    @foreach (var item in list)
+    {
+        string t = (item.QuestionType ?? "").ToLower();
+        <div class="qb-bank">
+            <div class="qb-q">
+                <div class="h"><b>@(item.sequenceNo))</b><span class="qb-tg @TypeCls(t)">@TypeName(t)</span></div>
+                <p>@item.QuestionQ</p>
+                @if (t == "o")
+                {
+                    <ol>
+                        <li class="@(item.CorrectAnswer == "1" ? "ans" : "")">@item.Question1@(item.CorrectAnswer == "1" ? " · 정답" : "")</li>
+                        <li class="@(item.CorrectAnswer == "2" ? "ans" : "")">@item.Question2@(item.CorrectAnswer == "2" ? " · 정답" : "")</li>
+                        <li class="@(item.CorrectAnswer == "3" ? "ans" : "")">@item.Question3@(item.CorrectAnswer == "3" ? " · 정답" : "")</li>
+                        <li class="@(item.CorrectAnswer == "4" ? "ans" : "")">@item.Question4@(item.CorrectAnswer == "4" ? " · 정답" : "")</li>
+                    </ol>
+                }
+                else
+                {
+                    <div class="ans-line">정답 @item.CorrectAnswer</div>
+                }
+            </div>
+            <div class="acts">
+                <button type="button" class="p" onclick="createQuizById(@item.Id)">수정없이 퀴즈로 등록</button>
+                <button type="button" onclick="createQuizByBank(@item.Id)">수정해서 퀴즈로 등록</button>
+                <button type="button" class="g" onclick="location.href='/BibleBulk/BibleSheet2?BibleText=@Html.Raw(item.BibleText)&Jang=@item.Jang'">관련 성경구절 보기</button>
+                <button type="button" class="d" onclick="deleteQuestion(@item.Id, '@HttpUtility.JavaScriptStringEncode(item.QuestionQ)')">퀴즈뱅크에서 이 퀴즈 삭제</button>
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>퀴즈뱅크</span>
+        <span><a href="/Question/Index">퀴즈 달력</a><a href="/Question/QuestionDetailList">퀴즈 목록</a><a href="#" onclick="history.back(); return false;">뒤로</a></span>
+    </div>
+</div>
+
+<!-- 알려 드려요 (오늘 하루 · 7일간 안보기) -->
+<div class="qb-pop" id="popup-background">
+    <div class="box">
+        <h3>알려 드려요</h3>
+        <p>퀴즈뱅크에서 문제가 잘못 생성될 수 있어요.<br />잘못된 문제는 고민없이 바로 삭제해 주세요.</p>
+        <div class="bt">
+            <button type="button" id="hideToday" onclick="handleCheckbox('hideToday', 1)">오늘 하루 안보기</button>
+            <button type="button" id="hide7Days" onclick="handleCheckbox('hide7Days', 7)">7일간 안보기</button>
+        </div>
+    </div>
+</div>
+
+<script src="/js/asyncProcesing.js"></script>
+<script src="/js/common2.js"></script>
+
+<script>
+    function createQuizById(id) {
+        document.getElementById('loadingOverlay').classList.add('on');
+        location.href = "/Question/CreateQuizById?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    function createQuizByBank(id) {
+        location.href = "/Question/CreateQuizByBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    async function deleteQuestion(id, QuestionQ) {
+        let result = await confirmMessage(true, ['퀴즈뱅크에서 아래 퀴즈를 삭제 할까요?', QuestionQ], null, '진행'); // 취소 버튼 표시
+        if (result === 'y') {
+            document.getElementById('loadingOverlay').classList.add('on');
+            location.href = "/Question/DeleteQuestionBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+        }
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+
+    function goBack() { window.history.back(); }
+    function redirectToPage(URL) { window.location.href = URL; }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const hideToday = getCookie('hideToday');
+        const hide7Days = getCookie('hide7Days');
+        // hideToday 또는 hide7Days 쿠키가 없을 때만 팝업을 표시
+        if (!hideToday && !hide7Days) {
+            document.getElementById('popup-background').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    });
+
+    function handleCheckbox(cookieName, days) {
+        setCookie(cookieName, 'true', days);
+        document.getElementById('popup-background').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = name + "=" + value + ";expires=" + date.toUTCString() + ";path=/";
+    }
+    function getCookie(name) {
+        const cname = name + "=";
+        const ca = decodeURIComponent(document.cookie).split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(cname) === 0) return c.substring(cname.length, c.length);
+        }
+        return "";
+    }
+</script>

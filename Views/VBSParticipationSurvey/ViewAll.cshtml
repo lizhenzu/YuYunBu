@@ -1,0 +1,897 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Services.Abstract.VBSParticipationSurveyAdminVM
+@{
+    Layout = null;
+
+    var viewMode   = ((ViewBag.ViewMode as string) ?? "Student").ToLowerInvariant();
+    bool isStudent = viewMode == "student";
+    bool isTeacher = viewMode == "teacher";
+    bool isAll     = !isStudent && !isTeacher;
+
+    string themeKey  = isStudent ? "student" : isTeacher ? "teacher" : "all";
+    string pageTitle = isStudent ? "학생 참여자 목록" : isTeacher ? "교사·스탭 목록" : "전체 참여자 목록";
+    string pageIcon  = isStudent ? "🎒" : isTeacher ? "👨‍🏫" : "👥";
+    string vp        = isStudent ? "Student" : isTeacher ? "Teacher" : "All";
+
+    DateTime[] days = Model.Days ?? new[] {
+        ConstatsCommon.VBSParticipationStartDate,
+        ConstatsCommon.VBSParticipationStartDate.AddDays(1),
+        ConstatsCommon.VBSParticipationStartDate.AddDays(2)
+    };
+    var hidePmDate = new DateTime(2026, 7,31).Date;
+
+    bool? getSlot(VBSParticipationSurveyAdminRow r, DateTime d, string slot)
+        => r.Slots != null && r.Slots.TryGetValue((d.Date, slot), out var v) ? v : (bool?)null;
+
+    string? getNote(VBSParticipationSurveyAdminRow r, DateTime d, string slot)
+        => r.StatusNotes != null && r.StatusNotes.TryGetValue((d.Date, slot), out var n) ? n : null;
+
+    string noteLabel(string? note) => note switch {
+        "CONDITIONAL"   => "상황따라",
+        "ABSENT_CONFIRM"=> "참석불가",
+        "UNDECIDED"     => "추후결정",
+        _ => "—"
+    };
+
+    string[] koDdd = { "일", "월", "화", "수", "목", "금", "토" };
+    string fmtDay(DateTime d) => $"{d.Month}/{d.Day}({koDdd[(int)d.DayOfWeek]})";
+
+    bool isExcluded(VBSParticipationSurveyAdminRow r)
+    {
+        var rc = (r.RoleCode ?? "").Trim().ToLower();
+        var rn = (r.RoleNM   ?? "").Trim().ToLower();
+        var nm = (r.FullName  ?? "").Trim();
+        return rc is "guest" or "admin" or "superadmin"
+            || rn is "guest" or "admin" or "superadmin"
+            || nm is "관리자" or "구경하기";
+    }
+    bool isT1001(VBSParticipationSurveyAdminRow r) =>
+        (r.RoleCode ?? "").Trim().Equals("T1001", StringComparison.OrdinalIgnoreCase);
+
+    var rows = (Model.Rows ?? new List<VBSParticipationSurveyAdminRow>())
+        .Select((r, i) => new { r, i })
+        .Where(x => x.r != null && !isExcluded(x.r))
+        .OrderBy(x => (isT1001(x.r) && x.r.ClassYear.HasValue) ? 1 : 0)
+        .ThenBy(x => x.i)
+        .Select(x => x.r)
+        .ToList();
+
+    bool isFullAttend(VBSParticipationSurveyAdminRow r)
+    {
+        foreach (var d in days) {
+            if (getSlot(r, d, "AM") != true) return false;
+            if (d.Date != hidePmDate && getSlot(r, d, "PM") != true) return false;
+        }
+        return true;
+    }
+    bool isPartial(VBSParticipationSurveyAdminRow r)
+    {
+        bool any = days.Any(d => getSlot(r, d, "AM") == true
+            || (d.Date != hidePmDate && getSlot(r, d, "PM") == true));
+        return any && !isFullAttend(r);
+    }
+    bool isResp(VBSParticipationSurveyAdminRow r)
+        => days.Any(d => getSlot(r, d, "AM") != null
+            || (d.Date != hidePmDate && getSlot(r, d, "PM") != null));
+
+    int total  = rows.Count;
+    int resp   = rows.Count(r => isResp(r));
+    int unresp = total - resp;
+    int full   = rows.Count(r => isFullAttend(r));
+    int part   = rows.Count(r => isPartial(r));
+    int pct    = total <= 0 ? 0 : (int)Math.Round(resp * 100.0 / total);
+    int cntAtt(DateTime d, string s) => rows.Count(r => getSlot(r, d, s) == true);
+
+    int rn = 1;
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>🏕️ @pageTitle</title>
+<style>
+/* ═══════════════════════════════════════
+   Reset
+═══════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;min-height:100vh;color:#0f172a}
+a{text-decoration:none;color:inherit}
+button,select,input{font-family:inherit}
+
+/* ═══════════════════════════════════════
+   Theme Tokens
+═══════════════════════════════════════ */
+body.t-student {
+    --bg:       linear-gradient(155deg,#dbeafe 0%,#e0f2fe 35%,#f0faff 70%,#f8faff 100%);
+    --pri:      #2563eb;
+    --pri-d:    #1d4ed8;
+    --pri-dd:   #1e3a8a;
+    --pri-soft: #dbeafe;
+    --pri-xs:   #eff6ff;
+    --sb:       rgba(37,99,235,.18);
+    --hero1:    #1e3a8a;
+    --hero2:    #2563eb;
+    --hero3:    #60a5fa;
+}
+body.t-teacher {
+    --bg:       linear-gradient(155deg,#dcfce7 0%,#d1fae5 35%,#ecfdf5 70%,#f7fef9 100%);
+    --pri:      #16a34a;
+    --pri-d:    #15803d;
+    --pri-dd:   #14532d;
+    --pri-soft: #dcfce7;
+    --pri-xs:   #f0fdf4;
+    --sb:       rgba(22,163,74,.18);
+    --hero1:    #14532d;
+    --hero2:    #16a34a;
+    --hero3:    #4ade80;
+}
+body.t-all {
+    --bg:       linear-gradient(155deg,#ede9fe 0%,#e0e7ff 35%,#f0f4ff 70%,#faf8ff 100%);
+    --pri:      #6366f1;
+    --pri-d:    #4f46e5;
+    --pri-dd:   #312e81;
+    --pri-soft: #e0e7ff;
+    --pri-xs:   #eef2ff;
+    --sb:       rgba(99,102,241,.18);
+    --hero1:    #312e81;
+    --hero2:    #6366f1;
+    --hero3:    #a5b4fc;
+}
+
+body { background: var(--bg); }
+
+/* ═══════════════════════════════════════
+   Top Navigation Bar
+═══════════════════════════════════════ */
+.topbar {
+    position: sticky; top: 0; z-index: 200;
+    background: rgba(255,255,255,.86);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    box-shadow: 0 1px 16px rgba(0,0,0,.07);
+}
+.tb-inner {
+    max-width: 1200px; margin: 0 auto; padding: 0 16px;
+    height: 52px; display: flex; align-items: center; gap: 10px;
+}
+.tb-brand {
+    font-size: 15px; font-weight: 950; white-space: nowrap; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+}
+.tb-tabs {
+    flex: 1; display: flex; gap: 4px;
+    overflow-x: auto; scrollbar-width: none;
+}
+.tb-tabs::-webkit-scrollbar { display: none; }
+.tb-tab {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 14px; border-radius: 999px;
+    font-size: 13px; font-weight: 800;
+    color: #64748b; white-space: nowrap; flex-shrink: 0;
+    transition: all .15s;
+}
+.tb-tab:hover { background: var(--pri-soft); color: var(--pri); }
+.tb-tab.on {
+    background: var(--pri); color: #fff;
+    box-shadow: 0 3px 12px rgba(0,0,0,.16);
+}
+.tb-acts { display: flex; gap: 6px; flex-shrink: 0; }
+.tb-act {
+    padding: 5px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 800;
+    background: rgba(0,0,0,.05); transition: background .15s;
+    white-space: nowrap;
+}
+.tb-act:hover { background: rgba(0,0,0,.10); }
+.tb-act.hi { background: var(--pri); color: #fff; }
+.tb-act.hi:hover { filter: brightness(1.08); }
+
+@@media (max-width: 600px) {
+    .tb-brand span { display: none; }
+    .tb-tab { font-size: 12px; padding: 5px 10px; }
+}
+
+/* ═══════════════════════════════════════
+   Hero
+═══════════════════════════════════════ */
+.hero {
+    background: linear-gradient(135deg, var(--hero1) 0%, var(--hero2) 55%, var(--hero3) 100%);
+    padding: 24px 16px 20px;
+}
+.hero-inner { max-width: 1200px; margin: 0 auto; }
+.hero-eyebrow {
+    font-size: 11px; font-weight: 900; letter-spacing: .1em;
+    text-transform: uppercase; color: rgba(255,255,255,.65);
+    margin-bottom: 6px;
+}
+.hero-ttl {
+    font-size: 26px; font-weight: 950; color: #fff;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 20px; line-height: 1.2;
+}
+
+/* Stats row */
+.sc-row {
+    display: grid; grid-template-columns: repeat(5,1fr);
+    gap: 10px; margin-bottom: 16px;
+}
+@@media (max-width: 900px) { .sc-row { grid-template-columns: repeat(3,1fr); } }
+@@media (max-width: 520px) { .sc-row { grid-template-columns: repeat(2,1fr) 1fr; } }
+
+.sc {
+    background: rgba(255,255,255,.14);
+    border: 1.5px solid rgba(255,255,255,.20);
+    border-radius: 16px; padding: 13px 14px;
+    cursor: pointer; user-select: none;
+    transition: transform .12s, background .15s, border-color .15s;
+}
+.sc:hover { transform: translateY(-2px); background: rgba(255,255,255,.22); }
+.sc.on {
+    background: rgba(255,255,255,.96);
+    border-color: #fff;
+    box-shadow: 0 5px 24px rgba(0,0,0,.18);
+}
+.sc.on .sc-lbl, .sc.on .sc-num { color: var(--pri-d); }
+.sc-lbl {
+    font-size: 10.5px; font-weight: 900;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: rgba(255,255,255,.72); margin-bottom: 6px;
+}
+.sc-num {
+    font-size: 24px; font-weight: 950; color: #fff; line-height: 1;
+}
+.sc-num small { font-size: 12px; font-weight: 700; opacity: .80; margin-left: 2px; }
+
+/* Progress bar */
+.pb-track {
+    background: rgba(255,255,255,.22);
+    border-radius: 999px; height: 8px; overflow: hidden;
+}
+.pb-fill {
+    height: 100%; border-radius: 999px;
+    background: rgba(255,255,255,.90);
+    transition: width .7s cubic-bezier(.4,0,.2,1);
+}
+.pb-lbl {
+    margin-top: 8px; font-size: 12px; font-weight: 800;
+    color: rgba(255,255,255,.75);
+}
+
+/* ═══════════════════════════════════════
+   Controls Bar
+═══════════════════════════════════════ */
+.ctrl-bar {
+    position: sticky; top: 52px; z-index: 190;
+    background: rgba(255,255,255,.90);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0,0,0,.07);
+    padding: 9px 16px;
+}
+.ctrl-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.srch {
+    flex: 1; min-width: 150px; max-width: 280px;
+    padding: 8px 12px 8px 34px;
+    border: 1.5px solid rgba(0,0,0,.12);
+    border-radius: 999px;
+    font-size: 13.5px; font-weight: 700;
+    outline: none; background: #fff;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.44.56a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 11px center;
+    transition: border-color .15s;
+}
+.srch:focus { border-color: var(--pri); }
+
+.srt-sel {
+    padding: 8px 11px; border-radius: 12px;
+    border: 1.5px solid rgba(0,0,0,.12);
+    font-size: 12.5px; font-weight: 800;
+    background: #fff; outline: none; cursor: pointer;
+    color: #0f172a; transition: border-color .15s;
+}
+.srt-sel:focus { border-color: var(--pri); }
+
+.org-btn {
+    padding: 8px 13px; border-radius: 12px;
+    border: none; cursor: pointer;
+    font-size: 12.5px; font-weight: 900;
+    background: var(--pri); color: #fff;
+    transition: filter .15s, transform .1s;
+}
+.org-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+.fchip {
+    padding: 5px 13px; border-radius: 999px;
+    font-size: 12px; font-weight: 900;
+    background: var(--pri-soft);
+    border: 1px solid var(--sb);
+    color: var(--pri-d);
+    white-space: nowrap;
+}
+.upd-at {
+    margin-left: auto;
+    font-size: 11px; font-weight: 800;
+    color: #94a3b8; white-space: nowrap;
+}
+@@media (max-width: 600px) {
+    .upd-at { display: none; }
+    .srch { max-width: none; }
+}
+
+/* ═══════════════════════════════════════
+   Table Section
+═══════════════════════════════════════ */
+.tmain { padding: 14px 16px 10px; }
+.tmain-inner { max-width: 1200px; margin: 0 auto; }
+
+/* scroll hint */
+.scroll-hint {
+    display: none;
+    font-size: 11.5px; font-weight: 800;
+    color: #94a3b8; text-align: right;
+    padding: 0 4px 6px;
+}
+@@media (max-width: 700px) { .scroll-hint { display: block; } }
+
+.tcard {
+    background: rgba(255,255,255,.94);
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius: 18px;
+    box-shadow: 0 6px 32px rgba(0,0,0,.08);
+    overflow: hidden;
+}
+.tscroll {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+/* Fade edges on scroll */
+.tcard-wrap { position: relative; }
+.tcard-wrap::after {
+    content: '';
+    position: absolute; top: 0; right: 0; bottom: 0; width: 32px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,.80));
+    pointer-events: none;
+    border-radius: 0 18px 18px 0;
+}
+@@media (min-width: 1100px) { .tcard-wrap::after { display: none; } }
+
+table { width: 100%; border-collapse: separate; border-spacing: 0; }
+
+thead th {
+    background: var(--pri-xs);
+    border-bottom: 2px solid var(--sb);
+    padding: 10px 12px;
+    font-size: 11px; font-weight: 950;
+    letter-spacing: .05em; text-transform: uppercase;
+    color: var(--pri-d); text-align: center;
+    white-space: nowrap;
+    position: sticky; top: 0;
+}
+thead th.th-no   { width: 46px; min-width: 46px; }
+thead th.th-nm   { text-align: left; min-width: 72px; }
+thead th.th-role { text-align: left; min-width: 90px; border-right: 2px solid var(--sb); }
+thead th.th-day  { min-width: 88px; }
+
+tbody tr { transition: background .10s; }
+tbody tr:hover td { background: var(--pri-xs); }
+tbody tr:last-child td { border-bottom: none; }
+
+tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid rgba(0,0,0,.05);
+    text-align: center;
+    font-weight: 800; font-size: 13px;
+    white-space: nowrap;
+}
+tbody td.td-no   { color: #94a3b8; font-size: 11.5px; font-weight: 700; width: 46px; }
+tbody td.td-nm   { text-align: left; font-weight: 950; font-size: 13.5px; }
+tbody td.td-role { text-align: left; border-right: 2px solid rgba(0,0,0,.05); }
+
+.col-sep { border-right: 1px solid rgba(0,0,0,.07); }
+
+/* Slot bubbles */
+.sl-y {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--pri); color: #fff;
+    font-size: 14px; font-weight: 900;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.sl-n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #fee2e2; color: #ef4444;
+    font-size: 13px; font-weight: 900;
+}
+.sl-null {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(0,0,0,.04); color: #cbd5e1;
+    font-size: 13px;
+}
+.sl-note {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 3px 7px; border-radius: 999px;
+    background: rgba(245,158,11,.15); color: #92400e;
+    font-size: 10px; font-weight: 900;
+    border: 1px solid rgba(245,158,11,.30);
+    white-space: nowrap;
+}
+
+/* Status dot next to name */
+.sdot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; flex-shrink: 0;
+    margin-right: 5px; vertical-align: middle;
+}
+.sdot.full    { background: #22c55e; }
+.sdot.partial { background: #f59e0b; }
+.sdot.none    { background: #e2e8f0; }
+
+/* Role / Class chip */
+.rchip {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 11.5px; font-weight: 900;
+    background: var(--pri-soft); color: var(--pri-d);
+    border: 1px solid var(--sb); white-space: nowrap;
+}
+
+/* Empty state */
+.empty {
+    padding: 60px 32px; text-align: center; color: #94a3b8;
+}
+.empty-icon { font-size: 44px; margin-bottom: 12px; }
+.empty-txt  { font-size: 13.5px; font-weight: 800; }
+
+/* ═══════════════════════════════════════
+   Day Summary
+═══════════════════════════════════════ */
+.dsum { padding: 12px 16px 32px; }
+.dsum-inner { max-width: 1200px; margin: 0 auto; }
+.dsum-ttl {
+    font-size: 11.5px; font-weight: 950;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: #64748b; margin-bottom: 10px;
+}
+.dsum-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+.dcard {
+    background: rgba(255,255,255,.88);
+    border: 1px solid rgba(0,0,0,.07);
+    border-radius: 16px; padding: 16px 18px;
+    box-shadow: 0 3px 14px rgba(0,0,0,.06);
+}
+.dcard-date {
+    font-size: 13.5px; font-weight: 950; color: var(--pri);
+    margin-bottom: 12px;
+    padding-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.dslot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 7px;
+}
+.dslot:last-child { margin-bottom: 0; }
+.dslot-lbl { font-size: 12px; font-weight: 900; color: #64748b; }
+.dslot-val {
+    font-size: 20px; font-weight: 950; color: #0f172a; line-height: 1;
+}
+.dslot-val small { font-size: 11px; font-weight: 700; color: #94a3b8; margin-left: 2px; }
+
+/* ═══════════════════════════════════════
+   Misc
+═══════════════════════════════════════ */
+@@keyframes spin { to { transform: rotate(360deg); } }
+
+@@media (max-width: 480px) {
+    .hero-ttl  { font-size: 20px; }
+    .sc-num    { font-size: 20px; }
+    .tmain     { padding: 10px 10px 8px; }
+    .dsum      { padding: 10px 10px 24px; }
+}
+</style>
+</head>
+
+<body class="t-@themeKey">
+
+<!-- ════════ TOP NAV ════════ -->
+<nav class="topbar">
+    <div class="tb-inner">
+        <div class="tb-brand">🏕️ <span>성경학교 참석현황</span></div>
+        <div class="tb-tabs">
+            <a class="tb-tab @(isStudent ? "on" : "")" href="/VBSParticipationSurvey/ViewAll?view=Student">🎒 학생</a>
+            <a class="tb-tab @(isTeacher ? "on" : "")" href="/VBSParticipationSurvey/ViewAll?view=Teacher">👨‍🏫 교사·스탭</a>
+            <a class="tb-tab @(isAll     ? "on" : "")" href="/VBSParticipationSurvey/ViewAll?view=All">👥 전체</a>
+        </div>
+        <div class="tb-acts">
+            <a class="tb-act" href="/VBSParticipationSurvey/Index">🏠 홈</a>
+            <a class="tb-act hi" href="/VBSParticipationSurvey/Admin?view=@vp">⚙️ 관리자</a>
+        </div>
+    </div>
+</nav>
+
+<!-- ════════ HERO ════════ -->
+<div class="hero">
+    <div class="hero-inner">
+        <div class="hero-eyebrow">🏕️ 2026 성경학교 · 참석 현황</div>
+        <div class="hero-ttl">@pageIcon @pageTitle</div>
+
+        <div class="sc-row">
+            <div class="sc" data-f="all" id="sc-all">
+                <div class="sc-lbl">대상</div>
+                <div class="sc-num" id="sv-total">@total<small>명</small></div>
+            </div>
+            <div class="sc" data-f="responded" id="sc-responded">
+                <div class="sc-lbl">응답</div>
+                <div class="sc-num" id="sv-resp">@resp<small>명</small></div>
+            </div>
+            <div class="sc" data-f="unresponded" id="sc-unresponded">
+                <div class="sc-lbl">미응답</div>
+                <div class="sc-num" id="sv-unresp">@unresp<small>명</small></div>
+            </div>
+            <div class="sc" data-f="full" id="sc-full">
+                <div class="sc-lbl">전체 참여</div>
+                <div class="sc-num" id="sv-full">@full<small>명</small></div>
+            </div>
+            <div class="sc" data-f="partial" id="sc-partial">
+                <div class="sc-lbl">부분 참여</div>
+                <div class="sc-num" id="sv-part">@part<small>명</small></div>
+            </div>
+        </div>
+
+        <div class="pb-track">
+            <div class="pb-fill" id="pbFill" style="width:@pct%"></div>
+        </div>
+        <div class="pb-lbl">응답률 <b id="pbPct">@pct</b>% &nbsp;·&nbsp; 통계 숫자를 누르면 해당 대상만 표시됩니다</div>
+    </div>
+</div>
+
+<!-- ════════ CONTROLS ════════ -->
+<div class="ctrl-bar">
+    <div class="ctrl-inner">
+        <input type="search" class="srch" id="srchInput" placeholder="이름 검색..." autocomplete="off" />
+        <select class="srt-sel" id="srtSel">
+            <option value="default">기본 순서</option>
+            <option value="orgChart">역할별 정렬</option>
+            <option value="nameAsc">이름 ↑ 가나다</option>
+            <option value="nameDesc">이름 ↓ 가나다</option>
+            <option value="classAsc">학년·반 ↑</option>
+            <option value="classDesc">학년·반 ↓</option>
+        </select>
+        <button class="org-btn" id="orgBtn">🧭 역할별</button>
+        <span class="fchip" id="fchip">전체 @(@total)명</span>
+        <span class="upd-at" id="updAt">페이지 로드 기준</span>
+    </div>
+</div>
+
+<!-- ════════ TABLE ════════ -->
+<div class="tmain">
+    <div class="tmain-inner">
+        <div class="scroll-hint">← 좌우로 스크롤 →</div>
+        <div class="tcard-wrap">
+            <div class="tcard">
+                <div class="tscroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="th-no"   rowspan="2">No.</th>
+                                <th class="th-nm"   rowspan="2">이름</th>
+                                <th class="th-role" rowspan="2">@(isStudent ? "학년·반" : "구분")</th>
+                                @foreach (var d in days)
+                                {
+                                    int cs = (d.Date == hidePmDate) ? 1 : 2;
+                                    <th class="th-day" colspan="@cs">@fmtDay(d)</th>
+                                }
+                            </tr>
+                            <tr>
+                                @foreach (var d in days)
+                                {
+                                    <th>오전</th>
+                                    @if (d.Date != hidePmDate) { <th class="col-sep">오후</th> }
+                                }
+                            </tr>
+                        </thead>
+                        <tbody id="tbody">
+                            @if (!rows.Any())
+                            {
+                                <tr>
+                                    <td colspan="12">
+                                        <div class="empty">
+                                            <div class="empty-icon">📭</div>
+                                            <div class="empty-txt">표시할 데이터가 없습니다</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var r in rows)
+                                {
+                                    bool isRespR  = isResp(r);
+                                    bool isFullR  = isFullAttend(r);
+                                    bool isPartR  = isPartial(r);
+                                    string dot    = isFullR ? "full" : isPartR ? "partial" : "none";
+                                    string name   = (r.FullName ?? "").Trim();
+                                    string roleCd = (r.RoleCode ?? "").Trim();
+                                    string roleNm = (r.RoleNM   ?? "").Trim();
+                                    bool  isStRow = isT1001(r);
+
+                                    int roleOrder = 999999;
+                                    if (!string.IsNullOrWhiteSpace(roleCd) &&
+                                        Model.RoleDisplayOrder != null &&
+                                        Model.RoleDisplayOrder.TryGetValue(roleCd, out var od))
+                                        roleOrder = od;
+
+                                    <tr data-idx="@rn"
+                                        data-name="@name"
+                                        data-role="@roleCd"
+                                        data-rolenm="@roleNm"
+                                        data-roleorder="@roleOrder"
+                                        data-cy="@(r.ClassYear?.ToString() ?? "")"
+                                        data-cb="@(r.ClassBan?.ToString()  ?? "")"
+                                        data-responded="@(isRespR  ? "1":"0")"
+                                        data-unresponded="@(!isRespR ? "1":"0")"
+                                        data-full="@(isFullR ? "1":"0")"
+                                        data-partial="@(isPartR ? "1":"0")">
+
+                                        <td class="td-no">@rn</td>
+                                        <td class="td-nm">
+                                            <span class="sdot @dot"></span>@name
+                                        </td>
+                                        <td class="td-role">
+                                            @if (isStRow)
+                                            {
+                                                <span class="rchip">@(r.ClassYear?.ToString() ?? "?")학년 @(r.ClassBan?.ToString() ?? "?")반</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="rchip">@(string.IsNullOrWhiteSpace(roleNm) ? roleCd : roleNm)</span>
+                                            }
+                                        </td>
+
+                                        @foreach (var d in days)
+                                        {
+                                            var am   = getSlot(r, d, "AM");
+                                            var amN  = getNote(r, d, "AM");
+                                            <td>
+                                                @if      (am == true)  { <span class="sl-y">✓</span> }
+                                                else if  (am == false) { <span class="sl-n">✕</span> }
+                                                else if  (!string.IsNullOrEmpty(amN)) { <span class="sl-note">@noteLabel(amN)</span> }
+                                                else                   { <span class="sl-null">—</span> }
+                                            </td>
+                                            @if (d.Date != hidePmDate)
+                                            {
+                                                var pm  = getSlot(r, d, "PM");
+                                                var pmN = getNote(r, d, "PM");
+                                                <td class="col-sep">
+                                                    @if      (pm == true)  { <span class="sl-y">✓</span> }
+                                                    else if  (pm == false) { <span class="sl-n">✕</span> }
+                                                    else if  (!string.IsNullOrEmpty(pmN)) { <span class="sl-note">@noteLabel(pmN)</span> }
+                                                    else                   { <span class="sl-null">—</span> }
+                                                </td>
+                                            }
+                                        }
+                                    </tr>
+                                    rn++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════ DAY SUMMARY ════════ -->
+<div class="dsum">
+    <div class="dsum-inner">
+        <div class="dsum-ttl">📊 날짜별 참석 합계 (현재 필터 기준)</div>
+        <div class="dsum-grid">
+            @foreach (var d in days)
+            {
+                <div class="dcard">
+                    <div class="dcard-date">@fmtDay(d)</div>
+                    <div class="dslot">
+                        <span class="dslot-lbl">🌅 오전</span>
+                        <span class="dslot-val" id="ds-@d.ToString("yyyyMMdd")-AM">@cntAtt(d,"AM")<small>명</small></span>
+                    </div>
+                    @if (d.Date != hidePmDate)
+                    {
+                        <div class="dslot">
+                            <span class="dslot-lbl">🌇 오후</span>
+                            <span class="dslot-val" id="ds-@d.ToString("yyyyMMdd")-PM">@cntAtt(d,"PM")<small>명</small></span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ════════ JS ════════ -->
+<script>
+(function () {
+    'use strict';
+    const VP = '@vp';
+    let activeFilter = 'all';
+    let activeSort   = 'default';
+    let searchQuery  = '';
+
+    /* ── Visibility ── */
+    function applyVis() {
+        const q = searchQuery.trim().toLowerCase();
+        document.querySelectorAll('#tbody tr').forEach(tr => {
+            let show = true;
+            // search
+            if (q && !(tr.dataset.name || '').toLowerCase().includes(q)) show = false;
+            // filter
+            if (show && activeFilter !== 'all' && tr.dataset[activeFilter] !== '1') show = false;
+            tr.style.display = show ? '' : 'none';
+        });
+        renum();
+        updateChip();
+        updateScActive();
+    }
+
+    function renum() {
+        let n = 1;
+        document.querySelectorAll('#tbody tr').forEach(tr => {
+            if (tr.style.display === 'none') return;
+            const td = tr.querySelector('.td-no');
+            if (td) td.textContent = n++;
+        });
+    }
+
+    function updateChip() {
+        const chip = document.getElementById('fchip');
+        if (!chip) return;
+        const vis = document.querySelectorAll('#tbody tr:not([style*="display: none"]):not([style*="display:none"])').length;
+        const labels = { all:'전체', responded:'응답', unresponded:'미응답', full:'전체 참여', partial:'부분 참여' };
+        chip.textContent = (labels[activeFilter] || '전체') + ' ' + vis + '명';
+    }
+
+    function updateScActive() {
+        document.querySelectorAll('.sc').forEach(sc =>
+            sc.classList.toggle('on', sc.dataset.f === activeFilter));
+    }
+
+    /* ── Filter via stat cards ── */
+    function setFilter(key, toggle) {
+        if (toggle && activeFilter === key) key = 'all';
+        activeFilter = key;
+        applyVis();
+    }
+
+    /* ── Sort ── */
+    function toN(s) { const n = parseInt((s || '').trim(), 10); return isNaN(n) ? null : n; }
+    function toNm(s) { return ((s || '') + '').trim().toLowerCase(); }
+
+    function sortRows(mode) {
+        activeSort = mode || 'default';
+        const tbody = document.getElementById('tbody');
+        if (!tbody) return;
+        const trs = Array.from(tbody.querySelectorAll('tr'));
+        trs.sort((a, b) => {
+            if (activeSort === 'default') {
+                return (toN(a.dataset.idx) || 0) - (toN(b.dataset.idx) || 0);
+            }
+            if (activeSort === 'orgChart') {
+                const oa = toN(a.dataset.roleorder) ?? 999999;
+                const ob = toN(b.dataset.roleorder) ?? 999999;
+                if (oa !== ob) return oa - ob;
+                const rr = toNm(a.dataset.rolenm).localeCompare(toNm(b.dataset.rolenm), 'ko');
+                if (rr !== 0) return rr;
+                return toNm(a.dataset.name).localeCompare(toNm(b.dataset.name), 'ko');
+            }
+            if (activeSort === 'nameAsc' || activeSort === 'nameDesc') {
+                const r = toNm(a.dataset.name).localeCompare(toNm(b.dataset.name), 'ko');
+                return activeSort === 'nameAsc' ? r : -r;
+            }
+            if (activeSort === 'classAsc' || activeSort === 'classDesc') {
+                const sa = (a.dataset.role || '').toUpperCase() === 'T1001';
+                const sb = (b.dataset.role || '').toUpperCase() === 'T1001';
+                if (sa !== sb) return sa ? 1 : -1;
+                if (sa && sb) {
+                    const cya = toN(a.dataset.cy) ?? 999, cyb = toN(b.dataset.cy) ?? 999;
+                    const cba = toN(a.dataset.cb) ?? 999, cbb = toN(b.dataset.cb) ?? 999;
+                    let r = cya !== cyb ? cya - cyb : cba !== cbb ? cba - cbb
+                        : toNm(a.dataset.name).localeCompare(toNm(b.dataset.name), 'ko');
+                    return activeSort === 'classAsc' ? r : -r;
+                }
+                const r = toNm(a.dataset.name).localeCompare(toNm(b.dataset.name), 'ko');
+                return activeSort === 'classAsc' ? r : -r;
+            }
+            return 0;
+        });
+        trs.forEach(tr => tbody.appendChild(tr));
+        applyVis();
+    }
+
+    /* ── Live stats (10s polling) ── */
+    function setTxt(id, v) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = v ?? '';
+    }
+    function setHTML(id, h) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = h;
+    }
+
+    async function refreshStats() {
+        try {
+            const r = await fetch(
+                `/VBSParticipationSurvey/AdminStats?view=${encodeURIComponent(VP)}&t=${Date.now()}`,
+                { cache: 'no-store', headers: { 'Accept': 'application/json' } }
+            );
+            const j = await r.json().catch(() => null);
+            if (!r.ok || !j || !j.ok) return;
+
+            setTxt('sv-total',  j.peopleTotal);
+            setTxt('sv-resp',   j.respondedPeople);
+            setTxt('sv-unresp', j.unrespondedPeople);
+            setTxt('sv-full',   j.fullAttendPeople);
+            setTxt('sv-part',   j.partialAttendPeople);
+
+            const fill = document.getElementById('pbFill');
+            if (fill) fill.style.width = (j.respondedPct || 0) + '%';
+            setTxt('pbPct', j.respondedPct || 0);
+
+            if (Array.isArray(j.dayCounts)) {
+                j.dayCounts.forEach(dc => {
+                    const key = (dc.date || '').replaceAll('-', '');
+                    if (!key) return;
+                    setHTML(`ds-${key}-AM`, (dc.am ?? 0) + '<small>명</small>');
+                    if (dc.pm != null) setHTML(`ds-${key}-PM`, (dc.pm ?? 0) + '<small>명</small>');
+                });
+            }
+            const upd = document.getElementById('updAt');
+            if (upd && j.updatedAtText) upd.textContent = '갱신: ' + j.updatedAtText;
+
+            updateChip();
+        } catch (_) {}
+    }
+
+    /* ── Init ── */
+    document.addEventListener('DOMContentLoaded', () => {
+        // Stat card clicks
+        document.querySelectorAll('.sc').forEach(sc =>
+            sc.addEventListener('click', () => setFilter(sc.dataset.f, true)));
+
+        // Sort select
+        const srtSel = document.getElementById('srtSel');
+        if (srtSel) srtSel.addEventListener('change', () => sortRows(srtSel.value));
+
+        // Org sort button
+        const orgBtn = document.getElementById('orgBtn');
+        if (orgBtn) orgBtn.addEventListener('click', () => {
+            const sel = document.getElementById('srtSel');
+            if (sel) sel.value = 'orgChart';
+            sortRows('orgChart');
+        });
+
+        // Search
+        const srch = document.getElementById('srchInput');
+        if (srch) {
+            srch.addEventListener('input', () => { searchQuery = srch.value; applyVis(); });
+            srch.addEventListener('search', () => { searchQuery = srch.value; applyVis(); });
+        }
+
+        // Init
+        sortRows('default');
+        refreshStats();
+        setInterval(refreshStats, 10000);
+    });
+})();
+</script>
+</body>
+</html>

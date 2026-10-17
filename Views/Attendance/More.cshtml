@@ -1,0 +1,88 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 출석부 "더보기" — 가끔 쓰는 메뉴 (기존 화면으로 그대로 연결)
+    ViewData["AttTab"] = "more";
+    bool isStaff = ViewBag.IsStaff as bool? ?? false;
+    var sundayDate = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    var thisSunday = sundayDate.ToString("yyyy-MM-dd");
+
+    // 올해 첫 주일 ~ 이번 주일까지 주일 수 (예: 2026-09-20 → 38)
+    var jan1 = new DateTime(sundayDate.Year, 1, 1);
+    var firstSunday = jan1.AddDays((7 - (int)jan1.DayOfWeek) % 7);
+    int weeksYtd = sundayDate < firstSunday ? 1 : (sundayDate - firstSunday).Days / 7 + 1;
+
+    var items = new List<(string Label, string Desc, string Url, bool StaffOnly)>
+    {
+        ("주일 출석 보고서",  "반별 · 학생별 출석 (PC 화면)",     $"/Attendance/SundayStudentsPC?sunday={thisSunday}", true),
+        ("최근 전체 출석현황(3주)",     "최근 3주 반별 출석 추이",          $"/Attendance/AdminTrend3Weeks?date={thisSunday}", true),
+        ("아이별 출석 등수",     "올해 누적 아이별 출석 등수",        $"/Attendance/AdminStudentRank3Weeks?date={thisSunday}", true),
+        ("아이별 주별 출석표(52주)", $"아이 × 주일 표 · 올해 {weeksYtd}주", $"/Attendance/AdminStudentMatrixWeeks?date={thisSunday}&weeks={weeksYtd}", true),
+        ("교사 · 반 배정",    "누가 어느 반 담임인지 정하기",      "/Attendance/TeacherAssign", true),
+        ("출석인증 게시판",   "출석 인증 사진 올리기",            "/BandBoard/Index?boardTableName=BandAttendancePosts&boardName=출석인증게시판", false),
+        ("예전 출석 체크 화면", "반을 골라 한 반씩 체크하던 화면",   "/Attendance/Check", false),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>출석부 · 더보기</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .hdS { margin-top: 4px; font-size: 13px; color: var(--dim2); }
+        .sec { margin-top: 12px; }
+        .mo { display: flex; align-items: center; gap: 12px; padding: 15px 2px; border-top: 1px solid var(--line); }
+        .mo:last-child { border-bottom: 1px solid var(--line); }
+        .moTx { flex: 1; min-width: 0; }
+        .moL { display: block; font-size: 16px; font-weight: 700; color: var(--ink); }
+        .moD { display: block; margin-top: 2px; font-size: 12.5px; color: var(--dim2); }
+        .moA { flex: none; font-size: 18px; color: #7FA3DB; transition: transform .15s; }
+        .mo:hover .moA { transform: translateX(3px); }
+        .ft { margin-top: 18px; padding: 12px 0 20px; font-size: 11.5px; color: var(--dim); }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><a href="/Attendance/Index">출석부</a><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">MORE</div>
+        <h1 class="hdT">더보기</h1>
+        <div class="hdS">@(isStaff ? "관리자 메뉴가 함께 보여요." : "가끔 쓰는 메뉴를 모았어요.")</div>
+    </header>
+
+    <main class="sh">
+        <section class="sec">
+            @foreach (var m in items.Where(i => isStaff || !i.StaffOnly))
+            {
+                <a class="mo" href="@m.Url">
+                    <span class="moTx"><span class="moL">@m.Label</span><span class="moD">@m.Desc</span></span>
+                    <span class="moA">›</span>
+                </a>
+            }
+            <a class="mo" href="/">
+                <span class="moTx"><span class="moL">@ConstatsCommon.ToHome</span><span class="moD">메인 화면</span></span>
+                <span class="moA">›</span>
+            </a>
+        </section>
+        <div class="ft"><span>© 유년부 · 출석부</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+</body>
+</html>

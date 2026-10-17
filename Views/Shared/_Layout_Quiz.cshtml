@@ -1,0 +1,338 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+       var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #F9F9F9;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            overflow-x: hidden; /* 좌우 스크롤 방지 */
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            background-color: @ConstatsColorCommon.HeaderColor2;
+            color: white;
+        }
+
+            .header h1 {
+                margin: 0;
+                font-size: 20px;
+            }
+
+            .header h2 {
+                margin: 5px 0 0 0;
+                font-size: 32px;
+            }
+
+            .header h4 {
+                margin: 5px;
+                font-size: 16px;
+            }
+
+
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: #2E8B57;
+            color: white;
+        }
+
+            .calendar-controls button {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 16px;
+                cursor: pointer;
+            }
+
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            padding: 10px;
+        }
+
+
+        .calendarLegend {
+            display: flex;
+            justify-content: flex-end; /* 오른쪽 끝으로 정렬 */
+            gap: 5px;
+            padding: 10px;
+        }
+
+            .calendarLegend div {
+                text-align: center;
+                padding: 10px;
+                border-radius: 5px;
+            }
+
+            .calendarLegend .day {
+                background-color: #F1F1F1;
+                cursor: pointer;
+            }
+
+                .calendarLegend .day.has-event {
+                    background-color: #D7FFD9;
+                }
+
+        .calendar div {
+            text-align: center;
+            padding: 10px 0;
+            border-radius: 5px;
+        }
+
+        .calendar .day {
+            background-color: #F1F1F1;
+            cursor: pointer;
+        }
+
+            .calendar .day.has-event {
+                background-color: #D7FFD9;
+            }
+
+        .calendar .selected {
+            background-color: #FFC107;
+        }
+
+        .events {
+            padding: 20px;
+        }
+
+        .event {
+            background-color: #E8E8FF;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+            .event.green {
+                background-color: #D7FFD9;
+            }
+
+        .buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px 0;
+        }
+
+        .buttons2 {
+            display: flex;
+            /*            gap: 3px;*/
+            padding: 20px 0;
+        }
+
+        .buttons, .buttons2 {
+            justify-content: space-between;
+            padding: 20px 0;
+            margin-bottom: 5.5px;
+        }
+
+        .button {
+            flex: 1;
+            padding: 10px;
+            margin: 0 3px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+
+            .button.new-task {
+                background-color: #E8E8FF;
+            }
+
+            .button.new-reminder {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .button.new-reminder-delete {
+                background-color: #CC0000;
+                color: white;
+            }
+
+
+            .button.back {
+                background-color: #ffeb3b;
+                color: black;
+            }
+
+            .button.choice {
+                background-color: #009900;
+                color: white;
+            }
+
+
+            .button.choiceFromBank {
+                background-color: #008000;
+                color: white;
+            }
+
+
+            .button.enroll {
+                background-color: #00C853;
+                color: white;
+            }
+            .button.home {
+                background-color: #00BCD4; /* Cyan */
+                color: white;
+            }
+
+            .button.quizCalendar {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+
+            .button.quizHome {
+                background-color: #00704A;
+                color: white;
+            }
+
+            .button.subjective {
+                background-color: #FFC107;
+            }
+            .button.subjectiveOX {
+                background-color: #FFC1E3; /* Blue */
+                color: #4A154B;
+            }
+
+        .card {
+            background-color: #E8E8FF;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+
+        .card-buttons {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+        }
+
+        .card-button {
+            flex: 1;
+            padding: 10px;
+            margin: 5px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+            .card-button.create {
+                background-color: #00C853;
+                color: white;
+            }
+
+            .card-button.modify {
+                background-color: #FFC107;
+                color: black;
+            }
+
+            .card-button.delete {
+                background-color: #FF5722; /* Orange */
+                color: white;
+            }
+
+            .card-button.bible {
+                background-color: #FFEB3B; /* Yellow */
+            }
+
+        .guide {
+            padding: 5px;
+            background-color: coral;
+            color: black;
+        }
+
+
+
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+            .form-group label {
+                width: 100%;
+                text-align: left; /* Maintain original left alignment for labels */
+                margin-bottom: 5px;
+            }
+
+            .form-group textarea, .form-group input[type="text"] {
+                width: 96%;
+                padding: 10px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                box-sizing: border-box;
+                display: block;
+                margin: auto; /* Center align the text area and input elements */
+            }
+
+            .form-group .radio-group {
+                display: flex;
+                justify-content: space-around; /* Ensure space between radio buttons */
+                margin-top: 10px;
+                align-items: center;
+            }
+
+                .form-group .radio-group label {
+                    display: flex;
+                    align-items: center;
+                    margin-right: 10px; /* Add margin to space out radio buttons */
+                }
+
+    </style>
+
+    <style>
+        .button {
+            -webkit-user-select: none; /* Chrome, Safari, Opera */
+            -moz-user-select: none; /* Firefox */
+            -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, supported by most browsers */
+        }
+    </style>
+    <style>
+
+
+        .formatted-text {
+            white-space: pre-wrap; /* 유지된 공백 및 줄바꿈 */
+            word-wrap: break-word; /* 너무 긴 단어를 자동으로 줄바꿈 */
+        }
+
+    </style>
+</head>
+<body>
+    @RenderBody()
+</body>

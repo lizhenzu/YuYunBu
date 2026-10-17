@@ -1,0 +1,145 @@
+@model BulletinBoard.Models.JuManNa
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 말씀 수정 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · 저장 주소(ProcessModifyJuManNa) · 필드 이름은 예전 그대로.  영상 주소(URL)는 예전처럼 바꿀 수 없음(저장 쿼리에도 없음)
+    · 고친 것: 저장 버튼이 없는 요소를 찾다 오류 내던 save() 제거 / "유투브" · "홈" 버튼이 저장까지 같이 하던 것(type 없는 button) 정리
+              / 다섯째 구간 이름 "종료 시간(4)" → 구간 5
+    · 저장하면 대기카드.  예전 bootstrap CDN 대신 공용 CSS
+    · 이전 화면은 ModifyJuManNa.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string JanZulString = SharedComm.MakeBibleSerialJangZul(Model.BibleText, Model.FromJang, Model.FromZul, Model.ToJang, Model.ToZul);
+    string dateLabel = $"{Model.ExposeDate.Year}년 {Model.ExposeDate.Month}월 {Model.ExposeDate.Day}일 {Model.WeekDayKor}요일";
+    string ym = Model.ExposeDate.ToString("yyyy-MM");
+    string[] urls = { Model.URL, Model.URL2, Model.URL3, Model.URL4, Model.URL5 };
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>말씀 수정</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>저장하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><span class="sep">›</span>수정</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">EDIT · @dateLabel</div>
+    <h1 class="qb-h1">말씀 수정<small>@Model.BibleText @JanZulString</small></h1>
+
+    <form asp-action="ProcessModifyJuManNa" method="post" onsubmit="document.getElementById('loadingOverlay').classList.add('on');">
+
+        <div class="qb-f">
+            <label for="BibleSubject">주제</label>
+            <input asp-for="BibleSubject" class="qb-in" autocomplete="off" />
+            <span asp-validation-for="BibleSubject" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label for="BibleSummary">말씀 요약</label>
+            <textarea asp-for="BibleSummary" class="qb-in" rows="5"></textarea>
+            <span asp-validation-for="BibleSummary" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label for="Synopsis">줄거리</label>
+            <textarea asp-for="Synopsis" class="qb-in" rows="5"></textarea>
+            <span asp-validation-for="Synopsis" class="error"></span>
+        </div>
+
+        <div class="qb-sec">본문</div>
+
+        <div class="qb-f">
+            <label for="BibleText">성경</label>
+            <input asp-for="BibleText" class="qb-in" autocomplete="off" />
+            <span asp-validation-for="BibleText" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <span class="lbl">장 · 절</span>
+            <div class="jm-rng">
+                <div class="pair">
+                    <input type="number" asp-for="FromJang" class="qb-in" inputmode="numeric" aria-label="시작 장" /><span>장</span>
+                    <input type="number" asp-for="FromZul" class="qb-in" inputmode="numeric" aria-label="시작 절" /><span>절</span>
+                </div>
+                <i>~</i>
+                <div class="pair">
+                    <input type="number" asp-for="ToJang" class="qb-in" inputmode="numeric" aria-label="끝 장" /><span>장</span>
+                    <input type="number" asp-for="ToZul" class="qb-in" inputmode="numeric" aria-label="끝 절" /><span>절</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="qb-sec">영상 구간<small>분 · 초</small></div>
+
+        <div class="qb-f">
+            <label for="URL">영상 주소<small>여기서는 바꿀 수 없어요</small></label>
+            <input asp-for="URL" class="qb-in" disabled />
+        </div>
+
+        @* 구간 1 ~ 5 — 필드 이름은 YouTuBuStartMM(2~5) · YouTuBuStartSS · YouTuBuEndMM · YouTuBuEndSS *@
+        @for (int i = 1; i <= 5; i++)
+        {
+            string sfx = i == 1 ? "" : i.ToString();
+            bool hasUrl = !string.IsNullOrWhiteSpace(urls[i - 1]);
+            int smm = (int)(typeof(BulletinBoard.Models.JuManNa).GetProperty("YouTuBuStartMM" + sfx)!.GetValue(Model) ?? 0);
+            int sss = (int)(typeof(BulletinBoard.Models.JuManNa).GetProperty("YouTuBuStartSS" + sfx)!.GetValue(Model) ?? 0);
+            int emm = (int)(typeof(BulletinBoard.Models.JuManNa).GetProperty("YouTuBuEndMM" + sfx)!.GetValue(Model) ?? 0);
+            int ess = (int)(typeof(BulletinBoard.Models.JuManNa).GetProperty("YouTuBuEndSS" + sfx)!.GetValue(Model) ?? 0);
+
+            <div class="jm-segf">
+                <span class="lbl">
+                    <span class="n">@i.ToString("00")</span>구간 @(i)
+                    @if (!hasUrl)
+                    {
+                        <small>· 영상 주소 없음</small>
+                    }
+                </span>
+                <div class="jm-rng">
+                    <div class="pair">
+                        <input type="number" class="qb-in" inputmode="numeric" name="YouTuBuStartMM@(sfx)" value="@smm" aria-label="구간 @i 시작 분" /><span>분</span>
+                        <input type="number" class="qb-in" inputmode="numeric" name="YouTuBuStartSS@(sfx)" value="@sss" aria-label="구간 @i 시작 초" /><span>초</span>
+                    </div>
+                    <i>~</i>
+                    <div class="pair">
+                        <input type="number" class="qb-in" inputmode="numeric" name="YouTuBuEndMM@(sfx)" value="@emm" aria-label="구간 @i 끝 분" /><span>분</span>
+                        <input type="number" class="qb-in" inputmode="numeric" name="YouTuBuEndSS@(sfx)" value="@ess" aria-label="구간 @i 끝 초" /><span>초</span>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <input type="hidden" name="Id" value="@Model.Id" />
+
+        <div class="jm-bar">
+            <a href="/JuManNa/IndexByID?Id=@Model.Id">취소</a>
+            <button type="submit">저장하기</button>
+        </div>
+    </form>
+
+    <div class="qb-ft">
+        <span>말씀 수정</span>
+        <span><a href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@ym">이 달 영상 구간</a><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

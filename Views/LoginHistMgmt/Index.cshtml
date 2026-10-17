@@ -1,0 +1,161 @@
+@model IEnumerable<BulletinBoard.Models.LoginHistoryData>
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers
+
+@*  ══════════════════════════════════════════════════════════════
+    로그인 기록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 예전 _Layout_Mission + 어두운 배경 대신 단독 화면.  찾기 · 학생/교사 칩은 화면 안에서만 거른다.
+    · 삭제 주소(DeleteLoginHistory)는 그대로, 누르기 전에 화면 안 확인창을 거친다.
+    · 이전 화면은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var list = Model?.ToList() ?? new List<BulletinBoard.Models.LoginHistoryData>();
+    var now = DateHelper.GetKoreaNow();
+    bool canDelete = ViewBag.CanDelete as bool? ?? false;   // 2026-10-04: 기록 삭제 버튼은 SuperAdmin 에게만
+
+    string Ago(DateTime t)
+    {
+        var d = now - t;
+        if (d.TotalMinutes < 1) return "방금";
+        if (d.TotalMinutes < 60) return $"{(int)d.TotalMinutes}분 전";
+        if (t.Date == now.Date) return "오늘";
+        if (t.Date == now.Date.AddDays(-1)) return "어제";
+        return $"{(int)(now.Date - t.Date).TotalDays}일 전";
+    }
+    int no = 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>로그인 기록</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .qb button { font: inherit; }
+        .lh-search { margin-top: 14px; }
+        .lh-search input { width: 100%; border: 0; border-radius: 999px; background: var(--grey); padding: 11px 16px; font: inherit; font-size: 14px; color: var(--ink); }
+        .lh-search input:focus { outline: 0; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .lh-row { display: flex; gap: 12px; align-items: flex-start; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        .lh-row .n { flex: none; width: 26px; padding-top: 10px; font-size: 15px; font-weight: 800; color: #7FA3DB; }
+        .lh-row .av { flex: none; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: var(--soft); }
+        .lh-row .av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .lh-row .t { flex: 1; min-width: 0; }
+        .lh-row .t b { font-size: 15.5px; font-weight: 800; color: var(--ink); }
+        .lh-row .t small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--dim2); overflow-wrap: anywhere; }
+        .lh-tg { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--blue); font-size: 10.5px; font-weight: 800; vertical-align: 2px; }
+        .lh-tg.tc { background: var(--okbg); color: var(--ok); }
+        .lh-when { margin-top: 4px; font-size: 12px; color: var(--dim2); }
+        .lh-when em { font-style: normal; font-weight: 800; color: var(--blue); }
+        .lh-ac { display: flex; gap: 6px; margin-top: 9px; }
+        .lh-ac a, .lh-ac button { border: 0; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 12px; background: var(--grey); color: var(--dim2); cursor: pointer; }
+        .lh-ac a:hover, .lh-ac button:hover { color: var(--blue); }
+        .lh-ac .d { background: var(--redbg); color: var(--red); }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>삭제하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb-pop" id="pop"><div class="box">
+    <h3 id="popTitle"></h3>
+    <p>이 사람의 로그인 기록이 모두 지워져요.<br />되돌릴 수 없어요.</p>
+    <div class="bt"><button type="button" id="popNo">취소</button><button type="button" id="popYes" style="background:#FDEEEE;color:#D9534F">삭제</button></div>
+</div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>로그인 기록</span>
+        <span>LOG</span>
+    </div>
+
+    <div class="qb-k">LOGIN HISTORY</div>
+    <h1 class="qb-h1">로그인 기록<small id="lhCount">@(list.Count)명</small></h1>
+    <div class="qb-sub">사람마다 가장 최근에 접속한 때를 보여요. @now.ToString("yyyy-MM-dd HH:mm") 기준</div>
+
+    <div class="lh-search"><input id="lhQ" type="search" placeholder="이름이나 아이디로 찾기" aria-label="찾기" /></div>
+    <div class="qb-chips" id="lhFilter">
+        <button type="button" class="on" data-f="all">전체</button>
+        <button type="button" data-f="s">학생</button>
+        <button type="button" data-f="t">교사</button>
+    </div>
+
+    <div id="lhList">
+        @foreach (var item in list)
+        {
+            no++;
+            bool isStudent = item.ClassYear > 0 && item.ClassBan > 0;
+            <div class="lh-row" data-kind="@(isStudent ? "s" : "t")" data-name="@($"{item.FullName} {item.UserName}".ToLowerInvariant())">
+                <span class="n">@no.ToString("00")</span>
+                <div class="av"><img src="@item.ProfilePicturePath" alt="" loading="lazy" onerror="this.style.display='none'" /></div>
+                <div class="t">
+                    <b>@item.FullName</b><span class="lh-tg@(isStudent ? "" : " tc")">@(isStudent ? $"{item.ClassYear}학년 {item.ClassBan}반" : "교사")</span>
+                    <small>@item.UserName</small>
+                    <div class="lh-when">최근 접속 <em>@Ago(item.maxInsertDT)</em> · @item.maxInsertDT.ToString("yyyy-MM-dd HH:mm")</div>
+                    <div class="lh-ac">
+                        <a href="/HumanResource/ManageUserInfo?UserId=@item.UserId">사용자 관리</a>
+                        @if (canDelete)
+                        {
+                            <button type="button" class="d" data-del="@item.UserName" data-who="@item.FullName (@item.UserName)">기록 삭제</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="qb-empty" id="lhEmpty" hidden="@(list.Count > 0)">@(list.Count == 0 ? "로그인 기록이 없어요" : "찾는 사람이 없어요")</div>
+
+    <div class="qb-ft">
+        <span>로그인 기록</span>
+        <span><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+(function () {
+    // ── 찾기 + 학생/교사 ──
+    var q = document.getElementById('lhQ'), mode = 'all';
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#lhList .lh-row'));
+    function apply() {
+        var term = (q.value || '').trim().toLowerCase(), n = 0;
+        rows.forEach(function (r) {
+            var ok = (mode === 'all' || r.dataset.kind === mode) && (!term || r.dataset.name.indexOf(term) >= 0);
+            r.hidden = !ok;
+            if (ok) { n++; r.querySelector('.n').textContent = (n < 10 ? '0' : '') + n; }
+        });
+        document.getElementById('lhCount').textContent = n + '명';
+        if (rows.length) document.getElementById('lhEmpty').hidden = n > 0;
+    }
+    q.addEventListener('input', apply);
+    document.getElementById('lhFilter').addEventListener('click', function (e) {
+        var b = e.target.closest('[data-f]'); if (!b) return;
+        mode = b.dataset.f;
+        this.querySelectorAll('[data-f]').forEach(function (x) { x.classList.toggle('on', x === b); });
+        apply();
+    });
+
+    // ── 기록 삭제: 화면 안 확인창 ──
+    var pop = document.getElementById('pop'), target = null;
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-del]'); if (!b) return;
+        target = b.dataset.del;
+        document.getElementById('popTitle').textContent = b.dataset.who + ' 님의 기록을 삭제할까요?';
+        pop.style.display = 'flex';
+    });
+    document.getElementById('popNo').addEventListener('click', function () { pop.style.display = ''; target = null; });
+    document.getElementById('popYes').addEventListener('click', function () {
+        pop.style.display = '';
+        if (!target) return;
+        document.getElementById('loadingOverlay').classList.add('on');
+        location.href = '/LoginHistMgmt/DeleteLoginHistory?UserName=' + encodeURIComponent(target);
+    });
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+})();
+</script>
+</body>
+</html>

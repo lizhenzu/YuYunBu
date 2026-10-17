@@ -1,0 +1,429 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.ViewModels.Birthday.BirthdayListPageVM
+@{
+    Layout = null;
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>@Model.PageTitle</title>
+    <style>
+        :root {
+            --bg1: #fff7fb;
+            --bg2: #f5fbff;
+            --bg3: #f6fff8;
+            --ink: #101828;
+            --muted: rgba(16,24,40,.62);
+            --card: rgba(255,255,255,.74);
+            --line: rgba(16,24,40,.10);
+            --shadow: 0 18px 60px rgba(16,24,40,.16);
+            --r: 26px;
+            --r2: 18px;
+            --sans: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            --mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+
+            /* ✅ 단색(깔끔) 포인트 */
+            --solid: #374151;         /* slate-700 */
+            --solid-soft: #f3f4f6;    /* gray-100 */
+            --solid-line: #e5e7eb;    /* gray-200 */
+
+            /* ✅ 단색 버튼 */
+            --btn-ink: #111827;
+            --btn-bg: #ffffff;
+            --btn-line: rgba(16,24,40,.16);
+            --btn-bg-hover: #f9fafb;
+            --btn-line-hover: rgba(16,24,40,.26);
+        }
+
+        * { box-sizing: border-box }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 700px at 15% 10%, rgba(255,111,177,.22), transparent 55%),
+                radial-gradient(900px 600px at 85% 15%, rgba(87,185,255,.20), transparent 55%),
+                radial-gradient(900px 600px at 40% 95%, rgba(47,211,176,.18), transparent 55%),
+                linear-gradient(135deg,var(--bg1),var(--bg2),var(--bg3));
+        }
+
+        .wrap {
+            width: min(1120px,92vw);
+            margin: 0 auto;
+            padding: 26px 0 40px;
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            background: linear-gradient(135deg,rgba(255,111,177,.85),rgba(138,119,255,.75));
+            box-shadow: 0 14px 30px rgba(138,119,255,.28);
+        }
+
+        .title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 1000;
+        }
+
+        .sub {
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 1px solid rgba(16,24,40,.12);
+            background: rgba(255,255,255,.65);
+            backdrop-filter: blur(10px);
+            padding: 10px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 900;
+            box-shadow: 0 12px 26px rgba(16,24,40,.10);
+            transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 40px rgba(16,24,40,.14);
+            background: rgba(255,255,255,.85);
+        }
+
+        .btn.primary {
+            border: 0;
+            color: #fff;
+            background: linear-gradient(90deg,rgba(87,185,255,.95),rgba(47,211,176,.95));
+        }
+
+        .hero {
+            margin-top: 14px;
+            border: 1px solid rgba(16,24,40,.10);
+            background: linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.52));
+            border-radius: var(--r);
+            box-shadow: var(--shadow);
+            padding: 16px;
+            display:flex;
+            gap:10px;
+            flex-wrap:wrap;
+            align-items:center;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(16,24,40,.10);
+            background: rgba(255,255,255,.60);
+            font-weight: 900;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .pill b { font-family: var(--mono); }
+
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(4,minmax(0,1fr));
+            gap: 16px;
+        }
+
+        @@media (max-width:980px) { .grid { grid-template-columns: repeat(3,1fr); } }
+        @@media (max-width:740px) { .grid { grid-template-columns: repeat(2,1fr); } }
+        @@media (max-width:430px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            position: relative;
+            border-radius: var(--r);
+            border: 1px solid rgba(16,24,40,.10);
+            background: linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,255,255,.52));
+            box-shadow: 0 16px 44px rgba(16,24,40,.14);
+            overflow: hidden;
+        }
+
+        /* ✅ 카드별 순번: 왼쪽 상단 단색 */
+        .ribbon {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            color: #fff;
+            font-weight: 1000;
+            font-size: 12px;
+            background: var(--solid);
+            box-shadow: 0 10px 22px rgba(17,24,39,.18);
+            letter-spacing: .2px;
+            white-space: nowrap;
+            z-index: 2;
+        }
+
+        .head {
+            padding: 18px 16px 10px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 58px;
+            height: 58px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(16,24,40,.12);
+            box-shadow: 0 14px 30px rgba(16,24,40,.10);
+            background: #fff;
+            flex: 0 0 auto;
+        }
+
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .name {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 1000;
+            line-height: 1.15;
+        }
+
+        .meta {
+            margin-top: 6px;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            color: rgba(16,24,40,.68);
+            font-size: 12px;
+        }
+
+        .smallpill {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(16,24,40,.10);
+            background: rgba(255,255,255,.55);
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        /* ✅ “생일 미지정” 단색 */
+        .smallpill.warn {
+            border: 1px solid var(--solid-line);
+            background: var(--solid-soft);
+            color: var(--solid);
+        }
+
+        .smallpill b { font-family: var(--mono); }
+
+        .body { padding: 0 16px 14px; }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .box {
+            flex: 1 1 120px;
+            border-radius: var(--r2);
+            border: 1px solid rgba(16,24,40,.10);
+            background: rgba(255,255,255,.55);
+            padding: 10px 12px;
+        }
+
+        .k {
+            font-size: 11px;
+            color: rgba(16,24,40,.60);
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .v {
+            font-size: 13px;
+            font-weight: 1000;
+            word-break: break-word;
+        }
+
+        /* ✅ 관리자일 때만 보이는 수정 버튼 영역 */
+        .foot {
+            padding: 12px 14px;
+            border-top: 1px dashed rgba(16,24,40,.12);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .cta {
+            border: 1px solid var(--btn-line);
+            background: var(--btn-bg);
+            color: var(--btn-ink);
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-weight: 900;
+            font-size: 13px;
+            line-height: 1;
+            white-space: nowrap;
+            min-width: 56px;
+            text-align: center;
+            box-shadow: none;
+            appearance: none;
+            -webkit-appearance: none;
+            transition: background .12s ease, border-color .12s ease;
+        }
+
+        .cta:hover {
+            background: var(--btn-bg-hover);
+            border-color: var(--btn-line-hover);
+        }
+
+        .empty {
+            margin-top: 16px;
+            padding: 22px 18px;
+            text-align: center;
+            border-radius: var(--r);
+            border: 1px solid rgba(16,24,40,.10);
+            background: rgba(255,255,255,.65);
+            box-shadow: 0 16px 44px rgba(16,24,40,.12);
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="top">
+            <div class="brand">
+                <div class="logo"></div>
+                <div>
+                    <p class="title">🧾 생일 미지정 명단</p>
+                    <p class="sub">bMonth 또는 bDay가 0/NULL 인 대상</p>
+                </div>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" onclick="location.href='/'">🏠 Home</button>
+                <button class="btn" type="button" onclick="location.href='/Birthdays'">🎂 이번 달</button>
+                <button class="btn" type="button" onclick="location.href='/Birthdays/Year'">📅 연간</button>
+                <button class="btn primary" type="button" onclick="window.print()">🖨️ 인쇄</button>
+            </div>
+        </div>
+
+        <section class="hero">
+            <span class="pill">👥 <b>@(Model.Items?.Count ?? 0)</b> 명</span>
+            <span class="pill">⚠️ 생일 입력 필요</span>
+            @if (isAdmin || isSuperAdmin)
+            {
+                <span class="pill">🔒 관리자: 수정 가능</span>
+            }
+            else
+            {
+                <span class="pill">👀 조회 전용</span>
+            }
+        </section>
+
+        @if (Model.Items == null || Model.Items.Count == 0)
+        {
+            <div class="empty">
+                <div style="font-size:18px; font-weight:1000;">생일 미지정 대상이 없어요 🙂</div>
+                <div style="margin-top:8px; color:rgba(16,24,40,.70);">모두 생일 정보가 입력되어 있습니다.</div>
+            </div>
+        }
+        else
+        {
+            <section class="grid">
+                @{
+                    long seq = 0;
+                }
+                @foreach (var u in Model.Items)
+                {
+                    seq++;
+                    <article class="card">
+                        <div class="head">
+                            <div class="avatar"><img src="@u.ProfileImageUrl" alt="profile" /></div>
+                            <div style="min-width:0; flex:1;">
+                                <p class="name">@u.FullName</p>
+                                <div class="meta">
+                                    <span class="smallpill warn">생일 미지정</span>
+                                    @if (!string.IsNullOrWhiteSpace(u.ClassLabel))
+                                    {
+                                        <span class="smallpill">🏫 <b>@u.ClassLabel</b></span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="body">
+                            <div class="row">
+                                @if (!string.IsNullOrWhiteSpace(u.PhoneNumber) || !string.IsNullOrWhiteSpace(u.PhoneNumber2))
+                                {
+                                    <div class="box">
+                                        <div class="k">연락처</div>
+                                        <div class="v">
+                                            @if (!string.IsNullOrWhiteSpace(u.PhoneNumber))
+                                            { <span>@u.PhoneNumber</span> }
+                                            @if (!string.IsNullOrWhiteSpace(u.PhoneNumber2))
+                                            { <span>@(!string.IsNullOrWhiteSpace(u.PhoneNumber) ? " · " : "")@u.PhoneNumber2</span> }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        @* ✅ 관리자일 때만 “수정” 버튼 노출 *@
+                        @if (isAdmin || isSuperAdmin)
+                        {
+                            <div class="foot">
+                                <button class="cta" type="button"
+                                        onclick="location.href='/Birthdays/Edit/@u.PersonId'">수정</button>
+                            </div>
+                        }
+                    </article>
+                }
+            </section>
+        }
+    </div>
+</body>
+</html>

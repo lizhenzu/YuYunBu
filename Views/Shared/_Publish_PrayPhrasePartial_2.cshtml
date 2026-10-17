@@ -1,0 +1,58 @@
+﻿@model BulletinBoard.Models.TodayCollectPrayPhrase
+
+@if (!string.IsNullOrEmpty(@Model.PrayPhraseData.PrayContent1))
+{
+
+    <form method="post" asp-action="AddPrayPhrasePoint">
+        @await Html.PartialAsync("_PublisheBible3",Model.TodayeBiblesToPrayData)
+        @await Html.PartialAsync("_PublishePrayPhrase",@Model.PrayPhraseData)
+ 
+        @if (@Model.TodayCheckCompositeData.PrayPhraseCountToMe == 0)
+        {
+            <div class="form-group">
+                <label asp-for="@Model.PrayPhraseData.PrayWrite"></label>
+                <input asp-for="@Model.PrayPhraseData.PrayWrite" class="form-control text-font-20px-bold" autofocus placeholder=@Html.DisplayNameFor(model => model.PrayPhraseData.PrayWrite) />
+                <span asp-validation-for="@Model.PrayPhraseData.PrayWrite" class="text-danger"></span>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <button type="button" class="btn btn-primary text-font-20px-bold" value="화면사용법" id="loadData" onclick="openPopup('/html/HowToPray.html')">화면사용법</button>
+                </div>
+            </div>
+        }
+
+        <div class="body-container">
+            @if (@Model.TodayCheckCompositeData.PrayPhraseCountToMe == 0)
+            {
+                <div class="button-click-division" onclick="sendPostRequest()">아2멘</div>
+            }
+            
+            @*<div class="button-click-division" onclick="goHome()">Home</div>*@
+
+        </div> 
+        <input type="hidden" id="Id" name="Id" value="@Model.PrayPhraseData.Id" />
+    </form>
+}
+else
+{
+
+    @await Html.PartialAsync("_DisplayMessageBar" ,"오늘은 성품기도가 없습니다.")
+}
+
+<script>
+    function goHome() {
+        window.location.href = "/Home/IndexBranch";
+    }
+    function sendPostRequest() {
+        document.getElementById('submitButton').click(); // submit 버튼 클릭 효과
+    }
+
+    function openPopup(url) {
+        window.open(url, 'Popup', 'width=600,height=400,left=200,top=200');
+    }
+
+</script>
+
+
+@await Html.PartialAsync("_PublisheModalDialogBox")

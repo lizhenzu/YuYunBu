@@ -1,0 +1,440 @@
+﻿@model BulletinBoard.Models.DailyMission2.ParticipantCardsVM
+@using BulletinBoard.Common
+@using BulletinBoard.Models.DailyMission2
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using System
+@using System.Linq
+@using System.Collections.Generic
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject BulletinBoard.Services.Abstract.IAuthService AuthService
+
+@*  ══════════════════════════════════════════════════════════════
+    가족팀 — Bone 스킨 · 세로 가계도
+
+    가족을 나열하지 않고 관계가 보이게 그린다.
+      조부모 ─ 부모(나란히) ─ 세로선 ─ 자녀들(형제는 나란히)
+    선은 1px 가는 선이라 이 톤을 해치지 않는다.
+    사람마다 사진 · 역할 · 이름 · 점수가 붙고, 0점은 흐리게 둔다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    ViewData["Title"] = "가족팀 참여자";
+    Layout = null;
+
+    var _user       = await AuthService.GetSignedUser(User);
+    var _isSignedIn = await AuthService.IsSignedIn(User);
+    bool isStaff    = _isSignedIn && (
+        await AuthService.IsInRole(_user, nameof(Roles.Admin)) ||
+        await AuthService.IsInRole(_user, nameof(Roles.SuperAdmin))
+    );
+
+    // 가족이 고른 합산 선물 (teamName → (ProductId, ProductName, Status))
+    var familyCombinedGiftInfo = ViewBag.FamilyCombinedGiftInfo
+        as Dictionary<string, (int ProductId, string ProductName, string Status)>
+        ?? new Dictionary<string, (int, string, string)>();
+
+    string Safe(string? s) => (s ?? "").Trim();
+
+    var todayKst = DateHelper.GetKoreaNow().Date;
+
+    // 마지막 수행일 — 오늘·어제만 말로, 그 밖은 날짜로 (예: 2026-09-01)
+    string LastText(DateTime? dt)
+    {
+        if (!dt.HasValue) return "수행 기록 없음";
+        var d = dt.Value.Date;
+        if (d == todayKst) return "오늘";
+        if (d == todayKst.AddDays(-1)) return "어제";
+        return d.ToString("yyyy-MM-dd");
+    }
+
+    // 가계도 안에서도 같은 규칙. 오늘·어제만 말로 적는다.
+    string ShortLast(DateTime? dt)
+    {
+        if (!dt.HasValue) return "—";
+        var d = dt.Value.Date;
+        if (d == todayKst) return "오늘";
+        if (d == todayKst.AddDays(-1)) return "어제";
+        return d.ToString("yyyy-MM-dd");
+    }
+
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var physicalPath = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+            if (System.IO.File.Exists(physicalPath)) return $"/images/profile/{uid}.png";
+        }
+        return "/images/icon/people/people_01.webp";
+    }
+
+    string UserMonthlyUrl(string? userName)
+    {
+        var u = Safe(userName);
+        if (string.IsNullOrWhiteSpace(u)) return "#";
+        return "/DailyMission4/UserMonthlyPoints?userName=" + Uri.EscapeDataString(u);
+    }
+
+    // 학생 역할 라벨 — 학년/반이 있으면 그것을, 없으면 형제 관계를 쓴다.
+    string KidLabel(FamilyMemberRow m)
+    {
+        if (m.ClassYear.HasValue && m.ClassBan.HasValue) return $"{m.ClassYear}학년 {m.ClassBan}반";
+        return m.RelationCode switch
+        {
+            1 => "형", 2 => "동생", 3 => "언니", 4 => "누나", 0 => "본인", _ => "학생"
+        };
+    }
+
+    var teams = (Model?.Rows ?? new List<ParticipantCardRow>())
+                .OrderByDescending(x => x.YearPoint)
+                .ThenBy(x => Safe(x.FamilyTeamName))
+                .ToList();
+
+    var me = Safe(Model?.CurrentUserName);
+    bool IsMe(string? userName)
+        => !string.IsNullOrWhiteSpace(me)
+           && string.Equals(me, Safe(userName), StringComparison.OrdinalIgnoreCase);
+
+    int totalTeamCount = teams.Count;
+    int reachedCount   = teams.Count(t => t.AchievePercent >= 100);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>@ViewData["Title"] — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;800&display=swap">
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+    body { margin: 0; background: #FFFFFF; }
+    .qz.pb { --pBlue: #2F80ED; --pSoft: #EAF2FD; --pInk: #111827; --pTx: #374151; --pDim: #9CA3AF; --pDim2: #6B7280; --pLine: #EEF0F3; --pGrey: #F4F6F9; --pGreen: #15803D;
+             background: #FFFFFF; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: var(--pTx); }
+    .qz.pb .qzBody { background: #FFFFFF; }
+    .qz.pb .qzBar { border-bottom-color: var(--pLine); }
+    .qz.pb .qzProg { display: none; }
+
+    .qz .ptPgm { padding: 20px 0 0; border-bottom: 0; }
+    .qz .ptPgmK { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--pBlue); margin: 0; }
+    .qz .ptPgmT { margin-top: 6px; font-family: inherit; font-weight: 800; font-size: 24px; line-height: 1.35; letter-spacing: -.02em; color: var(--pInk); }
+    .qz .ptPgmS { margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--pDim2); }
+
+    .qz .ptSeg { display: flex; gap: 22px; margin-top: 18px; border-top: 0; border-bottom: 1px solid var(--pLine); }
+    .qz .ptSeg a { text-align: left; padding: 10px 0 11px; text-decoration: none; font-size: 15px; font-weight: 700; letter-spacing: 0;
+                   color: var(--pDim); position: relative; margin-bottom: -1px; border-bottom: 2.5px solid transparent; }
+    .qz .ptSeg a.on { color: var(--pInk); border-bottom-color: var(--pBlue); }
+    .qz .ptSeg a.on::before { display: none; }
+
+    .qz .ptTot { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; padding: 18px 0 0; border-bottom: 0; }
+    .qz .ptTotL { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--pDim); margin-bottom: 4px; }
+    .qz .ptTotN { font-family: inherit; font-weight: 300; font-size: 30px; line-height: 1.1; color: var(--pInk); font-variant-numeric: tabular-nums; }
+    .qz .ptTotN u { text-decoration: none; font-size: 13px; font-weight: 400; color: var(--pDim2); margin-left: 2px; }
+    .qz .ptTotR { text-align: right; flex: 0 0 auto; white-space: nowrap; }
+    .qz .ptTotRV { font-family: inherit; font-weight: 300; font-size: 22px; color: var(--pBlue); font-variant-numeric: tabular-nums; }
+
+    .qz .ptSrch { display: flex; align-items: center; gap: 8px; padding: 0; margin-top: 16px; border-bottom: 0; }
+    .qz .ptSrch input { flex: 1; min-width: 0; border: 0; background: var(--pGrey); border-radius: 12px; outline: none; font-family: inherit; font-size: 14px; color: var(--pInk); padding: 11px 13px; }
+    .qz .ptSrch input::placeholder { color: #B0B6C0; }
+    .qz .ptSrch select { border: 0; background: var(--pGrey); border-radius: 12px; padding: 11px 13px; outline: none; font-family: inherit; font-size: 13px; color: var(--pDim2); text-align: left; cursor: pointer; }
+
+    /* ── 팀 머리 ── */
+    .qz .ptTeam { border-bottom: 1px solid var(--pLine); padding: 0 0 20px; }
+    .qz .ptTeam[hidden] { display: none; }
+    .qz .ptHead { display: flex; align-items: center; gap: 11px; padding: 18px 0 0; }
+    .qz .ptNo { font-family: inherit; font-size: 13px; font-weight: 800; color: #7FA3DB; width: 22px; flex: 0 0 auto; padding-top: 0; font-variant-numeric: tabular-nums; }
+    .qz .ptHead.top .ptNo { color: var(--pBlue); font-weight: 800; }
+    .qz .ptTx { flex: 1 1 auto; min-width: 0; }
+    .qz .ptN { font-family: inherit; font-size: 17px; font-weight: 800; line-height: 1.35; color: var(--pInk); }
+    .qz .ptS { font-size: 11.5px; color: var(--pDim2); margin-top: 1px; }
+    .qz .ptS i { font-style: normal; color: #D1D5DB; margin: 0 5px; }
+    .qz .ptPV, .qz .ptPS, .qz .ptN, .qz .ptS { display: block; }
+    .qz .ptP { text-align: right; flex: 0 0 auto; white-space: nowrap; }
+    .qz .ptPV { font-family: inherit; font-size: 20px; font-weight: 300; color: var(--pInk); font-variant-numeric: tabular-nums; }
+    .qz .ptPV u { text-decoration: none; font-size: 11px; color: var(--pDim); margin-left: 1px; }
+    .qz .ptPS { font-size: 11px; font-weight: 700; color: var(--pBlue); margin-top: 1px; font-family: inherit; font-variant-numeric: tabular-nums; }
+    .qz .ptBar { height: 5px; border-radius: 3px; background: #E8ECF2; margin: 10px 0 0 33px; overflow: hidden; }
+    .qz .ptBar i { display: block; height: 5px; border-radius: 3px; background: var(--pBlue); }
+
+    /* ── 가계도 ── */
+    .qz .ptTree { padding: 14px 0 0 33px; text-align: center; }
+    .qz .ptRow { display: flex; justify-content: center; gap: 26px; flex-wrap: wrap; }
+    .qz .ptKids { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+    /* 날짜(2026-09-01)가 한 줄에 들어가야 해서 칸을 조금 넓혔다. */
+    .qz .ptOne { width: 88px; text-decoration: none; color: inherit; display: block; -webkit-tap-highlight-color: transparent; }
+    .qz .ptPh { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; margin: 0 auto 6px; display: block; background: var(--pGrey); box-shadow: none; }
+    .qz .ptRole { font-size: 10.5px; font-weight: 400; letter-spacing: 0; color: var(--pDim); margin-bottom: 1px; }
+    .qz .ptName { font-size: 13px; font-weight: 700; color: var(--pInk); line-height: 1.3; word-break: keep-all; }
+    .qz .ptVal { font-family: inherit; font-size: 13px; font-weight: 300; color: var(--pBlue); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .qz .ptVal.zero { color: var(--pDim); }
+    .qz .ptLast { font-size: 10px; color: var(--pDim); margin-top: 1px; letter-spacing: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+    .qz .ptOne.isMe .ptPh { box-shadow: 0 0 0 2.5px var(--pBlue); }
+    .qz .ptOne.isMe .ptName { font-weight: 800; }
+
+    /* 연결선 */
+    .qz .ptStem { width: 1px; height: 14px; background: #D6DEEA; margin: 0 auto; }
+    .qz .ptBridge { position: relative; height: 14px; margin: 0 auto; }
+    .qz .ptBridge::before { content: ""; position: absolute; left: 25%; right: 25%; top: 0; height: 1px; background: #D6DEEA; }
+    .qz .ptBridge::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #D6DEEA; }
+    .qz .ptFan { position: relative; height: 14px; margin: 0 auto; }
+    .qz .ptFan span { position: absolute; top: 0; height: 1px; background: #D6DEEA; }
+    .qz .ptFan i { position: absolute; top: 0; bottom: 0; width: 1px; background: #D6DEEA; }
+
+    /* 선물 */
+    .qz .ptGift { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 14px 0 0 33px; padding: 11px 13px; border-top: 0; border-radius: 12px; background: var(--pSoft); font-size: 12.5px; color: var(--pDim2); }
+    .qz .ptGift b { color: var(--pInk); font-weight: 700; text-align: right; }
+
+    .qz .ptNone { font-size: 13px; color: var(--pDim); padding: 28px 0; text-align: center; }
+
+    @@media (max-width: 560px) {
+        .qz .ptOne { width: 72px; }
+        .qz .ptRow { gap: 18px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz pb">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                    <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">@Model.Year</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="ptPgm">
+            <div class="ptPgmK">@ConstatsCommon.MainKeyTitle</div>
+            <div class="ptPgmT">참여자</div>
+            <div class="ptPgmS">@(Model.Year)년 · 목표 @Model.TargetPoint.ToString("N0")점</div>
+        </div>
+
+        <div class="ptSeg">
+            <a href="/DailyMission4/ParticipantPersons">개인</a>
+            <a class="on" href="/DailyMission4/ParticipantTeams">가족팀</a>
+        </div>
+
+        <div class="ptTot">
+            <div>
+                <div class="ptTotL">가족팀</div>
+                <div class="ptTotN">@totalTeamCount<u>팀</u></div>
+            </div>
+            <div class="ptTotR">
+                <div class="ptTotL">목표 달성</div>
+                <div class="ptTotRV">@(reachedCount)팀</div>
+            </div>
+        </div>
+
+        <div class="ptSrch">
+            <input id="ptQ" type="search" placeholder="가족 · 이름 검색" autocomplete="off" />
+            <select id="ptSort">
+                <option value="score">점수순</option>
+                <option value="name">가족 이름순</option>
+            </select>
+        </div>
+
+        <div id="ptList">
+            @{ int no = 1; }
+            @foreach (var t in teams)
+            {
+                var members = t.FamilyMembers ?? new List<FamilyMemberRow>();
+
+                // 세대별로 나눈다. 3·4 = 조부모, 1·2 = 부모, 0 = 자녀
+                var grands  = members.Where(m => m.RoleCode == 3 || m.RoleCode == 4).OrderBy(m => m.RoleCode).ToList();
+                var parents = members.Where(m => m.RoleCode == 1 || m.RoleCode == 2).OrderByDescending(m => m.RoleCode).ToList();
+                var kids    = members.Where(m => m.RoleCode == 0).OrderBy(m => m.RelationCode).ToList();
+                var others  = members.Where(m => m.RoleCode > 4).ToList();
+
+                var teamName = !string.IsNullOrWhiteSpace(t.FamilyTeamName) ? t.FamilyTeamName
+                             : (!string.IsNullOrWhiteSpace(t.FullName) ? $"{t.FullName} 가족" : Safe(t.UserName));
+
+                var pct = Math.Max(0, Math.Min(100, t.AchievePercent));
+
+                var searchKey = $"{teamName} {string.Join(" ", members.Select(m => $"{m.FullName} {m.UserName}"))}".ToLowerInvariant();
+
+                familyCombinedGiftInfo.TryGetValue(Safe(t.FamilyTeamName), out var gift);
+                bool hasGift = !string.IsNullOrWhiteSpace(gift.ProductName);
+
+                <div class="ptTeam" data-name="@searchKey" data-score="@t.YearPoint" data-sortname="@teamName.ToLowerInvariant()">
+                    <div class="ptHead @(no <= 3 ? "top" : "")">
+                        <span class="ptNo">@(no < 10 ? "0" + no : no.ToString())</span>
+                        <span class="ptTx">
+                            <span class="ptN">@teamName</span>
+                            <span class="ptS">@(members.Count)명<i>·</i>@LastText(t.LastActionDate)</span>
+                        </span>
+                        <span class="ptP">
+                            <span class="ptPV">@t.YearPoint.ToString("N0")<u>점</u></span>
+                            <span class="ptPS">@(pct)%</span>
+                        </span>
+                    </div>
+                    <div class="ptBar"><i style="width:@(pct)%"></i></div>
+
+                    @if (members.Count > 0)
+                    {
+                        <div class="ptTree">
+
+                            @* ── 조부모 ── *@
+                            @if (grands.Count > 0)
+                            {
+                                <div class="ptRow">
+                                    @foreach (var m in grands)
+                                    {
+                                        <a class="ptOne @(IsMe(m.UserName) ? "isMe" : "")" href="@UserMonthlyUrl(m.UserName)">
+                                            <img class="ptPh" src="@ProfileOrDefault(m.UserId)" alt="@m.FullName"
+                                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                                            <div class="ptRole">@(m.RoleCode == 3 ? "할머니" : "할아버지")@(IsMe(m.UserName) ? " · 본인" : "")</div>
+                                            <div class="ptName">@(!string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName)</div>
+                                            <div class="ptVal @(m.YearPoint <= 0 ? "zero" : "")">@m.YearPoint.ToString("N0")</div>
+                                            <div class="ptLast">@ShortLast(m.LastActionDate)</div>
+                                        </a>
+                                    }
+                                </div>
+                                <div class="ptStem"></div>
+                            }
+
+                            @* ── 부모 ── *@
+                            @if (parents.Count > 0)
+                            {
+                                <div class="ptRow">
+                                    @foreach (var m in parents)
+                                    {
+                                        <a class="ptOne @(IsMe(m.UserName) ? "isMe" : "")" href="@UserMonthlyUrl(m.UserName)">
+                                            <img class="ptPh" src="@ProfileOrDefault(m.UserId)" alt="@m.FullName"
+                                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                                            <div class="ptRole">@(m.RoleCode == 1 ? "엄마" : "아빠")@(IsMe(m.UserName) ? " · 본인" : "")</div>
+                                            <div class="ptName">@(!string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName)</div>
+                                            <div class="ptVal @(m.YearPoint <= 0 ? "zero" : "")">@m.YearPoint.ToString("N0")</div>
+                                            <div class="ptLast">@ShortLast(m.LastActionDate)</div>
+                                        </a>
+                                    }
+                                </div>
+
+                                @* 부모가 둘이면 다리로 잇고, 하나면 줄기만 내린다. *@
+                                @if (kids.Count > 0)
+                                {
+                                    if (parents.Count >= 2)
+                                    {
+                                        <div class="ptBridge" style="width:@(parents.Count * 88 + (parents.Count - 1) * 26)px"></div>
+                                    }
+                                    else
+                                    {
+                                        <div class="ptStem"></div>
+                                    }
+                                }
+                            }
+
+                            @* ── 자녀 ── *@
+                            @if (kids.Count > 0)
+                            {
+                                @if (kids.Count >= 2)
+                                {
+                                    var w = kids.Count * 88 + (kids.Count - 1) * 14;
+                                    var edge = 44;
+                                    <div class="ptFan" style="width:@(w)px">
+                                        <span style="left:@(edge)px; right:@(edge)px;"></span>
+                                        <i style="left:@(edge)px"></i>
+                                        <i style="right:@(edge)px"></i>
+                                    </div>
+                                }
+                                <div class="ptKids">
+                                    @foreach (var m in kids)
+                                    {
+                                        <a class="ptOne @(IsMe(m.UserName) ? "isMe" : "")" href="@UserMonthlyUrl(m.UserName)">
+                                            <img class="ptPh" src="@ProfileOrDefault(m.UserId)" alt="@m.FullName"
+                                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                                            <div class="ptRole">@KidLabel(m)@(IsMe(m.UserName) ? " · 본인" : "")</div>
+                                            <div class="ptName">@(!string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName)</div>
+                                            <div class="ptVal @(m.YearPoint <= 0 ? "zero" : "")">@m.YearPoint.ToString("N0")</div>
+                                            <div class="ptLast">@ShortLast(m.LastActionDate)</div>
+                                        </a>
+                                    }
+                                </div>
+                            }
+
+                            @* ── 그 밖의 구성원 ── *@
+                            @if (others.Count > 0)
+                            {
+                                <div class="ptStem"></div>
+                                <div class="ptRow">
+                                    @foreach (var m in others)
+                                    {
+                                        <a class="ptOne @(IsMe(m.UserName) ? "isMe" : "")" href="@UserMonthlyUrl(m.UserName)">
+                                            <img class="ptPh" src="@ProfileOrDefault(m.UserId)" alt="@m.FullName"
+                                                 onerror="this.src='/images/icon/people/people_01.webp'" />
+                                            <div class="ptRole">@(!string.IsNullOrWhiteSpace(m.RoleLabel) ? m.RoleLabel : "가족")@(IsMe(m.UserName) ? " · 본인" : "")</div>
+                                            <div class="ptName">@(!string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName)</div>
+                                            <div class="ptVal @(m.YearPoint <= 0 ? "zero" : "")">@m.YearPoint.ToString("N0")</div>
+                                            <div class="ptLast">@ShortLast(m.LastActionDate)</div>
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (hasGift)
+                    {
+                        <div class="ptGift">
+                            <span>가족 선물</span>
+                            <b>@gift.ProductName@(string.IsNullOrWhiteSpace(gift.Status) ? "" : " · " + gift.Status)</b>
+                        </div>
+                    }
+                </div>
+                no++;
+            }
+        </div>
+
+        <div class="ptNone" id="ptNone" hidden>찾는 가족이 없어요</div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var list = document.getElementById('ptList');
+        if (!list) return;
+        var items = Array.prototype.slice.call(list.querySelectorAll('.ptTeam'));
+        var none  = document.getElementById('ptNone');
+        var q     = document.getElementById('ptQ');
+        var sort  = document.getElementById('ptSort');
+
+        function apply() {
+            var term = (q.value || '').trim().toLowerCase();
+            var shown = 0;
+
+            items.forEach(function (el) {
+                el.hidden = !(!term || (el.dataset.name || '').indexOf(term) >= 0);
+                if (!el.hidden) shown++;
+            });
+            none.hidden = (shown > 0);
+
+            var key = sort.value;
+            var sorted = items.slice().sort(function (a, b) {
+                if (key === 'name') return (a.dataset.sortname || '').localeCompare(b.dataset.sortname || '', 'ko');
+                return (+b.dataset.score) - (+a.dataset.score);
+            });
+            sorted.forEach(function (el) { list.appendChild(el); });
+
+            // 번호는 보이는 순서대로 다시 매긴다.
+            var n = 1;
+            sorted.forEach(function (el) {
+                if (el.hidden) return;
+                var head = el.querySelector('.ptHead');
+                var noEl = el.querySelector('.ptNo');
+                if (noEl) noEl.textContent = (n < 10 ? '0' + n : String(n));
+                if (head) head.classList.toggle('top', n <= 3);
+                n++;
+            });
+        }
+
+        q.addEventListener('input', apply);
+        sort.addEventListener('change', apply);
+    })();
+</script>
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+</body>
+</html>

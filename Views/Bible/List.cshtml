@@ -1,0 +1,196 @@
+@model List<BibleReadingThrough.Models.BookReadingViewModel>
+@{
+    string testament = ViewBag.Testament as string ?? "구약";
+    ViewData["Title"] = testament + " 읽기";
+    ViewData["Page"]  = testament == "구약" ? "ot" : "nt";
+
+    bool isOt       = testament == "구약";
+    string accentBg = isOt ? "#16a34a" : "#4f46e5";   // 읽은 장 배경
+    string accentFg = "#ffffff";
+    string unreadBg = "var(--card-bg)";
+    string unreadFg = "var(--text)";
+    string unreadBd = "var(--border)";
+}
+
+<style>
+/* ── 탭 스위처 ── */
+.list-tabs { display:flex; gap:10px; margin-bottom:22px; }
+.list-tab {
+    flex:1; text-align:center; padding:12px 0; border-radius:14px;
+    font-size:.95rem; font-weight:800; text-decoration:none;
+    border:2px solid transparent; transition:all .18s;
+}
+.list-tab.ot-active  { background:#16a34a; color:#fff; border-color:#16a34a; }
+.list-tab.nt-active  { background:#4f46e5; color:#fff; border-color:#4f46e5; }
+.list-tab.ot-idle    { background:var(--card-bg); color:#16a34a; border-color:#16a34a; }
+.list-tab.nt-idle    { background:var(--card-bg); color:#4f46e5; border-color:#4f46e5; }
+.list-tab:hover      { filter:brightness(1.07); }
+
+/* ── 요약 헤더 ── */
+.list-summary {
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    background:var(--card-bg); border:1px solid var(--border);
+    border-radius:16px; padding:14px 18px; margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+}
+.list-summary-title { font-size:1.05rem; font-weight:900; }
+.list-summary-stat  { font-size:.88rem; color:var(--text2); font-weight:700; }
+
+/* ── 책 카드 ── */
+.book-card {
+    background:var(--card-bg); border:1px solid var(--border);
+    border-radius:18px; margin-bottom:14px; overflow:hidden;
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+    transition:box-shadow .18s;
+}
+.book-card:hover { box-shadow:0 4px 18px rgba(0,0,0,.10); }
+
+.book-card-head {
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:14px 18px; cursor:pointer;
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    user-select:none;
+}
+.book-card-head:hover { background:var(--bg3); }
+
+.book-name  { font-size:1rem; font-weight:900; }
+.book-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 10px; border-radius:999px; font-size:.78rem; font-weight:800;
+}
+.book-badge.done { background:#dcfce7; color:#166534; }
+.book-badge.part { background:var(--bg3);   color:var(--text2); }
+
+.book-prog-wrap { flex:1; max-width:120px; }
+.book-prog-track { height:6px; background:var(--bg3); border-radius:999px; overflow:hidden; }
+.book-prog-fill  { height:100%; border-radius:999px; transition:width .4s ease; }
+.book-prog-fill.ot { background:linear-gradient(90deg,#16a34a,#4ade80); }
+.book-prog-fill.nt { background:linear-gradient(90deg,#4f46e5,#818cf8); }
+
+.book-card-body { padding:14px 16px; }
+
+/* ── 장 버튼 ── */
+.ch-grid { display:flex; flex-wrap:wrap; gap:6px; }
+.ch-btn {
+    min-width:34px; height:34px; padding:0 6px;
+    display:inline-flex; align-items:center; justify-content:center;
+    border-radius:8px; font-size:.82rem; font-weight:700;
+    text-decoration:none; border:1.5px solid transparent;
+    transition:all .13s; cursor:pointer;
+}
+/* 읽은 장 */
+.ch-btn.read-ot { background:rgb(148,163,184); border-color:rgb(148,163,184); color:#fff; }
+.ch-btn.read-nt { background:rgb(148,163,184); border-color:rgb(148,163,184); color:#fff; }
+/* 안읽은 장 */
+.ch-btn.unread  { background:var(--card-bg); border-color:var(--border); color:var(--text); }
+.ch-btn.unread:hover { border-color:#f97316; color:#f97316; }
+
+/* 접기 화살표 */
+.toggle-arrow { transition:transform .22s; font-size:.9rem; color:var(--text2); }
+.collapsed .toggle-arrow { transform:rotate(-90deg); }
+
+/* 앵커 스크롤 시 sticky topbar 아래 여백 */
+.book-card { scroll-margin-top: 72px; }
+
+/* 반응형 */
+@@media (max-width:600px) {
+    .book-prog-wrap { display:none; }
+    .ch-btn { min-width:30px; height:30px; font-size:.75rem; }
+}
+</style>
+
+<!-- 탭 -->
+<div class="list-tabs">
+    <a href="/Bible/List?testament=구약"
+       class="list-tab @(isOt ? "ot-active" : "ot-idle")">📜 구약</a>
+    <a href="/Bible/List?testament=신약"
+       class="list-tab @(!isOt ? "nt-active" : "nt-idle")">✨ 신약</a>
+</div>
+
+<!-- 전체 요약 -->
+@{
+    int totalChapters = Model.Sum(b => b.Chapters.Count);
+    int totalRead     = Model.Sum(b => b.Chapters.Count(c => c.IsRead));
+    double totalPct   = totalChapters == 0 ? 0 : Math.Round((double)totalRead / totalChapters * 100, 1);
+}
+<div class="list-summary">
+    <div>
+        <div class="list-summary-title">@testament 전체 진도</div>
+        <div class="list-summary-stat">@totalRead 장 읽음 / @totalChapters 장 전체</div>
+    </div>
+    <div style="text-align:right;">
+        <div style="font-size:1.6rem; font-weight:900; color:@accentBg;">@totalPct%</div>
+        <div class="book-prog-track" style="width:140px; margin-top:6px;">
+            <div class="book-prog-fill @(isOt?"ot":"nt")" style="width:@totalPct%;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 책별 카드 -->
+@foreach (var book in Model)
+{
+    var readCount = book.Chapters.Count(c => c.IsRead);
+    var allRead   = readCount == book.Chapters.Count && book.Chapters.Count > 0;
+    var pct       = book.Chapters.Count == 0 ? 0 : (double)readCount / book.Chapters.Count * 100;
+    var key       = $"b_{Math.Abs(book.Name.GetHashCode())}";
+
+    <div class="book-card" id="card-@key" data-book="@book.Name">
+        <!-- 헤더 -->
+        <div class="book-card-head" onclick="toggleSection('@key')" id="head-@key">
+            <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                <span class="book-name">@book.Name</span>
+                <span class="book-badge @(allRead ? "done" : "part")">
+                    @readCount / @book.Chapters.Count
+                </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+                <div class="book-prog-wrap">
+                    <div class="book-prog-track">
+                        <div class="book-prog-fill @(isOt?"ot":"nt")" id="pbar-@key"
+                             style="width:@pct%;"></div>
+                    </div>
+                </div>
+                <span class="toggle-arrow" id="arrow-@key">▼</span>
+            </div>
+        </div>
+        <!-- 장 목록 -->
+        <div class="book-card-body" id="body-@key">
+            <div class="ch-grid">
+                @foreach (var ch in book.Chapters)
+                {
+                    string cls = ch.IsRead ? (isOt ? "read-ot" : "read-nt") : "unread";
+                    string href = $"/Bible/Read?bookName={Uri.EscapeDataString(book.Name)}&jang={ch.Jang}{(ch.IsRead ? "" : "#vc-1")}";
+                    <a href="@href"
+                       class="ch-btn @cls"
+                       title="@book.Name @ch.Jang 장 @(ch.IsRead ? "✅ 완독" : "📖 읽기")">@ch.Jang</a>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+function toggleSection(key) {
+    const body  = document.getElementById('body-' + key);
+    const head  = document.getElementById('head-' + key);
+    const arrow = document.getElementById('arrow-' + key);
+    const open  = body.style.display !== 'none';
+    body.style.display  = open ? 'none' : '';
+    head.classList.toggle('collapsed', open);
+    arrow.style.transform = open ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
+// 대시보드에서 특정 책 이름으로 이동 (#book=창세기)
+document.addEventListener('DOMContentLoaded', function () {
+    const hash = decodeURIComponent(location.hash);
+    if (!hash.startsWith('#book=')) return;
+    const bookName = hash.slice(6);
+    const target = Array.from(document.querySelectorAll('.book-card'))
+        .find(el => el.dataset.book === bookName);
+    if (target) {
+        setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+});
+</script>
+}

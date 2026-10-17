@@ -1,0 +1,542 @@
+﻿@{
+    Layout = null;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>부모님과 함께 성경미션북</title>
+    <style>
+        :root {
+            --bg1: #f6fbf8;
+            --bg2: #f2f7ff;
+            --card: #ffffff;
+            --ink: #0b1220;
+            --muted: rgba(11,18,32,.68);
+            --line: rgba(2,6,23,.10);
+            --shadow: 0 22px 60px rgba(2,6,23,.12);
+            --radius: 24px;
+            --g1: #2f6f6b;
+            --g2: #3f8b85;
+            --mint: #e9f6f3;
+            --gold: #f59e0b;
+            --goldSoft: #fff7e6;
+            --btn: #0b1220;
+            --btn2: #ffffff;
+            --btnLine: rgba(255,255,255,.18);
+            --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+        }
+
+        * { box-sizing: border-box }
+        html, body { height: 100% }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--ink);
+            background:
+                radial-gradient(900px 520px at 15% 10%, rgba(63,139,133,.16), transparent 55%),
+                radial-gradient(900px 520px at 90% 15%, rgba(14,165,233,.13), transparent 55%),
+                linear-gradient(180deg, var(--bg1), var(--bg2));
+
+            /* ✅ 가운데 정렬: wrap을 좌우 중앙으로 */
+            display: flex;
+            justify-content: center;
+
+            /* ✅ 위에서부터 시작(상단 잘림 방지) */
+            align-items: flex-start;
+
+            /* ✅ 모바일 주소창/노치 대응 */
+            min-height: 100svh;
+
+            /* ✅ 상단 안전영역 + 좌우 여백 */
+            padding: calc(14px + env(safe-area-inset-top)) 20px 20px;
+
+            /* ✅ 스크롤 허용 */
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ✅ 폭 제한 + 가운데 유지 */
+        .wrap {
+            width: min(920px, 100%);
+            display: grid;
+            gap: 14px;
+            margin: 0 auto; /* (추가 방어) */
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .hero {
+            position: relative;
+            padding: 26px 26px 18px;
+            background: radial-gradient(800px 360px at 10% 0%, rgba(47,111,107,.18), transparent 60%),
+                        radial-gradient(800px 360px at 90% 10%, rgba(63,139,133,.16), transparent 60%),
+                        linear-gradient(180deg, rgba(233,246,243,.75), rgba(255,255,255,1));
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(47,111,107,.10);
+            border: 1px solid rgba(47,111,107,.18);
+            color: var(--g1);
+            font-weight: 700;
+            letter-spacing: -.2px;
+            font-size: 13px;
+        }
+
+        h1 {
+            margin: 12px 0 8px;
+            font-size: clamp(20px, 3.2vw, 30px);
+            letter-spacing: -.6px;
+            line-height: 1.18;
+        }
+
+        .sub {
+            margin: 0;
+            color: var(--muted);
+            font-size: clamp(13px, 1.8vw, 15px);
+            line-height: 1.65;
+        }
+
+        .content {
+            padding: 18px 26px 22px;
+            display: grid;
+            gap: 14px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 1.15fr .85fr;
+        }
+
+        @@media (max-width: 780px) {
+            .grid { grid-template-columns: 1fr }
+            .hero { padding: 22px 18px 16px }
+            .content { padding: 16px 18px 18px }
+        }
+
+        .box {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 14px 14px 12px;
+            background: linear-gradient(180deg, rgba(233,246,243,.55), rgba(255,255,255,1));
+        }
+
+        .box h2 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            letter-spacing: -.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .box p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .bullets {
+            margin: 10px 0 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .bullets li {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            color: rgba(11,18,32,.78);
+            font-size: 14px;
+            line-height: 1.55;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: linear-gradient(180deg, var(--g2), var(--g1));
+            margin-top: 6px;
+            flex: 0 0 auto;
+            box-shadow: 0 6px 16px rgba(47,111,107,.22);
+        }
+
+        .callout {
+            border-radius: 18px;
+            padding: 14px 14px 12px;
+            background: linear-gradient(180deg, var(--goldSoft), rgba(255,255,255,1));
+            border: 1px solid rgba(245,158,11,.22);
+        }
+
+        .callout h2 {
+            margin: 0 0 8px;
+            font-size: 15px;
+            letter-spacing: -.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .callout p {
+            margin: 0;
+            color: rgba(11,18,32,.75);
+            font-size: 14px;
+            line-height: 1.65;
+        }
+
+        .highlight {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(47,111,107,.10);
+            border: 1px solid rgba(47,111,107,.18);
+            color: var(--g1);
+            font-weight: 800;
+            letter-spacing: -.2px;
+            margin: 0 2px;
+            white-space: nowrap;
+        }
+
+        .points {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .pitem {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 12px 12px;
+            border-radius: 16px;
+            border: 1px dashed rgba(2,6,23,.14);
+            background: rgba(255,255,255,.8);
+        }
+
+        .picon {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            font-size: 18px;
+            background: rgba(245,158,11,.14);
+            border: 1px solid rgba(245,158,11,.18);
+            flex: 0 0 auto;
+        }
+
+        .ptitle {
+            font-weight: 800;
+            letter-spacing: -.3px;
+            margin: 1px 0 4px;
+            font-size: 14px;
+        }
+
+        .pdesc {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13.5px;
+            line-height: 1.55;
+        }
+
+        .footer {
+            padding: 14px 26px 22px;
+            border-top: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,1), rgba(242,255,252,.55));
+        }
+
+        .btnrow {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 16px;
+            padding: 14px 14px;
+            font-weight: 900;
+            letter-spacing: -.3px;
+            cursor: pointer;
+            transition: transform .08s ease, filter .12s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-width: 220px;
+            flex: 1 1 240px;
+        }
+
+        .btn:active { transform: translateY(1px) }
+
+        .btn-primary {
+            color: var(--btn2);
+            background: linear-gradient(180deg, rgba(47,111,107,1), rgba(63,139,133,1));
+            box-shadow: 0 14px 32px rgba(47,111,107,.22);
+        }
+
+        .btn-secondary {
+            color: var(--ink);
+            background: rgba(255,255,255,.9);
+            border: 1px solid var(--line);
+        }
+
+        .btn small {
+            display: block;
+            font-weight: 700;
+            opacity: .85;
+            margin-top: 2px;
+            letter-spacing: -.1px;
+        }
+
+        .mini {
+            margin-top: 10px;
+            color: rgba(11,18,32,.58);
+            font-size: 12.5px;
+            line-height: 1.55;
+            text-align: center;
+        }
+
+        /* bullet 텍스트를 한 덩어리로 처리해 줄바꿈 안정화 */
+        .bullets .li-text {
+            display: inline;
+            line-height: 1.55;
+            word-break: keep-all;
+        }
+
+        .em-strong {
+            font-weight: 800;
+            color: var(--g1);
+            letter-spacing: 0;
+            background: rgba(47,111,107,.10);
+            padding: 1px 6px;
+            border-radius: 999px;
+            border: 1px solid rgba(47,111,107,.18);
+            white-space: nowrap;
+        }
+
+        /* ===============================
+           ✅ 접기 / 펼치기 (처음엔 접힘)
+           =============================== */
+        .fold {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .fold::after {
+            content: "▾";
+            margin-left: auto;
+            font-size: 14px;
+            transition: transform .2s ease;
+            opacity: .6;
+        }
+
+        .fold.active::after { transform: rotate(180deg); }
+
+        .fold-body {
+            overflow: hidden;
+            transition: grid-template-rows .25s ease, opacity .2s ease;
+            display: grid;
+            grid-template-rows: 1fr;
+        }
+
+        .fold-body.collapsed {
+            grid-template-rows: 0fr;
+            opacity: 0;
+        }
+
+        .fold-body > .inner { min-height: 0; }
+    </style>
+</head>
+
+<body>
+    <main class="wrap">
+        <section class="card">
+            <div class="hero">
+                <span class="badge">🌱 가정과 교회가 함께 키우는 “생각나무”</span>
+                <h1>부모님과 자녀가 함께<br />성경미션북을 해 주세요!</h1>
+                <p class="sub">
+                    아이들의 마음속에는 지금도 <span class="highlight">생각나무</span>가 자랍니다.<br />
+                    우리가 무엇을 심고, 어떤 대화를 나누느냐에 따라 그 나무의 <span class="highlight">뿌리·줄기·열매</span>가 달라져요.
+                </p>
+            </div>
+
+            <div class="content">
+                <div class="grid">
+                    <!-- ✅ 핵심 요약 (접기/펼치기) -->
+                    <div class="box">
+                        <h2 class="fold">📌 핵심 요약</h2>
+                        <div class="fold-body collapsed">
+                            <div class="inner">
+                                <p>
+                                    다음 세대 신앙은 교회만으로 세우기 어렵습니다.<br />
+                                    <b>교회는 씨앗을 심고, 가정은 매일 물을 주는 자리</b>입니다.
+                                </p>
+                                <ul class="bullets">
+                                    <li>
+                                        <span class="dot"></span>
+                                        <span class="li-text">
+                                            가정과 교회가 함께 손잡고, 말씀과 대화로
+                                            <span class="em-strong">기독교 세계관</span>을 심어야 해요.
+                                        </span>
+                                    </li>
+                                    <li>
+                                        <span class="dot"></span>
+                                        <span class="li-text">
+                                            여호수아 세대는 하나님을
+                                            <span class="em-strong">직접 경험</span>했지만,
+                                            다음 세대는 쉽게
+                                            <span class="em-strong">다른 길</span>로 갈 수 있어요
+                                            <span style="color:rgba(11,18,32,.6); font-size:13px;">
+                                                (사사기 세대의 경고)
+                                            </span>.
+                                        </span>
+                                    </li>
+                                    <li>
+                                        <span class="dot"></span>
+                                        <span class="li-text">
+                                            그래서 지금,
+                                            <span class="em-strong">가정에서의 꾸준한 실천</span>이
+                                            정말 중요합니다.
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ 결론 (접기/펼치기) -->
+                    <div class="callout">
+                        <h2 class="fold">✅ 결론</h2>
+                        <div class="fold-body collapsed">
+                            <div class="inner">
+                                <p>
+                                    이번 주부터 <b>부모님과 자녀가 함께</b><br />
+                                    <span class="highlight">성경미션북(주간 미션)</span>을 수행해 주세요.<br />
+                                    “말씀 읽기 + 질문하기 + 대화하기”가 아이의 믿음을 단단하게 합니다.
+                                </p>
+
+                                <div class="points">
+                                    <div class="pitem">
+                                        <div class="picon">🪙</div>
+                                        <div>
+                                            <div class="ptitle">미션 수행 = 포인트 누적</div>
+                                            <p class="pdesc">미션북을 <b>주간 단위</b>로 수행하면 아이들에게 포인트가 쌓입니다.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="pitem">
+                                        <div class="picon">🏆</div>
+                                        <div>
+                                            <div class="ptitle">분기 · 연말 시상 예정</div>
+                                            <p class="pdesc">누적 포인트를 기준으로 <b>분기/연말</b>에 격려 시상을 진행할 예정입니다.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ✅ 이렇게 해 주세요 (접기/펼치기) -->
+                <div class="box" style="background:linear-gradient(180deg, rgba(242,247,255,.75), rgba(255,255,255,1));">
+                    <h2 class="fold">👨‍👩‍👧 이렇게 해 주세요 (가장 쉬운 방식)</h2>
+                    <div class="fold-body collapsed">
+                        <div class="inner">
+                            <ul class="bullets" style="margin-top:8px">
+                                <li>
+                                    <span class="dot"></span>
+                                    <span class="li-text">
+                                        <span class="em-strong">주 1회</span>
+                                        아이와 함께 미션북을 펼치고,
+                                        오늘 질문을 같이 읽어요.
+                                    </span>
+                                </li>
+                                <li>
+                                    <span class="dot"></span>
+                                    <span class="li-text">
+                                        아이 답을 듣고,
+                                        부모님도
+                                        <span class="em-strong">한 문장</span>으로
+                                        생각을 나눠 주세요.
+                                    </span>
+                                </li>
+                                <li>
+                                    <span class="dot"></span>
+                                    <span class="li-text">
+                                        짧아도 좋아요.
+                                        중요한 건
+                                        <span class="em-strong">함께 하는 습관</span>입니다.
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div class="btnrow">
+                    <!-- ✅ 관리자용 랭킹/제출 현황 버튼 -->
+                    <button class="btn btn-secondary" type="button"
+                            onclick="location.href='/WorldviewAdmin/SubmitRank';"
+                            style="border:1px dashed rgba(47,111,107,.35);">
+                        📊 미션북 제출 현황
+                        <small>참여자 보러가기</small>
+                    </button>
+                    <button class="btn btn-primary" type="button"
+                            onclick="location.href='/worldview/StartMission';">
+                        🚀 미션 시작
+                        <small>자녀와 함께 시작해요</small>
+                    </button>
+
+                    <button class="btn btn-secondary" type="button"
+                            onclick="location.href='/';">
+                        🏠 홈으로 가기
+                        <small>유년부 홈페이지로</small>
+                    </button>
+
+                </div>
+
+                <div class="mini">
+                    * 미션/포인트/시상 안내는 운영 상황에 따라 일부 조정될 수 있습니다.
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        // ✅ 제목 클릭 시 접기/펼치기 (초기 상태는 HTML에서 collapsed로 지정)
+        document.querySelectorAll(".fold").forEach(title => {
+            const body = title.nextElementSibling;
+            if (!body) return;
+
+            title.addEventListener("click", () => {
+                const isCollapsed = body.classList.toggle("collapsed");
+                title.classList.toggle("active", !isCollapsed);
+            });
+        });
+    </script>
+</body>
+</html>

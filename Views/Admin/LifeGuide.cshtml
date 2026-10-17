@@ -1,0 +1,175 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@*  ══════════════════════════════════════════════════════════════
+    유년부 생활가이드 — 자주 찾는 안내 + 생일 선물 문자 안내 주소(이동 · 복사).
+    DailyMission4 밝은 흰색 버전.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    const string birthUrl = "https://www.jamsilkids.com/Admin/SendBirthMessage";
+
+    var guides = new[]
+    {
+        (Title: $"{ConstatsCommon.myDoToRi} 통합 시상 안내", Desc: "포인트 통합 시상 기준 확인", Url: "/StudentPointDashboard4/guide"),
+        (Title: "전도상 시상가이드",                          Desc: "전도 시상 기준 및 안내",  Url: "/Admin/evangelism_reward_guide_v1"),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>유년부 생활가이드 — @ConstatsCommon.MainKeyTitle</title>
+<meta name="description" content="유년부 생활가이드 - 시상/전도 안내 및 생일 선물 안내 링크" />
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+<style>
+    /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; }
+    .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+    /* 머리 */
+    .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+    .hdTop a { color: #374151; }
+    .hdTop a:hover { color: #2F80ED; }
+    .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+    .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+    /* 구역 */
+    .sec { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+    .secT { font-size: 16px; font-weight: 800; color: #111827; }
+    .secD { margin-top: 4px; font-size: 12.5px; line-height: 1.7; color: #9CA3AF; word-break: keep-all; }
+
+    /* 목차 줄 */
+    .mn { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid #EEF0F3; }
+    .mn:last-of-type { border-bottom: 0; }
+    .mnNo { flex: none; width: 26px; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+    .mnTx { flex: 1; min-width: 0; }
+    .mnL { display: block; font-size: 16px; font-weight: 700; color: #111827; line-height: 1.4; word-break: keep-all; }
+    .mnD { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; word-break: keep-all; }
+    .mnA { flex: none; font-size: 20px; font-weight: 300; color: #D1D5DB; transition: transform .15s, color .15s; }
+    .mn:hover .mnA { color: #2F80ED; transform: translateX(3px); }
+    .mn:hover .mnL { color: #2F80ED; }
+
+    /* 생일 선물 문자 안내 : 주소 한 줄 + 이동 · 복사 */
+    .lgUrl { margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: #F4F6F9; font-size: 12.5px; line-height: 1.6; color: #6B7280; word-break: break-all; user-select: all; -webkit-user-select: all; }
+    .lgActs { display: flex; gap: 8px; margin-top: 10px; }
+    .lgBtn { flex: 1; text-align: center; padding: 13px 14px; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .lgBtn:hover { background: #1F6FDB; }
+    .lgBtn.line { background: #F4F6F9; color: #6B7280; font-weight: 700; }
+    .lgBtn.line:hover { color: #2F80ED; background: #F4F6F9; }
+    .lgHint { margin-top: 10px; font-size: 12px; line-height: 1.7; color: #9CA3AF; word-break: keep-all; }
+
+    .homeBar { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; padding: 15px 16px; border-radius: 12px; background: #F4F6F9; }
+    .homeBar b { font-size: 15px; font-weight: 700; color: #111827; }
+    .homeBar i { font-style: normal; font-size: 20px; font-weight: 300; color: #2F80ED; }
+
+    .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+    .ft a { color: #6B7280; }
+    .ft a:hover { color: #2F80ED; }
+
+    /* 복사 알림 */
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none;
+             background: #111827; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 13px; max-width: calc(100vw - 32px);
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .18s, transform .18s; z-index: 9999; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<div class="sh">
+
+    <div class="hdTop">
+        <a href="/">← @ConstatsCommon.ToHome</a>
+        <span>@dateText</span>
+    </div>
+
+    <div class="hdK">잠실새내 유년부 입니다.</div>
+    <h1 class="hdT">유년부 생활가이드</h1>
+
+    <section class="sec">
+        <div class="secT">주요 안내</div>
+
+        @for (int i = 0; i < guides.Length; i++)
+        {
+            var g = guides[i];
+            <a class="mn" href="@g.Url">
+                <span class="mnNo">@((i + 1).ToString("00"))</span>
+                <span class="mnTx">
+                    <span class="mnL">@g.Title</span>
+                    <span class="mnD">@g.Desc</span>
+                </span>
+                <span class="mnA">›</span>
+            </a>
+        }
+    </section>
+
+    <section class="sec">
+        <div class="secT">생일 선물 문자 안내</div>
+        <div class="secD">부모님께 보내는 문자 · 카톡에 아래 주소를 붙여 넣어 주세요.</div>
+        <div class="lgUrl" id="birthUrlText">@birthUrl</div>
+        <div class="lgActs">
+            <a class="lgBtn" href="@birthUrl" target="_blank" rel="noopener">페이지 이동</a>
+            <button type="button" class="lgBtn line" onclick="copyBirthLink()">주소 복사</button>
+        </div>
+        <div class="lgHint">iPhone · Safari 에서 복사가 안 되면 주소를 길게 눌러 복사해 주세요.</div>
+    </section>
+
+    <a class="homeBar" href="/">
+        <b>@ConstatsCommon.ToHome 가기</b>
+        <i>›</i>
+    </a>
+
+    <div class="ft"><span>© 유년부 · 생활가이드</span></div>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+    const BIRTH_URL = "@birthUrl";
+
+    function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg || "완료";
+        t.classList.add("show");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => t.classList.remove("show"), 2000);
+    }
+
+    async function copyBirthLink() {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(BIRTH_URL);
+                showToast("주소를 복사했어요");
+                return;
+            }
+        } catch (e) { }
+
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = BIRTH_URL;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select(); ta.setSelectionRange(0, ta.value.length);
+            const ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            showToast(ok ? "주소를 복사했어요" : "주소를 길게 눌러 복사해 주세요");
+        } catch (err) {
+            showToast("주소를 길게 눌러 복사해 주세요");
+        }
+    }
+</script>
+</body>
+</html>

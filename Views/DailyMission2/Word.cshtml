@@ -1,0 +1,487 @@
+﻿@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var toast = (ViewBag.Toast ?? "").ToString();
+    bool canAct = Model.IsActionable;
+
+    // ✅ 네비(공용) active + 완료 뱃지용
+    ViewBag.DM2Page = "word";
+    ViewBag.DM2Done = Model.DayStatus?.WordDone ?? false;
+
+    // ✅ 성공 팝업(저장 성공 시 Controller에서 TempData["DM2_OK_POPUP"] 세팅)
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+ 
+}
+
+<style>
+    .box {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
+    }
+
+    .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .title {
+        font-size: 20px;
+     /*    font-weight: 950; */
+    }
+
+    .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+        /* font-weight: 950; */
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .toast {
+        background: rgba(15,23,42,.86);
+        color: white;
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-weight: 900;
+        margin: 12px 0;
+    }
+
+    .card {
+        margin-top: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        border-radius: 18px;
+        background: rgba(255,255,255,.92);
+        padding: 14px;
+        box-shadow: 0 10px 22px rgba(15,23,42,.10);
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+     /*    font-weight: 950; */
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        white-space: nowrap;
+    }
+
+    .btnPrimary {
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+        border-color: rgba(34,197,94,.18);
+    }
+
+        .btnPrimary:disabled,
+        .btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+    .warn {
+        color: #b45309;
+        font-weight: 900;
+        margin-top: 10px;
+        line-height: 1.35;
+    }
+
+    .lockBar {
+        margin-top: 12px;
+        border: 1px dashed rgba(148,163,184,.65);
+        background: rgba(241,245,249,.70);
+        border-radius: 16px;
+        padding: 10px 12px;
+    /*     font-weight: 900; */
+        color: rgba(15,23,42,.86);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lockIcon {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15,23,42,.08);
+        border: 1px solid rgba(226,232,240,.95);
+        flex: 0 0 auto;
+        font-size: 18px;
+    }
+
+    .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        align-items: center;
+    }
+
+    .mini {
+        font-size: 13px;
+        color: rgba(71,85,105,.92);
+    /*     font-weight: 900; */
+    }
+
+    .badgeDone {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 10px;
+        border-radius: 999px;
+/*         font-weight: 950; */
+        font-size: 12.5px;
+        border: 1px solid rgba(34,197,94,.28);
+        background: rgba(34,197,94,.12);
+        color: rgba(20,83,45,.96);
+    }
+
+    .sectionTitle {
+       /*  font-weight: 950; */
+        font-size: 15px;
+        margin: 0;
+    }
+
+    .block {
+        margin-top: 12px;
+        border-top: 1px solid rgba(226,232,240,.95);
+        padding-top: 12px;
+    }
+
+    .contentTitle {
+        /* font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; */
+         font-weight: 950; 
+        font-size: 18px;
+        margin: 0;
+    }
+
+    .contentSub {
+        margin-top: 6px;
+     /*    font-weight: 900; */
+        color: rgba(71,85,105,.95);
+        line-height: 1.35;
+    }
+
+    .textBox {
+        margin-top: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.9);
+/*         font-weight: 850; */
+        color: rgba(15,23,42,.92);
+        line-height: 1.55;
+        white-space: pre-line;
+    }
+
+    /* ✅ 토글 타이틀(클릭 펼침/접힘) */
+    .toggleTitle {
+        cursor: pointer;
+        user-select: none;
+    }
+
+        .toggleTitle:hover {
+            color: rgba(34,197,94,.95);
+        }
+
+    /* ✅ 성공 팝업(페이지 CSS 잔존 가능 - 실제 표시는 _OkPopup.cshtml이 담당) */
+    .dm2PopupBg {
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        padding: 16px;
+    }
+
+    .dm2PopupCard {
+        width: min(520px, 92vw);
+        border-radius: 22px;
+        background: rgba(255,255,255,.98);
+        border: 1px solid rgba(226,232,240,.95);
+        box-shadow: 0 26px 70px rgba(15,23,42,.28);
+        padding: 16px 16px 14px;
+        text-align: center;
+    }
+
+    .dm2PopupTitle {
+        font-weight: 950;
+        font-size: 20px;
+        margin-bottom: 8px;
+    }
+
+    .dm2PopupMsg {
+     /*    font-weight: 900; */
+        font-size: 14px;
+        color: rgba(15,23,42,.90);
+        line-height: 1.45;
+        white-space: pre-line;
+    }
+
+    .dm2PopupHint {
+        margin-top: 10px;
+   /*      font-weight: 900; */
+        font-size: 12.5px;
+        color: rgba(71,85,105,.92);
+    }
+
+    .dm2PopupBtn {
+        margin-top: 12px;
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+    /*     font-weight: 950; */
+        cursor: pointer;
+    }
+
+        .dm2PopupBtn:active {
+            transform: translateY(1px);
+        }
+
+</style>
+
+<div class="box">
+    <div class="top">
+        <div class="title">📚 하나님 말씀 📚</div>
+
+        <div class="chip">
+            @if (!canAct)
+            {
+                <span title="수행 불가 날짜">🔒</span>
+            }
+            <span>@d</span>
+        </div>
+    </div>
+
+
+
+    @* ✅ 수행 불가(잠김) 안내 *@
+    @if (!canAct)
+    {
+        <div class="lockBar">
+            <div class="lockIcon">🔒</div>
+            <div>
+                <div style="font-weight:950;">다른 날짜 미션을 보고 있어요.</div>
+                <div class="mini">이 날짜는 수행이 불가능합니다. (오늘/어제/그저께만 가능)</div>
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="toast">@toast</div>
+    }
+
+    @* ✅ 핵심 콘텐츠(Partial) *@
+   
+
+
+
+
+
+
+
+
+
+
+    @functions {
+        // dynamic 안전 처리
+        string S(object v) => v == null ? "" : v.ToString();
+        int I(object v) { try { return v == null ? 0 : Convert.ToInt32(v); } catch { return 0; } }
+    }
+
+    @{
+        
+
+        // 완료 상태
+        bool doneToMe = Model.DayStatus?.Word_ToMe ?? false;
+        bool doneToParent = Model.DayStatus?.Word_ToParent ?? false;
+
+        dynamic wordRow = ViewBag.TodayWordToReadRow;
+        bool hasId = Model.Content.TodayWordToReadId != null;
+    }
+
+    <link rel="stylesheet" href="/css/mission2/missionButtons.css" />
+
+    <div class="card">
+        @if (!hasId)
+        {
+            <div class="sectionTitle">📖 오늘의 말씀</div>
+            <div class="warn">이 날짜(@d)에 해당하는 TodayWordToRead 콘텐츠가 없어요.</div>
+        }
+        else
+        {
+            <div class="sectionTitle">📖 오늘의 말씀</div>
+
+            @if (wordRow != null)
+            {
+                <div class="block">
+                    <h3 class="contentTitle">@S(wordRow?.BibleSubject)</h3>
+
+                    <div class="contentSub">
+                        @S(wordRow?.BibleText)
+                        @SharedComm.MakeBibleSerialJangZul(wordRow?.BibleText, wordRow?.FromJang, wordRow?.FromZul, wordRow?.ToJang, wordRow?.ToZul)
+                    </div>
+
+                    @{
+                        var synopsis = S(wordRow?.synopsis);
+                        var bibleSummary = S(wordRow?.BibleSummary);
+                        bool hasSynopsis = !string.IsNullOrWhiteSpace(synopsis);
+                        var toggleTitle = hasSynopsis ? "▶ 오늘의 말씀 요약 [🤖]" : "▶ 오늘의 말씀 가이드 [하나바이블]";
+                        var toggleBody = hasSynopsis ? synopsis : bibleSummary;
+                    }
+
+                    <div class="block">
+                        <div class="sectionTitle toggleTitle" onclick="toggleBlock(this)">@toggleTitle</div>
+                        <div class="textBox toggleBody" style="display:none;">@toggleBody</div>
+                    </div>
+                </div>
+            }
+
+            <!-- ✅ 말씀 읽으러 가기 -->
+            <div class="block">
+                <div class="row" style="justify-content: space-between; align-items:center;">
+                    <div>
+                        <div class="sectionTitle">📖 성경 본문 읽기</div>
+                        <div class="mini" style="margin-top:4px;">말씀을 읽고 ‘읽었음/책갈피’를 표시할 수 있어요</div>
+                    </div>
+
+                    <a class="missionBtn" href="/DailyMission2/BibleRead?date=@d">
+                        📖 말씀 읽으러 가기 →
+                    </a>
+                </div>
+            </div>
+
+            <!-- ✅ 수행 버튼 -->
+            <div class="block">
+
+                <!-- (원하면 이 뱃지 영역은 주석 말고 조건으로 숨기는 걸 추천) -->
+                @* 
+        <div class="row" style="justify-content: space-between;">
+            <div class="sectionTitle">1️⃣ 수행 버튼</div>
+            <div class="row" style="margin-top:0;">
+                @if (doneToMe)
+                {
+                    <span class="badgeDone boxBorder">✅ 내가 읽었어요 완료</span>
+                }
+                @if (doneToParent)
+                {
+                    <span class="badgeDone">✅ 부모님께 읽어드렸어요 완료</span>
+                }
+            </div>
+        </div>
+        *@
+
+                <!-- ✅ 두 버튼을 "한 줄"로 -->
+                <div class="missionBtnRow" style="margin-top:12px;">
+
+                    <!-- 버튼 1: 내가 읽었어요 -->
+                    <form class="missionForm" method="post" action="/DailyMission2/SaveWord">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="date" value="@d" />
+                        <input type="hidden" name="todayWordToReadId" value="@Model.Content.TodayWordToReadId.Value" />
+                        <input type="hidden" name="toMe" value="true" />
+
+                        <button class="missionBtn"
+                                type="submit"
+                                @((canAct && !doneToMe) ? "" : "disabled")>
+ @(doneToMe ? "✅ 내가 읽기 완료됨" : "내가 읽었어요")
+                        </button>
+                    </form>
+
+                    <!-- 버튼 2: 부모님께 읽어드렸어요 -->
+                    <form class="missionForm" method="post" action="/DailyMission2/SaveWord">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="date" value="@d" />
+                        <input type="hidden" name="todayWordToReadId" value="@Model.Content.TodayWordToReadId.Value" />
+                        <input type="hidden" name="toParent" value="true" />
+
+                        <button class="missionBtn"
+                                type="submit"
+                                @((canAct && !doneToParent) ? "" : "disabled")>
+ @(doneToParent ? "✅ 부모님께 읽기 완료됨" : "부모님께 읽어드렸어요")    
+                        </button>
+                    </form>
+
+                </div>
+
+                @if (!canAct)
+                {
+                    <div class="warn">🔒 오늘/어제/그저께만 수행할 수 있어요.</div>
+                }
+            </div>
+        }
+    </div>
+
+
+
+    @await Html.PartialAsync("~/Views/DailyMission2/Partials/_Dm2Nav.cshtml", Model)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+@{ 
+
+    var awardUrl = TempData["DM2_AWARD_URL"]?.ToString();
+}
+
+@* ✅ 저장 성공 팝업(Partial) *@
+@await Html.PartialAsync("~/Views/DailyMission2/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = @ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = awardUrl, RedirectLabel = "선물 선택" })
+
+<script>
+    // ✅ 섹션 타이틀 클릭 시 내용 펼침/접힘
+    function toggleBlock(titleEl) {
+        const body = titleEl.nextElementSibling;
+        if (!body) return;
+
+        const isOpen = body.style.display !== 'none';
+
+        if (isOpen) {
+            body.style.display = 'none';
+            titleEl.innerText = titleEl.innerText.replace('▼', '▶');
+        } else {
+            body.style.display = 'block';
+            titleEl.innerText = titleEl.innerText.replace('▶', '▼');
+        }
+    }
+</script>

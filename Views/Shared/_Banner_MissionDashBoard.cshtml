@@ -1,0 +1,617 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+@{
+    // ---------------------------
+    // 1) totalPoint 계산
+    // ---------------------------
+    int totalPoint = 0;
+
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as string;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as string;
+
+    BibleLastReadInfo _BibleLastReadInfo = ViewBag.BibleLastReadInfo as BibleLastReadInfo;
+
+    if (ViewBag.YearTotalPoint is int ytp)
+    {
+        totalPoint = ytp;   // 홈 · 미션홈과 같은 계산 (GetYearPointAsync)
+    }
+    else if (ViewBag.TodayCheckCompositeData != null)
+    {
+        dynamic data = ViewBag.TodayCheckCompositeData;
+        int Safe(dynamic v) => v == null ? 0 : Convert.ToInt32(v);
+        totalPoint = Safe(data.Total_All);
+    }
+
+    // ---------------------------
+    // 2) speedText(%) 계산
+    // ---------------------------
+    double speed = 0;
+    if (ViewBag.TotalProgressRate != null)
+    {
+        double.TryParse(ViewBag.TotalProgressRate.ToString(), out speed);
+        if (speed <= 1) speed *= 100; // 0~1이면 %로 변환
+    }
+    var speedText = speed.ToString("0"); // 소수점 없이
+}
+
+@if (isSignedIn)
+{
+    <!--
+      ✅ 개선 포인트
+      1) "전체 화면 + 스타일"이 쿠키 판정 결과에 따라 함께 보이거나(Show) 아예 DOM에서 제거(Hide)되도록 처리
+      2) 판정 중에는 로딩/안내(“결정 중…”)가 먼저 보이도록 처리
+    -->
+
+    <div id="mi-total-dashboard-root"
+         class="mi-root js-global-cookie-section"
+         data-cookie-key="TotalDashBoard"
+         data-state="checking">
+
+        <!-- ✅ (2) 판정 중 표시: 먼저 보이는 영역 -->
+        <div class="mi-boot" aria-live="polite">
+            <div class="mi-boot-card">
+                <div class="mi-boot-row">
+                    <div class="mi-boot-spinner" aria-hidden="true"></div>
+                    <div class="mi-boot-title">대시보드 표시 여부를 확인 중이에요…</div>
+                </div>
+                <div class="mi-boot-sub">잠시만요 ✨ (숨김 설정이 있으면 자동으로 감춰져요)</div>
+            </div>
+        </div>
+
+        <!-- ✅ 실제 대시보드(Show일 때만 표시) -->
+        <div class="mi-content" hidden>
+            <div class="mi-board-wrap">
+                <div class="mi-board-head">
+                    @*   <div class="mi-board-badge">MISSION BOARD</div>
+
+                    <!-- ✅ 숨기기 버튼(훅은 그대로) -->
+                    <div class="mi-hide-controls">
+                        <button type="button"
+                                class="mi-hide-btn js-global-cookie-hide-btn"
+                                data-hide="today">
+                            오늘만 안보기
+                        </button>
+                        <button type="button"
+                                class="mi-hide-btn js-global-cookie-hide-btn"
+                                data-hide="1week">
+                            1주일 숨기기
+                        </button>
+                        <button type="button"
+                                class="mi-hide-btn js-global-cookie-hide-btn"
+                                data-hide="3week">
+                            3주 숨기기
+                        </button>
+                    </div>*@
+
+                    <div class="mi-board-title">나의 미션 통합 대쉬보드</div>
+                    @* <div class="mi-board-sub">한눈에 확인하고, 한 번에 이동해요 ✨</div>*@
+                </div>
+
+                <div class="mi-grid">
+
+                    @* ✅ 카드 1: totalPoint *@
+                    <button type="button"
+                            class="mi-card mi-card-point"
+                            aria-label="미션 메인보드로 이동">
+                        <div class="mi-card-top">
+                            <div class="mi-ico">🌟</div>
+                            <div class="mi-kicker">@ConstatsCommon.MainKeyTitle</div>
+                        </div>
+
+                        <div class="mi-metric">
+                            <span class="mi-unit">총</span>
+                            <span class="mi-number">@totalPoint.ToString("N0")</span>
+                            <span class="mi-unit">Point</span>
+                        </div>
+                        @*   <div class="mi-notice">
+                            <strong>현재 테스트 진행 중입니다.</strong><br />
+                            미션 시작 일정은 <b>별도 공지</b>로 안내드릴게요 🚀
+                        </div>*@
+                        <!-- ✅ 여기만 클릭/hand -->
+                        <div class="mi-cta" onclick="location.href='/DailyMission2/index';">
+                            나의 미션보드로 이동 <span class="mi-arrow">→</span>
+                        </div>
+                    </button>
+
+                    @* ✅ 카드 2: speedText% *@
+                    <button type="button"
+                            class="mi-card mi-card-bible"
+                            aria-label="나의 성경 대쉬보드로 이동">
+                        <div class="mi-card-top">
+                            <div class="mi-ico">📚</div>
+                            <div class="mi-kicker">@ConstatsCommon.ReadBibleAllTitleButton</div>
+                        </div>
+
+                        <div class="mi-metric">
+                            <span class="mi-unit">전체 성경 완독률</span>
+                            <span class="mi-number">@speedText</span>
+                            <span class="mi-unit">%</span>
+                        </div>
+
+                        <div class="mi-progress">
+                            @{
+                                // 안전한 width 값(0~100 clamp)
+                                var w = 0;
+                                int.TryParse(speedText, out w);
+                                if (w < 0) w = 0;
+                                if (w > 100) w = 100;
+                            }
+                            <div class="mi-progress-track" aria-hidden="true">
+                                <div class="mi-progress-fill" style="width:@w%;"></div>
+                            </div>
+                        </div>
+
+                        @{
+                            string lastReadUrl = null;
+                            string lastReadLabel = null;
+
+                            if (_BibleLastReadInfo != null)
+                            {
+                                lastReadUrl = $"/DailyMission/BibleSheetJangByJang"
+                                + $"?ControllerSource={ControllerSource}"
+                                + $"&ActionSource={ActionSource}"
+                                + $"&BibleText={_BibleLastReadInfo.BibleText}"
+                                + $"&FromJang={_BibleLastReadInfo.Jang}&FromZul=0"
+                                + $"&ToJang={_BibleLastReadInfo.Jang}&ToZul=0";
+
+                                var bt = (_BibleLastReadInfo.BibleText ?? "").Trim();
+                                var j = _BibleLastReadInfo.Jang;
+
+                                if (!string.IsNullOrEmpty(bt) && j > 0)
+                                    lastReadLabel = $"{bt} · {j}장";
+                                else if (!string.IsNullOrEmpty(bt))
+                                    lastReadLabel = $"{bt}";
+                                else if (j > 0)
+                                    lastReadLabel = $"{j}장";
+                            }
+                        }
+
+                        <!-- ✅ 여기만 클릭/hand -->
+                        <div class="mi-cta" onclick="location.href='/Bible/Welcome';">
+                            나의 대쉬보드로 이동 <span class="mi-arrow">→</span>
+                        </div>
+
+                        @* ✅ 최근 읽은 성경 버튼 (조건부) + 상세 정보 표시 *@
+                        @if (!string.IsNullOrEmpty(lastReadUrl))
+                        {
+                            <div class="mi-cta mi-cta-sub"
+                                 onclick="location.href='@lastReadUrl';">
+                                최근 읽은 성경으로 이동
+                                @if (!string.IsNullOrWhiteSpace(lastReadLabel))
+                                {
+                                    <span class="mi-cta-meta">(@lastReadLabel)</span>
+                                }
+                                <span class="mi-arrow">↗</span>
+                            </div>
+                        }
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ✅ (1) 스타일도 "Show 상태"에서만 적용되도록 전부 스코프 처리 -->
+        <style id="mi-total-dashboard-style">
+            /* ==========================================
+                           ✅ Boot(판정중) UI: 항상 먼저 보임
+                           ========================================== */
+            .mi-root {
+                margin: 1.2rem 0 2rem;
+            }
+
+            .mi-boot {
+                display: block;
+            }
+
+            .mi-boot-card {
+                border-radius: 18px;
+                padding: .95rem 1rem;
+                background: rgba(2, 6, 23, .06);
+                border: 1px solid rgba(2, 6, 23, .10);
+                box-shadow: 0 14px 34px rgba(2, 6, 23, .08);
+                backdrop-filter: blur(10px);
+            }
+
+            .mi-boot-row {
+                display: flex;
+                align-items: center;
+                gap: .65rem;
+            }
+
+            .mi-boot-title {
+                font-weight: 900;
+                font-size: .98rem;
+                color: rgba(2,6,23,.88);
+            }
+
+            .mi-boot-sub {
+                margin-top: .35rem;
+                font-size: .86rem;
+                color: rgba(2,6,23,.60);
+                font-weight: 700;
+            }
+
+            .mi-boot-spinner {
+                width: 18px;
+                height: 18px;
+                border-radius: 50%;
+                border: 3px solid rgba(2,6,23,.18);
+                border-top-color: rgba(31,111,91,.9);
+                animation: miSpin .8s linear infinite;
+            }
+
+            @@keyframes miSpin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            /* ==========================================
+                           ✅ 실제 대시보드 스타일: Show 상태에서만 적용
+                           (중요) 전부 .mi-root[data-state="shown"] 스코프 아래로!
+                           ========================================== */
+            .mi-root[data-state="shown"] .mi-board-wrap {
+                margin: 0;
+                padding: 1.2rem 1.2rem 1.35rem;
+                border-radius: 28px;
+                background: radial-gradient(900px 420px at 10% 0%, rgba(90, 255, 214, .28), transparent 60%), radial-gradient(900px 420px at 90% 0%, rgba(121, 140, 255, .24), transparent 60%), linear-gradient(180deg, rgba(8, 12, 28, .96), rgba(8, 12, 28, .88));
+                border: 1px solid rgba(255,255,255,.10);
+                box-shadow: 0 24px 70px rgba(0,0,0,.30);
+                color: #eef6ff;
+                overflow: hidden;
+                position: relative;
+            }
+
+                .mi-root[data-state="shown"] .mi-board-wrap::before {
+                    content: "";
+                    position: absolute;
+                    inset: -2px;
+                    border-radius: 30px;
+                    background: linear-gradient(135deg, rgba(90,255,214,.25), rgba(121,140,255,.20), rgba(255,180,90,.12) );
+                    filter: blur(22px);
+                    opacity: .55;
+                    pointer-events: none;
+                }
+
+            .mi-root[data-state="shown"] .mi-board-head {
+                position: relative;
+                z-index: 1;
+                margin-bottom: .95rem;
+            }
+
+            .mi-root[data-state="shown"] .mi-board-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: .45rem;
+                font-size: .72rem;
+                font-weight: 900;
+                letter-spacing: .14em;
+                padding: .28rem .65rem;
+                border-radius: 999px;
+                background: rgba(255,255,255,.10);
+                border: 1px solid rgba(255,255,255,.12);
+                color: rgba(235,245,255,.92);
+                width: fit-content;
+            }
+
+            .mi-root[data-state="shown"] .mi-hide-controls {
+                margin-top: .55rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: .45rem;
+                justify-content: flex-end;
+            }
+
+            .mi-root[data-state="shown"] .mi-hide-btn {
+                border-radius: 999px;
+                border: 1px solid rgba(255,255,255,.16);
+                padding: .38rem .78rem;
+                font-size: .8rem;
+                font-weight: 900;
+                cursor: pointer;
+                background: rgba(255,255,255,.10);
+                color: rgba(235,245,255,.92);
+                box-shadow: 0 10px 22px rgba(0,0,0,.12);
+                transition: transform .12s ease, background .12s ease, border-color .12s ease, box-shadow .12s ease;
+                white-space: nowrap;
+            }
+
+                .mi-root[data-state="shown"] .mi-hide-btn:hover {
+                    transform: translateY(-1px);
+                    background: rgba(255,255,255,.14);
+                    border-color: rgba(120,255,214,.28);
+                    box-shadow: 0 14px 30px rgba(0,0,0,.16);
+                }
+
+            .mi-root[data-state="shown"] .mi-board-title {
+                margin-top: .5rem;
+                font-size: 1.28rem;
+                font-weight: 950;
+                letter-spacing: -.02em;
+                line-height: 1.25;
+            }
+
+            .mi-root[data-state="shown"] .mi-board-sub {
+                margin-top: .25rem;
+                font-size: .92rem;
+                color: rgba(235,245,255,.78);
+                line-height: 1.35;
+            }
+
+            .mi-root[data-state="shown"] .mi-grid {
+                position: relative;
+                z-index: 1;
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: .85rem;
+            }
+
+            @@media (min-width: 820px) {
+                .mi-root[data-state="shown"] .mi-grid {
+                    grid-template-columns: 1fr 1fr;
+                }
+
+                .mi-root[data-state="shown"] .mi-board-head {
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    grid-template-areas:
+                        "badge hide"
+                        "title title"
+                        "sub sub";
+                    align-items: start;
+                    gap: .25rem .85rem;
+                }
+
+                .mi-root[data-state="shown"] .mi-board-badge {
+                    grid-area: badge;
+                }
+
+                .mi-root[data-state="shown"] .mi-hide-controls {
+                    grid-area: hide;
+                    margin-top: 0;
+                }
+
+                .mi-root[data-state="shown"] .mi-board-title {
+                    grid-area: title;
+                }
+
+                .mi-root[data-state="shown"] .mi-board-sub {
+                    grid-area: sub;
+                }
+            }
+
+            .mi-root[data-state="shown"] .mi-card {
+                text-align: left;
+                width: 100%;
+                border: 0;
+                border-radius: 22px;
+                padding: 1.05rem 1.05rem 1rem;
+                color: inherit;
+                background: rgba(255,255,255,.06);
+                border: 1px solid rgba(255,255,255,.12);
+                box-shadow: 0 14px 34px rgba(0,0,0,.18);
+                transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease, background .14s ease;
+                position: relative;
+                overflow: hidden;
+                cursor: default; /* ✅ 카드 상위는 hand X */
+            }
+
+                .mi-root[data-state="shown"] .mi-card:focus {
+                    outline: none;
+                    box-shadow: 0 0 0 4px rgba(120, 255, 214, .18), 0 16px 40px rgba(0,0,0,.22);
+                    border-color: rgba(120, 255, 214, .35);
+                }
+
+                .mi-root[data-state="shown"] .mi-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 20px 50px rgba(0,0,0,.26);
+                    background: rgba(255,255,255,.075);
+                    border-color: rgba(255,255,255,.18);
+                }
+
+            .mi-root[data-state="shown"] .mi-card-top {
+                display: flex;
+                align-items: center;
+                gap: .6rem;
+                margin-bottom: .7rem;
+            }
+
+            .mi-root[data-state="shown"] .mi-ico {
+                width: 42px;
+                height: 42px;
+                border-radius: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 1.35rem;
+                background: rgba(255,255,255,.10);
+                border: 1px solid rgba(255,255,255,.12);
+            }
+
+            .mi-root[data-state="shown"] .mi-kicker {
+                font-size: .86rem;
+                font-weight: 900;
+                color: rgba(235,245,255,.86);
+            }
+
+            .mi-root[data-state="shown"] .mi-metric {
+                display: flex;
+                align-items: baseline;
+                gap: .35rem;
+                margin-bottom: .35rem;
+            }
+
+            .mi-root[data-state="shown"] .mi-number {
+                font-size: 2.15rem;
+                font-weight: 1000;
+                letter-spacing: -.03em;
+                line-height: 1;
+            }
+
+            .mi-root[data-state="shown"] .mi-unit {
+                font-size: 1rem;
+                font-weight: 900;
+                color: rgba(235,245,255,.78);
+            }
+
+            .mi-root[data-state="shown"] .mi-desc {
+                font-size: .92rem;
+                color: rgba(235,245,255,.72);
+                margin-bottom: .75rem;
+            }
+
+            /* ✅ CTA에서만 hand */
+            .mi-root[data-state="shown"] .mi-cta {
+                display: inline-flex;
+                align-items: center;
+                gap: .35rem;
+                font-size: .9rem;
+                font-weight: 900;
+                color: rgba(235,245,255,.88);
+                cursor: pointer;
+            }
+
+                .mi-root[data-state="shown"] .mi-cta:hover {
+                    text-decoration: underline;
+                }
+
+            .mi-root[data-state="shown"] .mi-arrow {
+                font-weight: 1000;
+                opacity: .95;
+            }
+
+            .mi-root[data-state="shown"] .mi-card-point::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(520px 220px at 20% 0%, rgba(120,255,214,.28), transparent 60%);
+                pointer-events: none;
+            }
+
+            .mi-root[data-state="shown"] .mi-card-bible::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(520px 220px at 80% 0%, rgba(121,140,255,.28), transparent 60%);
+                pointer-events: none;
+            }
+
+            .mi-root[data-state="shown"] .mi-progress {
+                margin-top: .15rem;
+            }
+
+            .mi-root[data-state="shown"] .mi-progress-track {
+                height: 12px;
+                border-radius: 999px;
+                background: rgba(255,255,255,.10);
+                border: 1px solid rgba(255,255,255,.12);
+                overflow: hidden;
+            }
+
+            .mi-root[data-state="shown"] .mi-progress-fill {
+                height: 100%;
+                border-radius: 999px;
+                background: linear-gradient(90deg, rgba(90,255,214,.95), rgba(121,140,255,.95) );
+                box-shadow: 0 8px 18px rgba(90,255,214,.18);
+                transition: width .25s ease;
+            }
+
+            .mi-root[data-state="shown"] .mi-progress-label {
+                margin-top: .4rem;
+                font-size: .88rem;
+                color: rgba(235,245,255,.75);
+            }
+
+                .mi-root[data-state="shown"] .mi-progress-label strong {
+                    color: rgba(255,255,255,.96);
+                }
+
+            /* ✅ 서브 CTA */
+            .mi-root[data-state="shown"] .mi-cta-sub {
+                margin-top: .4rem;
+                padding: .32rem .75rem;
+                border-radius: 999px;
+                background: rgba(255,255,255,.12);
+                border: 1px solid rgba(255,255,255,.22);
+                font-size: .78rem;
+                font-weight: 950;
+                color: rgba(235,245,255,.95);
+                box-shadow: 0 6px 14px rgba(0,0,0,.18);
+                transition: transform .12s ease, background .12s ease, box-shadow .12s ease;
+                text-decoration: none;
+            }
+
+                .mi-root[data-state="shown"] .mi-cta-sub:hover {
+                    transform: translateY(-1px);
+                    background: rgba(255,255,255,.18);
+                    box-shadow: 0 10px 22px rgba(0,0,0,.22);
+                    text-decoration: none;
+                }
+
+            .mi-root[data-state="shown"] .mi-cta-meta {
+                font-weight: 900;
+                font-size: .78rem;
+                color: rgba(235,245,255,.80);
+            }
+        </style>
+
+        <!-- ✅ (1)(2) 쿠키 판정 스크립트: Show/Hide 결정 + Hide면 "스타일/화면" 통째로 제거 -->
+        <script>
+            (function () {
+                var root = document.getElementById("mi-total-dashboard-root");
+                if (!root) return;
+
+                var cookieKey = root.getAttribute("data-cookie-key") || "TotalDashBoard";
+
+                function getCookie(name) {
+                    var m = document.cookie.match(new RegExp("(^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+                    return m ? decodeURIComponent(m[2]) : null;
+                }
+
+                function showContent() {
+                    root.setAttribute("data-state", "shown");
+                    var boot = root.querySelector(".mi-boot");
+                    var content = root.querySelector(".mi-content");
+                    if (boot) boot.style.display = "none";
+                    if (content) { content.hidden = false; content.style.display = "block"; }
+                    // ✅ 기존 글로벌 훅이 display:none을 강제로 걸어둔 경우 대비
+                    root.style.display = "block";
+                }
+
+                function hideAll() {
+                    root.setAttribute("data-state", "hidden");
+
+                    // ✅ 스타일도 함께 제거(요구사항 1)
+                    var st = document.getElementById("mi-total-dashboard-style");
+                    if (st && st.parentNode) st.parentNode.removeChild(st);
+
+                    // ✅ 화면도 통째로 제거
+                    // (판정중 UI도 남기지 않기 원하면 바로 제거)
+                    if (root && root.parentNode) root.parentNode.removeChild(root);
+                }
+
+                // ✅ (2) "결정중" UI는 이미 보이는 상태(data-state="checking")
+                // 쿠키가 존재하면 숨김, 없으면 표시
+                var v = getCookie(cookieKey);
+
+                if (v) hideAll();
+                else showContent();
+            })();
+        </script>
+    </div>
+}

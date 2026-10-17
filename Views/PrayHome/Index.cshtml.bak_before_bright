@@ -1,0 +1,363 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultDataOG = $"{@ViewBag.Domain}/images/workspace/marriedcouple/horizontal/MarriedCouple_{todayDate}.webp";
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    // 우리 반을 위한 기도 — SuperAdmin 에게만 보인다
+    var signedUser   = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && signedUser != null
+                       && await AuthService.IsInRole(signedUser, nameof(Roles.SuperAdmin));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#FBF7FF">
+    <title>기도 공간 · @ChurchName</title>
+    <meta property="og:title"       content="@ChurchName · @DepartmentName">
+    <meta property="og:description" content="@ChurchName · @DepartmentName 입니다.">
+    <meta property="og:image"       content="@formattedModResultDataOG">
+    <meta property="og:url"         content="@ViewBag.FullURL">
+    <meta property="og:type"        content="website">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════════
+   기도 공간 — 밝은 라벤더 테마
+══════════════════════════════════════════ */
+:root{
+    --bg:        #FBF7FF;
+    --card:      #FFFFFF;
+    --ink:       #2B2340;
+    --ink2:      #5A5170;
+    --muted:     #9A93AD;
+    --line:      #EFE9F7;
+
+    --violet:    #A855F7;
+    --violet-dk: #7E22CE;
+    --magenta:   #D946EF;
+
+    --leaf:      #2E9E7A;
+    --leaf-dk:   #1E7A5C;
+    --leaf-sf:   #E7F6F0;
+    --leaf-line: #BEE5D6;
+
+    --miss:      #3B82F6;
+    --miss-dk:   #1D4ED8;
+    --miss-sf:   #EFF6FF;
+    --miss-line: #BFDBFE;
+
+    --dawn:      #F59E0B;
+    --dawn-dk:   #B45309;
+    --dawn-sf:   #FEF3C7;
+    --dawn-line: #FDE68A;
+
+    /* 수험생 — 새벽 책상 남색 */
+    --exam:      #5B54C9;
+    --exam-dk:   #423AA6;
+    --exam-sf:   #EEEDFB;
+    --exam-line: #C7C3EE;
+
+    --cls:       #F43F5E;
+    --cls-dk:    #BE123C;
+    --cls-sf:    #FFF1F3;
+    --cls-line:  #FECDD3;
+
+    --shadow-s: 0 1px 2px rgba(43,35,64,.04), 0 4px 16px rgba(43,35,64,.06);
+    --shadow-m: 0 6px 24px rgba(43,35,64,.10);
+
+    --f: "Gothic A1","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--f); line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+}
+a{ color:inherit; text-decoration:none; }
+
+/* 은은한 배경 광 */
+body::before{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(760px 420px at 88% -6%, rgba(217,70,239,.10), transparent 62%),
+      radial-gradient(700px 400px at -6% 4%,  rgba(168,85,247,.10), transparent 60%),
+      radial-gradient(620px 360px at 50% 106%, rgba(46,158,122,.07), transparent 62%);
+}
+
+.wrap{ max-width:760px; margin:0 auto; padding:0 clamp(14px,4vw,22px) 40px; }
+
+/* ── 상단바 ───────────────────────────── */
+.topbar{
+    display:flex; align-items:center; justify-content:flex-start;
+    padding:14px 0 4px;
+}
+.top-home{
+    display:inline-flex; align-items:center; gap:6px;
+    height:36px; padding:0 14px; border-radius:999px;
+    background:var(--card); border:1px solid var(--line);
+    font-size:13px; font-weight:800; color:var(--ink2);
+    box-shadow:var(--shadow-s); transition:.16s;
+}
+.top-home:hover{ border-color:var(--violet); color:var(--violet-dk); }
+
+/* ── 섹션 머리 ────────────────────────── */
+.sec{ padding:26px 0 0; text-align:center; }
+.sec-ico{ font-size:34px; line-height:1; margin-bottom:10px; }
+.sec-tt{
+    margin:0; font-size:clamp(21px,4.8vw,27px); font-weight:900; letter-spacing:-.03em;
+    background:linear-gradient(90deg,var(--violet),var(--magenta));
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--violet-dk);
+}
+.sec-tt.heal{
+    background:linear-gradient(90deg,var(--leaf),#3FA9C9);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--leaf-dk);
+}
+.sec-tt.exam{
+    background:linear-gradient(90deg,var(--exam),#8B7BE8);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--exam-dk);
+}
+.sec-tt.miss{
+    background:linear-gradient(90deg,var(--miss),#6366F1);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--miss-dk);
+}
+.sec-tt.dawn{
+    background:linear-gradient(90deg,var(--dawn),#F97316);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--dawn-dk);
+}
+.sec-tt.cls{
+    background:linear-gradient(90deg,var(--cls),#FB7185);
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:var(--cls-dk);
+}
+.sec-sub{ margin-top:9px; font-size:13px; font-weight:600; color:var(--muted); }
+
+/* ── 카드 격자 ────────────────────────── */
+.grid{
+    display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:12px; margin-top:20px;
+}
+.grid .card.wide{ grid-column:1 / -1; }
+
+.card{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; padding:22px 14px 18px;
+    background:var(--card); border:1px solid var(--line); border-radius:20px;
+    box-shadow:var(--shadow-s);
+    transition:transform .16s, box-shadow .16s, border-color .16s;
+}
+.card:hover{ transform:translateY(-3px); box-shadow:var(--shadow-m); }
+.card:active{ transform:translateY(0); }
+
+.card-ico{
+    width:56px; height:56px; border-radius:50%;
+    display:grid; place-items:center; font-size:26px; line-height:1;
+    flex:none;
+}
+.ico-child { background:#FFEDD5; }
+.ico-wife  { background:#F3E8FF; }
+.ico-husb  { background:#FCE7F3; }
+.ico-heal  { background:var(--leaf-sf); }
+.ico-exam  { background:var(--exam-sf); }
+.ico-miss  { background:var(--miss-sf); }
+.ico-dawn  { background:var(--dawn-sf); }
+.ico-cls   { background:var(--cls-sf); }
+
+.card-tt{ font-size:14.5px; font-weight:900; letter-spacing:-.2px; color:var(--ink); text-align:center; }
+
+/* 치유와 회복 카드 — 초록 계열로 구분 */
+.card.heal{ border-color:var(--leaf-line); background:linear-gradient(180deg,#F6FCFA,var(--card)); }
+.card.heal:hover{ border-color:var(--leaf); }
+.card.heal .card-tt{ color:var(--leaf-dk); }
+
+/* 수험생 카드 — 남색 계열로 구분 */
+.card.exam{ border-color:var(--exam-line); background:linear-gradient(180deg,#F8F7FD,var(--card)); }
+.card.exam:hover{ border-color:var(--exam); }
+.card.exam .card-tt{ color:var(--exam-dk); }
+
+/* 중보기도 카드 — 파랑 계열로 구분 */
+.card.miss{ border-color:var(--miss-line); background:linear-gradient(180deg,#F7FAFF,var(--card)); }
+.card.miss:hover{ border-color:var(--miss); }
+.card.miss .card-tt{ color:var(--miss-dk); }
+
+/* 하루를 여는 기도 카드 — 새벽빛 계열로 구분 */
+.card.dawn{ border-color:var(--dawn-line); background:linear-gradient(180deg,#FFFBF2,var(--card)); }
+.card.dawn:hover{ border-color:var(--dawn); }
+.card.dawn .card-tt{ color:var(--dawn-dk); }
+
+/* 우리 반을 위한 기도 카드 — 로즈 계열로 구분 */
+.card.cls{ border-color:var(--cls-line); background:linear-gradient(180deg,#FFF7F8,var(--card)); }
+.card.cls:hover{ border-color:var(--cls); }
+.card.cls .card-tt{ color:var(--cls-dk); }
+
+/* ── 하단 링크 ────────────────────────── */
+.foot{
+    display:flex; justify-content:center; gap:8px; flex-wrap:wrap;
+    margin-top:34px; padding-top:22px; border-top:1px solid var(--line);
+}
+.foot a{
+    display:inline-flex; align-items:center;
+    height:40px; padding:0 18px; border-radius:999px;
+    background:var(--card); border:1px solid var(--line);
+    font-size:13px; font-weight:800; color:var(--ink2);
+    box-shadow:var(--shadow-s); transition:.16s;
+}
+.foot a:hover{ border-color:var(--violet); color:var(--violet-dk); background:#FCF7FF; }
+
+.copy{ margin-top:20px; text-align:center; font-size:11.5px; color:var(--muted); }
+
+@@media (max-width:430px){
+    .grid{ gap:10px; }
+    .card{ padding:18px 10px 15px; }
+    .card-ico{ width:50px; height:50px; font-size:23px; }
+    .card-tt{ font-size:13.5px; }
+}
+@@media (prefers-reduced-motion:reduce){
+    *{ transition:none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+    <div class="topbar">
+        <a class="top-home" href="/">🏠 홈</a>
+    </div>
+
+    <!-- ═══ 하루를 여는 기도 ═══ -->
+    <section class="sec">
+        <div class="sec-ico">🌅</div>
+        <h1 class="sec-tt dawn">하루를 여는 기도</h1>
+        <div class="sec-sub">오늘 하루 마음을 새롭게 하고 말과 행동을 주님께 맡겨요</div>
+    </section>
+
+    <div class="grid">
+        <a class="card dawn wide" href="/Prayer/Index">
+            <div class="card-ico ico-dawn">🕊️</div>
+            <div class="card-tt">오늘 하루 다짐 기도</div>
+        </a>
+    </div>
+
+    <!-- ═══ 가정을 위한 기도 ═══ -->
+    <section class="sec">
+        <div class="sec-ico">🙏</div>
+        <h2 class="sec-tt">가정을 위한 기도</h2>
+        <div class="sec-sub">매일 사랑하는 가족을 위해 기도해 주세요</div>
+    </section>
+
+    <div class="grid">
+        <a class="card" href="/BessingChild/DetailWords">
+            <div class="card-ico ico-child">🧒</div>
+            <div class="card-tt">자녀를 위해</div>
+        </a>
+
+        <a class="card" href="/BessingACouple/DetailWords?Kind=Wife">
+            <div class="card-ico ico-wife">👩</div>
+            <div class="card-tt">아내를 위해</div>
+        </a>
+
+        <a class="card wide" href="/BessingACouple/DetailWords?Kind=Husband">
+            <div class="card-ico ico-husb">👨</div>
+            <div class="card-tt">남편을 위해</div>
+        </a>
+    </div>
+
+    <!-- ═══ 치유와 회복 ═══ -->
+    <section class="sec">
+        <div class="sec-ico">🌿</div>
+        <h2 class="sec-tt heal">치유와 회복</h2>
+        <div class="sec-sub">몸과 마음이 아픈 이를 위해 함께 기도해요</div>
+    </section>
+
+    <div class="grid">
+        <a class="card heal wide" href="/HealingAndRestorationPray/Index">
+            <div class="card-ico ico-heal">💚</div>
+            <div class="card-tt">치료와 회복을 위해</div>
+        </a>
+    </div>
+
+    <!-- ═══ 수험생 ═══ -->
+    <section class="sec">
+        <div class="sec-ico">📚</div>
+        <h2 class="sec-tt exam">수험생</h2>
+        <div class="sec-sub">입시를 준비하는 학생을 위해 매일 한 편씩 기도해요</div>
+    </section>
+
+    <div class="grid">
+        @* 카드는 기도 목록(List)으로 — 목록에서 오늘의 기도문(Index)으로 들어갑니다 *@
+        <a class="card exam wide" href="/EntranceExamPray/Index">
+            <div class="card-ico ico-exam">📖</div>
+            <div class="card-tt">수험생을 위해</div>
+        </a>
+    </div>
+
+    <!-- ═══ 중보기도 ═══ -->
+    <section class="sec">
+        <div class="sec-ico">🌍</div>
+        <h2 class="sec-tt miss">중보기도</h2>
+        <div class="sec-sub">교회와 목사님, 선교사님을 위해 마음을 모아 기도해요</div>
+    </section>
+
+    <div class="grid">
+        <a class="card miss wide" href="/PrayHome/Intercessory">
+            <div class="card-ico ico-miss">🙌</div>
+            <div class="card-tt">선교사님을 위해 기도</div>
+        </a>
+    </div>
+
+    @* ═══ 우리 반을 위한 기도 — SuperAdmin 에게만 노출 ═══ *@
+    @if (isSuperAdmin)
+    {
+        <section class="sec">
+            <div class="sec-ico">🧑‍🏫</div>
+            <h2 class="sec-tt cls">우리 반을 위한 기도</h2>
+            <div class="sec-sub">내 반 아이들과 함께 섬기는 선생님들을 마음에 품고 기도해요</div>
+        </section>
+
+        <div class="grid">
+            <a class="card cls wide" href="/PrayHome/coClass">
+                <div class="card-ico ico-cls">🤝</div>
+                <div class="card-tt">내 반 · 동역 교사를 위해</div>
+            </a>
+        </div>
+    }
+
+    <!-- ═══ 하단 링크 ═══ -->
+    <nav class="foot">
+        <a href="/">Home</a>
+            <a href="/DailyMission2/Index">@ConstatsCommon.MainKeyTitle</a>
+            <a href="/RhapsodyOfReality/DetailWords">말씀묵상</a>
+    </nav>
+
+    <div class="copy">@ChurchName · @DepartmentName</div>
+
+</div>
+
+</body>
+</html>

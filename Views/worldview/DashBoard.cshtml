@@ -1,0 +1,523 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.ViewModels.Worldview
+@using System.Text.Json
+@using System.Linq
+@using BulletinBoard.Models
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+}
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    if (string.IsNullOrWhiteSpace(UserFullName)) { UserFullName = "익명"; }
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) ?? "";
+}
+@{
+    int activeLessonNo = 0;
+    if (ViewBag.ActiveLessonNo != null)
+        int.TryParse(ViewBag.ActiveLessonNo.ToString(), out activeLessonNo);
+    if (activeLessonNo <= 0) activeLessonNo = 1;
+
+    var dashMap = ViewBag.LessonDashMap as Dictionary<int, LessonDashStatusVM>
+                 ?? new Dictionary<int, LessonDashStatusVM>();
+    int myTotalScore = dashMap.Sum(kv => kv.Value?.Score ?? 0);
+    int myCompletedLessons = dashMap.Count(kv => kv.Value?.SubmittedAt.HasValue == true);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>성경적 세계관 미션북</title>
+<style>
+:root{
+  --teal:#1a9e8a; --teal-d:#0e6b5d; --teal-l:#e4f7f3;
+  --green:#16a34a; --green-l:#dcfce7;
+  --amber:#d97706; --amber-l:#fef3c7;
+  --coral:#e55a30; --coral-l:#fff0eb;
+  --ink:#1a2e28; --muted:#5a7a72; --border:#d6ede8;
+  --card:#fff; --bg:#f4fbf8;
+  --radius:18px;
+  --shadow:0 2px 16px rgba(14,107,93,.08);
+  --shadow-lg:0 8px 32px rgba(14,107,93,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Apple SD Gothic Neo','Noto Sans KR',system-ui,sans-serif;
+  background:var(--bg); color:var(--ink);
+  min-height:100vh; padding:16px 12px 40px;
+}
+
+/* ── HEADER ── */
+.hdr{
+  max-width:900px; margin:0 auto 24px;
+  background:var(--card); border-radius:var(--radius);
+  border:1px solid var(--border); box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.hdr-top{
+  background:linear-gradient(135deg,var(--teal-d) 0%,var(--teal) 60%,#2eada0 100%);
+  padding:24px 24px 0; display:flex; align-items:flex-end; gap:18px; position:relative;
+}
+.hdr-top::after{
+  content:''; position:absolute; right:-40px; top:-40px;
+  width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,.07);
+}
+.hdr-avatar-wrap{
+  flex:0 0 auto; position:relative; bottom:-20px;
+}
+.hdr-avatar{
+  width:80px; height:80px; border-radius:50%;
+  border:3px solid #fff; box-shadow:0 4px 16px rgba(0,0,0,.18);
+  object-fit:cover; background:#cde9e4; display:block;
+}
+.hdr-avatar-fb{
+  width:80px; height:80px; border-radius:50%;
+  border:3px solid #fff; box-shadow:0 4px 16px rgba(0,0,0,.18);
+  background:linear-gradient(135deg,var(--teal-d),var(--teal));
+  display:flex; align-items:center; justify-content:center;
+  font-size:32px; color:#fff; font-weight:900; display:none;
+}
+.hdr-title-area{flex:1; padding-bottom:14px; min-width:0; z-index:1;}
+.hdr-tagline{
+  font-size:11px; font-weight:700; letter-spacing:.08em;
+  color:rgba(255,255,255,.75); background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.25); border-radius:999px;
+  display:inline-block; padding:3px 12px; margin-bottom:6px;
+}
+.hdr-name{font-size:20px; font-weight:900; color:#fff; word-break:keep-all;}
+.hdr-sub{font-size:12px; color:rgba(255,255,255,.8); margin-top:3px;}
+.hdr-bottom{
+  padding:28px 24px 20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.stat-chip{
+  display:flex; align-items:center; gap:8px;
+  background:var(--teal-l); border:1px solid var(--border);
+  border-radius:12px; padding:10px 16px;
+}
+.stat-chip .sn{font-size:24px; font-weight:900; color:var(--teal-d); line-height:1;}
+.stat-chip .sl{font-size:11px; color:var(--muted); margin-top:2px;}
+.active-pill{
+  margin-left:auto;
+  background:linear-gradient(135deg,var(--coral),#f97316);
+  color:#fff; font-weight:900; font-size:13px;
+  padding:8px 18px; border-radius:999px;
+  box-shadow:0 4px 14px rgba(229,90,48,.3);
+  white-space:nowrap; display:flex; align-items:center; gap:6px;
+}
+.active-pill::before{
+  content:''; width:8px; height:8px; border-radius:50%; background:#fff;
+  animation:blink 1.4s ease-in-out infinite;
+}
+@@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── LEGEND ── */
+.legend{
+  max-width:900px; margin:0 auto 16px;
+  display:flex; gap:10px; flex-wrap:wrap;
+}
+.leg{
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; font-weight:600; color:var(--muted);
+}
+.leg-dot{width:12px; height:12px; border-radius:4px; flex:0 0 auto;}
+.leg-dot.done{background:#22c55e;}
+.leg-dot.active{background:var(--coral);}
+.leg-dot.future{background:#94a3b8;}
+
+/* ── SEMESTER LABEL ── */
+.semester-block{max-width:900px;margin:0 auto;}
+.semester-label{
+  display:flex; align-items:center; gap:12px;
+  margin:0 0 14px; padding:12px 18px;
+  background:var(--card); border:1px solid var(--border);
+  border-radius:14px; box-shadow:var(--shadow);
+}
+.semester-label .sem-icon{font-size:20px;}
+.semester-label .sem-text{font-size:15px; font-weight:900; color:var(--ink);}
+.semester-label .sem-sub{font-size:12px; color:var(--muted); margin-left:4px;}
+
+/* ── UNIT SECTION ── */
+.unit-section{max-width:900px; margin:0 auto 16px;}
+.unit-head{
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:10px; padding:0 2px;
+}
+.unit-stripe{width:4px; border-radius:999px; flex:0 0 4px; height:20px;}
+.unit-label{font-size:14px; font-weight:800; color:var(--ink);}
+
+/* ── GRID ── */
+.lesson-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:10px;
+}
+
+/* ── LESSON BUTTON ── */
+.lb{
+  border:none; border-radius:16px; padding:14px 12px 12px;
+  display:flex; flex-direction:column; gap:8px; align-items:flex-start;
+  cursor:default; transition:transform .15s,box-shadow .15s;
+  text-align:left; position:relative; overflow:hidden; min-height:96px;
+}
+
+/* 완료 (지나간 미션) */
+.lb.done{
+  background:var(--green-l); border:1.5px solid #86efac;
+  cursor:pointer; pointer-events:auto;
+}
+.lb.done:hover{transform:translateY(-2px); box-shadow:0 6px 20px rgba(22,163,74,.18);}
+
+/* 현재 진행중 */
+.lb.active{
+  background:linear-gradient(145deg,#fff7f0,#fff);
+  border:2px solid var(--coral);
+  box-shadow:0 4px 20px rgba(229,90,48,.22);
+  cursor:pointer; pointer-events:auto;
+  animation:pulse-lb 2.8s ease-in-out infinite;
+}
+.lb.active:hover{transform:translateY(-3px); box-shadow:0 8px 28px rgba(229,90,48,.35);}
+@@keyframes pulse-lb{
+  0%,100%{box-shadow:0 4px 20px rgba(229,90,48,.22);}
+  50%{box-shadow:0 4px 24px rgba(229,90,48,.42),0 0 0 5px rgba(229,90,48,.09);}
+}
+
+/* 다가올 미션 */
+.lb.future{
+  background:#f8fafc; border:1.5px solid #e2e8f0;
+  opacity:.55; pointer-events:none;
+}
+
+/* superadmin overrides */
+.lb.done.adm, .lb.future.adm{pointer-events:auto; cursor:pointer; opacity:1;}
+.lb.future.adm:hover{transform:translateY(-2px); opacity:.85;}
+
+/* 번호 뱃지 */
+.lb-no{
+  font-size:12px; font-weight:800;
+  padding:3px 10px; border-radius:999px;
+  letter-spacing:-.2px; white-space:nowrap;
+}
+.done .lb-no{background:rgba(22,163,74,.15); color:var(--green);}
+.active .lb-no{background:rgba(229,90,48,.12); color:var(--coral);}
+.future .lb-no{background:#e2e8f0; color:#64748b;}
+
+/* 제목 */
+.lb-title{
+  font-size:11.5px; font-weight:600; line-height:1.4; word-break:keep-all;
+}
+.done .lb-title{color:var(--ink);}
+.active .lb-title{color:var(--ink);}
+.future .lb-title{color:#94a3b8;}
+
+/* 점수 뱃지 */
+.lb-score{
+  position:absolute; top:8px; right:8px;
+  background:var(--green); color:#fff;
+  font-size:10px; font-weight:900;
+  padding:2px 8px; border-radius:999px; white-space:nowrap;
+}
+.active .lb-score{background:var(--coral);}
+
+/* 번호 행 (번호 + 진행중 뱃지 가로 배치) */
+.lb-no-row{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+/* 현재 진행 라벨 — 번호 옆 인라인 */
+.lb-now{
+  background:var(--coral); color:#fff;
+  font-size:10px; font-weight:900;
+  padding:2px 8px; border-radius:999px;
+  white-space:nowrap;
+}
+
+/* ── FOOTER BTNS ── */
+.footer-btns{
+  max-width:900px; margin:24px auto 0;
+  display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+}
+.fbtn{
+  padding:10px 20px; border-radius:12px; border:none;
+  font-size:13px; font-weight:800; cursor:pointer;
+  transition:opacity .15s, transform .15s;
+}
+.fbtn:hover{opacity:.88; transform:translateY(-1px);}
+.fbtn-ghost{background:var(--card); border:1.5px solid var(--border); color:var(--muted);}
+.fbtn-admin{background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff;}
+.fbtn-rank{background:linear-gradient(135deg,#0369a1,#0ea5e9); color:#fff;}
+
+@@media(max-width:480px){
+  .lesson-grid{grid-template-columns:repeat(2,1fr);}
+  .hdr-avatar,.hdr-avatar-fb{width:68px; height:68px;}
+  .hdr-name{font-size:17px;}
+  .active-pill{margin-left:0;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── 헤더 ── -->
+<div class="hdr">
+  <div class="hdr-top">
+    <div class="hdr-avatar-wrap">
+      @if (!string.IsNullOrWhiteSpace(UserId))
+      {
+        <img class="hdr-avatar" id="profileImg"
+             src="/HumanResource/GetProfilePicture?userId=@UserId"
+             alt="@UserFullName"
+             onerror="this.style.display='none';document.getElementById('profileFb').style.display='flex'"/>
+        <div class="hdr-avatar-fb" id="profileFb">@(UserFullName.Length > 0 ? UserFullName.Substring(0,1) : "?")</div>
+      }
+      else
+      {
+        <div class="hdr-avatar-fb" style="display:flex">🙋</div>
+      }
+    </div>
+    <div class="hdr-title-area">
+      <div class="hdr-tagline">부모님과 자녀가 함께하는 성경 미션북</div>
+      <div class="hdr-name">@UserFullName 님</div>
+      <div class="hdr-sub">@ChurchName · @DepartmentName</div>
+    </div>
+  </div>
+  <div class="hdr-bottom">
+    <div class="stat-chip">
+      <div>
+        <div class="sn">@myCompletedLessons</div>
+        <div class="sl">완료한 과</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <div>
+        <div class="sn">@myTotalScore</div>
+        <div class="sl">총 점수</div>
+      </div>
+    </div>
+    <div class="active-pill">@activeLessonNo 과 진행 중</div>
+  </div>
+</div>
+
+<!-- ── 범례 ── -->
+<div class="legend">
+  <div class="leg"><div class="leg-dot done"></div>완료한 미션</div>
+  <div class="leg"><div class="leg-dot active"></div>지금 진행 중</div>
+  <div class="leg"><div class="leg-dot future"></div>다가올 미션</div>
+</div>
+
+<!-- ── 미션 보드 ── -->
+<div id="board1h" class="semester-block"></div>
+<div id="board2h" class="semester-block"></div>
+
+<!-- ── 하단 버튼 ── -->
+<div class="footer-btns">
+  <button class="fbtn fbtn-ghost" onclick="location.href='/'">🏠 홈으로</button>
+  <button class="fbtn fbtn-ghost" onclick="location.href='/Worldview/Intro'">🎯 미션홈</button>
+  @if (isSuperAdmin)
+  {
+    <button class="fbtn fbtn-admin" onclick="location.href='/WorldviewAdmin'">🛠 관리자</button>
+    <button class="fbtn fbtn-rank" onclick="location.href='/WorldviewAdmin/SubmitRank'">🏆 순위</button>
+  }
+</div>
+
+<script>
+const DASH_MAP = @Html.Raw(JsonSerializer.Serialize(
+    dashMap.ToDictionary(
+        kv => kv.Key.ToString(),
+        kv => new { score = kv.Value.Score, submittedAt = kv.Value.SubmittedAt }
+    ),
+    new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+));
+const ACTIVE_NO = @activeLessonNo;
+const IS_SUPER  = @(isSuperAdmin ? "true" : "false");
+
+const UNITS_1H = [
+  { name:"1단원 · 하나님 나라 백성의 세계관", color:"#0f766e", items:[
+    {no:1, title:"성경적 세계관이 뭐예요?"},
+    {no:2, title:"이 세상은 누구의 것일까요?"},
+    {no:3, title:"하나님이 창조하신 세상이 왜 악해졌을까요?"},
+    {no:4, title:"누가 이 세상을 회복할까요?"},
+  ]},
+  { name:"2단원 · 하나님 나라 백성의 정체성", color:"#1d4ed8", items:[
+    {no:5, title:"우리는 누구일까요?"},
+    {no:6, title:"하나님의 형상인 우리가 죄로 인해 어떻게 되었나요?"},
+    {no:7, title:"무엇을 간절히 원하고 있나요?"},
+    {no:8, title:"세상 속에서 우리는 누구일까요?"},
+  ]},
+  { name:"3단원 · 하나님 나라 백성의 가정", color:"#be123c", items:[
+    {no:9,  title:"가정은 어떤 곳일까요?"},
+    {no:10, title:"관계가 깨어진 가정은 누가 돌보실까요?"},
+    {no:11, title:"우리 가정이 어떻게 회복될 수 있을까요?"},
+    {no:12, title:"나의 가족은 어디까지일까요?"},
+  ]},
+  { name:"4단원 · 하나님 나라 백성의 배움", color:"#c2410c", items:[
+    {no:13, title:"우리는 왜 배울까요?"},
+    {no:14, title:"우리는 배울 때 무엇을 조심해야 할까요?"},
+    {no:15, title:"무엇을 인지해서 배워야 할까요?"},
+    {no:16, title:"배운 것으로 어떻게 살아야 할까요?"},
+  ]},
+  { name:"5단원 · 하나님 나라 백성과 세상", color:"#7c3aed", items:[
+    {no:17, title:"우리는 왜 세상을 돌봐야 할까요?"},
+    {no:18, title:"우리는 세상 속에서 무엇을 조심해야 할까요?"},
+    {no:19, title:"우리는 세상에서 어떻게 살아야 할까요?"},
+  ]},
+  { name:"6단원 · 하나님 나라 백성의 세계관 형성과 예배", color:"#0369a1", items:[
+    {no:20, title:"어떻게 하면 성경적 세계관이 자랄까요?"},
+    {no:21, title:"예배할 때 무엇을 조심해야 할까요?"},
+    {no:22, title:"매일 예배할 수 있을까요?"},
+  ]},
+];
+
+const UNITS = [
+  { name:"7단원 · 가치 분별", color:"#7c3aed", items:[
+    {no:23,title:"이 세상은 우연히 생겨났나요?"},
+    {no:24,title:"변하지 않는 진리가 있을까요?"},
+    {no:25,title:"나만 생각해도 될까요?"},
+    {no:26,title:"많이 가지면 행복할까요?"},
+  ]},
+  { name:"8단원 · 생명과 죽음", color:"#be123c", items:[
+    {no:27,title:"생명은 어디서 왔나요?"},
+    {no:28,title:"우리의 생명은 누구의 것인가요?"},
+    {no:29,title:"죽지 않을 수 있나요?"},
+    {no:30,title:"죽은 후에는 어떻게 돼요?"},
+  ]},
+  { name:"9단원 · 환경과 기술", color:"#0f766e", items:[
+    {no:31,title:"아픈 지구를 어떻게 해야 할까요?"},
+    {no:32,title:"넘쳐나는 영상들 속에서…"},
+    {no:33,title:"인공지능이 사람을 대신할 수 있을까요?"},
+    {no:34,title:"나와 똑같은 사람을 만들어도 될까요?"},
+  ]},
+  { name:"10단원 · 일과 예술", color:"#c2410c", items:[
+    {no:35,title:"어떻게 일하고 어떻게 쉴까요?"},
+    {no:36,title:"무엇을 위해 일해야 할까요?"},
+    {no:37,title:"예술이 나와 무슨 상관이 있나요?"},
+    {no:38,title:"마법과 미신이 나를 도와줄 수 있나요?"},
+  ]},
+  { name:"11단원 · 관계와 거룩", color:"#9333ea", items:[
+    {no:39,title:"죄의 유혹에서 몸과 마음을 지킬까요?"},
+    {no:40,title:"남자와 여자, 서로를 어떻게 대해야?"},
+    {no:41,title:"멈출 수 있을까요?"},
+  ]},
+  { name:"12단원 · 총체적 회복", color:"#1d4ed8", items:[
+    {no:42,title:"고난이 찾아올 때 어떻게 해야 할까요?"},
+    {no:43,title:"연약한 사람을 어떻게 대해야 할까요?"},
+    {no:44,title:"변하지 않는 세상을 바라보며 무엇을 기대하나요?"},
+  ]},
+  { name:"절기 & 특별", color:"#0369a1", items:[
+    {no:45,title:"통일을 어떻게 생각하나요?"},
+    {no:46,title:"바른 믿음은 뭐예요?"},
+    {no:47,title:"어떻게 하나님께 감사를 전할까요?"},
+    {no:48,title:"성탄에 무엇이 기쁜가요?"},
+  ]},
+];
+
+function renderUnits(units, containerId) {
+  const board = document.getElementById(containerId);
+  units.forEach(unit => {
+    const sec = document.createElement("div");
+    sec.className = "unit-section";
+
+    // unit header
+    const head = document.createElement("div");
+    head.className = "unit-head";
+    const stripe = document.createElement("div");
+    stripe.className = "unit-stripe";
+    stripe.style.background = unit.color;
+    const label = document.createElement("div");
+    label.className = "unit-label";
+    label.textContent = unit.name;
+    head.appendChild(stripe);
+    head.appendChild(label);
+
+    // grid
+    const grid = document.createElement("div");
+    grid.className = "lesson-grid";
+
+    unit.items.forEach(it => {
+      const dash  = DASH_MAP[String(it.no)];
+      const isDone   = !!dash;
+      const isActive = (it.no === ACTIVE_NO);
+      const score    = isDone ? (dash.score ?? 0) : 0;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+
+      if (isActive) {
+        btn.className = "lb active";
+      } else if (isDone) {
+        btn.className = IS_SUPER ? "lb done adm" : "lb done";
+      } else {
+        btn.className = IS_SUPER ? "lb future adm" : "lb future";
+      }
+
+      // 점수 뱃지 (우상단 절대위치)
+      if (isDone) {
+        const scoreBadge = document.createElement("div");
+        scoreBadge.className = "lb-score";
+        scoreBadge.textContent = `+${score}점`;
+        btn.appendChild(scoreBadge);
+      }
+
+      // 번호 행 (번호 + "진행 중" 인라인)
+      const noRow = document.createElement("div");
+      noRow.className = "lb-no-row";
+
+      const noEl = document.createElement("div");
+      noEl.className = "lb-no";
+      noEl.textContent = `${it.no}과`;
+      noRow.appendChild(noEl);
+
+      if (isActive) {
+        const nowBadge = document.createElement("div");
+        nowBadge.className = "lb-now";
+        nowBadge.textContent = "진행 중";
+        noRow.appendChild(nowBadge);
+      }
+
+      btn.appendChild(noRow);
+
+      // 제목
+      const titleEl = document.createElement("div");
+      titleEl.className = "lb-title";
+      titleEl.textContent = it.title;
+      btn.appendChild(titleEl);
+
+      // 클릭
+      if (isActive || IS_SUPER) {
+        btn.addEventListener("click", () => location.href = "/Worldview/lesson/" + it.no);
+      } else if (isDone) {
+        btn.addEventListener("click", () => location.href = "/Worldview/lesson/" + it.no);
+      }
+
+      grid.appendChild(btn);
+    });
+
+    sec.appendChild(head);
+    sec.appendChild(grid);
+    board.appendChild(sec);
+  });
+}
+
+function semLabel(id, icon, text, sub) {
+  const el = document.createElement("div");
+  el.className = "semester-label";
+  el.innerHTML = `<span class="sem-icon">${icon}</span><span class="sem-text">${text}</span><span class="sem-sub">${sub}</span>`;
+  document.getElementById(id).prepend(el);
+}
+
+semLabel("board1h", "🌱", "1학기 미션", "1단원 ~ 6단원 (1과 ~ 22과)");
+renderUnits(UNITS_1H, "board1h");
+
+semLabel("board2h", "🍀", "2학기 미션", "7단원 ~ 12단원 + 절기 (23과 ~ 48과)");
+renderUnits(UNITS, "board2h");
+</script>
+</body>
+</html>

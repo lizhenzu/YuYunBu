@@ -1,0 +1,463 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    // ✅ 기존 버튼 URL 그대로 유지
+    var urlPrayBan = "/PrayHome/PrayBan";                // 담임반 아이들 기도
+    var urlBlessing = "/BessingChild/DetailWords";       // 교사/아이 축복기도문
+    var urlGuide = "/PrayHome/WhatTick";                 // 사용법
+}
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>교사 기도 똑딱이 · @ChurchName · @DepartmentName</title>
+
+    <style>
+        /* =========================================================
+                   PRAYER CLICK – Standalone Page (NEW 2026)
+                   - 완전 신규 테마: 잉크 네이비 + 민트/코랄 포인트
+                   - 카드형 대시보드 + 글라스 + 또렷한 타이포
+                   ========================================================= */
+
+        :root {
+            --bg0: #070B18;
+            --bg1: #0B1433;
+            --glass: rgba(255,255,255,.08);
+            --glass2: rgba(255,255,255,.12);
+            --stroke: rgba(255,255,255,.14);
+            --ink: #F5F7FF;
+            --muted: rgba(245,247,255,.70);
+            --mint: #33E6B6;
+            --mint2: #8CF7DA;
+            --coral: #FF6B9B;
+            --coral2: #FFB3C7;
+            --sky: #6FB6FF;
+            --shadow: 0 18px 65px rgba(0,0,0,.35);
+            --r18: 18px;
+            --r22: 22px;
+            --r28: 28px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            color: var(--ink);
+            background: radial-gradient(900px 520px at 12% 10%, rgba(51,230,182,.18), transparent 60%), radial-gradient(900px 520px at 88% 12%, rgba(255,107,155,.16), transparent 60%), radial-gradient(900px 520px at 50% 110%, rgba(111,182,255,.16), transparent 62%), linear-gradient(180deg, var(--bg1), var(--bg0));
+            min-height: 100vh;
+        }
+
+        .wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 26px 16px;
+        }
+
+        .shell {
+            width: 100%;
+            max-width: 980px;
+        }
+
+        /* HERO */
+        .hero {
+            position: relative;
+            border-radius: var(--r28);
+            padding: 18px 18px 16px;
+            border: 1px solid var(--stroke);
+            background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            backdrop-filter: blur(14px);
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(520px 260px at 0% 0%, rgba(51,230,182,.22), transparent 62%), radial-gradient(520px 260px at 100% 0%, rgba(255,107,155,.20), transparent 62%), radial-gradient(520px 260px at 60% 120%, rgba(111,182,255,.18), transparent 62%);
+                opacity: .9;
+                pointer-events: none;
+            }
+
+        .heroInner {
+            position: relative;
+            display: flex;
+            gap: 14px;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        .heroTitle {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 950;
+            letter-spacing: -.3px;
+            line-height: 1.12;
+        }
+
+        .heroDesc {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 13.5px;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .heroBadge {
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.10);
+            color: rgba(245,247,255,.86);
+            font-size: 12.5px;
+            font-weight: 900;
+            white-space: nowrap;
+            backdrop-filter: blur(12px);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--mint);
+            box-shadow: 0 8px 18px rgba(51,230,182,.22);
+        }
+
+        /* SECTION */
+        .section {
+            margin-top: 14px;
+            border-radius: var(--r28);
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(12px);
+            overflow: hidden;
+        }
+
+        .sectionHead {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.10);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .sectionTitle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0;
+            font-size: 17px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.08);
+            color: rgba(245,247,255,.82);
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        .sectionSub {
+            padding: 0 18px 16px;
+            color: var(--muted);
+            font-size: 13.5px;
+            font-weight: 650;
+            line-height: 1.5;
+        }
+
+        /* GRID */
+        .grid {
+            padding: 0 18px 18px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .card {
+            position: relative;
+            border-radius: var(--r22);
+            border: 1px solid rgba(255,255,255,.14);
+            background: linear-gradient(135deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+            overflow: hidden;
+            box-shadow: 0 14px 44px rgba(0,0,0,.22);
+            transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                filter: brightness(1.05);
+                box-shadow: 0 18px 58px rgba(0,0,0,.30);
+            }
+
+        .cardTop {
+            padding: 16px 16px 10px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.10);
+            box-shadow: 0 12px 26px rgba(0,0,0,.25);
+            flex: 0 0 auto;
+        }
+
+        .cardTitle {
+            font-size: 16px;
+            font-weight: 950;
+            letter-spacing: -.2px;
+            line-height: 1.15;
+            margin: 0;
+        }
+
+        .cardText {
+            margin: 0;
+            padding: 0 16px 12px;
+            color: rgba(245,247,255,.76);
+            font-size: 13.3px;
+            font-weight: 650;
+            line-height: 1.45;
+        }
+
+        .actions {
+            padding: 0 16px 16px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            width: 100%;
+            border: 0;
+            cursor: pointer;
+            border-radius: 16px;
+            padding: 12px 12px;
+            font-size: 13.5px;
+            font-weight: 950;
+            letter-spacing: -.1px;
+            color: #081018;
+            background: linear-gradient(135deg, var(--mint), var(--mint2));
+            box-shadow: 0 14px 30px rgba(51,230,182,.18);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform .14s ease, filter .14s ease;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                filter: brightness(1.03);
+            }
+
+            .btn:active {
+                transform: translateY(0px);
+                filter: brightness(.98);
+            }
+
+        .btn-outline {
+            color: rgba(245,247,255,.92);
+            background: rgba(255,255,255,.08);
+            border: 1px solid rgba(255,255,255,.18);
+            box-shadow: 0 14px 30px rgba(0,0,0,.22);
+        }
+
+        /* card themes */
+        .t-kids .icon {
+            background: linear-gradient(135deg, rgba(111,182,255,.22), rgba(255,255,255,.08));
+        }
+
+        .t-bless .icon {
+            background: linear-gradient(135deg, rgba(255,107,155,.22), rgba(255,255,255,.08));
+        }
+
+        .t-guide .icon {
+            background: linear-gradient(135deg, rgba(140,247,218,.18), rgba(255,255,255,.08));
+        }
+
+        .t-bless .btn {
+            background: linear-gradient(135deg, var(--coral), var(--coral2));
+            color: #160810;
+        }
+
+        .t-guide .btn {
+            background: linear-gradient(135deg, var(--sky), rgba(168,85,247,.18));
+            color: #071018;
+        }
+
+        /* footer */
+        .foot {
+            margin-top: 14px;
+            text-align: center;
+            color: rgba(245,247,255,.55);
+            font-size: 12.5px;
+            font-weight: 650;
+        }
+
+        @@media (max-width: 920px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .heroInner {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .heroBadge {
+                align-self: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="shell">
+
+            <!-- HERO -->
+            <header class="hero">
+                <div class="heroInner">
+                    <div>
+                        <h1 class="heroTitle">🙏 교사 기도 똑딱이</h1>
+                        <div class="heroDesc">
+                            이 공간은 <b>담임 교사</b>가 아이들과 유년부 사역을 위해 기도하는 곳이에요.<br />
+                            오늘도 아이들 한 명 한 명을 떠올리며, 짧게라도 따뜻하게 기도해 주세요.
+                        </div>
+                    </div>
+                    <div class="heroBadge">
+                        <span class="dot"></span>
+                        <span>교사를 위한 기도</span>
+                        <span style="opacity:.65;">·</span>
+                        <span>담임반 중심</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- MAIN -->
+            <section class="section" id="prayer-click">
+                <div class="sectionHead">
+                    <h2 class="sectionTitle">🧑‍🏫 담임 교사 기도 시작</h2>
+                    <div class="chip">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+                </div>
+                <div class="sectionSub">
+                    아래 메뉴를 눌러 바로 이동해요. <br />
+                    <b>아이들(담임반) · 교사 마음 · 유년부 사역</b>을 위해 오늘도 하나님께 맡겨 드려요.
+                </div>
+
+                <div class="grid">
+
+                    <!-- 담임반 아이들 기도 -->
+                    <article class="card t-kids">
+                        <div class="cardTop">
+                            <div class="icon">🧒</div>
+                            <div>
+                                <h3 class="cardTitle">담임반 아이들 위해 기도</h3>
+                                <div style="margin-top:6px;color:rgba(245,247,255,.62);font-weight:750;font-size:12.5px;">
+                                    이름을 누르며 한 명씩 축복해요
+                                </div>
+                            </div>
+                        </div>
+                        <p class="cardText">
+                            오늘 출석, 마음 상태, 가정 상황을 떠올리며
+                            아이 한 명 한 명에게 주님의 평안과 믿음이 자라도록 기도해 주세요.
+                        </p>
+                        <div class="actions">
+                            <button class="btn" type="button" onclick="location.href='@urlPrayBan'">
+                                <span>👦</span><span>담임반 기도하러 가기</span>
+                            </button>
+                        </div>
+                    </article>
+
+                    <!-- 축복/사역 기도문 -->
+                    <article class="card t-bless">
+                        <div class="cardTop">
+                            <div class="icon">🕊️</div>
+                            <div>
+                                <h3 class="cardTitle">교사 · 아이 축복기도문</h3>
+                                <div style="margin-top:6px;color:rgba(245,247,255,.62);font-weight:750;font-size:12.5px;">
+                                    함께 읽는 짧은 기도문
+                                </div>
+                            </div>
+                        </div>
+                        <p class="cardText">
+                            말이 막힐 때는 기도문을 따라 읽어도 좋아요.
+                            교사의 마음과 우리 반 아이들이 주님 안에서 자라도록 축복해 주세요.
+                        </p>
+                        <div class="actions">
+                            <button class="btn" type="button" onclick="location.href='@urlBlessing'">
+                                <span>📜</span><span>기도문 열기</span>
+                            </button>
+                        </div>
+                    </article>
+
+                    <!-- 사용법 -->
+                    <article class="card t-guide">
+                        <div class="cardTop">
+                            <div class="icon">🧭</div>
+                            <div>
+                                <h3 class="cardTitle">교사용 사용법</h3>
+                                <div style="margin-top:6px;color:rgba(245,247,255,.62);font-weight:750;font-size:12.5px;">
+                                    1분 요약 안내
+                                </div>
+                            </div>
+                        </div>
+                        <p class="cardText">
+                            담임반 기도 흐름(이름 클릭 → 기도 완료 → 다음 아이)을
+                            가장 빠르게 익힐 수 있도록 짧게 안내해 드려요.
+                        </p>
+                        <div class="actions">
+                            <button class="btn btn-outline" type="button" onclick="location.href='@urlGuide'">
+                                <span>📘</span><span>사용법 보기</span>
+                            </button>
+                        </div>
+                    </article>
+
+                </div>
+            </section>
+
+            <div class="foot">© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+        </div>
+    </div>
+</body>
+</html>

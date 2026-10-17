@@ -1,0 +1,184 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.ViewModels
+@using BulletinBoard.ViewModels.Notice
+@{
+    Layout = null;
+    // DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다
+    var urlNotice = "/Notice/";
+    var urlNoticeBoard = "/ReplayBoard/Index?tableName=NoticeBoard";
+    var urlBoard = "/BandBoard/Index";
+    var urlJubo = "/BandBoard/Index?boardTableName=BandJuboPosts&boardName=주보게시판";
+    var urlPopMsg = "/PopMessage/Index";
+    var urlHome = "/";
+
+    var notices = ViewBag.PinnedNotices as List<Notice>;
+    var latestPost = ViewBag.BandBoardMessage as BandPost;
+
+    string Plain(string? html, int max)
+    {
+        var s = System.Text.RegularExpressions.Regex.Replace(html ?? "", "<[^>]+>", " ");
+        s = System.Net.WebUtility.HtmlDecode(s);
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ").Trim();
+        return s.Length > max ? s.Substring(0, max) + "…" : s;
+    }
+
+    var menus = new[] {
+        new { No = "01", Label = "공지사항",   Desc = "중요한 안내를 먼저 확인하세요", Url = urlNotice },
+        new { No = "02", Label = "공지게시판", Desc = "글 · 사진 · 자료를 함께 나눠요", Url = urlNoticeBoard },
+        new { No = "03", Label = "주보게시판", Desc = "이번 주 주보와 주간 소식",       Url = urlJubo },
+        new { No = "04", Label = "쪽지함",     Desc = "받은 쪽지 · 보낸 쪽지 · 답장",   Url = urlPopMsg },
+    };
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>유년부 소통공간</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+
+        /* 머리 */
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+        /* 구역 */
+        .sec { margin-top: 24px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+        .secH { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+        .secT { font-size: 16px; font-weight: 800; color: #111827; }
+        .secMore { font-size: 12px; font-weight: 700; color: #2F80ED; white-space: nowrap; }
+        .secMore:hover { color: #1F6FDB; }
+
+        /* 바로가기 */
+        .mn { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid #EEF0F3; }
+        .mn:last-child { border-bottom: 0; }
+        .mnNo { flex: none; width: 26px; font-size: 18px; font-weight: 300; color: #8DB5F3; font-variant-numeric: tabular-nums; }
+        .mnTx { flex: 1; min-width: 0; }
+        .mnL { display: block; font-size: 16px; font-weight: 700; color: #111827; line-height: 1.35; }
+        .mnD { display: block; margin-top: 2px; font-size: 12.5px; color: #9CA3AF; }
+        .mnA { flex: none; font-size: 20px; font-weight: 300; color: #D1D5DB; transition: transform .15s, color .15s; }
+        .mn:hover .mnA { color: #2F80ED; transform: translateX(3px); }
+        .mn:hover .mnL { color: #2F80ED; }
+
+        /* 최신 공지 */
+        .ntList { margin-top: 4px; }
+        .nt { display: block; padding: 14px 0; border-bottom: 1px solid #EEF0F3; }
+        .nt:last-child { border-bottom: 0; padding-bottom: 0; }
+        .nt:hover .ntT { color: #2F80ED; }
+        .ntT { font-size: 15px; font-weight: 700; color: #111827; line-height: 1.45; transition: color .15s; }
+        .ntM { margin-top: 3px; font-size: 11.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .ntX { margin-top: 7px; font-size: 13px; line-height: 1.7; color: #6B7280; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: keep-all; }
+
+        /* 최신 게시글 */
+        .ps { margin-top: 12px; cursor: pointer; }
+        .psWho { display: flex; align-items: center; gap: 10px; }
+        .psAv { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #EAF2FD; color: #2F80ED; font-size: 14px; font-weight: 700; }
+        .psN { font-size: 14px; font-weight: 700; color: #111827; }
+        .psM { margin-top: 1px; font-size: 11.5px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .psX { margin-top: 10px; font-size: 14px; line-height: 1.75; color: #6B7280; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; word-break: keep-all; }
+        .psF { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .psF button { font-family: inherit; font-size: 12px; padding: 7px 12px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+        .psF button:hover { color: #2F80ED; }
+
+        /* 홈 */
+        .homeBar { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; padding: 15px 16px; border-radius: 12px; background: #F4F6F9; }
+        .homeBar b { font-size: 15px; font-weight: 700; color: #111827; }
+        .homeBar i { font-style: normal; font-size: 20px; font-weight: 300; color: #2F80ED; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 18px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .ft a { color: #6B7280; }
+        .ft a:hover { color: #2F80ED; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><a href="@urlHome">← @ConstatsCommon.ToHome</a></div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">유년부 소통공간</h1>
+    </header>
+
+    <main class="sh">
+        @if (notices != null && notices.Any())
+        {
+            <section class="sec">
+                <div class="secH">
+                    <span class="secT">최신 공지</span>
+                    <a class="secMore" href="@urlNotice">공지 목록</a>
+                </div>
+                <div class="ntList">
+                    @foreach (var n in notices)
+                    {
+                        <a class="nt" href="@Url.Action("Details", "Notice", new { id = n.Id })">
+                            <div class="ntT">@n.Title</div>
+                            <div class="ntM">@n.CreatedAt.ToString("yyyy.MM.dd") · @(string.IsNullOrWhiteSpace(n.AuthorName) ? "관리자" : n.AuthorName) · 조회 @n.ViewCount.ToString("N0")</div>
+                            <div class="ntX">@Plain(n.Content, 220)</div>
+                        </a>
+                    }
+                </div>
+            </section>
+        }
+
+        <section class="sec">
+            <div class="secH"><span class="secT">바로가기</span></div>
+            <div style="margin-top:2px">
+                @foreach (var m in menus)
+                {
+                    <a class="mn" href="@m.Url">
+                        <span class="mnNo">@m.No</span>
+                        <span class="mnTx"><span class="mnL">@m.Label</span><span class="mnD">@m.Desc</span></span>
+                        <span class="mnA">›</span>
+                    </a>
+                }
+            </div>
+        </section>
+
+        @if (latestPost != null)
+        {
+            var psName = string.IsNullOrWhiteSpace(latestPost.WriterName) ? "익명" : latestPost.WriterName.Trim();
+            <section class="sec js-global-cookie-section" data-cookie-key="LatestBandPostBanner_2025" style="display:none;">
+                <div class="secH">
+                    <span class="secT">최신 게시글</span>
+                    <a class="secMore" href="@urlBoard">게시판</a>
+                </div>
+                <div class="ps" onclick="location.href='@urlBoard'">
+                    <div class="psWho">
+                        <div class="psAv">@psName.Substring(0, 1)</div>
+                        <div>
+                            <div class="psN">@psName</div>
+                            <div class="psM">@latestPost.CreatedAt.ToString("yyyy.MM.dd HH:mm") · 댓글 @(latestPost.Comments?.Count ?? 0) · 좋아요 @latestPost.LikeCount</div>
+                        </div>
+                    </div>
+                    <div class="psX">@((latestPost.Content ?? "").Trim())</div>
+                    <div class="psF" onclick="event.stopPropagation();">
+                        <button type="button" class="js-global-cookie-hide-btn" data-hide="today">오늘만 안 보기</button>
+                        <button type="button" class="js-global-cookie-hide-btn" data-hide="1week">1주일 숨기기</button>
+                        <button type="button" class="js-global-cookie-hide-btn" data-hide="3week">3주 숨기기</button>
+                    </div>
+                </div>
+            </section>
+        }
+
+        <a class="homeBar" href="@urlHome">
+            <b>@ConstatsCommon.ToHome 가기</b>
+            <i>›</i>
+        </a>
+
+        <div class="ft">
+            <span>© 유년부</span>
+            <span><a href="@urlNotice">공지</a> · <a href="@urlBoard">게시</a> · <a href="@urlJubo">주보</a> · <a href="@urlPopMsg">쪽지</a></span>
+        </div>
+    </main>
+
+    <script src="/js/GlobalCookie.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+@model BulletinBoard.Models.PrayPhrase
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    기도문 수정 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 폼 이름 · 검증 · 저장 주소(UpdatePrayPhrase) · hidden 값은 그대로
+    · 이전 화면은 ModifyPrayPhrase.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>기도문 수정</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pp-rng { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--soft); }
+        .pp-rng .lbl { display: block; margin-bottom: 8px; font-size: 12px; font-weight: 800; color: var(--blue); }
+        .pp-rng .pr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .pp-rng .pr + .pr { margin-top: 8px; }
+        .pp-rng .qb-in { background: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>저장하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/PrayPhrase/PrayPhraseDetailList">기도문 작성</a><span class="sep">›</span>수정</span>
+        <span>PRAY</span>
+    </div>
+
+    <div class="qb-k">EDIT · @SharedComm.GetTodayToStringKor(Model.ExposeDate)</div>
+    <h1 class="qb-h1">기도문 수정</h1>
+
+    <form asp-action="UpdatePrayPhrase" method="post" onsubmit="return beforeSubmit(this);">
+        <div asp-validation-summary="ModelOnly"></div>
+
+        <div class="qb-f">
+            <label asp-for="PrayTitle">기도제목</label>
+            <input asp-for="PrayTitle" class="qb-in" autofocus />
+            <span asp-validation-for="PrayTitle" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label asp-for="BibleTextToPray">성경 (예: 시편)</label>
+            <input asp-for="BibleTextToPray" class="qb-in" />
+            <span asp-validation-for="BibleTextToPray" class="error"></span>
+        </div>
+
+        <div class="pp-rng">
+            <span class="lbl">시작 장 · 절</span>
+            <div class="pr">
+                <input type="number" asp-for="BibleTextToPrayFromJang" class="qb-in" placeholder="시작 장" aria-label="시작 장" />
+                <input type="number" asp-for="BibleTextToPrayFromZul" class="qb-in" placeholder="시작 절" aria-label="시작 절" />
+            </div>
+            <span class="lbl" style="margin-top:12px">종료 장 · 절</span>
+            <div class="pr">
+                <input type="number" asp-for="BibleTextToPrayToJang" class="qb-in" placeholder="종료 장" aria-label="종료 장" />
+                <input type="number" asp-for="BibleTextToPrayToZul" class="qb-in" placeholder="종료 절" aria-label="종료 절" />
+            </div>
+            <span asp-validation-for="BibleTextToPrayFromJang" class="error"></span>
+            <span asp-validation-for="BibleTextToPrayFromZul" class="error"></span>
+            <span asp-validation-for="BibleTextToPrayToJang" class="error"></span>
+            <span asp-validation-for="BibleTextToPrayToZul" class="error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label asp-for="PrayContent1">기도내용</label>
+            <textarea id="PrayContent1" name="PrayContent1" asp-for="PrayContent1" class="qb-in" rows="12"></textarea>
+            <span asp-validation-for="PrayContent1" class="error"></span>
+        </div>
+
+        <input type="hidden" id="Id" name="Id" value="@Model.Id" />
+        <input type="hidden" asp-for="ExposeDate" value="@Model.ExposeDate.ToString("yyyy-MM-dd")" />
+
+        @* 2026-10-04: 이 화면에 없는 네 칸도 기존 값을 그대로 함께 보낸다.
+           저장 쿼리가 9칸을 모두 덮어쓰므로, 빠뜨리면 시작 말씀 · 기도내용 2 · 3 · 맺음 말씀이 빈 값으로 지워졌다.
+           (이전 파일은 ModifyPrayPhrase.cshtml.bak_before_hidden4) *@
+        <input type="hidden" name="PraryBeginMesssage" value="@Model.PraryBeginMesssage" />
+        <input type="hidden" name="PrayContent2" value="@Model.PrayContent2" />
+        <input type="hidden" name="PrayContent3" value="@Model.PrayContent3" />
+        <input type="hidden" name="PraryEndMesssage" value="@Model.PraryEndMesssage" />
+
+        <button type="submit" class="qb-submit">저장</button>
+    </form>
+
+    <div class="qb-ft">
+        <span>기도문 수정</span>
+        <span><a href="/PrayPhrase/PrayPhraseDetailList">기도문 목록</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script>
+    function beforeSubmit(form) {
+        if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) return false;
+        document.getElementById('loadingOverlay').classList.add('on');
+        return true;
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

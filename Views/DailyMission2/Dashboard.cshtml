@@ -1,0 +1,951 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+
+@{
+    var awardPickUrl = TempData.Peek("DM2_AWARD_URL") as string;
+    bool needPickAward = !string.IsNullOrWhiteSpace(awardPickUrl);
+
+    int cYear = DateHelper.GetKoreaNow().Year;
+
+    Layout = "_Layout_Mission2_New";
+
+    ViewBag.DM2Page = "dash";
+    ViewBag.DM2Done = false;
+
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var toast = (ViewBag.Toast ?? "").ToString();
+
+    bool canAct = Model.IsActionable;
+    int total = Model.YearPoint?.YearTotalPoint ?? 0;
+
+    string UrlWithDate(string baseUrl) => $"{baseUrl}?date={d}";
+
+    var okPopupMsg = TempData["DM2_OK_POPUP"] as string;
+    var awardUrl   = TempData["DM2_AWARD_URL"] as string;
+    var returnUrl  = (Context?.Request?.Path.ToString() ?? "") + (Context?.Request?.QueryString.ToString() ?? "");
+
+    var st = Model.DayStatus;
+
+    bool prayDoneComputed = st?.PrayDone ?? false;
+    bool doneToMe         = st?.Pray_ToMe ?? false;
+    bool doneToParent     = st?.Pray_ToParent ?? false;
+    bool doneToFriend     = st?.Pray_ToFriend ?? false;
+
+    bool finalPrayDone = prayDoneComputed;
+
+    bool mWord   = st?.WordDone   ?? false;
+    bool mQuiz   = st?.QuizDone   ?? false;
+    bool mPray   = finalPrayDone;
+    bool mRecite = st?.ReciteDone ?? false;
+    int  doneCnt = (mWord?1:0) + (mQuiz?1:0) + (mPray?1:0) + (mRecite?1:0);
+
+    var dateKo = Model.SelectedDate.ToString("M월 d일 (ddd)", new CultureInfo("ko-KR"));
+
+    // FullName 우선, 없으면 UserName
+    var fullName = (ViewData["UserFullName"] as string ?? "").Trim();
+    var displayName = !string.IsNullOrEmpty(fullName) ? fullName : Model.UserName;
+
+    // 오늘(선택일) 일별 점수
+    int todayPts = 0;
+    if (Model.CalendarDayPointMap != null && Model.CalendarDayPointMap.TryGetValue(d, out var _tp))
+        todayPts = _tp;
+
+    // 링 표시 계산
+    // · 4점 이하: doneCnt / 4  (1/4, 2/4, 3/4, 4/4)
+    // · 5점 이상: todayPts / todayPts  (5/5, 6/6 ...)
+    int ringCur  = todayPts > 4 ? todayPts : doneCnt;
+    int ringMax  = todayPts > 4 ? todayPts : 4;
+    double ringFill = ringMax > 0 ? Math.Min((double)ringCur / ringMax, 1.0) : 0.0;
+
+    // SVG 링
+    double ringR    = 52.0;
+    double ringCirc = 2.0 * Math.PI * ringR;
+    double ringOff  = ringCirc * (1.0 - ringFill);
+    string ringStroke = ringFill >= 1.0 ? "#fbbf24" : "#ffffff";
+}
+
+@{
+    var user        = await AuthService.GetSignedUser(User);
+    var isSignedIn  = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+    bool isStaff    = (isAdmin || isSuperAdmin);
+}
+
+<style>
+/* ================================================================
+   DASHBOARD — Daily Quest  (2025 혁신 디자인)
+   ================================================================ */
+:root {
+    --dq-bg:     #f0f2ff;
+    --dq-surf:   #ffffff;
+    --dq-ink:    #1e1b4b;
+    --dq-muted:  #64748b;
+    --dq-border: rgba(99,102,241,.13);
+    --dq-r:      22px;
+    --dq-trans:  .18s cubic-bezier(.4,0,.2,1);
+    --dq-shadow: 0 4px 20px rgba(30,27,75,.10);
+    --dq-shadow-lg: 0 12px 40px rgba(30,27,75,.15);
+}
+
+.dqWrap {
+    min-height: 100%;
+    padding-bottom: 24px;
+}
+
+/* ── 토스트 ── */
+.dqToast {
+    background: #1e1b4b; color: #fff;
+    padding: 10px 16px; border-radius: 14px;
+    font-weight: 800; font-size: 14px;
+    margin-bottom: 14px;
+    box-shadow: var(--dq-shadow-lg);
+    animation: dqSlideDown .35s ease both;
+}
+@@keyframes dqSlideDown {
+    from { opacity:0; transform:translateY(-12px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+
+/* ================================================================
+   HERO — 진행률 링 + 포인트 + 미션 도트
+   ================================================================ */
+.dqHero {
+    position: relative;
+    border-radius: 28px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    background: linear-gradient(145deg, #312e81 0%, #4f46e5 40%, #0ea5e9 100%);
+    box-shadow: 0 16px 48px rgba(79,70,229,.40), 0 4px 12px rgba(79,70,229,.25);
+    padding: 22px 20px 20px;
+    color: #fff;
+}
+
+/* 배경 데코 원 */
+.dqHero::before,
+.dqHero::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
+.dqHero::before {
+    width: 220px; height: 220px;
+    top: -60px; right: -50px;
+    background: rgba(255,255,255,.06);
+}
+.dqHero::after {
+    width: 140px; height: 140px;
+    bottom: -40px; left: 10px;
+    background: rgba(255,255,255,.04);
+}
+
+/* 프로그램 타이틀 */
+.dqHero-program {
+    text-align: center;
+    margin-bottom: 14px;
+    position: relative; z-index: 2;
+
+    /* 링크지만 링크처럼 보이지 않게 — 색·밑줄·눌림 효과를 모두 지운다. */
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.dqHero-program:hover,
+.dqHero-program:focus,
+.dqHero-program:active,
+.dqHero-program:visited {
+    color: inherit;
+    text-decoration: none;
+}
+.dqHero-programTitle {
+    font-size: 20px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -.3px;
+    text-shadow: 0 2px 8px rgba(0,0,0,.25);
+    margin-bottom: 4px;
+}
+.dqHero-programSub {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: rgba(255,255,255,.82);
+    line-height: 1.4;
+}
+
+/* 날짜 + 잠금 뱃지 */
+.dqHero-toprow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    position: relative; z-index: 2;
+}
+.dqHero-dateBadge {
+    font-size: 12px; font-weight: 800;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 99px;
+    padding: 4px 12px;
+    backdrop-filter: blur(4px);
+}
+.dqHero-lockBadge {
+    font-size: 11px; font-weight: 800;
+    background: rgba(251,191,36,.25);
+    border: 1px solid rgba(251,191,36,.40);
+    color: #fef3c7;
+    border-radius: 99px;
+    padding: 4px 10px;
+}
+
+/* 메인 콘텐츠: 링 + 텍스트 나란히 */
+.dqHero-main {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    position: relative; z-index: 2;
+}
+
+/* SVG 진행률 링 */
+.dqRingWrap {
+    position: relative;
+    flex-shrink: 0;
+    width: 120px; height: 120px;
+}
+.dqRing { transform: rotate(-90deg); }
+.dqRing-track  { transition: none; }
+.dqRing-prog   {
+    transition: stroke-dashoffset 1.2s cubic-bezier(.34,1.0,.64,1);
+    stroke-linecap: round;
+}
+.dqRingCenter {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+}
+.dqRingNum {
+    font-size: 26px;
+    font-weight: 900;
+    line-height: 1;
+    color: #fff;
+}
+.dqRingLabel {
+    font-size: 10px;
+    font-weight: 700;
+    opacity: .75;
+    margin-top: 2px;
+}
+
+/* 텍스트 영역 */
+.dqHero-info { flex: 1; min-width: 0; }
+.dqHero-greeting {
+    font-size: 13px;
+    font-weight: 700;
+    opacity: .8;
+    margin-bottom: 2px;
+}
+.dqHero-name {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1.15;
+    margin-bottom: 10px;
+    word-break: keep-all;
+}
+.dqHero-ptRow {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+.dqHero-ptIcon { font-size: 16px; }
+.dqHero-ptNum  {
+    font-size: 28px; font-weight: 900;
+    color: #fde68a;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+.dqHero-ptUnit { font-size: 12px; font-weight: 700; opacity: .8; }
+
+/* 4개 미션 진행 도트 */
+.dqDots {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+}
+.dqDot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.dqDot-circle {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    border: 2px solid rgba(255,255,255,.30);
+    background: rgba(255,255,255,.10);
+    transition: all .3s ease;
+    position: relative;
+}
+.dqDot-circle.done {
+    background: rgba(34,197,94,.30);
+    border-color: rgba(134,239,172,.60);
+    box-shadow: 0 0 12px rgba(34,197,94,.40);
+}
+.dqDot-circle.done::after {
+    content: "✓";
+    position: absolute;
+    bottom: -4px; right: -4px;
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    background: #22c55e;
+    color: #fff;
+    font-size: 8px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #fff;
+    line-height: 15px; text-align: center;
+}
+.dqDot-lbl {
+    font-size: 9px; font-weight: 700;
+    opacity: .75;
+}
+
+/* 완료 메시지 (4/4) */
+.dqHero-allDone {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(34,197,94,.20);
+    border: 1px solid rgba(134,239,172,.40);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #d1fae5;
+    position: relative; z-index: 2;
+    animation: dqPulse 2s ease-in-out infinite;
+}
+@@keyframes dqPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,.3); }
+    50%       { box-shadow: 0 0 0 6px rgba(34,197,94,.0); }
+}
+
+/* ================================================================
+   잠금 경고 바
+   ================================================================ */
+.dqLock {
+    background: #fffbeb;
+    border: 1.5px dashed #fcd34d;
+    border-radius: 16px;
+    padding: 13px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #78350f;
+}
+.dqLock-ico { font-size: 22px; flex-shrink: 0; margin-top: -1px; }
+
+/* ================================================================
+   달력 섹션
+   ================================================================ */
+.dqCalCard {
+    background: var(--dq-surf);
+    border-radius: var(--dq-r);
+    // border: 1px solid var(--dq-border);
+    box-shadow: var(--dq-shadow);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+
+/* ================================================================
+   다른날짜 알림
+   ================================================================ */
+.dqOtherDate {
+    background: var(--dq-surf);
+    border: 1px solid var(--dq-border);
+    border-radius: var(--dq-r);
+    padding: 18px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 16px;
+    box-shadow: var(--dq-shadow);
+}
+.dqBtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 22px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #fff; font-weight: 800; font-size: 14px;
+    text-decoration: none; border: none; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(79,70,229,.35);
+    transition: transform .15s, box-shadow .15s;
+}
+.dqBtn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(79,70,229,.40); }
+
+/* ================================================================
+   미션 그리드
+   ================================================================ */
+.dqMGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 16px;
+}
+@@media (max-width: 440px) {
+    .dqMGrid { grid-template-columns: 1fr; }
+}
+
+/* ================================================================
+   퀵 메뉴 (아이콘 그리드)
+   ================================================================ */
+.dqQuick {
+    background: var(--dq-surf);
+    border-radius: var(--dq-r);
+    border: 1px solid var(--dq-border);
+    box-shadow: var(--dq-shadow);
+    overflow: hidden;
+    margin-bottom: 16px;
+}
+.dqQuick-head {
+    padding: 13px 16px 11px;
+    font-size: 14px; font-weight: 800;
+    color: var(--dq-ink);
+    border-bottom: 1px solid var(--dq-border);
+    display: flex; align-items: center; gap: 7px;
+    background: linear-gradient(90deg, rgba(99,102,241,.06), transparent);
+}
+.dqQuick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;                          /* 셀 사이 1px 간격 — 번짐 차단 */
+    background: var(--dq-border);      /* 간격 자체가 구분선 */
+}
+@@media (max-width: 400px) {
+    .dqQuick-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.dqQBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px 6px 14px;
+    text-decoration: none;
+    color: var(--dq-ink);
+    cursor: pointer;
+    background: var(--dq-surf);        /* 각 셀 독립 배경 */
+    position: relative;
+    overflow: hidden;                  /* ripple 등 효과 셀 안에서만 */
+    isolation: isolate;                /* 완전히 독립 — 인접 셀 영향 없음 */
+    transition: background var(--dq-trans);
+    -webkit-tap-highlight-color: transparent; /* 모바일 번짐 제거 */
+}
+/* hover: 아이콘만 살짝 올라감 */
+.dqQBtn:hover { background: rgba(99,102,241,.06); }
+/* active: ::after 오버레이로 셀 안에서만 표시 */
+.dqQBtn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(99,102,241,.10);
+    opacity: 0;
+    transition: opacity .12s ease;
+    pointer-events: none;
+}
+.dqQBtn:active::after { opacity: 1; }
+.dqQIco {
+    width: 46px; height: 46px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    background: linear-gradient(135deg, rgba(99,102,241,.12), rgba(139,92,246,.08));
+    border: 1px solid rgba(99,102,241,.12);
+    transition: transform var(--dq-trans);
+}
+.dqQBtn:hover .dqQIco { transform: scale(1.08) rotate(-3deg); }
+.dqQLbl {
+    font-size: 11px; font-weight: 800;
+    text-align: center; line-height: 1.3;
+    max-width: 64px; color: var(--dq-ink);
+}
+.dqQSub {
+    font-size: 9.5px; font-weight: 600;
+    color: var(--dq-muted);
+    text-align: center; line-height: 1.2;
+    max-width: 64px;
+}
+/* 특수 버튼 */
+.dqQBtn.award-btn .dqQIco    { background: linear-gradient(135deg,rgba(245,158,11,.20),rgba(251,191,36,.12)); border-color:rgba(245,158,11,.20); }
+.dqQBtn.admin-btn             { background: rgba(254,226,226,.30); }
+.dqQBtn.admin-btn .dqQIco    { background: linear-gradient(135deg,rgba(239,68,68,.18),rgba(251,113,133,.12)); border-color:rgba(239,68,68,.18); }
+.dqQBtn.feedback-btn .dqQIco { background: linear-gradient(135deg,rgba(16,185,129,.18),rgba(56,189,248,.12)); border-color:rgba(16,185,129,.18); }
+.dqQBtn.award-hl              { background: rgba(254,243,199,.50); }
+
+/* ── 페이드업 진입 애니메이션 ── */
+.dqFU {
+    animation: dqFadeUp .45s cubic-bezier(.22,1,.36,1) both;
+}
+.dqFU:nth-child(1){animation-delay:.03s}
+.dqFU:nth-child(2){animation-delay:.09s}
+.dqFU:nth-child(3){animation-delay:.15s}
+.dqFU:nth-child(4){animation-delay:.21s}
+.dqFU:nth-child(5){animation-delay:.27s}
+@@keyframes dqFadeUp {
+    from { opacity:0; transform:translateY(20px); }
+    to   { opacity:1; transform:translateY(0); }
+}
+</style>
+
+<div class="dqWrap">
+
+    @if (!string.IsNullOrWhiteSpace(toast))
+    {
+        <div class="dqToast">@toast</div>
+    }
+
+    <!-- ══════════════════════════════════════
+         HERO
+    ══════════════════════════════════════ -->
+    <div class="dqHero dqFU">
+
+        @* 프로그램 타이틀 — 눌러서 새 디자인(DailyMission4)으로 넘어간다.
+           링크인 티가 나지 않게 색·밑줄을 그대로 물려받게 해 둔다. *@
+        <a class="dqHero-program" href="/DailyMission4/Index">
+            <div class="dqHero-programTitle">🔥 @ConstatsCommon.MainKeyTitle</div>
+            <div class="dqHero-programSub">"거룩한 습관 만들기" 프로그램에 오심을 환영해요 🙌</div>
+        </a>
+
+        <!-- 날짜 / 잠금 뱃지 -->
+        <div class="dqHero-toprow">
+            <div class="dqHero-dateBadge">📅 @dateKo</div>
+            @if (!canAct)
+            {
+                <div class="dqHero-lockBadge">🔒 읽기 전용</div>
+            }
+        </div>
+
+        <!-- 링 + 텍스트 -->
+        <div class="dqHero-main">
+
+            <!-- SVG 진행률 링 -->
+            <div class="dqRingWrap">
+                <svg class="dqRing" viewBox="0 0 120 120" width="120" height="120">
+                    <circle class="dqRing-track"
+                            cx="60" cy="60" r="@((int)ringR)"
+                            fill="none"
+                            stroke="rgba(255,255,255,.18)"
+                            stroke-width="9"/>
+                    <circle class="dqRing-prog"
+                            cx="60" cy="60" r="@((int)ringR)"
+                            fill="none"
+                            stroke="@ringStroke"
+                            stroke-width="9"
+                            stroke-dasharray="@(ringCirc.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))"
+                            stroke-dashoffset="@(ringCirc.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))"
+                            data-target-offset="@(ringOff.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))"
+                            id="dqRingProg"/>
+                </svg>
+                <div class="dqRingCenter">
+                    <div class="dqRingNum">@ringCur/@ringMax</div>
+                    <div class="dqRingLabel">완료</div>
+                </div>
+            </div>
+
+            <!-- 텍스트 -->
+            <div class="dqHero-info">
+                <div class="dqHero-greeting">안녕하세요 👋</div>
+                <div class="dqHero-name">@(@displayName)<span style="font-size:.6em;font-weight:800;opacity:.85;">님</span></div>
+
+                <div class="dqHero-ptRow">
+                    <span class="dqHero-ptIcon"></span>
+                    <span class="dqHero-ptNum" id="dqPtNum">0</span>
+                    <span class="dqHero-ptUnit">점</span>
+                </div>
+
+                <!-- 미션 도트 -->
+                <div class="dqDots">
+                    <div class="dqDot">
+                        <div class="dqDot-circle @(mWord?"done":"")">📖</div>
+                        <div class="dqDot-lbl">말씀</div>
+                    </div>
+                    <div class="dqDot">
+                        <div class="dqDot-circle @(mQuiz?"done":"")">❓</div>
+                        <div class="dqDot-lbl">퀴즈</div>
+                    </div>
+                    <div class="dqDot">
+                        <div class="dqDot-circle @(mPray?"done":"")">🙏</div>
+                        <div class="dqDot-lbl">기도</div>
+                    </div>
+                    <div class="dqDot">
+                        <div class="dqDot-circle @(mRecite?"done":"")">📝</div>
+                        <div class="dqDot-lbl">암송</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (doneCnt == 4)
+        {
+            <div class="dqHero-allDone">
+                🎉 오늘 미션 @(@ringCur)점 달성! (@ringCur/@ringMax) 대단해요!
+            </div>
+        }
+    </div>
+
+    <!-- 잠금 안내 -->
+    @if (!canAct)
+    {
+        <div class="dqLock dqFU">
+            <div class="dqLock-ico">🔒</div>
+            <div>
+                <b>수행 불가 날짜입니다.</b><br />
+                <span style="font-size:12px;font-weight:600;">오늘·어제·그저께만 수행할 수 있어요.</span>
+            </div>
+        </div>
+    }
+
+    @* ── 선물 고를 수 있음 ──────────────────────────────
+       조건은 HasAffordableGift 다. "팝업을 봤는지"(eval.Show)와 무관하게
+       고를 수 있는 동안 계속 보인다. 학생이 아니면 서비스에서 이미 false 로 온다.
+       홈(/Home/Index)에 넣은 배너와 같은 모양·같은 기준이다.
+    ────────────────────────────────────────────────── *@
+    @{
+        bool _giftAvailable = ViewBag.GiftAvailable is bool _ga && _ga;
+        int  _giftCredit    = ViewBag.GiftCredit is int _gc ? _gc : 0;
+    }
+    @if (_giftAvailable)
+    {
+        <a class="gift-banner dqFU" href="/StudentPointDashboard4/MyGiftBox" aria-label="선물 고르러 가기">
+            
+            <span class="gift-tx">
+                <span class="gift-t">선물을 고를 수 있어요!</span>
+                <span class="gift-s">쌓은 크레딧으로 선물을 골라 보세요</span>
+            </span>
+            <span class="gift-r">
+                @if (_giftCredit > 0)
+                {
+                    <span class="gift-c">@_giftCredit.ToString("N0")<u>credit</u></span>
+                }
+                <span class="gift-go">고르러 가기 ›</span>
+            </span>
+        </a>
+        <style>
+            /* 위아래 여백은 이 화면의 다른 카드와 같은 규칙(아래 16px)을 쓴다.
+               위쪽 여백은 앞 카드의 margin-bottom 이 이미 만들어 준다. */
+            .gift-banner {
+                display: flex; align-items: center; gap: 16px;
+                text-decoration: none; color: inherit;
+                background: linear-gradient(135deg, #F59E0B, #D97706);
+                border-radius: 16px; padding: 20px 18px; margin: 0 0 16px;
+                min-height: 144px;
+                box-shadow: 0 6px 18px rgba(217,119,6,.28);
+                transition: box-shadow .18s, transform .18s;
+            }
+            .gift-banner:hover { box-shadow: 0 10px 26px rgba(217,119,6,.36); transform: translateY(-1px); }
+            .gift-banner:active { transform: translateY(0); }
+
+            .gift-tx { flex: 1; min-width: 0; color: #fff; text-align: left; }
+            .gift-t  { display: block; font-size: 18px; font-weight: 900; letter-spacing: -.3px; }
+            .gift-s  { display: block; font-size: 13px; margin-top: 7px; line-height: 1.5; color: rgba(255,255,255,.9); }
+            .gift-r  { flex: 0 0 auto; text-align: right; color: #fff; white-space: nowrap; }
+            .gift-c  { display: block; font-size: 26px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+            .gift-c u { text-decoration: none; font-size: 11px; font-weight: 700; margin-left: 4px; color: rgba(255,255,255,.85); }
+            .gift-go {
+                display: inline-block; font-size: 12px; font-weight: 800; margin-top: 12px;
+                color: #fff; background: rgba(255,255,255,.2); border-radius: 999px; padding: 6px 13px;
+            }
+
+            /* 모바일 : 좁은 폭에서 좌우로 나누면 글이 눌린다.
+               위아래로 쌓고, 크레딧과 버튼을 한 줄에 나란히 둔다. */
+            @@media (max-width: 560px) {
+                .gift-banner {
+                    flex-direction: column; align-items: stretch;
+                    gap: 14px; min-height: 0; padding: 18px 16px;
+                }
+                .gift-tx { text-align: left; }
+                .gift-t  { font-size: 16.5px; word-break: keep-all; }
+                .gift-s  { font-size: 12.5px; margin-top: 5px; word-break: keep-all; }
+                .gift-r  {
+                    display: flex; align-items: center; justify-content: space-between;
+                    gap: 12px; text-align: left;
+                    padding-top: 13px; border-top: 1px solid rgba(255,255,255,.25);
+                }
+                .gift-c  { font-size: 23px; }
+                .gift-go { margin-top: 0; }
+            }
+        </style>
+    }
+
+    <!-- 공지 배너 -->
+@*    @await Html.PartialAsync("_Banner_4Mission_Notice_Once") *@
+
+    <!-- ══════════════════════════════════════
+         달력
+    ══════════════════════════════════════ -->
+    <div class="dqCalCard dqFU">
+        @await Html.PartialAsync("~/Views/DailyMission2/_Calendar.cshtml", Model)
+    </div>
+
+    @await Html.PartialAsync("_FamilyTree")
+
+    <!-- 다른 날짜 알림 -->
+    @if (Model.IsOtherDate)
+    {
+        <div class="dqOtherDate dqFU">
+            📢 <b>@Model.SelectedDate.ToString("M월 d일", new CultureInfo("ko-KR"))</b>자 미션을 보고 있어요.<br /><br />
+            <a class="dqBtn" href="/DailyMission2?date=@Model.Today.ToString("yyyy-MM-dd")">오늘로 이동 →</a>
+        </div>
+    }
+
+    <!-- ══════════════════════════════════════
+         4대 미션 카드
+    ══════════════════════════════════════ -->
+    <div class="dqMGrid">
+
+        @{
+            var done       = st?.WordDone ?? false;
+            var hasContent = Model.Content?.TodayWordToReadId != null;
+            var pillClass  = done ? "pill done" : "pill todo";
+            var pillText   = done ? "✅ 완료!" : "⏳ 미완료";
+            var btnWText   = done ? "말씀 미션(다시보기)" : "말씀 읽기";
+            var sticker    = done ? "잘했어요! 🎉 오늘 말씀을 읽었어요!" : "지금 읽으면 마음이 반짝✨ 말씀 읽고 포인트도 쑥쑥!";
+            var disabled   = (!canAct || !hasContent);
+            var _wr = ViewBag.TodayWordToReadRow as BulletinBoard.Models.DailyMission2.TodayWordDetailResult;
+            var _wTitle = _wr?.BibleSubject ?? "";
+            var _wRef   = _wr != null
+                ? $"{_wr.BibleText} {BulletinBoard.Common.SharedComm.MakeBibleSerialJangZul(_wr.BibleText, _wr.FromJang, _wr.FromZul, _wr.ToJang, _wr.ToZul)}"
+                : "";
+        }
+        @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji="📖", Title="오늘의 말씀",
+            PillClass=pillClass, PillText=pillText, Sticker=sticker,
+            Desc="오늘의 말씀을 읽어요 · 2P",
+            SubTitle=_wTitle, SubRef=_wRef,
+            BtnClass="word", BtnIcon="📖", BtnText=btnWText,
+            Href=UrlWithDate("/DailyMission2/Word"),
+            Disabled=disabled, HasContent=hasContent,
+            DateText=d, NoContentMsg="TodayWordToRead 콘텐츠가 없어요.", IsDone=done
+        })
+
+        @{
+            var quiz         = Model.Content?.Quiz;
+            bool hasQuiz     = quiz?.QuestionId != null;
+            bool quizCorrect = st?.QuizCorrect ?? false;
+            int  tryCntMax   = st?.QuizTryCntMax ?? 0;
+            bool doneQuiz    = st?.QuizDone ?? false;
+            bool qFailedOnce = (!quizCorrect && tryCntMax == 1);
+            bool qFailed     = (!quizCorrect && tryCntMax >= 2);
+            string pillQ; string pillQClass; var btnQText = "퀴즈 풀기";
+            if (qFailedOnce)    { pillQ = "한 번 더! 😊";   pillQClass = "pill fail"; }
+            else if (qFailed)   { pillQ = "❌ 아쉽네요!";    pillQClass = "pill fail"; }
+            else if (!doneQuiz) { pillQ = "⏳ 미완료";       pillQClass = "pill todo"; }
+            else                { pillQ = "✅ 완료!";        pillQClass = "pill done"; btnQText = "퀴즈 미션(다시보기)"; }
+            var stickerQ = qFailed  ? "오늘은 어려웠나봐요 🥲 내일 다시 도전!" :
+                           doneQuiz ? "정답 맞혔어요 🎉 똑똑 스티커! 🧠" :
+                           "말씀 읽고 퀴즈 풀면 더 쉬워요! ✨";
+            var disabledQ = (!canAct || !hasQuiz);
+        }
+        @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji="❓", Title="재미있는 퀴즈",
+            PillClass=pillQClass, PillText=pillQ, Sticker=stickerQ,
+            Desc="말씀 퀴즈 도전 · 1P",
+            BtnClass="quiz", BtnIcon="❓", BtnText=btnQText,
+            Href=UrlWithDate("/DailyMission2/Quiz"),
+            Disabled=disabledQ, HasContent=hasQuiz,
+            DateText=d, NoContentMsg="Quiz 콘텐츠가 없어요.", IsDone=doneQuiz
+        })
+
+        @{
+            var hasP       = Model.Content?.PrayPhraseId != null;
+            var doneP      = finalPrayDone;
+            var pillPClass = doneP ? "pill done" : "pill todo";
+            var pillPText  = doneP ? "✅ 완료!" : "⏳ 미완료";
+            var stickerP   = doneP ? "하나님께 마음을 드렸어요 💚" : "짧게라도 좋아요! 🙏 한마디부터 시작!";
+            var disabledP  = (!canAct || !hasP);
+            var btnPText   = doneP ? "기도 미션(다시보기)" : "기도하기";
+            var btnPIcon   = doneP ? "👀" : "🙏";
+            dynamic _pr = ViewBag.TodayPrayPhraseRow;
+            string _pTitle = "";
+            if (_pr != null && _pr?.PrayPhraseData != null)
+            {
+                try { _pTitle = (_pr.PrayPhraseData.PrayTitle ?? "").ToString(); } catch { }
+            }
+        }
+        @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji="🙏", Title="기도해요",
+            PillClass=pillPClass, PillText=pillPText, Sticker=stickerP,
+            Desc="가족을 위해 · 2P",
+            SubTitle="오늘의 성품기도", SubRef=_pTitle,
+            BtnClass="pray", BtnIcon=btnPIcon, BtnText=btnPText,
+            Href=UrlWithDate("/DailyMission2/Pray"),
+            Disabled=disabledP, HasContent=hasP,
+            DateText=d, NoContentMsg="PrayPhrase 콘텐츠가 없어요.", IsDone=doneP
+        })
+
+        @{
+            var doneR      = st?.ReciteDone ?? false;
+            var hasR       = Model.Content?.WeeklyWordToReadId != null;
+            var pillRClass = doneR ? "pill done" : "pill todo";
+            var pillRText  = doneR ? "✅ 완료!" : "⏳ 미완료";
+            var stickerR   = doneR ? "말씀을 외웠어요 🌟 암송 마스터!" : "한 줄씩 천천히! 🐢 가리고 말해보기로 쉽게!";
+            var btnRText   = doneR ? "암송 미션(다시보기)" : "암송하기";
+            var disabledR  = (!canAct || !hasR);
+        }
+        @await Html.PartialAsync("~/Views/DailyMission2/Partials/_MissionCard.cshtml", new {
+            Emoji="📝", Title="말씀 암송",
+            PillClass=pillRClass, PillText=pillRText, Sticker=stickerR,
+            Desc="이번 주 암송 · 1P",
+            BtnClass="recite", BtnIcon="📝", BtnText=btnRText,
+            Href=UrlWithDate("/DailyMission2/Recite"),
+            Disabled=disabledR, HasContent=hasR,
+            DateText=d, NoContentMsg="WeeklyWordToRead 콘텐츠가 없어요.", IsDone=doneR
+        })
+    </div>
+
+    <!-- 잠금 날짜 하단 -->
+    @if (!canAct)
+    {
+        <div class="dqOtherDate dqFU">
+            🔒 <b>수행 불가 날짜</b>입니다.<br />
+            오늘·어제·그저께만 수행 가능해요.<br /><br />
+            <a class="dqBtn" href="/DailyMission2?date=@Model.Today.ToString("yyyy-MM-dd")">오늘로 가기 →</a>
+        </div>
+    }
+
+    <!-- ══════════════════════════════════════
+         퀵 메뉴
+    ══════════════════════════════════════ -->
+    <div class="dqQuick dqFU">
+        <div class="dqQuick-head">🔗 더 보기</div>
+        <div class="dqQuick-grid">
+
+            @if (needPickAward)
+            {
+                <a class="dqQBtn award-hl award-btn" onclick="location.href='@awardPickUrl'">
+                    <div class="dqQIco">🎁</div>
+                    <div class="dqQLbl">상품선택</div>
+                    <div class="dqQSub">레벨달성!</div>
+                </a>
+            }
+
+            <a class="dqQBtn" onclick="location.href='/StudentPointDashboard4/MyGiftBox3'">
+                <div class="dqQIco">🎁</div>
+                <div class="dqQLbl">선물함</div>
+                <div class="dqQSub">나의 선물</div>
+            </a>
+
+            <a class="dqQBtn" onclick="location.href='/DailyMission2/ParticipantPersons'">
+                <div class="dqQIco">👥</div>
+                <div class="dqQLbl">참여자</div>
+                <div class="dqQSub">개인/팀</div>
+            </a>
+
+            <a class="dqQBtn" onclick="location.href='/DailyMission2/ParticipantTeams'">
+                <div class="dqQIco">👨‍👩‍👧‍👦</div>
+                <div class="dqQLbl">가족팀</div>
+                <div class="dqQSub">팀 목록</div>
+            </a>
+
+            <a class="dqQBtn" onclick="location.href='/DailyMission2/UserMonthlyPoints?userName=@ViewData["UserName"]'">
+                <div class="dqQIco">📊</div>
+                <div class="dqQLbl">월별보기</div>
+                <div class="dqQSub">월별이력</div>
+            </a>
+
+            <a class="dqQBtn" onclick="location.href='/DailyMission2/UserDailyPoints?userName=@ViewData["UserName"]'">
+                <div class="dqQIco">🗓️</div>
+                <div class="dqQLbl">일자별</div>
+                <div class="dqQSub">일별이력</div>
+            </a>
+
+            <a class="dqQBtn" onclick="location.href='/StudentPointDashboard4/AdminPurchaseList'">
+                <div class="dqQIco">🎁</div>
+                <div class="dqQLbl">친구선물</div>
+                <div class="dqQSub">친구가 고른</div>
+            </a>
+
+            <a class="dqQBtn feedback-btn" href="/Board/Create2?boardName=Anonymous">
+                <div class="dqQIco">💬</div>
+                <div class="dqQLbl">불편접수</div>
+                <div class="dqQSub">개선사항</div>
+            </a>
+
+            @if (isSuperAdmin)
+            {
+                <a class="dqQBtn admin-btn" onclick="location.href='/DailyMission2/DeleteClickHistory'">
+                    <div class="dqQIco">🛠️</div>
+                    <div class="dqQLbl">관리자</div>
+                    <div class="dqQSub">이력삭제</div>
+                </a>
+            }
+
+            <a class="dqQBtn" href="/">
+                <div class="dqQIco">🏠</div>
+                <div class="dqQLbl">홈</div>
+                <div class="dqQSub">메인으로</div>
+            </a>
+
+        </div>
+    </div>
+
+</div>
+
+<script src="/js/GlobalCookie.js"></script>
+<script>
+(function () {
+    // ── 포인트 카운트업 ──
+    var ptEl = document.getElementById('dqPtNum');
+    if (ptEl) {
+        var target = @total, dur = 1000, start = null;
+        function countUp(ts) {
+            if (!start) start = ts;
+            var p    = Math.min((ts - start) / dur, 1);
+            var ease = 1 - Math.pow(1 - p, 3);
+            ptEl.textContent = Math.round(ease * target).toLocaleString('ko-KR');
+            if (p < 1) requestAnimationFrame(countUp);
+        }
+        requestAnimationFrame(countUp);
+    }
+
+    // ── SVG 링 애니메이션 (CSS 트랜지션 트리거) ──
+    var prog = document.getElementById('dqRingProg');
+    if (prog) {
+        var targetOff = parseFloat(prog.getAttribute('data-target-offset'));
+        // 렌더 후 한 프레임 뒤에 offset 적용 → CSS transition 발동
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                prog.style.strokeDashoffset = targetOff;
+            });
+        });
+    }
+})();
+</script>
+
+@await Html.PartialAsync(
+    "~/Views/DailyMission2/Partials/_OkPopup.cshtml",
+    new {
+        Message        = okPopupMsg,
+        RedirectUrl    = awardUrl,
+        ReturnUrl      = returnUrl,
+        AutoCloseSeconds = 10,
+        ShowActions    = true
+    }
+)

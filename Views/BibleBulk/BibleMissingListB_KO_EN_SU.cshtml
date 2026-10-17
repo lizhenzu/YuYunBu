@@ -1,0 +1,298 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<BulletinBoard.Models.view_KO_EN_SU>
+
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경등록(전체)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Gowun Dodum', sans-serif;
+            background: linear-gradient(to right, #e0f7fa, #f1f8e9);
+            text-align: center;
+            color: #2e2e2e;
+        }
+
+
+
+        header {
+            background-color: #4caf50;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+            .controls button {
+                padding: 0.6rem 1.2rem;
+                font-size: 1rem;
+                border: none;
+                border-radius: 10px;
+                cursor: pointer;
+                background-color: #ffffff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            }
+
+        .grid-contai11ner {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1.2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .grid-container {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+
+        .book-card {
+            background-color: #ffffffcc;
+            border-radius: 20px;
+            text-align: center;
+            padding: 1.2rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+            .book-card:hover {
+                transform: scale(1.05);
+                background-color: #dcedc8;
+            }
+
+        .modal, .video-popup {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content, .video-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 20px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .chapter-list {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+            .chapter-list button {
+                background-color: #aed581;
+                border: none;
+                padding: 0.4rem 0.8rem;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 0.9rem;
+            }
+
+        .video-frame {
+            width: 320px;
+            height: 180px;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.9rem;
+            padding: 2rem 1rem;
+            color: #666;
+        }
+    </style>
+
+    <style>
+
+        table {
+            width: 90%;
+            max-width: 1000px;
+            border-collapse: collapse;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 3px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        th {
+            background-color: #34495e;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+    </style>
+
+</head>
+<body>
+
+    <header>성경등록(전체)</header>
+
+    <div class="controls">
+        <button onclick="location.href='/'">Home</button>
+        <button onclick="toggleBgm()">🎵 배경 음악</button>
+        <button onclick="location.href='/BibleBulk/EnrollBulkQuiz'">SQL</button>
+    </div>
+
+
+    <div class="grid-container">
+
+        <table>
+            <thead>
+                <tr>
+                    <th>성경</th>
+                    @*    <th>영문</th>*@
+                    <th>장</th>
+                    <th>K</th>
+                    <th>E</th>
+                    <th>EN</th>
+                    <th>A</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                { // Id, BibleText, BibleJang, Chapters_KO, Verses_KO, Chapters_EN, Verses_EN, Chapters_NIV, Verses_NIV, Summary_Count
+                    bool theSame = false;
+                    <tr>
+
+                        @if ((@item.BibleJang == @item.Chapters_KO) && (@item.BibleJang == @item.Chapters_EN) && (@item.BibleJang == @item.Chapters_NIV) && (@item.BibleJang == @item.Summary_Count))
+                        {
+                            @if ((@item.Verses_KO == @item.Verses_EN) && (@item.Verses_KO == @item.Verses_NIV))
+                            {
+                                theSame = true;
+                            }
+                        }
+                        @if (theSame)
+                        {
+                            @*  <td colspan=4>
+                    @item.BibleJang
+                    </td>*@
+                        }
+                        else
+                        {
+                            <td>@item.BibleText</td>
+                            <td>@item.BibleJang</td>
+
+
+                            <td style="color:red;" onclick="showChapters('/BibleBulk/BibleMissingListByLang?KO_BibleText=@item.BibleText')">
+                                @item.Chapters_KO
+                            </td>
+                            <td style="color:red;" onclick="showChapters('/BibleBulk/BibleMissingListByLang?KO_BibleText=@item.BibleText')">
+                                @item.Chapters_EN
+                            </td>
+                            <td style="color:red;" onclick="showChapters('/BibleBulk/BibleMissingList_NIV?BibleText=@item.BibleText')">
+                                @item.Chapters_NIV
+                            </td>
+                            <td style="color:red;" onclick="location.href='/BibleBulk/BibleMissingListB_SU?BibleText=@item.BibleText'">
+                                @item.Summary_Count
+                            </td>
+
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="controls">
+        <button onclick="location.href='/'">Home</button>
+        <button onclick="toggleBgm()">🎵 배경 음악</button>
+    </div>
+
+
+
+
+    <footer>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</footer>
+
+    <script>
+        const modal = document.getElementById("modal");
+        const chapterList = document.getElementById("chapterList");
+        const selectedBookEl = document.getElementById("selectedBook");
+        const videoPopup = document.getElementById("videoPopup");
+        const youtubeFrame = document.getElementById("youtubeFrame");
+        const fixedVideoId = "QquLCaitw9s";
+
+        function showChapters(URL) {
+            window.location.href = URL;
+        }
+
+        function closeModal() {
+            modal.style.display = "none";
+        }
+
+        function closeVideo() {
+            videoPopup.style.display = "none";
+            youtubeFrame.src = "";
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle("dark-mode");
+        }
+
+        function toggleBgm() {
+            const bgm = document.getElementById("bgm");
+            if (bgm.paused) {
+                bgm.play();
+            } else {
+                bgm.pause();
+            }
+        }
+    </script>
+
+</body>
+</html>

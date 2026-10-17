@@ -1,0 +1,77 @@
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Cfg = BulletinBoard.Models.Prayer365.Prayer365Config
+@inject BulletinBoard.Services.Prayer365.IPrayer365Service Prayer365
+
+<!-- ✅ 가정을 위한 기도 — DailyMission4 밝은 흰색 카드 (2026-10-03 시안 확정)
+     · 테두리 A안(연한 회색 선 1px) · 자녀 칸을 위로 넓게(달력 칩 + 오늘 기도 제목) · 아래 아내 · 남편 두 칸
+     · 예전 크림색 "오늘의 축복 기도" 배너(_Banner_Prayer365)의 날짜 · 제목을 여기로 옮겼다
+     · 오늘 기도 제목은 365 기도문이 공개 전(StaffOnly)이면 관리자(SuperAdmin · Basic)에게만.  이전 화면은 .bak_before_bright -->
+@{
+    var fprToday = DateHelper.GetKoreaToday();
+    bool fprStaff = User?.Identity?.IsAuthenticated == true;   // 공개 전에는 로그인한 회원만
+    string? fprTitle = null;
+    if (!Cfg.StaffOnly || fprStaff)
+    {
+        try { fprTitle = await Prayer365.GetTitleAsync(Cfg.Md(fprToday)); }
+        catch { fprTitle = null; }   // 표 문제면 제목 없이
+    }
+}
+<section class="fprSec">
+    <style>
+        .fprSec { padding: 16px 0; }
+        .fprCard { background: #FFFFFF; border: 1px solid #E8ECF2; border-radius: 18px; padding: 20px 18px; text-align: left;
+                   font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: #374151; }
+        .fprHd { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+        .fprK { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        /* 기도 전체 — 연파랑 알약 (2026-10-04 · 기도홈으로) */
+        .fprMore { flex: none; font-size: 12.5px; font-weight: 800; color: #2F80ED; background: #EAF2FD; border-radius: 999px; padding: 4px 12px; text-decoration: none; white-space: nowrap; }
+        .fprMore:hover { background: #DCEAFB; color: #2F80ED; }
+        .fprHd { align-items: center; }
+        .fprT { margin: 6px 0 0; font-size: 20px; font-weight: 800; letter-spacing: -.02em; line-height: 1.35; color: #111827; }
+        .fprS { margin-top: 3px; font-size: 12.5px; color: #6B7280; }
+        .fprTiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+        .fprTi { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-height: 84px; padding: 14px 12px;
+                 border-radius: 14px; background: #F4F6F9; color: inherit; text-decoration: none; transition: background .15s; }
+        .fprTi:hover { background: #EDF0F4; }
+        .fprTi i { font-style: normal; font-size: 11px; font-weight: 800; color: #6B7280; }
+        .fprTi b { font-size: 15px; font-weight: 800; line-height: 1.35; color: #111827; word-break: keep-all; }
+        .fprTi u { margin-top: auto; text-decoration: none; font-size: 12px; font-weight: 700; color: #6B7280; }
+
+        /* 자녀를 위한 365 — 위로 넓게 */
+        .fprTi.main { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 14px; min-height: 0; background: #EAF2FD; }
+        .fprTi.main:hover { background: #DCEAFB; }
+        .fprCal { flex: none; width: 52px; border-radius: 10px; overflow: hidden; background: #fff; text-align: center; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
+        .fprCal small { display: block; padding: 3px 0; background: #2F80ED; color: #fff; font-size: 10.5px; font-weight: 800; letter-spacing: .02em; }
+        .fprCal strong { display: block; padding: 3px 0 5px; font-size: 22px; font-weight: 300; line-height: 1.1; color: #111827; }
+        .fprTx { flex: 1; min-width: 0; }
+        .fprTx b { display: block; }
+        .fprTx span { display: block; margin-top: 3px; font-size: 13.5px; font-weight: 700; color: #2F80ED; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .fprTx span.dim { font-weight: 400; color: #6B7280; }
+        .fprTi.main u { flex: none; margin: 0; font-size: 18px; font-weight: 300; color: #2F80ED; }
+        @@media (max-width: 480px) { .fprCard { padding: 18px 14px; } .fprTiles { gap: 6px; } }
+    </style>
+
+    <div class="fprCard">
+        <div class="fprHd">
+            <span class="fprK">가정을 위한 기도</span>
+            <a class="fprMore" href="/PrayHome/Index" aria-label="기도홈 — 기도 전체 보기">기도 전체 ›</a>
+        </div>
+        <div class="fprT">오늘도 가족을 위해</div>
+        <div class="fprS">매일 사랑하는 가족을 위해 기도해 주세요</div>
+
+        <div class="fprTiles">
+            <a class="fprTi main" href="/Prayer365?view=user" aria-label="자녀를 위한 365일 축복 기도 — 오늘 기도문">
+                <span class="fprCal"><small>@(fprToday.Month)월</small><strong>@fprToday.Day</strong></span>
+                <span class="fprTx">
+                    <b>자녀를 위한 365</b>
+                    @if (!string.IsNullOrWhiteSpace(fprTitle)) { <span>@fprTitle</span> }
+                    else { <span class="dim">오늘 날짜의 축복 기도문</span> }
+                </span>
+                <u>›</u>
+            </a>
+            <a class="fprTi" href="/BessingACouple/DetailWords?Kind=Wife"><i>부부</i><b>아내를 위해</b><u>기도하기 ›</u></a>
+            <a class="fprTi" href="/BessingACouple/DetailWords?Kind=Husband"><i>부부</i><b>남편을 위해</b><u>기도하기 ›</u></a>
+        </div>
+    </div>
+</section>

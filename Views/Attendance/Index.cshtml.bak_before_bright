@@ -1,0 +1,376 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.ViewModels.Attendance
+@model AttendanceTodayVM
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 출석부 "오늘" — 모든 아이를 한 화면에. 온 아이 이름을 순서 없이 톡 → 바로 저장(/Attendance/SavePresent)
+    ViewData["AttTab"] = "today";
+    ViewData["CareCount"] = Model.IsStaff ? Model.CareCount : 0;
+
+    var sundayStr = Model.Sunday.ToString("yyyy-MM-dd");
+    bool isThisSunday = Model.Sunday == Model.ThisSunday;
+    var prevUrl = $"/Attendance/Index?date={Model.Sunday.AddDays(-7):yyyy-MM-dd}";
+    var nextUrl = $"/Attendance/Index?date={Model.Sunday.AddDays(7):yyyy-MM-dd}";
+    string ShortName(AttendanceTodayVM.ClassGroup g) => $"{g.ClassYear}학년 {g.ClassBan}반";
+
+    // 담임은 내 반을 맨 위에
+    var groups = Model.Classes
+        .OrderBy(g => (Model.MyClassYear == g.ClassYear && Model.MyClassBan == g.ClassBan) ? 0 : 1)
+        .ToList();
+    int pct = Model.TotalCount == 0 ? 0 : (int)Math.Round(Model.PresentCount * 100.0 / Model.TotalCount);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>출석부 · @Model.Sunday.ToString("M월 d일")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        @@media (prefers-color-scheme: dark) { :root { --ok: #3F8A66; } }
+
+        /* 머리 */
+        .hd .sh { padding-top: 16px; padding-bottom: 18px; }
+        .dNav { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+        .dNav a, .dNav span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--headdim); }
+        .dNav a:hover { color: var(--headk); }
+        .dNav span.off { opacity: .25; }
+        .dNav h1 { margin: 0; text-align: center; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; }
+        .dNav h1 small { display: block; font-family: "Gothic A1", sans-serif; font-size: 11px; letter-spacing: .18em; color: var(--headk); margin-top: 2px; }
+        .dNav h1 small.past { color: var(--headdim); }
+        .prog { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--headdim); }
+        .prog b { font-family: "Inter", sans-serif; font-weight: 200; font-size: 36px; line-height: 1; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .prog i { font-style: normal; color: var(--headk); }
+        .bar { height: 2px; background: #3A3C40; margin-top: 12px; }
+        .bar i { display: block; height: 2px; background: var(--headk); transition: width .25s; }
+        /* 주일 출결 보고서 바로가기 — 머리 안에서 눈에 띄게 */
+        .rptGo { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; height: 50px; padding: 0 16px; background: var(--headk); color: #16181C; }
+        .rptGo span { display: flex; align-items: baseline; gap: 10px; font-family: "Noto Serif KR", serif; font-size: 16px; font-weight: 500; }
+        .rptGo small { font-family: "Inter", sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .2em; opacity: .65; }
+        .rptGo em { font-style: normal; font-family: "Inter", sans-serif; font-size: 20px; }
+        .rptGo:hover { background: #D8BF94; }
+
+        /* 도움말 — 처음 쓰는 선생님용 한 줄 안내 */
+        .help { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: var(--mark); border-left: 3px solid var(--acc); }
+        .help i { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--acc); color: #fff; font-style: normal; font-family: "Inter", sans-serif; font-size: 12px; font-weight: 600; }
+        .help p { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--dim2); }
+        .help b { color: var(--tx); font-weight: 600; }
+
+        /* 검색 · 거르기 — 스크롤해도 위에 붙음 */
+        .tools { position: sticky; top: 0; z-index: 40; background: var(--card); border-bottom: 1px solid var(--rule); }
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .srch { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: 1px solid var(--rule); background: var(--bg); }
+        .srch:focus-within { border-color: var(--tx); }
+        .srch span { color: var(--dim); font-size: 16px; }
+        .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-family: inherit; font-size: 16px; color: var(--tx); }
+        .srch button { border: 0; background: none; color: var(--dim); font-size: 16px; padding: 4px; cursor: pointer; }
+        .seg { display: flex; margin-top: 8px; border: 1px solid var(--rule); }
+        .seg button { flex: 1; font-family: inherit; font-size: 13px; padding: 9px 2px; background: var(--card); color: var(--dim2); border: 0; cursor: pointer; }
+        .seg button + button { border-left: 1px solid var(--rule); }
+        .seg button.on { background: var(--tx); color: var(--bg); font-weight: 600; }
+        .seg b { font-family: "Inter", sans-serif; font-weight: 500; }
+
+        /* 반 요약 띠 */
+        .jumpH { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--dim); }
+        .jumpH b { font-family: "Inter", sans-serif; color: var(--danger); }
+        .jumpH em { font-style: normal; font-family: "Inter", sans-serif; font-weight: 600; color: var(--ok); }
+        .jumpH .all { display: none; color: var(--ok); font-weight: 600; }
+        .jumpH.allDone .a, .jumpH.allDone .z { display: none; }
+        .jumpH.allDone .all { display: inline; }
+        .jump { display: flex; flex-wrap: wrap; gap: 6px; padding: 7px 0 4px; }
+        .jump a { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); white-space: nowrap; transition: background .2s, border-color .2s, color .2s; }
+        .jump a.todo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+        .jump a.done { background: #E3EEE8; border-color: var(--ok); color: var(--ok); }
+        .jump a.done::before { content: "✓"; font-size: 11px; font-weight: 600; }
+        .jump a.flash { outline: 2px solid var(--ok); outline-offset: 1px; }
+        .jump a.todo.flash { outline-color: var(--danger); }
+        .jump .jSep { order: 999; flex-basis: 100%; height: 0; }
+        .jump.one .jSep { display: none; }
+
+        /* 반 묶음 */
+        .grp { padding-top: 16px; scroll-margin-top: 150px; }
+        .gH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+        .gH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 16px; }
+        .gH b .tag { margin-left: 6px; vertical-align: 2px; }
+        .gH span { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .kids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        @@media (min-width: 560px) { .kids { grid-template-columns: repeat(4, 1fr); } }
+        @@media (min-width: 720px) { .kids { grid-template-columns: repeat(5, 1fr); } }
+        .kid { position: relative; height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 0 4px;
+               font-family: inherit; color: var(--tx); background: var(--card); border: 1px solid var(--rule); cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; transition: background .12s, border-color .12s, transform .08s; }
+        .kid:active { transform: scale(.97); }
+        .kid b { font-size: 16px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .kid small { display: none; font-size: 10.5px; color: var(--dim); margin-top: -3px; }
+        .kd { display: flex; gap: 3px; }
+        .kd i { width: 5px; height: 5px; border-radius: 50%; background: var(--acc); }
+        .kd i.o { background: none; border: 1px solid var(--rule); }
+        .kid.w { border-color: var(--danger); }
+        .kid.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+        .kid.on .kd i { background: #fff; }
+        .kid.on .kd i.o { background: none; border-color: rgba(255,255,255,.55); }
+        .kid.on small { color: rgba(255,255,255,.8); }
+        .kid.on::after { content: "✓"; position: absolute; top: 4px; right: 6px; font-size: 12px; }
+        /* 저장 대기 — 누른 칸 안에서 동그라미가 돈다 (성경 읽기 절 버튼과 같은 방식) */
+        .kid.busy { cursor: progress; }
+        .kid.busy > * { visibility: hidden; }
+        .kid.busy::after { content: ""; position: absolute; top: 50%; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+                           border: 2px solid var(--rule); border-top-color: var(--acc); border-radius: 50%; animation: kspin .8s linear infinite; }
+        .kid.on.busy::after { border-color: rgba(255,255,255,.35); border-top-color: #fff; right: auto; font-size: 0; }
+        @@keyframes kspin { to { transform: rotate(360deg); } }
+        @@media (prefers-reduced-motion: reduce) { .kid.busy::after { animation-duration: 2s; } }
+        .hidden { display: none !important; }
+        .searching .kid small { display: block; }
+        .none { padding: 40px 0; text-align: center; font-size: 14px; color: var(--dim); }
+
+        /* 저장 알림 · 되돌리기 */
+        .toast { position: fixed; left: 50%; bottom: calc(70px + env(safe-area-inset-bottom)); z-index: 950; transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+                 display: flex; align-items: center; gap: 14px; max-width: calc(100% - 32px); padding: 11px 14px; background: var(--head); color: var(--headtx); font-size: 13.5px; box-shadow: 0 10px 24px rgba(0,0,0,.25); transition: opacity .18s, transform .18s; }
+        .toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+        .toast.err { background: var(--danger); }
+        .toast button { border: 0; background: none; color: var(--headk); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer; padding: 0; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="/Admin/TeacherOnly">교사전용</a><span class="sep">›</span>출석부</span>
+                <a href="/">@ConstatsCommon.ToHome</a>
+            </div>
+            <div class="dNav">
+                <a href="@prevUrl" aria-label="지난 주일">‹</a>
+                <h1>@Model.Sunday.ToString("M월 d일") 주일<small class="@(isThisSunday ? "" : "past")">@(isThisSunday ? "이번 주일" : "지난 주일 · 고치는 중")</small></h1>
+                @if (isThisSunday)
+                {
+                    <span class="off" aria-hidden="true">›</span>
+                }
+                else
+                {
+                    <a href="@nextUrl" aria-label="다음 주일">›</a>
+                }
+            </div>
+            <div class="prog"><b id="presentN">@Model.PresentCount</b><span>/ @(Model.TotalCount)명 출석 · 남은 아이 <i id="leftN">@(Model.TotalCount - Model.PresentCount)</i></span></div>
+            <div class="bar"><i id="barFill" style="width:@(pct)%"></i></div>
+            <a class="rptGo" href="/Attendance/SundayStudentsPC?sunday=@sundayStr"><span>주일 출결 보고서<small>[종이 출력지와 동일]</small></span><em>→</em></a>
+        </div>
+    </header>
+
+    <div class="tools">
+        <div class="sh">
+            <label class="srch">
+                <span aria-hidden="true">⌕</span>
+                <input id="q" type="search" inputmode="search" autocomplete="off" placeholder="이름 검색 (초성도 돼요 · 예: ㅈㅎ)" aria-label="이름 검색" />
+                <button type="button" id="qClear" class="hidden" aria-label="검색어 지우기">✕</button>
+            </label>
+            <div class="seg" role="tablist" aria-label="보기">
+                <button type="button" data-f="all" class="on">전체 <b id="cAll">@Model.TotalCount</b></button>
+                <button type="button" data-f="left">미출석/미체크 아이 <b id="cLeft">@(Model.TotalCount - Model.PresentCount)</b></button>
+            </div>
+        </div>
+    </div>
+
+    <main class="sh" id="board">
+        @* 도움말 — 전체/미출석 버튼 바로 아래 · 스크롤하면 위로 사라짐 *@
+        <div class="help"><i aria-hidden="true">?</i><p>아래 <b>아이 이름을 누르면</b> 바로 출석 체크돼요.<br />잘못 눌렀다면 한 번 더 누르면 취소돼요.</p></div>
+        @if (groups.Count == 0)
+        {
+            <div class="none">등록된 반 · 학생이 없습니다.</div>
+        }
+        else
+        {
+            @* 반 버튼 — 체크 안 한 반(출석 0명)은 빨간 점 · 맨 앞 / 한 명이라도 체크한 반은 초록 · 줄 바꿔 뒤로 (순서는 CSS order) *@
+            int doneN = groups.Count(g => g.Kids.Any(k => k.IsPresent));
+            <div class="jumpH" id="jumpH">
+                <span class="a">체크 안 한 반 <b id="jTodo">@(groups.Count - doneN)</b></span>
+                <span class="z">체크한 반 <em id="jDone">@doneN</em></span>
+                <span class="all">✓ 모든 반 체크 완료</span>
+            </div>
+            <nav class="jump" id="jump" aria-label="반으로 이동">
+                @{ int ord = 0; }
+                @foreach (var g in groups)
+                {
+                    bool done = g.Kids.Any(k => k.IsPresent);
+                    <a href="#g-@g.ClassYear-@g.ClassBan" data-g="@g.ClassYear-@g.ClassBan" data-ord="@ord" class="@(done ? "done" : "todo")" style="order:@(done ? 1000 + ord : ord)">@ShortName(g)</a>
+                    ord++;
+                }
+                <span class="jSep" aria-hidden="true"></span>
+            </nav>
+
+            @foreach (var g in groups)
+            {
+                bool mine = Model.MyClassYear == g.ClassYear && Model.MyClassBan == g.ClassBan;
+                <section class="grp" id="g-@g.ClassYear-@g.ClassBan" data-g="@g.ClassYear-@g.ClassBan">
+                    <div class="gH">
+                        <b>@g.ClassName@if (mine) {<span class="tag">내 반</span>}</b>
+                        <span>@(string.IsNullOrWhiteSpace(g.TeacherName) ? "" : g.TeacherName + " · ")<em class="gc" style="font-style:normal">@g.Kids.Count(k => k.IsPresent)/@g.Kids.Count</em></span>
+                    </div>
+                    <div class="kids">
+                        @foreach (var k in g.Kids)
+                        {
+                            string title = k.AbsentStreak >= 3 ? $"{k.AbsentStreak}주 연속 결석" : "";
+                            <button type="button"
+                                    class="kid @(k.IsPresent ? "on" : "") @(k.AbsentStreak >= 3 ? "w" : "")"
+                                    data-id="@k.PersonId" data-name="@k.Name" data-p="@(k.IsPresent ? "1" : "0")"
+                                    aria-pressed="@(k.IsPresent ? "true" : "false")" title="@title">
+                                <b>@k.Name</b>
+                                <small>@g.ClassName</small>
+                                <span class="kd" aria-hidden="true">@foreach (var r in k.Recent) {<i class="@(r ? "" : "o")"></i>}</span>
+                            </button>
+                        }
+                    </div>
+                </section>
+            }
+            <div class="none hidden" id="noHit">찾는 아이가 없어요.</div>
+        }
+
+        <div class="ft">
+            <span>이름 아래 점 = 지난 4주 출석 · 빨간 테두리 = 3주 이상 결석</span>
+        </div>
+    </main>
+
+    <div class="toast err" id="toast" role="alert"><span id="toastMsg"></span></div>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    const SUNDAY = '@sundayStr';
+    const board = document.getElementById('board');
+    const q = document.getElementById('q'), qClear = document.getElementById('qClear');
+    const kids = Array.from(document.querySelectorAll('.kid'));
+    let filter = 'all'; // 처음 열면 '전체'
+
+    // ── 초성 검색 ──
+    const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+    const cho = s => Array.from(s).map(ch => { const c = ch.charCodeAt(0) - 0xAC00; return (c >= 0 && c <= 11171) ? CHO[Math.floor(c / 588)] : ch; }).join('');
+    kids.forEach(k => { k.dataset.cho = cho(k.dataset.name); });
+    const isChoOnly = s => /^[ㄱ-ㅎ]+$/.test(s);
+
+    function apply() {
+        const t = (q.value || '').replace(/\s+/g, '');
+        board.classList.toggle('searching', !!t);
+        qClear.classList.toggle('hidden', !t);
+        let hits = 0;
+        kids.forEach(k => {
+            const p = k.dataset.p === '1';
+            let show = t ? (isChoOnly(t) ? k.dataset.cho.includes(t) : k.dataset.name.includes(t))
+                         : (filter === 'all' || (filter === 'left' && !p) || (filter === 'came' && p));
+            k.classList.toggle('hidden', !show);
+            if (show) hits++;
+        });
+        document.querySelectorAll('.grp').forEach(g => g.classList.toggle('hidden', !g.querySelector('.kid:not(.hidden)')));
+        const nh = document.getElementById('noHit'); if (nh) nh.classList.toggle('hidden', hits > 0 || (!t && filter !== 'left'));
+        if (nh && !t && filter === 'left') nh.textContent = '모두 왔어요 🙂'; else if (nh) nh.textContent = '찾는 아이가 없어요.';
+    }
+
+    function counts() {
+        const total = kids.length, came = kids.filter(k => k.dataset.p === '1').length;
+        // 화면에서 빠진 칸이 있어도 멈추지 않게(없으면 건너뜀) — 여기서 멈추면 저장·동그라미가 통째로 안 됨
+        const put = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        put('presentN', came);
+        put('leftN', total - came);
+        put('cLeft', total - came);
+        put('cCame', came);
+        const bf = document.getElementById('barFill');
+        if (bf) bf.style.width = (total ? Math.round(came * 100 / total) : 0) + '%';
+        let todoN = 0, doneN = 0;
+        document.querySelectorAll('.grp').forEach(g => {
+            const ks = g.querySelectorAll('.kid'), c = g.querySelectorAll('.kid.on').length;
+            g.querySelector('.gc').textContent = c + '/' + ks.length;
+            const j = document.querySelector('.jump a[data-g="' + g.dataset.g + '"]');
+            if (!j) return;
+            // 한 명이라도 체크 → 초록 · 뒤로 / 0명 → 빨간 점 · 맨 앞 (바뀐 순간 잠깐 테두리)
+            const done = c > 0;
+            if (done) doneN++; else todoN++;
+            if (j.classList.contains('done') !== done) {
+                j.classList.toggle('done', done);
+                j.classList.toggle('todo', !done);
+                j.style.order = (done ? 1000 : 0) + Number(j.dataset.ord);
+                j.classList.add('flash');
+                clearTimeout(j._ft); j._ft = setTimeout(() => j.classList.remove('flash'), 1200);
+            }
+        });
+        put('jTodo', todoN);
+        put('jDone', doneN);
+        const jh = document.getElementById('jumpH'), jp = document.getElementById('jump');
+        if (jh) jh.classList.toggle('allDone', todoN === 0 && doneN > 0);
+        if (jp) jp.classList.toggle('one', todoN === 0 || doneN === 0);   // 한쪽만 있으면 줄 바꿈 없음
+    }
+
+    // ── 저장 실패 알림 (성공은 누른 칸의 동그라미로만 보여 준다) ──
+    const toast = document.getElementById('toast'), toastMsg = document.getElementById('toastMsg');
+    let tTimer = null;
+    function fail(msg) {
+        toastMsg.textContent = msg;
+        toast.classList.add('show');
+        clearTimeout(tTimer);
+        tTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    // ── 저장 ──
+    function set(k, on) {
+        k.dataset.p = on ? '1' : '0';
+        k.classList.toggle('on', on);
+        k.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    async function toggle(k) {
+        if (k.classList.contains('busy')) return;
+        const prev = k.dataset.p === '1', next = !prev;
+        set(k, next); counts();
+        k.classList.add('busy');
+        k.setAttribute('aria-busy', 'true');
+        // 서버가 수 ms 만에 답하면 동그라미가 그려지기도 전에 사라짐 → 최소 표시 시간 보장
+        const MIN_SPIN = 500, t0 = performance.now();
+        try {
+            const res = await fetch('/Attendance/SavePresent', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attendDate: SUNDAY, personId: Number(k.dataset.id), isPresent: next })
+            });
+            const j = await res.json();
+            if (!j || !j.ok) throw new Error(j && j.message || '저장 실패');
+        } catch (e) {
+            set(k, prev); counts();
+            fail(k.dataset.name + ' 저장하지 못했어요 · ' + (e.message || '네트워크 오류'));
+        } finally {
+            const left = MIN_SPIN - (performance.now() - t0);
+            if (left > 0) await new Promise(r => setTimeout(r, left));
+            k.classList.remove('busy');
+            k.removeAttribute('aria-busy');
+            // 검색으로 찾아 체크했으면 검색어를 지워 다음 아이를 바로 찾게
+            if (q.value) { q.value = ''; apply(); q.focus(); }
+            else if (filter !== 'all') setTimeout(apply, 350);
+        }
+    }
+    kids.forEach(k => k.addEventListener('click', () => toggle(k)));
+
+    // ── 검색 · 거르기 ──
+    q.addEventListener('input', apply);
+    qClear.addEventListener('click', () => { q.value = ''; apply(); q.focus(); });
+    document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+        filter = b.dataset.f;
+        document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
+        apply();
+    }));
+    // 반 요약을 누르면 그 반이 보이도록 거르기를 '전체'로
+    document.querySelectorAll('.jump a').forEach(a => a.addEventListener('click', () => {
+        if (filter !== 'all') document.querySelector('.seg button[data-f="all"]').click();
+    }));
+
+    counts(); // 반 버튼 줄 · "체크 안 한 반 N" 첫 상태
+
+    // 다른 화면에서 "#g-학년-반" 으로 들어오면 그 반이 보이도록 '전체'로 열고 그 반으로 이동
+    if (location.hash.indexOf('#g-') === 0) {
+        document.querySelector('.seg button[data-f="all"]')?.click();
+        document.getElementById(location.hash.slice(1))?.scrollIntoView();
+    } else {
+        apply();
+    }
+})();
+</script>
+</body>
+</html>

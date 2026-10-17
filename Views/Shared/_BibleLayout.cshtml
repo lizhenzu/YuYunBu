@@ -1,0 +1,122 @@
+﻿<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - 성경 통독</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site2.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
+
+    <div class="app-wrapper">
+        <!-- 사이드바 -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                  <a href="/" style="text-decoration:none; color:inherit;">
+        <span>✝</span> Home
+    </a>
+            </div>
+            <div class="sidebar-nav">
+                <a href="/Bible" class="nav-item-s @(ViewData["Page"]?.ToString() == "home" ? "active" : "")">
+                    <span class="icon">🏠</span> 대시보드
+                </a>
+                <a href="/Bible/List?testament=구약" class="nav-item-s @(ViewData["Page"]?.ToString() == "ot" ? "active" : "")">
+                    <span class="icon">📜</span> 구약 읽기
+                </a>
+                <a href="/Bible/List?testament=신약" class="nav-item-s @(ViewData["Page"]?.ToString() == "nt" ? "active" : "")">
+                    <span class="icon">✨</span> 신약 읽기
+                </a>
+                <a href="/Bible/Search" class="nav-item-s @(ViewData["Page"]?.ToString() == "search" ? "active" : "")">
+                    <span class="icon">🔍</span> 성경 검색
+                </a>
+                <a href="/Bible/Bookmarks" class="nav-item-s @(ViewData["Page"]?.ToString() == "bookmark" ? "active" : "")">
+                    <span class="icon">🔖</span> 북마크
+                </a>
+                <a href="/Bible/Participants" class="nav-item-s @(ViewData["Page"]?.ToString() == "participants" ? "active" : "")">
+                    <span class="icon">👥</span> 참여자 현황
+                </a>
+                <a href="/Bible/Welcome" class="nav-item-s @(ViewData["Page"]?.ToString() == "welcome" ? "active" : "")">
+                    <span class="icon">🏛️</span> 허브 (Welcome)
+                </a>
+                <div style="padding:16px 20px 6px; font-size:.72rem; color:rgba(255,255,255,.3); text-transform:uppercase; letter-spacing:.08em;">
+                    빠른 이동
+                </div>
+                <a href="/Bible/Read?bookName=창세기&jang=1" class="nav-item-s">
+                    <span class="icon">📖</span> 창세기 1장
+                </a>
+                <a href="/Bible/Read?bookName=마태복음&jang=1" class="nav-item-s">
+                    <span class="icon">📖</span> 마태복음 1장
+                </a>
+                <a href="/Bible/Read?bookName=시편&jang=23" class="nav-item-s">
+                    <span class="icon">📖</span> 시편 23편
+                </a>
+                <a href="/Bible/Read?bookName=요한복음&jang=3" class="nav-item-s">
+                    <span class="icon">📖</span> 요한복음 3장
+                </a>
+            </div>
+            <div class="sidebar-bottom">
+                <button class="dark-toggle w-100" onclick="toggleDark()" style="background:rgba(255,255,255,.08);color:#fff;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:.9rem;">
+                    🌙 다크 모드
+                </button>
+            </div>
+        </nav>
+
+        <!-- 메인 -->
+        <div class="main-content">
+            <!-- 상단 바 -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+                    <span class="page-title">@(ViewData["Title"] ?? "성경 통독")</span>
+                </div>
+                <div class="topbar-right">
+                    @if (ViewData["Page"]?.ToString() != "search")
+                    {
+                        <form method="get" action="/Bible/Search" class="search-wrap">
+                            <span class="search-icon">🔍</span>
+                            <input name="q" class="search-input" placeholder="성경 구절 검색..." />
+                        </form>
+                    }
+                    <button class="dark-toggle" onclick="toggleDark()" title="다크모드">🌙</button>
+                </div>
+            </header>
+
+            <!-- 콘텐츠 -->
+            <div class="page-body">
+                @RenderBody()
+            </div>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 다크모드
+        const html = document.documentElement;
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+
+        function toggleDark() {
+            const cur = html.getAttribute('data-theme');
+            const next = cur === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        // 사이드바 (모바일)
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('overlay').classList.toggle('show');
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('overlay').classList.remove('show');
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

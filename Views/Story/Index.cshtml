@@ -1,0 +1,190 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model IEnumerable<BulletinBoard.Models.StoryElementary123s>
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 활동 영상 — 카드를 누르면 이 화면에서 바로 재생 (이전·다음 · 유튜브에서 보기) · 제목 찾기
+    var DepartmentName = HttpContextAccessor.HttpContext?.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var videoList = Model?.ToList() ?? new List<BulletinBoard.Models.StoryElementary123s>();
+    string Title(BulletinBoard.Models.StoryElementary123s v) => string.IsNullOrWhiteSpace(v.contentsText) ? "활동 영상" : v.contentsText.Trim();
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>활동 영상@(string.IsNullOrWhiteSpace(DepartmentName) ? "" : " · " + DepartmentName)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        .sh { max-width: 1000px; }
+        .st { display: flex; gap: 26px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headk); font-variant-numeric: tabular-nums; }
+
+        .tools { position: sticky; top: 0; z-index: 40; background: var(--card); border-bottom: 1px solid var(--rule); }
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .srch { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: 1px solid var(--rule); background: var(--bg); }
+        .srch:focus-within { border-color: var(--tx); }
+        .srch span { color: var(--dim); }
+        .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-family: inherit; font-size: 16px; color: var(--tx); }
+
+        .vg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 18px; }
+        @@media (min-width: 640px) { .vg { grid-template-columns: repeat(3, 1fr); gap: 18px; } }
+        .vc { display: block; width: 100%; padding: 0; border: 1px solid var(--rule); background: var(--card); color: var(--tx); text-align: left; font-family: inherit; cursor: pointer; transition: border-color .15s; }
+        .vc:hover { border-color: var(--acc); }
+        .vc .th { position: relative; aspect-ratio: 16 / 9; background: var(--mark); overflow: hidden; }
+        .vc .th img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+        .vc:hover .th img { transform: scale(1.04); }
+        .vc .no { position: absolute; top: 0; left: 0; font-family: "Inter", sans-serif; font-size: 11px; font-weight: 600; padding: 3px 8px; background: rgba(22,24,28,.8); color: #fff; }
+        .vc .pl { position: absolute; right: 8px; bottom: 8px; width: 34px; height: 34px; display: grid; place-items: center; background: rgba(22,24,28,.8); }
+        .vc .pl::after { content: ""; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 11px solid #fff; margin-left: 3px; }
+        .vc:hover .pl { background: var(--acc); }
+        .vc .tt { padding: 10px 11px 12px; font-size: 14px; font-weight: 600; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: calc(14px * 1.45 * 2 + 22px); }
+        .vc .tt mark { background: var(--mark); color: inherit; }
+        .none { padding: 50px 0; text-align: center; font-size: 14px; color: var(--dim); }
+        .hidden { display: none !important; }
+
+        /* 재생 창 */
+        .pv { position: fixed; inset: 0; z-index: 990; display: none; align-items: center; justify-content: center; padding: 16px; background: rgba(12,13,15,.88); }
+        .pv.open { display: flex; }
+        .pvB { width: 100%; max-width: 900px; background: #16181C; color: #F2EFE9; }
+        .pvH { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; }
+        .pvH b { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 16px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pvH small { display: block; font-family: "Inter", sans-serif; font-size: 11px; letter-spacing: .12em; color: #C9AE82; }
+        .pvH button { flex: none; width: 38px; height: 38px; border: 1px solid #3A3C40; background: none; color: #F2EFE9; font-size: 17px; cursor: pointer; }
+        .pvV { position: relative; aspect-ratio: 16 / 9; background: #000; }
+        .pvV iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .pvF { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px 12px; flex-wrap: wrap; }
+        .pvF .nav { display: flex; gap: 6px; }
+        .pvF button, .pvF a { height: 38px; padding: 0 14px; display: inline-flex; align-items: center; border: 1px solid #3A3C40; background: none; color: #F2EFE9; font-family: inherit; font-size: 13px; cursor: pointer; }
+        .pvF button:hover, .pvF a:hover { border-color: #C9AE82; color: #C9AE82; }
+        .pvF button:disabled { opacity: .3; cursor: default; }
+        .pvF .yt { color: #9A978F; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Albums/Branch">사진 · 영상</a><span class="sep">›</span>활동 영상</span><span style="display:flex;gap:14px">@if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin") || User.IsInRole("Moderator")) {<a href="/Story/Manage">영상 관리</a>}<a href="/">@ConstatsCommon.ToHome</a></span></div>
+            <div class="hdK">ACTIVITY VIDEO</div>
+            <h1 class="hdT">활동 영상</h1>
+            <div class="hdS">예배와 활동 모습을 함께 봐요. 영상을 누르면 이 화면에서 바로 재생돼요.</div>
+            @if (videoList.Count > 0) { <div class="st"><div>영상<b>@videoList.Count</b></div></div> }
+        </div>
+    </header>
+
+    @if (videoList.Count > 0)
+    {
+        <div class="tools">
+            <div class="sh">
+                <label class="srch"><span aria-hidden="true">⌕</span><input id="q" type="search" autocomplete="off" placeholder="영상 제목으로 찾기 (예: 성경학교)" aria-label="영상 제목으로 찾기" /></label>
+            </div>
+        </div>
+    }
+
+    <main class="sh">
+        @if (videoList.Count == 0)
+        {
+            <div class="none">아직 등록된 영상이 없어요.</div>
+        }
+        else
+        {
+            <div class="vg" id="vg">
+                @for (int i = 0; i < videoList.Count; i++)
+                {
+                    var item = videoList[i];
+                    // 예전 방식으로 embed 전체 주소가 저장된 영상도 ID 만 뽑아 쓴다
+                    var vid = BulletinBoard.Controllers.StoryController.ExtractVideoId(item.contentsURL) ?? (item.contentsURL?.Trim() ?? "");
+                    var t = Title(item);
+                    <button type="button" class="vc" data-i="@i" data-vid="@vid" data-title="@t" aria-label="@t 재생">
+                        <span class="th" style="display:block">
+                            <img src="https://img.youtube.com/vi/@vid/mqdefault.jpg" alt="" loading="lazy" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/@vid/hqdefault.jpg'" />
+                            <span class="no">@item.sequenceNo</span>
+                            <span class="pl" aria-hidden="true"></span>
+                        </span>
+                        <span class="tt" style="display:-webkit-box">@t</span>
+                    </button>
+                }
+            </div>
+            <div class="none hidden" id="none">찾는 영상이 없어요.</div>
+        }
+        <div class="ft"><span>영상은 유튜브에서 불러와요</span><a href="/Albums">사진 앨범 →</a></div>
+    </main>
+
+    @* 재생 창 *@
+    <div class="pv" id="pv" role="dialog" aria-modal="true" aria-labelledby="pvT">
+        <div class="pvB">
+            <div class="pvH"><div style="min-width:0"><small id="pvN">VIDEO</small><b id="pvT">영상</b></div><button type="button" id="pvX" aria-label="닫기">✕</button></div>
+            <div class="pvV" id="pvV"></div>
+            <div class="pvF">
+                <div class="nav"><button type="button" id="pvP">‹ 이전</button><button type="button" id="pvNx">다음 ›</button></div>
+                <a class="yt" id="pvY" href="#" target="_blank" rel="noopener">유튜브에서 보기 ↗</a>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function () {
+    const cards = Array.from(document.querySelectorAll('.vc'));
+    if (!cards.length) return;
+    const pv = document.getElementById('pv'), pvV = document.getElementById('pvV');
+    let cur = -1, opener = null;
+
+    // ── 제목 찾기 ──
+    const q = document.getElementById('q'), none = document.getElementById('none');
+    cards.forEach(c => c._t = c.querySelector('.tt').textContent);
+    const esc = s => s.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    q.addEventListener('input', () => {
+        const t = q.value.trim();
+        let n = 0;
+        cards.forEach(c => {
+            const i = t ? c._t.toLowerCase().indexOf(t.toLowerCase()) : -1;
+            const ok = !t || i >= 0;
+            c.classList.toggle('hidden', !ok);
+            if (ok) n++;
+            c.querySelector('.tt').innerHTML = i >= 0 ? esc(c._t.slice(0, i)) + '<mark>' + esc(c._t.slice(i, i + t.length)) + '</mark>' + esc(c._t.slice(i + t.length)) : esc(c._t);
+        });
+        none.classList.toggle('hidden', n > 0);
+    });
+
+    // ── 재생 창 ── (보이는 카드끼리 이전·다음)
+    const visible = () => cards.filter(c => !c.classList.contains('hidden'));
+    function show(i) {
+        const c = cards[i]; if (!c) return;
+        cur = i;
+        const vid = c.dataset.vid;
+        document.getElementById('pvT').textContent = c.dataset.title;
+        document.getElementById('pvN').textContent = 'VIDEO · ' + (c.querySelector('.no')?.textContent || '');
+        document.getElementById('pvY').href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(vid);
+        pvV.innerHTML = '<iframe src="https://www.youtube.com/embed/' + encodeURIComponent(vid) + '?autoplay=1&rel=0&modestbranding=1&playsinline=1" title="' + esc(c.dataset.title) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+        const v = visible(), k = v.indexOf(c);
+        document.getElementById('pvP').disabled = k <= 0;
+        document.getElementById('pvNx').disabled = k < 0 || k >= v.length - 1;
+    }
+    function step(d) { const v = visible(), k = v.indexOf(cards[cur]); const n = v[k + d]; if (n) show(cards.indexOf(n)); }
+    function open(c) { opener = c; pv.classList.add('open'); document.body.style.overflow = 'hidden'; show(cards.indexOf(c)); document.getElementById('pvX').focus(); }
+    function close() { pv.classList.remove('open'); pvV.innerHTML = ''; document.body.style.overflow = ''; cur = -1; if (opener) opener.focus({ preventScroll: true }); }
+    cards.forEach(c => c.addEventListener('click', () => open(c)));
+    document.getElementById('pvX').addEventListener('click', close);
+    document.getElementById('pvP').addEventListener('click', () => step(-1));
+    document.getElementById('pvNx').addEventListener('click', () => step(1));
+    pv.addEventListener('click', e => { if (e.target === pv) close(); });
+    document.addEventListener('keydown', e => {
+        if (!pv.classList.contains('open')) return;
+        if (e.key === 'Escape') close();
+        if (e.key === 'ArrowLeft') step(-1);
+        if (e.key === 'ArrowRight') step(1);
+    });
+})();
+</script>
+</body>
+</html>

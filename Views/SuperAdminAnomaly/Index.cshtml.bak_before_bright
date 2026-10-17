@@ -1,0 +1,211 @@
+@model BulletinBoard.Models.SuperAdmin.AnomalyDashboardVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+
+@*  ══════════════════════════════════════════════════════════════
+    이상징후(중복 이름) 점검 — 슈퍼관리자.  Identity.User 와 view_PersonMaster_2026 에서
+    같은 이름이 둘 이상인 묶음을 이름별로 모아 보여 준다.  Bone(호텔 인쇄물) 스킨.
+    (12열짜리 표 대신 이름 묶음 → 사람 줄 → 항목 꼬리표로 풀어 모바일에서도 읽힌다)
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    ViewData["Title"] = "중복 이름 점검";
+
+    var now = DateHelper.GetKoreaNow();
+    string dateText = now.ToString("yyyy.MM.dd") + " " + now.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    var idGroups = (Model.IdentityDupRows ?? new()).GroupBy(r => r.FullNameKey).ToList();
+    var pmGroups = (Model.PersonMasterDupRows ?? new()).GroupBy(r => r.FullName).ToList();
+    bool clean = idGroups.Count == 0 && pmGroups.Count == 0;
+
+    string D(DateTime? d, string fmt = "yyyy.MM.dd") => d.HasValue ? d.Value.ToString(fmt) : "";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@ViewData["Title"] — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+    .qz { max-width: 920px; --warn: #B4531F; }
+
+    /* ── 머리 ── */
+    .qz .brK  { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin: 18px 0 9px; }
+    .qz .brH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.4; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .qz .brH1 b { font-weight: 400; background-image: linear-gradient(transparent 62%, var(--mark) 62%); padding: 0 2px; }
+    .qz .brH1 small { font-family: "Inter", sans-serif; font-weight: 300; font-size: 12px; color: var(--dim); letter-spacing: .06em; }
+    .qz .brSum { font-size: 11.5px; color: var(--dim); margin-top: 8px; line-height: 1.7; word-break: keep-all; }
+
+    .qz .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--rule); margin-top: 16px; background: #fff; }
+    .qz .stats div { padding: 12px 14px; border-right: 1px solid var(--rule); }
+    .qz .stats div:last-child { border-right: 0; }
+    .qz .stats b { display: block; font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; color: var(--tx); line-height: 1; }
+    .qz .stats b.warn { color: var(--warn); }
+    .qz .stats b.ok { color: var(--acc); }
+    .qz .stats span { font-size: 10px; letter-spacing: .12em; color: var(--dim); display: block; margin-top: 5px; white-space: nowrap; }
+
+    .qz .ok { margin-top: 22px; padding: 26px 0; text-align: center; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+              font-family: "Noto Serif KR", serif; font-size: 15px; color: var(--dim2); }
+
+    /* ── 섹션 · 묶음 · 줄 ── */
+    .qz .sec { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 0; padding-bottom: 9px; border-bottom: 1px solid var(--tx); }
+    .qz .secT { font-family: "Noto Serif KR", serif; font-size: 16px; }
+    .qz .secT i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 300; font-size: 11px; color: var(--dim); letter-spacing: .08em; margin-left: 8px; }
+    .qz .secS { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .qz .secH { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.7; word-break: keep-all; }
+
+    .qz .grp { margin-top: 14px; border: 1px solid var(--rule); background: #fff; }
+    .qz .grpH { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--rule); background: var(--mark); }
+    .qz .grpN { font-family: "Noto Serif KR", serif; font-size: 15.5px; }
+    .qz .grpC { font-family: "Inter", sans-serif; font-weight: 300; font-size: 12px; color: var(--warn); letter-spacing: .04em; }
+    .qz .grpC::before { content: "×"; margin-right: 2px; }
+    .qz .grpSp { margin-left: auto; font-size: 10px; letter-spacing: .1em; color: var(--dim); }
+
+    .qz .row { display: flex; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--rule); align-items: flex-start; }
+    .qz .row:first-of-type { border-top: 0; }
+    .qz .rowN { font-family: "Inter", sans-serif; font-weight: 300; font-size: 16px; color: var(--acc); width: 26px; flex: 0 0 auto; line-height: 1.2; font-variant-numeric: tabular-nums; }
+    .qz .rowB { flex: 1 1 auto; min-width: 0; }
+    .qz .kv { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; line-height: 1.7; }
+    .qz .kv span { white-space: nowrap; }
+    .qz .kv span u { text-decoration: none; font-size: 9.5px; letter-spacing: .12em; color: var(--dim); margin-right: 5px; }
+    .qz .kv span.empty { color: var(--rule); }
+    .qz .kv span.empty u { color: var(--rule); }
+    .qz .kv .id { font-family: "Inter", sans-serif; font-weight: 300; font-size: 10.5px; color: var(--dim2); word-break: break-all; white-space: normal; flex-basis: 100%; }
+
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule); display: flex; justify-content: space-between; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; }
+    .qz .brFoot a { color: var(--dim2); text-decoration: none; }
+    .qz .brFoot a:hover { color: var(--acc); }
+
+    @@media (max-width: 640px) {
+        .qz .stats { grid-template-columns: repeat(2, 1fr); }
+        .qz .stats div:nth-child(2) { border-right: 0; }
+        .qz .stats div:nth-child(-n+2) { border-bottom: 1px solid var(--rule); }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>이상징후</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">SUPER ADMIN · ANOMALY</div>
+        <div class="brH1"><b>중복 이름 점검</b><small>@Model.GeneratedAt.ToString("HH:mm") 기준</small></div>
+        <div class="brSum">같은 이름(성 + 이름)이 둘 이상인 계정과 명단을 모아 보여 줘요. 실제로 다른 사람인지, 잘못 만들어진 중복인지 확인해 주세요.</div>
+
+        <div class="stats">
+            <div><b class="@(Model.IdentityDupGroupCount > 0 ? "warn" : "ok")">@Model.IdentityDupGroupCount</b><span>IDENTITY 중복 이름</span></div>
+            <div><b>@Model.IdentityDupUserCount</b><span>IDENTITY 계정 수</span></div>
+            <div><b class="@(Model.PersonMasterDupGroupCount > 0 ? "warn" : "ok")">@Model.PersonMasterDupGroupCount</b><span>명단 중복 이름</span></div>
+            <div><b>@Model.PersonMasterDupRowCount</b><span>명단 행 수</span></div>
+        </div>
+
+        @if (clean)
+        {
+            <div class="ok">중복된 이름이 없어요.</div>
+        }
+
+        @* ── 1. Identity.User ── *@
+        <div class="sec">
+            <span class="secT">계정<i>IDENTITY.USER</i></span>
+            <span class="secS">@(idGroups.Count)개 이름 · @(Model.IdentityDupUserCount)계정</span>
+        </div>
+        <div class="secH">LastName + FirstName 이 같은 로그인 계정. 한 사람이 계정을 두 번 만든 경우가 대부분이에요.</div>
+
+        @if (idGroups.Count == 0)
+        {
+            <div class="secH" style="color:var(--acc)">이상 없음</div>
+        }
+        @foreach (var g in idGroups)
+        {
+            int n = 0;
+            <div class="grp">
+                <div class="grpH">
+                    <span class="grpN">@g.Key</span>
+                    <span class="grpC">@g.Count()</span>
+                    <span class="grpSp">IDENTITY</span>
+                </div>
+                @foreach (var r in g)
+                {
+                    n++;
+                    <div class="row">
+                        <div class="rowN">@n</div>
+                        <div class="rowB">
+                            <div class="kv">
+                                <span class="@(string.IsNullOrWhiteSpace(r.UserName) ? "empty" : "")"><u>ID</u>@(r.UserName ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.PhoneNumber) ? "empty" : "")"><u>PHONE</u>@(r.PhoneNumber ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Email) ? "empty" : "")"><u>EMAIL</u>@(r.Email ?? "—")</span>
+                                <span class="@(r.InsertDT.HasValue ? "" : "empty")"><u>가입</u>@(r.InsertDT.HasValue ? D(r.InsertDT, "yyyy.MM.dd HH:mm") : "—")</span>
+                                <span class="id"><u>USERID</u>@r.UserId</span>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @* ── 2. view_PersonMaster_2026 ── *@
+        <div class="sec">
+            <span class="secT">명단<i>VIEW_PERSONMASTER_2026</i></span>
+            <span class="secS">@(pmGroups.Count)개 이름 · @(Model.PersonMasterDupRowCount)행</span>
+        </div>
+        <div class="secH">fullName 이 같은 명단 행. 생년월일 · 학교 · 전화가 다르면 동명이인, 같으면 중복 등록이에요. 생일은 년·월·일이 모두 있을 때만 보여요.</div>
+
+        @if (pmGroups.Count == 0)
+        {
+            <div class="secH" style="color:var(--acc)">이상 없음</div>
+        }
+        @foreach (var g in pmGroups)
+        {
+            int n = 0;
+            <div class="grp">
+                <div class="grpH">
+                    <span class="grpN">@g.Key</span>
+                    <span class="grpC">@g.Count()</span>
+                    <span class="grpSp">PERSON MASTER</span>
+                </div>
+                @foreach (var r in g)
+                {
+                    n++;
+                    string birth = (r.BYear.HasValue && r.BMonth.HasValue && r.BDay.HasValue) ? $"{r.BYear:0000}.{r.BMonth:00}.{r.BDay:00}" : "";
+                    <div class="row">
+                        <div class="rowN">@n</div>
+                        <div class="rowB">
+                            <div class="kv">
+                                <span><u>PERSON</u>@(r.PersonId?.ToString() ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.UserName) ? "empty" : "")"><u>ID</u>@(r.UserName ?? "—")</span>
+                                <span class="@(birth == "" ? "empty" : "")"><u>생일</u>@(birth == "" ? "—" : birth)</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Sex) ? "empty" : "")"><u>성별</u>@(r.Sex ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.School) ? "empty" : "")"><u>학교</u>@(r.School ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.PhoneNumber) ? "empty" : "")"><u>PHONE</u>@(r.PhoneNumber ?? "—")</span>
+                                <span class="@(string.IsNullOrWhiteSpace(r.Email) ? "empty" : "")"><u>EMAIL</u>@(r.Email ?? "—")</span>
+                                <span class="@(r.InsertDT.HasValue ? "" : "empty")"><u>등록</u>@(r.InsertDT.HasValue ? D(r.InsertDT) : "—")</span>
+                                <span class="@(r.UpdateDT.HasValue ? "" : "empty")"><u>수정</u>@(r.UpdateDT.HasValue ? D(r.UpdateDT) : "—")</span>
+                                @if (!string.IsNullOrWhiteSpace(r.UserId))
+                                {
+                                    <span class="id"><u>USERID</u>@r.UserId</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="brFoot"><span>© BULLETIN BOARD · ANOMALY</span><a href="/">홈으로 →</a></div>
+
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,338 @@
+﻿@model IEnumerable<BulletinBoard.Models.PointByUserName>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = "_Layout_Mission";
+    string keyWordTitle = "UP";
+    string ViewBag_Kind = string.Empty;
+
+    if (ViewBag.Kind != null)
+    {
+        ViewBag_Kind = ViewBag.Kind as string;
+    }
+}
+
+<link rel="stylesheet" href="/css/missionCommon.css">
+<link rel="stylesheet" href="/css/missionC.css">
+<link rel="stylesheet" href="/css/common.layer.css">
+<style>
+    body {
+        background-size: cover;
+        margin: 0;
+        padding: 0;
+        color: #333;
+        display: flex;
+    }
+
+</style>
+
+<style>
+    .icon-container {
+        margin-top: 40px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .icon-background {
+        background: white;
+        width: 65px;
+        height: 65px;
+        position: absolute;
+        top: -36px;
+        left: 50%;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        transform: translateX(-35px);
+        z-index: 1; /* Behind the icon but in front of card background */
+    }
+
+    .icon-foreground {
+        background: #0d792d;
+        width: 59px;
+        height: 59px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        position: absolute;
+        top: -33px;
+        left: 50%;
+        transform: translateX(-32px);
+        z-index: 3; /* Above all */
+    }
+
+    .button-hyperlink {
+        border: none;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        display: block; /* Makes the button expand to the width of the container */
+        font-size: 18px;
+        margin: 10px 0; /* Adds space between buttons */
+        cursor: pointer;
+    }
+</style>
+
+<style>
+
+    .image-container {
+        border: 3.5px solid #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        width: 100%; /* 컨테이너의 너비에 맞춥니다 */
+        height: auto; /* 이미지의 비율에 따라 높이 조정 */
+        display: block; /* 이미지를 블록 요소로 만듭니다 */
+        align-items: center;
+        justify-content: center;
+        margin: auto; /* 자동 마진을 사용하여 중앙 정렬 */
+        margin-bottom: 10px; /* 자동 마진을 사용하여 중앙 정렬 */
+        max-width: 800px;
+    }
+</style>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #e6f7ff;
+    }
+
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 20px;
+        background-color: #ffcccb;
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #333;
+        }
+
+        .header p {
+            margin: 5px 0;
+            color: #555;
+        }
+
+    .card {
+        flex-direction: row;
+        background-color: #ffffff;
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .card img {
+            max-width: 100px;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+    .card-content {
+        margin-left: 15px;
+        flex: 1;
+    }
+
+        .card-content h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .card-content p {
+            margin: 5px 0;
+            color: #666;
+        }
+
+    .button-group {
+        margin-top: 10px;
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .profile-picture2{
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3.5px solid #ffffff;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        margin-right: 10px;
+    }
+    .button {
+        display: inline-block;
+        padding: 5px 10px;
+        margin: 3px;
+        background-color: #007bff;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+
+    .details {
+        display: none;
+        background-color: #ffffff;
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+        .details p {
+            margin: 5px 0;
+            color: #333;
+        }
+
+    .tableTD{
+        padding-left :5px;
+        padding-right : 5px;
+    }
+
+    .back-button {
+        text-align: center;
+        margin: 10px;
+    }
+
+        .back-button a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+            .back-button a:hover {
+                background-color: #0056b3;
+            }
+
+    @@media (max-width: 600px) {
+        .card {
+            flex-direction: row;
+            align-items: flex-start;
+        }
+
+        .card-content {
+            margin-left: 0;
+            text-align: center;
+        }
+    }
+</style>
+<script>
+    function ManageUserInfo(UserId) {
+        window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+    }
+</script>
+
+<div class="container">
+    <div class="icon-container">
+        <div class="icon-background"></div>
+        <div class="icon-foreground">
+            <span class="material-icons">@keyWordTitle</span>
+        </div>
+    </div>
+    <div class="image-container">
+        <img src="/images/admin/admin002.webp" alt="Descriptive Alt Text" style="width: 100%; height: auto;">
+    </div>
+ @*   <div class="card" style="margin:3px;">
+        <div class="card-content">
+            <div class="button-group">
+                <span class="button no-select" onclick="redirectToPage('/CheckPoint/CheckPointDetail?rankQueryOption=@ViewBag_Kind&orderBy=DC_Total')">총합포인트로정렬</span>
+                <span class="button no-select" onclick="redirectToPage('/CheckPoint/CheckPointDetail?rankQueryOption=@ViewBag_Kind&orderBy=DC')">상대포인트로정렬</span>
+            </div>
+        </div>
+    </div>*@
+
+    @foreach (var item in Model)
+    {
+        string YearBan = string.Empty;
+        string roleString = string.Empty;
+
+
+        if (item.RoleCode == "T1001" && item.ClassYear > 0)
+        {
+            YearBan = $"{item.ClassYear}학년{item.ClassBan}반";
+            roleString = item.RoleNM;
+        }
+        else if (item.RoleCode == "T1002" || item.RoleCode == "T1003" || item.RoleCode == "T1004" || item.RoleCode == "T1005" ||
+                 item.RoleCode == "T1006" || item.RoleCode == "T1007" || item.RoleCode == "T1008" || item.RoleCode == "T1009")
+        {
+            roleString = item.RoleNM;
+        }
+        else
+        {
+            roleString = $"기타";
+        }
+    
+        <div class="card" style="margin:3px;align-items: center;">
+            <div style=" display: flex; margin-top: 10px;align-items: center;">
+                <img id="myImage" src="@item.ProfilePicturePath" alt="Profile Picture" loading="lazy" onclick="ManageUserInfo('@item.UserId')" class="profile-picture2" >
+                <div class="card-content">
+                    <table style="text-align:left;">
+                        <tr><td class="tableTD">순서</td><td>:</td><td class="tableTD"> @item.sequenceNo</td></tr>
+                        <tr><td class="tableTD">이름</td><td>:</td><td class="tableTD"> @item.FullName</td></tr>
+                        <tr><td class="tableTD">계정</td><td>:</td><td class="tableTD"> @item.UserName</td></tr>
+                        <tr><td class="tableTD">그룹</td><td>:</td><td class="tableTD"> @YearBan @roleString</td></tr>
+                        <tr><td class="tableTD">보상</td><td>:</td><td class="tableTD"> @item.AwardLevel.ToString("N0")점</td></tr>
+                        <tr><td class="tableTD">점수</td><td>:</td><td class="tableTD"> @item.DC_Total.ToString("N0")점</td></tr>
+                        @if (item.DC_Total != item.Total)
+                        {
+                            <tr><td class="tableTD">총합</td><td>:</td><td class="tableTD"> @item.Total.ToString("N0")점</td></tr>
+
+                        }
+                        <tr><td class="tableTD">접속</td><td>:</td><td class="tableTD"> @item.maxclickDate.ToString("yy년 MM월 dd일")</td></tr>
+                    </table>
+               
+                </div>
+            </div>
+            <div>
+                <div class="button-group" style="justify-content: flex-end;">
+                    <span class="button no-select" onclick="redirectToPage('/Home/NaviMonth?userName=@item.UserName')">수행내역(월별)</span>
+                    <span class="button no-select" onclick="redirectToPage('/Home/NaviHistory?userName=@item.UserName')">수행내역(일자별)</span>
+                    @if (await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+                    {
+                        <span class="button no-select" onclick="redirectToPage('/CheckPoint/ManagePoint?UserId=@item.UserId')">점수관리</span>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @await Html.PartialAsync("_Publish_Homeontents", new MissionContents { MissionText = "Home" ,BackGround="/images/home/Home.webp", MissionCount = 0, MissionMessage ="첫 화면으로 돌아가기" ,  MissionURL = "/", ButtonStyle ="mission-button-color-5" })
+    @await Html.PartialAsync("_Publish_Homeontents", new MissionContents { MissionText = "포인트 Home" ,BackGround="/images/home/Home.webp", MissionCount = 0, MissionMessage ="퀴즈/공과 등록합니다" ,  MissionURL = "/Admin/IndexPoint", ButtonStyle ="mission-button-color-5" })
+
+</div>
+
+
+<script>
+    function redirectToPage(URL) {
+        window.location.href = URL;
+    }
+</script>

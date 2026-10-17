@@ -1,0 +1,49 @@
+﻿@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Common;
+@{
+	string backgroundColor = "white";
+
+	var sessionWorkDT = Context.Session.GetString(DateKind.WorkDT.ToString());
+	var sessionTodayDT = Context.Session.GetString(DateKind.TodayDT.ToString());
+
+	DateTime todayDT = BulletinBoard.Common.SharedComm.GetToday();
+	DateTime missionDT = BulletinBoard.Common.SharedComm.GetToday();
+
+	string todayDString = BulletinBoard.Common.SharedComm.GetTodayString();
+	
+	if (sessionWorkDT != null)
+	{
+		missionDT = DateTime.Parse(sessionWorkDT);
+	}
+
+	if (sessionTodayDT != null)
+	{
+		todayDT = DateTime.Parse(sessionTodayDT);
+	}
+
+	string TodayMesssage = $"오늘은 {@BulletinBoard.Common.SharedComm.GetTodayStringKor()} 입니다.";
+ 
+	string MissionMesssage = $"{missionDT.Month}월{missionDT.Day}일자 미션을 보고 계시네요.";
+} 
+@if (missionDT.ToString("yyyy-MM-dd") != todayDT.ToString("yyyy-MM-dd"))
+{
+	<div class="reward-card">
+		<div class="mission-title">📢 알림</div>
+        <div class="mission-desc">@MissionMesssage</div>
+		<button class="buttonCommon colorBaseSoftTeal" onclick=goToPage('/Home/goWorkDT?workDT=@todayDString')>오늘 날짜로 이동</button>
+    </div>
+}
+else
+{
+	@*<div class="content" style="text-align:center;background-color: #004d40;color: white; ">
+		<h4 style="margin:3px;">알림</h4>
+		<hr>
+
+		
+		<h5 style="margin:3px;text-align:left;">과거 미션 수행이 가능해 졌어요.<br>
+			위에 날짜 아래 "원"을 누루세요.<br>
+		    과거 미션은 D-2일까지 가능 합니다.</h5>
+	</div>*@
+}
+
+

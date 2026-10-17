@@ -1,0 +1,249 @@
+@using BulletinBoard.Models
+@model PrayerArrow
+
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    오늘 하루 다짐 기도 (화살 기도)
+    · 2026-10-05 시안 확정 — 자녀 축복 기도 · 부부 기도와 같은 밝은 흰색 결
+      한 줄 머리(홈 · 다짐 기도 + 가− 100% 가+) · 해 뜨는 원 + 제목 머리 · "주님," 호칭 줄 · 기도 세 줄은 흐린 파랑 번호
+    · 이전 화면(새벽 여명 · 카드)은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null; /* 레이아웃 미사용 */
+    ViewData["Title"] = "오늘의 다짐 기도";
+
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+
+    var kNow = DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow.Month}월 {kNow.Day}일 {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    var bodyLines = new List<string>();
+    if (Model != null)
+    {
+        if (!string.IsNullOrWhiteSpace(Model.Line1)) bodyLines.Add(Model.Line1.Trim());
+        if (!string.IsNullOrWhiteSpace(Model.Line2)) bodyLines.Add(Model.Line2.Trim());
+        if (!string.IsNullOrWhiteSpace(Model.Line3)) bodyLines.Add(Model.Line3.Trim());
+    }
+
+    // 첫 줄이 이미 하나님을 부르며 시작하면 "주님," 을 따로 붙이지 않는다
+    // (그대로 두면 "주님, / 주님, 끝까지 인내하게…" 처럼 겹친다)
+    string[] callWords = { "주님", "하나님", "아버지", "예수님" };
+    bool needOpening = bodyLines.Count > 0
+                       && !callWords.Any(w => bodyLines[0].StartsWith(w, StringComparison.Ordinal));
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@ViewData["Title"]</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --tx:#111827; --body:#374151; --read:#2A2F3A; --dim:#9CA3AF; --dim2:#6B7280; --rule:#EEF0F3; --mark:#F4F6F9;
+                --acc:#2F80ED; --soft:#EAF2FD; --soft2:#DCEAFB; --num:#7FA3DB; --fs: 1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #FFFFFF; color: var(--body); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; }
+        :focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+        .pz { max-width: 760px; margin: 0 auto; padding: 0 16px 48px; }
+
+        /* 맨 위 한 줄 */
+        .bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 0 12px; font-size: 13px; color: var(--dim); }
+        .bar > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar a { color: var(--body); font-weight: 700; }
+        .bar a:hover { color: var(--acc); }
+        .bar .sep { margin: 0 6px; color: #D1D5DB; }
+        .prog { height: 3px; border-radius: 99px; background: var(--mark); }
+
+        /* 글자 크기 — 가− 100% 가+ (가운데를 누르면 100%) */
+        .fz { flex: none; display: inline-flex; align-items: stretch; border: 1px solid #E1E6EE; border-radius: 8px; overflow: hidden; background: #fff; }
+        .fz button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--body); padding: 5px 9px; cursor: pointer; }
+        .fz button:hover:not(:disabled) { color: var(--acc); }
+        .fz button:disabled { color: #D1D5DB; cursor: default; }
+        .fz #pfsPct { min-width: 48px; border-left: 1px solid #E1E6EE; border-right: 1px solid #E1E6EE; font-size: 11.5px; font-weight: 400; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+        /* 머리 — 해 뜨는 원 + 제목 */
+        .phd { display: flex; gap: 14px; align-items: center; margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+        .dawn { flex: none; width: 72px; height: 72px; border-radius: 50%; background: var(--soft); position: relative; overflow: hidden; }
+        .dawn::before { content: ""; position: absolute; left: 50%; top: 24px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: var(--acc); }
+        .dawn::after { content: ""; position: absolute; left: 14px; right: 14px; top: 44px; height: 3px; border-radius: 2px; background: #fff; box-shadow: 0 7px 0 0 var(--soft); }
+        .phdTx { flex: 1; min-width: 0; }
+        .kk { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--acc); }
+        .ttl { margin: 4px 0 0; font-size: 19px; font-weight: 800; line-height: 1.4; letter-spacing: -.01em; color: var(--tx); word-break: keep-all; text-wrap: balance; }
+        .phdS { margin-top: 3px; font-size: 12px; color: var(--dim); }
+
+        /* 본문 */
+        .body { margin-top: 16px; }
+        .call { margin: 0 0 6px; padding-left: 10px; border-left: 3px solid var(--acc); font-size: calc(15.5px * var(--fs)); line-height: 1.5; font-weight: 800; color: var(--tx); }
+        .lines { list-style: none; margin: 0; padding: 0; }
+        .lines li { display: flex; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--rule); font-size: calc(16px * var(--fs)); line-height: 1.85; color: var(--read); word-break: keep-all; }
+        .lines li .n { flex: none; width: 22px; font-size: calc(15px * var(--fs)); font-weight: 800; color: var(--num); font-variant-numeric: tabular-nums; line-height: 1.85; }
+        .close { margin: 14px 0 0; font-size: calc(15.5px * var(--fs)); line-height: 1.9; color: var(--read); }
+        .amen { margin: 0; text-align: right; font-weight: 800; color: var(--tx); font-size: calc(15.5px * var(--fs)); }
+
+        .nb { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--mark); color: var(--dim2); cursor: pointer; white-space: nowrap; }
+        .nb:hover { color: var(--acc); }
+        .copy { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 16px; }
+        .copy .msg { font-size: 12px; color: var(--acc); }
+        .copy .msg:empty { display: none; }
+
+        .none { margin-top: 24px; text-align: center; padding: 28px 20px; border-radius: 14px; background: var(--mark); color: var(--dim2); font-size: 14px; }
+
+        /* 아래 버튼 — 연한 색 */
+        .act { display: flex; gap: 8px; margin-top: 18px; }
+        .act a { flex: 1; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 14px; font-weight: 800; }
+        .act .p { background: var(--soft); color: var(--acc); }
+        .act .p:hover { background: var(--soft2); }
+        .act .s { background: var(--mark); color: var(--dim2); }
+        .act .s:hover { color: var(--acc); }
+        .adm { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+
+        @@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="@Url.Content("~/")">@ConstatsCommon.ToHome</a><span class="sep">·</span>다짐 기도</span>
+        <span class="fz" role="group" aria-label="기도문 글자 크기">
+            <button type="button" id="pfsDn" onclick="stepPFs(-1)" aria-label="글자 작게">가−</button>
+            <button type="button" id="pfsPct" onclick="setPFs('m')" title="100%로 되돌리기" aria-label="글자 크기 100%로 되돌리기">100%</button>
+            <button type="button" id="pfsUp" onclick="stepPFs(1)" aria-label="글자 크게">가+</button>
+        </span>
+    </div>
+    <div class="prog"></div>
+
+    <div class="phd">
+        <div class="dawn" aria-hidden="true"></div>
+        <div class="phdTx">
+            <div class="kk">하루를 여는 기도@(Model != null && Model.DayIndex > 0 ? $" · {Model.DayIndex}일차" : "")</div>
+            <h1 class="ttl">@(Model == null || string.IsNullOrWhiteSpace(Model.Title) ? "오늘의 다짐 기도" : Model.Title)</h1>
+            <div class="phdS">오늘 하루 다짐 기도 · @dateStr</div>
+        </div>
+    </div>
+
+    @if (Model == null)
+    {
+        <div class="none">등록된 기도문이 없어요</div>
+    }
+    else
+    {
+        @* 복사 대상 — 이 영역의 글자만 클립보드로 옮긴다 *@
+        <div class="body" id="prayer-text">
+            @if (needOpening)
+            {
+                <p class="call">주님,</p>
+            }
+            @if (bodyLines.Count > 0)
+            {
+                <ol class="lines">
+                    @for (int i = 0; i < bodyLines.Count; i++)
+                    {
+                        <li><span class="n" aria-hidden="true">@(i + 1)</span><span>@bodyLines[i]</span></li>
+                    }
+                </ol>
+            }
+            <p class="close">예수님의 이름으로 기도드립니다.</p>
+            <p class="amen">아멘.</p>
+        </div>
+
+        <div class="copy">
+            <button type="button" class="nb" onclick="copyPrayer()">전체 복사</button>
+            <span id="copy-note" class="msg" aria-live="polite"></span>
+        </div>
+    }
+
+    <div class="act">
+        <a class="p" href="@Url.Content("~/")">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/PrayHome/Index">기도홈</a>
+    </div>
+
+    @if (Model != null && (isSuperAdmin || isAdmin))
+    {
+        <div class="adm"><a class="nb" href="@Url.Action("Edit", new { id = Model.PrayerId })">수정</a></div>
+    }
+
+</div>
+
+<script>
+    /* 기도문 글자 크기 — 가− 100% 가+ (예전과 같은 저장 키 prFs · 단계 s/m/l/xl) */
+    (function () {
+        var MAP = { s: 0.90, m: 1, l: 1.18, xl: 1.36 }, ORD = ['s', 'm', 'l', 'xl'], cur = 'm';
+        window.setPFs = function (k, silent) {
+            if (!MAP[k]) k = 'm';
+            cur = k;
+            document.documentElement.style.setProperty('--fs', MAP[k]);
+            var pct = document.getElementById('pfsPct'); if (pct) pct.textContent = Math.round(MAP[k] * 100) + '%';
+            var ix = ORD.indexOf(k);
+            var dn = document.getElementById('pfsDn'), up = document.getElementById('pfsUp');
+            if (dn) dn.disabled = ix <= 0;
+            if (up) up.disabled = ix >= ORD.length - 1;
+            if (!silent) { try { localStorage.setItem('prFs', k); } catch (e) { } }
+        };
+        window.stepPFs = function (d) {
+            var ix = Math.max(0, Math.min(ORD.length - 1, ORD.indexOf(cur) + d));
+            setPFs(ORD[ix]);
+        };
+        var saved = 'm';
+        try { saved = localStorage.getItem('prFs') || 'm'; } catch (e) { }
+        setPFs(saved, true);
+    })();
+
+    /* 기도문 전체 복사 — 번호(1·2·3)는 빼고 글만 */
+    function copyPrayer() {
+        var el = document.getElementById('prayer-text');
+        var note = document.getElementById('copy-note');
+        if (!el) return;
+
+        var parts = [];
+        el.querySelectorAll('.call, .lines li > span:last-child, .close, .amen').forEach(function (n) { parts.push(n.textContent.trim()); });
+        var text = parts.join('\n');
+
+        function done(ok) {
+            if (!note) return;
+            note.textContent = ok ? '기도문을 복사했어요' : '복사하지 못했어요';
+            setTimeout(function () { note.textContent = ''; }, 1800);
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback(text)); });
+        } else {
+            done(fallback(text));
+        }
+
+        /* clipboard API 를 쓸 수 없는 환경(비 HTTPS 등) 대비 */
+        function fallback(t) {
+            try {
+                var ta = document.createElement('textarea');
+                ta.value = t;
+                ta.setAttribute('readonly', '');
+                ta.style.position = 'fixed';
+                ta.style.top = '-1000px';
+                document.body.appendChild(ta);
+                ta.select();
+                var ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                return ok;
+            } catch (e) { return false; }
+        }
+    }
+</script>
+</body>
+</html>

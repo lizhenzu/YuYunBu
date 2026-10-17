@@ -1,0 +1,66 @@
+@model BulletinBoard.Models.OneLineFamousWords
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    명구 등록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 폼 이름 · 검증 · 저장 주소(CreateOneLineFamousWordProcess)는 그대로
+    · 이전 화면은 CreateOneLineFamousWord.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>명구 등록</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>등록하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/OneLineFamousWord/Index">명구 관리</a><span class="sep">›</span>등록</span>
+        <span>QUOTE</span>
+    </div>
+
+    <div class="qb-k">NEW</div>
+    <h1 class="qb-h1">명구 등록</h1>
+
+    <form asp-action="CreateOneLineFamousWordProcess" method="post" onsubmit="return beforeSubmit(this);">
+        <div asp-validation-summary="ModelOnly"></div>
+
+        <div class="qb-f">
+            <label asp-for="OneLineText">명구</label>
+            <textarea id="OneLineText" name="OneLineText" class="qb-in" rows="10" style="min-height:220px" placeholder="한 줄 명구를 적어 주세요" autofocus></textarea>
+            <span asp-validation-for="OneLineText" class="error"></span>
+        </div>
+
+        <button type="submit" class="qb-submit">명구 등록</button>
+    </form>
+
+    <div class="qb-ft">
+        <span>명구 등록</span>
+        <span><a href="/OneLineFamousWord/Index">명구 목록</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script>
+    function beforeSubmit(form) {
+        if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) return false;
+        document.getElementById('loadingOverlay').classList.add('on');
+        return true;
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+</script>
+</body>
+</html>

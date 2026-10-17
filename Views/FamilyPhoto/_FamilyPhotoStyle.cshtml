@@ -1,0 +1,108 @@
+@*  가족 사진 콘테스트 — 네 화면(갤러리 · 올리기 · 결과 · 관리)이 같이 쓰는 스타일.  bone.css 위에 얹는다. *@
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+    .qz { max-width: 760px; --warn: #B4531F; }
+    .qz form { margin: 0; }
+
+    /* 머리 */
+    .qz .brK  { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin: 18px 0 9px; }
+    .qz .brH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 24px; line-height: 1.4; word-break: keep-all; }
+    .qz .brH1 b { font-weight: 400; background-image: linear-gradient(transparent 62%, var(--mark) 62%); padding: 0 2px; }
+    .qz .brSum { font-size: 11.5px; color: var(--dim); margin-top: 8px; line-height: 1.7; word-break: keep-all; }
+    .qz .sec { display: flex; justify-content: space-between; align-items: baseline; font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: var(--dim); margin: 24px 0 8px; }
+    .qz .sec span { letter-spacing: .04em; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .qz .msg { margin-top: 14px; padding: 10px 13px; background: var(--mark); font-size: 12px; line-height: 1.6; word-break: keep-all; }
+    .qz .msg.err { background: #F3E4DC; color: var(--warn); }
+    .qz .hint { margin-top: 12px; padding: 9px 12px; background: var(--mark); font-size: 11px; color: var(--dim2); line-height: 1.6; word-break: keep-all; }
+
+    /* 일정 띠 */
+    .qz .tl { display: grid; grid-template-columns: 1fr 1fr 1fr; border: 1px solid var(--rule); background: #fff; margin-top: 16px; }
+    .qz .tl div { padding: 11px 13px; border-right: 1px solid var(--rule); }
+    .qz .tl div:last-child { border-right: 0; }
+    .qz .tl div.on { background: var(--mark); }
+    .qz .tl u { text-decoration: none; display: block; font-size: 9.5px; letter-spacing: .16em; color: var(--dim); }
+    .qz .tl b { display: block; font-family: "Inter", sans-serif; font-weight: 300; font-size: 15px; margin-top: 4px; color: var(--tx); }
+    .qz .tl div.on b { color: var(--acc); }
+    .qz .tl i { display: block; font-style: normal; font-size: 10.5px; color: var(--dim); margin-top: 2px; }
+
+    /* 버튼 */
+    .qz .btn { display: inline-block; border: 1px solid var(--tx); background: var(--tx); color: var(--bg); padding: 11px 16px; font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-decoration: none; white-space: nowrap; cursor: pointer; text-align: center; }
+    .qz .btn:hover { background: var(--acc); border-color: var(--acc); color: var(--bg); }
+    .qz .btn.line { background: transparent; color: var(--dim2); border-color: #D6CBB7; }
+    .qz .btn.line:hover { color: var(--acc); border-color: var(--acc); background: transparent; }
+    .qz .btn.acc { background: var(--acc); border-color: var(--acc); }
+    .qz .btn.acc:hover { background: var(--tx); border-color: var(--tx); }
+    .qz .btn.sm { padding: 6px 10px; font-size: 10px; }
+    .qz .btn[disabled] { opacity: .45; cursor: default; }
+    .qz .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .qz .acts .btn { flex: 1 1 160px; }
+
+    /* 가족 카드 */
+    .qz .fam { margin-top: 12px; border: 1px solid var(--rule); background: #fff; padding: 12px 12px 10px; }
+    .qz .fam.off { opacity: .55; border-style: dashed; }
+    .qz .famH { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .qz .famN { font-family: "Noto Serif KR", serif; font-size: 16px; word-break: keep-all; }
+    .qz .famN i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 300; font-size: 10.5px; color: var(--dim); margin-left: 8px; letter-spacing: .06em; }
+    .qz .famC { font-family: "Inter", sans-serif; font-size: 10px; color: var(--dim); letter-spacing: .08em; white-space: nowrap; }
+    .qz .ph { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 10px; }
+    .qz .ph .p { position: relative; aspect-ratio: 1 / 1; background: repeating-linear-gradient(45deg, #EFEDE8 0 6px, #E7E4DE 6px 12px); overflow: hidden; cursor: zoom-in; }
+    .qz .ph .p.wide { grid-column: 1 / -1; aspect-ratio: 3 / 2; }
+    .qz .ph .p img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .qz .ph .p.off img { opacity: .35; }
+    .qz .ph .p .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 8px 6px; font-size: 10.5px; color: #fff; background: linear-gradient(transparent, rgba(22,24,28,.7)); line-height: 1.4; word-break: keep-all; }
+    /* 좋아요 — 하트 + "좋아요" 알약 (2026-09-27 C안).  누르기 전 빈 하트 · 누르면 장미색으로 꽉 참 + 톡 커짐 + 작은 방울 */
+    .qz .ph .p .lk { position: absolute; right: 7px; top: 7px; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px 0 9px;
+                     border: 0; border-radius: 999px; background: rgba(255,255,255,.94); box-shadow: 0 2px 8px rgba(0,0,0,.16);
+                     font-family: inherit; font-size: 11.5px; font-weight: 800; color: #F0506E; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .qz .ph .p .lk::after { content: "좋아요"; }
+    .qz .ph .p .lk.on { background: #F0506E; color: #fff; }
+    .qz .ph .p .lk[disabled] { opacity: .5; cursor: default; }
+    .fpHeart { display: block; width: 16px; height: 16px; flex: none; transition: transform .15s; }
+    .fpHeart .f { fill: transparent; transition: fill .15s; }
+    .fpHeart .l { fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+    .lk.on .fpHeart .f, .like.on .fpHeart .f { fill: currentColor; }
+    .lk:active .fpHeart { transform: scale(.88); }
+    .lk.on .fpHeart { animation: fpHeartPop .45s cubic-bezier(.2,.9,.3,1.4); }
+    @@keyframes fpHeartPop { 0% { transform: scale(.6); } 55% { transform: scale(1.3); } 100% { transform: scale(1); } }
+    .lk .burst { position: absolute; left: 20px; top: 50%; pointer-events: none; }
+    .lk .burst i { position: absolute; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: #FF8FA3; opacity: 0; }
+    .lk.boom .burst i { animation: fpFly .6s ease-out forwards; }
+    @@keyframes fpFly { 0% { opacity: 1; transform: translate(0,0) scale(1); } 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(.3); } }
+    @@media (prefers-reduced-motion: reduce) { .lk.on .fpHeart, .lk.boom .burst i { animation: none; } }
+    .qz .ph .p .cnt { position: absolute; left: 6px; top: 6px; font-family: "Inter", sans-serif; font-size: 10px; background: rgba(22,24,28,.8); color: #F7F6F3; padding: 2px 6px; }
+    .qz .famF { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; font-size: 10.5px; color: var(--dim); gap: 8px; flex-wrap: wrap; }
+    .qz .famF em { font-style: normal; color: #F0506E; font-weight: 800; }
+    .qz .famF .mine { display: inline-flex; align-items: center; gap: 4px; color: var(--dim2); }
+    .qz .famF .mine .fpHeart { width: 12px; height: 12px; color: #F0506E; }
+    .qz .famF .mine .fpHeart .f { fill: currentColor; }
+    .qz .empty { padding: 30px 0; text-align: center; font-size: 12.5px; color: var(--dim); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin-top: 12px; }
+
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule); display: flex; justify-content: center; align-items: center; gap: 14px; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; flex-wrap: wrap; text-align: center; }
+    .qz .brFoot a { color: var(--dim2); text-decoration: none; margin-left: 14px; }
+    .qz .brFoot a:first-child { margin-left: 0; }
+    .qz .brFoot a:hover { color: var(--acc); }
+
+    /* 알림 · 크게 보기 */
+    .fpToast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none; background: #16181C; color: #F7F6F3; padding: 8px 14px; font-size: 11px; letter-spacing: .06em; max-width: calc(100vw - 32px); transition: opacity .18s, transform .18s; z-index: 9999; }
+    .fpToast.show { opacity: 1; transform: translate(-50%, 0); }
+    .fpMask { display: none; position: fixed; inset: 0; background: rgba(22,24,28,.85); z-index: 9000; align-items: center; justify-content: center; padding: 14px; }
+    .fpMask.show { display: flex; }
+    .fpBox { background: #F7F6F3; border: 1px solid #E2E0DB; width: 100%; max-width: 520px; padding: 12px; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; color: #16181C; text-align: left; }
+    .fpBox img { display: block; width: 100%; max-height: 66vh; object-fit: contain; background: #fff; }
+    .fpBox .t { font-family: "Noto Serif KR", serif; font-size: 15px; margin-top: 10px; }
+    .fpBox .t span { font-family: "Inter", sans-serif; font-weight: 300; font-size: 10.5px; color: #83868C; margin-left: 6px; }
+    .fpBox .c { font-size: 11.5px; color: #5C5F66; margin-top: 3px; line-height: 1.6; min-height: 18px; word-break: keep-all; }
+    .fpBox .a { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #E2E0DB; }
+    .fpBox .a button { font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; padding: 11px 12px; border: 1px solid #16181C; background: #16181C; color: #F7F6F3; cursor: pointer; }
+    .fpBox .a button.like { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; background: #fff; color: #F0506E; border: 1.5px solid #F0506E; letter-spacing: .02em; }
+    .fpBox .a button.like .fpHeart { width: 17px; height: 17px; }
+    .fpBox .a button.like.on { background: #F0506E; border-color: #F0506E; color: #fff; }
+    .fpBox .a button.nav { background: transparent; color: #5C5F66; border-color: #D6CBB7; }
+    .fpBox .a button[disabled] { opacity: .45; cursor: default; }
+
+    @@media (max-width: 480px) {
+        .qz .tl div { padding: 9px 8px; }
+        .qz .tl b { font-size: 13px; }
+    }
+</style>

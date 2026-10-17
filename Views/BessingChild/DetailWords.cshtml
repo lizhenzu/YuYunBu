@@ -1,0 +1,229 @@
+@model BulletinBoard.Models.BessingChildDatas
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@using System.Text.RegularExpressions
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@*  ══════════════════════════════════════════════════════════════
+    자녀 축복 기도 — 오늘의 기도문
+    · 2026-10-05 시안 확정 — 부부 기도 · /Prayer365 와 같은 밝은 흰색 결
+      한 줄 머리(홈 · 자녀 축복 기도 + 가− 100% 가+) · 새싹 원 + 제목 머리 · 호칭 줄 파란 선 · 이름 자리 연파랑
+    · 이전 화면(아침 햇살 파스텔)은 DetailWords.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"pray_{todayDate}.webp";
+    string formattedModResultDataOG = $"{@ViewBag.Domain}/images/pray/{formattedModResultData}";
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    string pageTitle = $"{ChurchName} {DepartmentName}";
+
+    var kNow = DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow.Month}월 {kNow.Day}일 {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // **○○(이)** 처럼 별표로 감싼 이름 자리를 강조 표시로 바꿔 준다.
+    // 그 밖의 본문은 HTML 로 해석되지 않도록 먼저 이스케이프한다.
+    Func<string, Microsoft.AspNetCore.Html.IHtmlContent> Mark = raw =>
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(raw ?? string.Empty);
+        enc = Regex.Replace(enc, @"\*{2,3}(.+?)\*{2,3}", "<span class=\"nm\">$1</span>");
+        enc = enc.Replace("*", string.Empty);   // 짝이 맞지 않는 별표는 지운다
+        return new Microsoft.AspNetCore.Html.HtmlString(enc);
+    };
+
+    Func<string, string[]> Lines = raw =>
+        string.IsNullOrWhiteSpace(raw)
+            ? new string[0]
+            : raw.Replace("\r\n", "\n").Replace("\r", "\n").Trim()
+                 .Split('\n')
+                 .Where(l => !string.IsNullOrWhiteSpace(l))
+                 .ToArray();
+
+    var koLines = Lines(Model?.PrayText);
+    var enLines = Lines(Model?.PrayText_Eng);
+    var wordLines = Lines(Model?.HolyWord);
+
+    // 짧고 쉼표로 끝나는 줄("사랑의 하나님 아버지,")은 호칭 — 365 · 부부 기도와 같은 규칙
+    bool IsCall(string line) { var l = line.Trim(); return l.EndsWith(",") && l.Length <= 30; }
+    // 따로 떨어진 "아멘." 줄은 오른쪽에
+    bool IsAmen(string line) { var l = line.Trim(); return l == "아멘" || l == "아멘."; }
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@pageTitle</title>
+
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@pageTitle 입니다." />
+    <meta property="og:image" content="@formattedModResultDataOG" />
+    <meta property="og:url" content="@ViewBag.FullURL" />
+    <meta property="og:type" content="website" />
+
+    <partial name="_BcStyle" />
+    <style>
+        /* 글자 크기 — 가− 100% 가+ (가운데를 누르면 100%) */
+        .fz { flex: none; display: inline-flex; align-items: stretch; border: 1px solid #E1E6EE; border-radius: 8px; overflow: hidden; background: #fff; }
+        .fz button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: var(--body); padding: 5px 9px; cursor: pointer; }
+        .fz button:hover:not(:disabled) { color: var(--acc); }
+        .fz button:disabled { color: #D1D5DB; cursor: default; }
+        .fz #pfsPct { min-width: 48px; border-left: 1px solid #E1E6EE; border-right: 1px solid #E1E6EE; font-size: 11.5px; font-weight: 400; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+        /* 머리 — 새싹 원 + 제목 */
+        .phd { display: flex; gap: 14px; align-items: center; margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+        .sprout { flex: none; width: 72px; height: 72px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; }
+        .sprout i { position: relative; width: 40px; height: 40px; }
+        .sprout i::before { content: ""; position: absolute; left: 19px; bottom: 2px; width: 3px; height: 22px; border-radius: 2px; background: var(--acc); }
+        .sprout i::after { content: ""; position: absolute; left: 4px; top: 6px; width: 16px; height: 11px; border-radius: 16px 0; background: var(--num); box-shadow: 16px -3px 0 0 var(--acc); }
+        .phdTx { flex: 1; min-width: 0; }
+        .ttl { margin: 4px 0 0; font-size: 19px; font-weight: 800; line-height: 1.4; letter-spacing: -.01em; color: var(--tx); word-break: keep-all; text-wrap: balance; }
+        .phdS { margin-top: 3px; font-size: 12px; color: var(--dim); }
+
+        /* 본문 */
+        .body { margin-top: 16px; }
+        .body p { margin: 0 0 12px; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: var(--read); word-break: keep-all; }
+        .body p.call { margin-top: 14px; padding-left: 10px; border-left: 3px solid var(--acc); line-height: 1.5; font-weight: 800; color: var(--tx); }
+        .body p.call:first-child { margin-top: 0; }
+        .body p.amen { text-align: right; font-weight: 800; color: var(--tx); }
+        .nm { background: var(--soft); color: var(--tx); font-weight: 700; border-radius: 4px; padding: 0 3px; }
+
+        /* 함께 읽는 말씀 · English Prayer — 처음에는 접힘 */
+        details.vs { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 14px; }
+        details.vs > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 800; color: var(--tx); }
+        details.vs > summary::-webkit-details-marker { display: none; }
+        details.vs > summary span { font-size: 12.5px; font-weight: 700; color: var(--acc); }
+        details.vs > summary span::after { content: "펼쳐 보기 ⌄"; }
+        details.vs[open] > summary span::after { content: "접기 ⌃"; }
+        .vsBody { margin-top: 10px; padding-left: 12px; border-left: 3px solid var(--line2); }
+        .vsBody p { margin: 0 0 8px; font-size: calc(13.5px * var(--fs)); line-height: 1.85; color: var(--dim2); word-break: keep-all; }
+        .vsBody p:last-child { margin-bottom: 0; }
+
+        .stamp { margin-top: 14px; text-align: right; font-size: 11px; color: var(--dim); }
+        .adm { display: flex; gap: 6px; justify-content: center; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>자녀 축복 기도</span>
+        <span class="fz" role="group" aria-label="기도문 글자 크기">
+            <button type="button" id="pfsDn" onclick="stepPFs(-1)" aria-label="글자 작게">가−</button>
+            <button type="button" id="pfsPct" onclick="setPFs('m')" title="100%로 되돌리기" aria-label="글자 크기 100%로 되돌리기">100%</button>
+            <button type="button" id="pfsUp" onclick="stepPFs(1)" aria-label="글자 크게">가+</button>
+        </span>
+    </div>
+    <div class="prog"></div>
+
+    <div class="phd">
+        <div class="sprout" aria-hidden="true"><i></i></div>
+        <div class="phdTx">
+            <div class="kk">자녀 축복 기도@(Model != null && Model.Id > 0 ? $" · {Model.Id}일" : "")</div>
+            <h1 class="ttl">@(string.IsNullOrWhiteSpace(Model?.PrayTitle) ? "자녀를 위한 축복 기도" : Model.PrayTitle)</h1>
+            <div class="phdS">우리 아이를 위한 기도 · @dateStr</div>
+        </div>
+    </div>
+
+    @if (koLines.Length == 0 && wordLines.Length == 0)
+    {
+        <div class="none">표시할 기도문이 없어요</div>
+    }
+    else
+    {
+        <div class="body">
+            @foreach (var line in koLines)
+            {
+                <p class="@(IsCall(line) ? "call" : IsAmen(line) ? "amen" : "")">@Mark(line)</p>
+            }
+        </div>
+
+        @if (wordLines.Length > 0)
+        {
+            <details class="vs">
+                <summary>함께 읽는 말씀<span></span></summary>
+                <div class="vsBody">
+                    @foreach (var line in wordLines)
+                    {
+                        <p>@Mark(line)</p>
+                    }
+                </div>
+            </details>
+        }
+
+        @if (enLines.Length > 0)
+        {
+            <details class="vs">
+                <summary>English Prayer<span></span></summary>
+                <div class="vsBody">
+                    @foreach (var line in enLines)
+                    {
+                        <p>@Mark(line)</p>
+                    }
+                </div>
+            </details>
+        }
+    }
+
+    @if (Model != null && Model.updateDT.HasValue)
+    {
+        <div class="stamp">수정일 @Model.updateDT.Value.ToString("yyyy-MM-dd")</div>
+    }
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/PrayHome/Index">기도홈</a>
+    </div>
+
+    @if (isSuperAdmin)
+    {
+        <div class="adm">
+            <a class="nb" href="/BessingChild/DetailList">목록</a>
+            @if (Model != null) { <a class="nb" href="/BessingChild/ModifyView?Id=@Model.Id">수정</a> }
+        </div>
+    }
+
+</div>
+
+<script>
+    /* 기도문 글자 크기 — 가− 100% 가+ (예전과 같은 저장 키 bcFs · 단계 s/m/l/xl) */
+    (function () {
+        var MAP = { s: 0.90, m: 1, l: 1.18, xl: 1.36 }, ORD = ['s', 'm', 'l', 'xl'], cur = 'm';
+        window.setPFs = function (k, silent) {
+            if (!MAP[k]) k = 'm';
+            cur = k;
+            document.documentElement.style.setProperty('--fs', MAP[k]);
+            var pct = document.getElementById('pfsPct'); if (pct) pct.textContent = Math.round(MAP[k] * 100) + '%';
+            var ix = ORD.indexOf(k);
+            var dn = document.getElementById('pfsDn'), up = document.getElementById('pfsUp');
+            if (dn) dn.disabled = ix <= 0;
+            if (up) up.disabled = ix >= ORD.length - 1;
+            if (!silent) { try { localStorage.setItem('bcFs', k); } catch (e) { } }
+        };
+        window.stepPFs = function (d) {
+            var ix = Math.max(0, Math.min(ORD.length - 1, ORD.indexOf(cur) + d));
+            setPFs(ORD[ix]);
+        };
+        var saved = 'm';
+        try { saved = localStorage.getItem('bcFs') || 'm'; } catch (e) { }
+        setPFs(saved, true);
+    })();
+</script>
+</body>
+</html>

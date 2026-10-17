@@ -1,0 +1,26 @@
+@model BulletinBoard.Models.RhapsodyOfReality
+@*  오늘의 5분 말씀 — 수정 · 등록 공통 입력칸 (2026-10-05 시안 확정).  ViewData["IdPfx"] : 칸 id 앞글자 *@
+@{
+    string pfx = ViewData["IdPfx"] as string ?? "f";
+    // date 칸은 yyyy-MM-dd 만 받으므로, 저장된 값이 다른 꼴이면 맞춰 준다
+    string D(string raw) => DateTime.TryParse(raw, out var dt) ? dt.ToString("yyyy-MM-dd") : (raw ?? "");
+    // 등록 화면의 0 은 빈칸으로 (placeholder 가 보이게)
+    string N(int v) => v == 0 && pfx == "e" ? "" : v.ToString();
+}
+<div class="row2">
+    <div><label class="l" for="@(pfx)-date">날짜</label><input class="in" id="@(pfx)-date" type="date" name="ExposeDate" value="@D(Model?.ExposeDate)" /></div>
+    <div><label class="l" for="@(pfx)-title">설교 제목</label><input class="in" id="@(pfx)-title" name="WordTitle" value="@Model?.WordTitle" placeholder="예) 말씀으로 새롭게 되는 마음" /></div>
+</div>
+<div class="row3">
+    <div><label class="l" for="@(pfx)-yt">유튜브 영상 ID</label><input class="in" id="@(pfx)-yt" name="YouTuBuURL" value="@Model?.YouTuBuURL" placeholder="주소 끝의 11글자" /></div>
+    <div><label class="l" for="@(pfx)-min">반복 끝 · 분</label><input class="in" id="@(pfx)-min" type="number" min="0" name="EndMinute" value="@N(Model?.EndMinute ?? 0)" placeholder="분" /></div>
+    <div><label class="l" for="@(pfx)-sec">초</label><input class="in" id="@(pfx)-sec" type="number" min="0" max="59" name="EndSecond" value="@N(Model?.EndSecond ?? 0)" placeholder="초" /></div>
+</div>
+<div class="hint up">영상은 0:00부터 이 시간까지 반복돼요. 0분 0초(빈칸)면 끝까지 재생해요.</div>
+<div>
+    <label class="l" for="@(pfx)-word">설교</label>
+    <textarea class="in" id="@(pfx)-word" name="WordPhrase">@Model?.WordPhrase</textarea>
+    <div class="hint">줄바꿈마다 한 문단으로 보여요.</div>
+</div>
+<div><label class="l" for="@(pfx)-pray">기도</label><textarea class="in mid" id="@(pfx)-pray" name="WordPray">@Model?.WordPray</textarea></div>
+<div><label class="l" for="@(pfx)-holy">성경</label><textarea class="in short" id="@(pfx)-holy" name="HolyWord">@Model?.HolyWord</textarea></div>

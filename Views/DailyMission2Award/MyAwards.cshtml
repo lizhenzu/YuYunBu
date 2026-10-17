@@ -1,0 +1,71 @@
+﻿@model List<BulletinBoard.Models.DailyMission2.AwardUserClaimRow>
+@{
+    Layout = "_Layout_Mission2_New";
+}
+
+<link rel="stylesheet" href="/css/mission2/awardDash.css" />
+
+<div class="awardWrap">
+    <div class="head">
+        <div class="title">
+            🧾 내 시상 내역
+            <div class="sub">Eligible/Selected/Delivered 상태를 확인해요</div>
+        </div>
+        <div class="actions">
+            <a class="btn ghost" href="/DailyMission2Award/Dashboard">대시보드</a>
+            <a class="btn ghost" href="/DailyMission2Award/Dashboard2">전체 히스토리</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="tableWrap">
+            <table class="tbl">
+                <thead>
+                    <tr>
+                        <th>연도</th>
+                        <th>단계</th>
+                        <th>Status</th>
+                        <th>선택 상품ID</th>
+                        <th>선택일</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || Model.Count == 0)
+                    {
+                        <tr><td colspan="5" class="empty">아직 시상 내역이 없어요 🙂</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var row in Model)
+                        {
+                            <tr>
+                                <td class="mono">@row.cYear</td>
+                                <td class="mono">@row.AwardLevel</td>
+                                <td>
+                                    @if ((row.Status ?? "").Equals("Eligible", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge warn">Eligible</span>
+                                    }
+                                    else if ((row.Status ?? "").Equals("Selected", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge ok">Selected</span>
+                                    }
+                                    else if ((row.Status ?? "").Equals("Delivered", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        <span class="badge done">Delivered</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge">@row.Status</span>
+                                    }
+                                </td>
+                                <td class="mono">@((row.SelectedProductID.HasValue) ? row.SelectedProductID.Value.ToString() : "-")</td>
+                                <td class="mono">@((row.SelectedDT.HasValue) ? row.SelectedDT.Value.ToString("yyyy-MM-dd HH:mm") : "-")</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

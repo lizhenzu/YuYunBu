@@ -1,0 +1,807 @@
+﻿@model IEnumerable<BulletinBoard.Models.AllStatusData>
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>일일 미션 수행 현황</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg1: #FFF7FB;
+            --bg2: #F3FBFF;
+            --bg3: #F3FFF4;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --card: #ffffff;
+            --line: rgba(31,41,55,.10);
+            --shadow: 0 12px 28px rgba(31,41,55,.12);
+            --pink: #FF6FAE;
+            --sky: #5EC9FF;
+            --mint: #33D3A3;
+            --lemon: #FFD54A;
+            --grape: #8B7CFF;
+            --good: #16a34a;
+            --bad: #ef4444;
+            --radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Noto Sans KR', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            color: var(--ink);
+            background: radial-gradient(900px 450px at 10% 0%, rgba(255,111,174,.18), transparent 60%), radial-gradient(900px 450px at 90% 10%, rgba(94,201,255,.18), transparent 60%), radial-gradient(900px 450px at 40% 100%, rgba(51,211,163,.18), transparent 60%), linear-gradient(180deg, var(--bg1), var(--bg2) 40%, var(--bg3));
+            padding: 14px 12px 28px; /* ✅ 모바일도 가로스크롤 없이 자연스럽게 */
+            overflow-x: hidden; /* ✅ 혹시 모를 가로 튐 방지 */
+        }
+
+        .wrap {
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+
+        /* 상단 카드 */
+        .hero {
+            border-radius: 28px;
+            background: rgba(255,255,255,.86);
+            border: 1px solid rgba(255,255,255,.78);
+            box-shadow: var(--shadow);
+            padding: 14px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .hero:before {
+                content: "";
+                position: absolute;
+                inset: -40px -60px auto auto;
+                width: 200px;
+                height: 200px;
+                background: radial-gradient(circle at 30% 30%, rgba(255,213,74,.45), transparent 60%);
+                transform: rotate(18deg);
+            }
+
+            .hero:after {
+                content: "";
+                position: absolute;
+                inset: auto auto -80px -90px;
+                width: 240px;
+                height: 240px;
+                background: radial-gradient(circle at 40% 40%, rgba(139,124,255,.30), transparent 60%);
+                transform: rotate(-10deg);
+            }
+
+        .titleRow {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.9);
+            border: 1px dashed rgba(31,41,55,.18);
+            font-weight: 900;
+        }
+
+        h1 {
+            margin: 2px 0 0;
+            font-size: clamp(22px, 4vw, 34px);
+            font-weight: 1000;
+            line-height: 1.12;
+        }
+
+        h2 {
+            margin: 0;
+            color: var(--muted);
+            font-weight: 900;
+            font-size: 14px;
+        }
+
+        /* 프로필 */
+        .profileRow {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .avatarWrap {
+            width: 92px;
+            height: 92px;
+            border-radius: 26px;
+            padding: 6px;
+            background: linear-gradient(135deg, rgba(255,111,174,.28), rgba(94,201,255,.25), rgba(51,211,163,.22));
+            box-shadow: 0 14px 24px rgba(31,41,55,.14);
+            flex: 0 0 auto;
+        }
+
+        .avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            object-fit: cover;
+            background: #fff;
+            border: 2px solid rgba(255,255,255,.9);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .nameBox {
+            min-width: 240px;
+            padding: 10px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,.9);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 18px rgba(31,41,55,.08);
+            text-align: left;
+        }
+
+            .nameBox .name {
+                margin: 0;
+                font-weight: 1000;
+                font-size: 18px;
+            }
+
+            .nameBox .mini {
+                margin: 4px 0 0;
+                color: var(--muted);
+                font-weight: 900;
+                font-size: 13px;
+            }
+
+        /* 안내 */
+        .hint {
+            margin-top: 12px;
+            border-radius: 20px;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 12px 22px rgba(31,41,55,.08);
+            padding: 12px 14px;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+            .hint b {
+                color: var(--pink);
+            }
+
+        /* 표 카드 */
+        .card {
+            margin-top: 14px;
+            border-radius: 26px;
+            background: rgba(255,255,255,.9);
+            border: 1px solid rgba(255,255,255,.78);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .cardHead {
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(135deg, rgba(255,111,174,.16), rgba(94,201,255,.14), rgba(51,211,163,.14));
+            border-bottom: 1px solid rgba(31,41,55,.08);
+            flex-wrap: wrap;
+        }
+
+            .cardHead .left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-weight: 1000;
+                flex-wrap: wrap;
+            }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.85);
+            border: 1px solid rgba(31,41,55,.10);
+            font-weight: 1000;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        /* ===== 데스크탑: 테이블 유지 ===== */
+        .tableWrap {
+            padding: 12px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 740px; /* ✅ 데스크탑용 */
+            background: #fff;
+            border: 1px solid rgba(31,41,55,.10);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 18px rgba(31,41,55,.08);
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding: 10px 8px;
+            background: rgba(255,255,255,.92);
+            border-bottom: 1px solid rgba(31,41,55,.10);
+            font-weight: 1000;
+            font-size: 13px;
+            color: rgba(31,41,55,.85);
+            text-align: center;
+        }
+
+        thead tr:first-child th {
+            background: linear-gradient(135deg, rgba(255,213,74,.22), rgba(255,111,174,.14), rgba(94,201,255,.14));
+        }
+
+        thead tr:nth-child(2) th {
+            background: rgba(255,255,255,.95);
+        }
+
+        tbody td {
+            padding: 10px 8px;
+            text-align: center;
+            border-bottom: 1px solid rgba(31,41,55,.08);
+            font-weight: 800;
+            font-size: 13px;
+        }
+
+        tbody tr:nth-child(even) td {
+            background: rgba(243,251,255,.55);
+        }
+
+        tbody tr:hover td {
+            background: rgba(255,247,251,.75);
+        }
+
+        .dateCell {
+            font-weight: 1000;
+            color: rgba(31,41,55,.90);
+            user-select: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+            .dateCell:after {
+                content: "";
+                position: absolute;
+                left: 10px;
+                right: 10px;
+                bottom: 6px;
+                height: 6px;
+                border-radius: 999px;
+                background: rgba(255,111,174,.16);
+                opacity: 0;
+                transition: opacity .12s ease;
+            }
+
+        tr:hover .dateCell:after {
+            opacity: 1;
+        }
+
+        .completed {
+            color: var(--good);
+            font-weight: 1000;
+            font-size: 16px;
+        }
+
+        .not-completed {
+            color: rgba(31,41,55,.25);
+            font-weight: 1000;
+            font-size: 14px;
+        }
+
+        .wrong {
+            color: var(--bad);
+            font-weight: 1000;
+            font-size: 16px;
+        }
+
+        .scoreTag {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.9);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 18px rgba(31,41,55,.10);
+            font-weight: 1000;
+        }
+
+        .score0 {
+            opacity: .35;
+            box-shadow: none;
+        }
+
+        /* ===== 모바일: 카드 리스트 ===== */
+        .mobileList {
+            display: none;
+            padding: 12px;
+        }
+
+        .mCard {
+            border-radius: 20px;
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 18px rgba(31,41,55,.10);
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .mTop {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mDate {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 1000;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.95);
+            border: 1px solid rgba(31,41,55,.10);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .mSum {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-weight: 1000;
+            background: radial-gradient(90px 50px at 20% 10%, rgba(94,201,255,.25), transparent 60%), rgba(255,255,255,.90);
+            border: 1px solid rgba(31,41,55,.10);
+        }
+
+        .mGrid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .mItem {
+            border-radius: 16px;
+            background: rgba(243,251,255,.55);
+            border: 1px solid rgba(31,41,55,.08);
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-weight: 900;
+        }
+
+            .mItem .label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: rgba(31,41,55,.85);
+            }
+
+            .mItem .mark {
+                min-width: 30px;
+                text-align: right;
+                font-weight: 1000;
+                font-size: 16px;
+            }
+
+                .mItem .mark.good {
+                    color: var(--good);
+                }
+
+                .mItem .mark.bad {
+                    color: var(--bad);
+                }
+
+                .mItem .mark.mute {
+                    color: rgba(31,41,55,.25);
+                    font-size: 14px;
+                }
+
+        .mHintMini {
+            margin-top: 10px;
+            color: var(--muted);
+            font-weight: 900;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        /* 하단 총점 */
+        .total {
+            margin-top: 12px;
+            border-radius: 22px;
+            background: rgba(255,255,255,.9);
+            border: 1px solid rgba(255,255,255,.78);
+            box-shadow: var(--shadow);
+            padding: 14px;
+            font-weight: 1000;
+            text-align: center;
+        }
+
+            .total b {
+                color: var(--grape);
+            }
+
+        /* ✅ footer: 고정 X, 자연스럽게 + 20px 간격 */
+        footer {
+            margin-top: 20px;
+            padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+            background: linear-gradient(135deg, rgba(255,111,174,.35), rgba(94,201,255,.30), rgba(51,211,163,.28));
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255,255,255,.60);
+            box-shadow: 0 -8px 20px rgba(31,41,55,.12);
+        }
+
+        .footerBar {
+            max-width: 1040px;
+            margin: 0 auto;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btnNav {
+            flex: 1 1 140px;
+            min-width: 120px;
+            max-width: 220px;
+            border: 0;
+            border-radius: 18px;
+            padding: 12px 12px;
+            font-weight: 1000;
+            cursor: pointer;
+            background: rgba(255,255,255,.88);
+            border: 1px solid rgba(31,41,55,.10);
+            box-shadow: 0 10px 18px rgba(31,41,55,.12);
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+            .btnNav:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 14px 28px rgba(31,41,55,.16);
+            }
+
+        /* =======================
+                   ✅ 모바일 전용 전환
+                   - 테이블 숨김
+                   - 카드 리스트 표시
+                   - 전체 패딩/타이포 최적화
+                   ======================= */
+        @@media (max-width: 520px) {
+            body {
+                padding: 12px 10px 18px;
+            }
+
+            .nameBox {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .profileRow {
+                gap: 10px;
+            }
+
+            .avatarWrap {
+                width: 84px;
+                height: 84px;
+                border-radius: 22px;
+            }
+
+            .avatar {
+                border-radius: 18px;
+            }
+
+            .cardHead {
+                gap: 8px;
+            }
+
+            .pill {
+                padding: 7px 9px;
+                font-size: 11.5px;
+            }
+            /* ✅ 모바일에선 테이블 대신 카드 */
+            .tableWrap {
+                display: none;
+            }
+
+            .mobileList {
+                display: block;
+                padding: 12px;
+            }
+
+            .mGrid {
+                grid-template-columns: 1fr 1fr; /* 2칸 */
+            }
+            /* footer 버튼: 2x2 느낌 */
+            .btnNav {
+                flex: 1 1 calc(50% - 10px);
+                min-width: 0;
+                max-width: none;
+            }
+        }
+    </style>
+
+    <script>
+        // ✅ 기능 유지: 본인만 날짜 클릭 이동 가능
+        var currentUserName = '@__UserInfos.UserName';
+        var loggedInUserName = '@ViewData["LoginUserName"]';
+
+        function goToPage(url) {
+            if (currentUserName === loggedInUserName) {
+                window.location.href = url;
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="hero">
+            <div class="titleRow">
+                <div class="badge">✨ 오늘의 미션 체크!</div>
+                <h1>@ConstatsCommon.MainKeyTitle</h1>
+                <h2>일일 미션 수행 현황</h2>
+
+                <div class="profileRow">
+                    <div class="avatarWrap">
+                        <img src="@__UserInfos.ProfilePicturePath"
+                             onclick="ManageUserInfo('@__UserInfos.UserId')"
+                             alt="Profile Picture"
+                             loading="lazy"
+                             class="avatar" />
+                    </div>
+                    <div class="nameBox">
+                        <p class="name">@($"{@__UserInfos.FullName}님")</p>
+                        <p class="mini">말씀 습관이 쑥쑥! 🌱</p>
+                    </div>
+                </div>
+            </div>
+
+            @if (__UserInfos.UserName == ViewData["LoginUserName"].ToString())
+            {
+                <div class="hint">
+                    📌 <b>날짜를 톡!</b> 누르면 그날 미션으로 이동해요.<br />
+                    (말씀/기도/퀴즈/암송을 하고 ○ 표시를 채워봐요!) 🧡
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <div class="cardHead">
+                <div class="left">
+                    📋 미션 기록표
+                    <span class="pill">○ 완료</span>
+                    <span class="pill">× 퀴즈 오답</span>
+                </div>
+                <div class="pill">매일 조금씩 꾸준히! 🏃‍♀️</div>
+            </div>
+
+            @{
+                int scoreSum = 0;
+            }
+
+            <!-- ✅ 데스크탑: 테이블 -->
+            <div class="tableWrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th rowspan="2">날짜</th>
+                            <th colspan="2">말씀</th>
+                            <th rowspan="2">퀴즈</th>
+                            <th colspan="2">기도</th>
+                            <th rowspan="2">암송</th>
+                            <th rowspan="2">합계</th>
+                        </tr>
+                        <tr>
+                            <th>1</th>
+                            <th>2</th>
+                            <th>1</th>
+                            <th>2</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            int score = 0;
+
+                            if (item.word_ToMe == "y") score += item.word_Cnt;
+                            if (item.word_ToParent == "y") score += item.word_Cnt;
+                            if (item.quiz_result == "t") score += item.quiz_Cnt;
+                            if (item.pray_ToMe == "y") score += item.pray_Cnt;
+                            if (item.pray_ToParent == "y") score += item.pray_Cnt;
+                            if (item.Recite_yn == "y") score += item.Recite_Cnt;
+
+                            scoreSum += score;
+
+                            <tr>
+                                <td class="dateCell" onclick="goToPage('/Home/goWorkDT?workDT=@item.DateBy.ToString("yyyy-MM-dd")')">
+                                    @SharedComm.GetTodayToStringKor_MMdd(@item.DateBy)
+                                </td>
+
+                                <td class="@(item.word_ToMe == "y" ? "completed" : "not-completed")">@(item.word_ToMe == "y" ? "○" : "")</td>
+                                <td class="@(item.word_ToParent == "y" ? "completed" : "not-completed")">@(item.word_ToParent == "y" ? "○" : "")</td>
+
+                                @if (item.quiz_result == "t")
+                                {
+                                    <td class="completed">○</td>
+                                }
+                                else if (item.quiz_result == "f")
+                                {
+                                    <td class="wrong">×</td>
+                                }
+                                else
+                                {
+                                    <td class="not-completed"></td>
+                                }
+
+                                <td class="@(item.pray_ToMe == "y" ? "completed" : "not-completed")">@(item.pray_ToMe == "y" ? "○" : "")</td>
+                                <td class="@(item.pray_ToParent == "y" ? "completed" : "not-completed")">@(item.pray_ToParent == "y" ? "○" : "")</td>
+
+                                <td class="@(item.Recite_yn == "y" ? "completed" : "not-completed")">@(item.Recite_yn == "y" ? "○" : "")</td>
+
+                                <td>
+                                    @if (score == 0)
+                                    {
+                                        <span class="scoreTag score0"> </span>
+                                    }
+                                    else
+                                    {
+
+                                        <span class="scoreTag">@score</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ✅ 모바일: 카드 리스트 (가로스크롤 없음) -->
+            <div class="mobileList">
+                @foreach (var item in Model)
+                {
+                    int score = 0;
+
+                    if (item.word_ToMe == "y") score += item.word_Cnt;
+                    if (item.word_ToParent == "y") score += item.word_Cnt;
+                    if (item.quiz_result == "t") score += item.quiz_Cnt;
+                    if (item.pray_ToMe == "y") score += item.pray_Cnt;
+                    if (item.pray_ToParent == "y") score += item.pray_Cnt;
+                    if (item.Recite_yn == "y") score += item.Recite_Cnt;
+
+                    <div class="mCard">
+                        <div class="mTop">
+                            <div class="mDate" onclick="goToPage('/Home/goWorkDT?workDT=@item.DateBy.ToString("yyyy-MM-dd")')">
+                                📅 @SharedComm.GetTodayToStringKor_MMdd(@item.DateBy)
+                            </div>
+                            <div class="mSum">
+                                ⭐ 합계 <b>@score</b>
+                            </div>
+                        </div>
+
+                        <div class="mGrid">
+                            <div class="mItem">
+                                <div class="label">📖 말씀(M)</div>
+                                <div class="mark @(item.word_ToMe == "y" ? "good" : "mute")">
+                                    @(item.word_ToMe == "y" ? "○" : "")
+                                </div>
+                            </div>
+
+                            <div class="mItem">
+                                <div class="label">📖 말씀(P)</div>
+                                <div class="mark @(item.word_ToParent == "y" ? "good" : "mute")">
+                                    @(item.word_ToParent == "y" ? "○" : "")
+                                </div>
+                            </div>
+
+                            <div class="mItem">
+                                <div class="label">🧠 퀴즈</div>
+                                @if (item.quiz_result == "t")
+                                {
+                                    <div class="mark good">○</div>
+                                }
+                                else if (item.quiz_result == "f")
+                                {
+                                    <div class="mark bad">×</div>
+                                }
+                                else
+                                {
+                                    <div class="mark mute"></div>
+                                }
+                            </div>
+
+                            <div class="mItem">
+                                <div class="label">🙏 기도(M)</div>
+                                <div class="mark @(item.pray_ToMe == "y" ? "good" : "mute")">
+                                    @(item.pray_ToMe == "y" ? "○" : "")
+                                </div>
+                            </div>
+
+                            <div class="mItem">
+                                <div class="label">🙏 기도(P)</div>
+                                <div class="mark @(item.pray_ToParent == "y" ? "good" : "mute")">
+                                    @(item.pray_ToParent == "y" ? "○" : "")
+                                </div>
+                            </div>
+
+                            <div class="mItem">
+                                <div class="label">🗣️ 암송</div>
+                                <div class="mark @(item.Recite_yn == "y" ? "good" : "mute")">
+                                    @(item.Recite_yn == "y" ? "○" : "")
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mHintMini">날짜를 누르면 그날 미션으로 이동해요 👆</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="total">
+            나의 총점 : <b>@($"{scoreSum}점")</b> 🎉<br />
+            <span style="color:var(--muted);font-weight:900;">작은 습관이 큰 믿음으로 자라요 🌱</span>
+        </div>
+
+        <!-- ✅ footer는 wrap 안쪽에 자연스럽게 -->
+        <footer>
+            <div class="footerBar">
+                <button class="btnNav" onclick="window.location.href='/Admin/IndexPoint'">🎁 포인트</button>
+                <button class="btnNav" onclick="location.href='/DailyMission2/NaviMonth?userName=@ViewData["UserName"]'">🗓️ 월별현황</button>
+                <button class="btnNav" onclick="location.href='/'">🏠 홈으로</button>
+                <button class="btnNav" onclick="location.href='/DailyMission2/index'">🧭 @ConstatsCommon.MainKeyTitle</button>
+            </div>
+        </footer>
+
+    </div>
+</body>
+</html>

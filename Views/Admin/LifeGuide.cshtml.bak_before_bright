@@ -1,0 +1,179 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@*  ══════════════════════════════════════════════════════════════
+    유년부 생활가이드 — 자주 찾는 안내 세 가지 + 생일 선물 문자 안내 주소(이동 · 복사).
+    Bone(호텔 인쇄물) 스킨.  /ApplyEvent/Branch · /Present/Kind 와 같은 목차형.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var today = DateHelper.GetKoreaNow();
+    string dateText = today.ToString("yyyy.MM.dd") + " " + today.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+
+    const string birthUrl = "https://www.jamsilkids.com/rules/SendBirthMessage.html";
+
+    var guides = new[]
+    {
+        (Title: $"{ConstatsCommon.myDoToRi} 통합 시상 안내", Desc: "포인트 통합 시상 기준 확인", Url: "https://www.jamsilkids.com/StudentPointDashboard4/guide"),
+        (Title: "전도상 시상가이드",                          Desc: "전도 시상 기준 및 안내",  Url: "/Rules/evangelism_reward_guide_v1.html"),
+        (Title: "홈으로 가기",                                Desc: "메인 페이지로 이동",      Url: "/"),
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>유년부 생활가이드 — @ConstatsCommon.MainKeyTitle</title>
+<meta name="description" content="유년부 생활가이드 - 시상/전도 안내 및 생일 선물 안내 링크" />
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+    /* ── 머리 ── */
+    .qz .brK  { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin: 18px 0 9px; }
+    .qz .brH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.4; }
+    .qz .brH1 b { font-weight: 400; background-image: linear-gradient(transparent 62%, var(--mark) 62%); padding: 0 2px; }
+    .qz .brSum { font-size: 11.5px; color: var(--dim); margin-top: 8px; line-height: 1.7; word-break: keep-all; }
+
+    .qz .brSec { display: flex; justify-content: space-between; align-items: baseline;
+                 font-size: 10.5px; font-weight: 600; letter-spacing: .2em; color: var(--dim); margin: 26px 0 6px; }
+    .qz .brSec span { letter-spacing: .04em; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+    /* ── 목차 줄 ── */
+    .qz a.brIdx { display: flex; align-items: center; gap: 14px; width: 100%;
+                  padding: 17px 2px; border-top: 1px solid var(--rule);
+                  text-decoration: none; color: inherit; cursor: pointer; }
+    .qz a.brIdx:last-of-type { border-bottom: 1px solid var(--rule); }
+    .qz .brNo { font-family: "Inter", sans-serif; font-weight: 300; font-size: 22px; color: var(--acc);
+                width: 34px; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .qz .brTx { flex: 1 1 auto; min-width: 0; }
+    .qz .brT  { font-family: "Noto Serif KR", serif; font-size: 16.5px; line-height: 1.35; word-break: keep-all; }
+    .qz .brD  { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.6; word-break: keep-all; }
+    .qz .brGo { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--dim2); white-space: nowrap; }
+    .qz a.brIdx:hover .brT, .qz a.brIdx:hover .brGo { color: var(--acc); }
+
+    /* ── 생일 선물 문자 안내 : 주소 한 줄 + 이동 · 복사 ── */
+    .qz .lgBox { border: 1px solid var(--rule); background: #fff; padding: 15px; }
+    .qz .lgT { font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.35; }
+    .qz .lgD { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.6; word-break: keep-all; }
+    .qz .lgUrl { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--rule); background: var(--bg);
+                 font-family: "Inter", sans-serif; font-weight: 300; font-size: 12px; color: var(--dim2);
+                 word-break: break-all; user-select: all; -webkit-user-select: all; line-height: 1.5; }
+    .qz .lgActs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .qz .lgBtn { flex: 1 1 160px; text-align: center; border: 1px solid var(--tx); background: var(--tx); color: var(--bg); padding: 11px 14px;
+                 font-family: inherit; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-decoration: none; cursor: pointer; white-space: nowrap; }
+    .qz .lgBtn:hover { background: var(--acc); border-color: var(--acc); color: var(--bg); }
+    .qz .lgBtn.line { background: transparent; color: var(--dim2); border-color: #D6CBB7; }
+    .qz .lgBtn.line:hover { color: var(--acc); border-color: var(--acc); background: transparent; }
+    .qz .lgHint { margin-top: 12px; font-size: 11px; color: var(--dim); line-height: 1.7; word-break: keep-all; }
+
+    .qz .brFoot { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--rule);
+                  display: flex; justify-content: space-between; font-size: 10.5px; color: var(--dim); letter-spacing: .08em; }
+    .qz .brFoot a { color: var(--dim2); text-decoration: none; }
+    .qz .brFoot a:hover { color: var(--acc); }
+
+    /* 복사 알림 */
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none;
+             background: #16181C; color: #F7F6F3; padding: 9px 14px; font-size: 11px; letter-spacing: .06em; max-width: calc(100vw - 32px);
+             white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .18s, transform .18s; z-index: 9999; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @@media (min-width: 620px) {
+        .qz .brT { font-size: 17.5px; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>생활가이드</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">LIFE GUIDE · 잠실새내교회 유년부</div>
+        <div class="brH1"><b>유년부 생활가이드</b></div>
+        <div class="brSum">필요한 안내를 한 번에 확인하고, 생일 선물 안내 주소는 이동하거나 복사해서 문자 · 카톡으로 나눌 수 있어요.</div>
+
+        <div class="brSec"><span style="letter-spacing:.2em;font-weight:600">주요 안내</span><span>01 – @(guides.Length.ToString("00"))</span></div>
+
+        @for (int i = 0; i < guides.Length; i++)
+        {
+            var g = guides[i];
+            <a class="brIdx" href="@g.Url">
+                <div class="brNo">@((i + 1).ToString("00"))</div>
+                <div class="brTx">
+                    <div class="brT">@g.Title</div>
+                    <div class="brD">@g.Desc</div>
+                </div>
+                <div class="brGo">열기 →</div>
+            </a>
+        }
+
+        <div class="brSec"><span style="letter-spacing:.2em;font-weight:600">생일 선물 문자 안내</span><span>이동 · 복사</span></div>
+
+        <div class="lgBox">
+            <div class="lgT">생일 선물 안내 페이지</div>
+            <div class="lgD">부모님께 보내는 문자 · 카톡에 아래 주소를 붙여 넣어 주세요.</div>
+            <div class="lgUrl" id="birthUrlText">@birthUrl</div>
+            <div class="lgActs">
+                <a class="lgBtn" href="@birthUrl" target="_blank" rel="noopener">페이지 이동 →</a>
+                <button type="button" class="lgBtn line" onclick="copyBirthLink()">주소 복사</button>
+            </div>
+            <div class="lgHint">
+                iPhone · Safari 에서 복사가 안 되면 주소를 길게 눌러 복사해 주세요.
+            </div>
+        </div>
+
+        <div class="brFoot"><span>© BULLETIN BOARD · LIFE GUIDE</span><a href="/">홈으로 →</a></div>
+
+    </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+    const BIRTH_URL = "@birthUrl";
+
+    function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg || "완료";
+        t.classList.add("show");
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => t.classList.remove("show"), 2000);
+    }
+
+    async function copyBirthLink() {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(BIRTH_URL);
+                showToast("주소를 복사했어요");
+                return;
+            }
+        } catch (e) { }
+
+        try {
+            const ta = document.createElement("textarea");
+            ta.value = BIRTH_URL;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.select(); ta.setSelectionRange(0, ta.value.length);
+            const ok = document.execCommand("copy");
+            document.body.removeChild(ta);
+            showToast(ok ? "주소를 복사했어요" : "주소를 길게 눌러 복사해 주세요");
+        } catch (err) {
+            showToast("주소를 길게 눌러 복사해 주세요");
+        }
+    }
+</script>
+</body>
+</html>

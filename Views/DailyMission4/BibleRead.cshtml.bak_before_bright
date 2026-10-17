@@ -1,0 +1,1261 @@
+﻿@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using BulletinBoard.Models
+@using BulletinBoard.Models.DailyMission2
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var d    = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var detail          = ViewBag.TodayWordToReadRow as TodayWordDetailResult;
+    var bible           = detail?.TodayeBiblesData;
+    var todayWordToRead = ViewBag.TodayWordToReadData as TodayWordToRead;
+    var ov              = ViewBag._BibleBookOverviewDetail as BibleBookOverviewDetail;
+    var bi              = ViewBag._BibleBasicInfos2 as BibleBasicInfos2;
+
+    var lang = (ViewBag.Lang ?? "ko").ToString().ToLowerInvariant();
+    if (lang != "ko" && lang != "en" && lang != "al" && lang != "modern" && lang != "ko+modern" && lang != "all") lang = "ko";
+
+    var modernMap = ViewBag.ModernMap as System.Collections.Generic.Dictionary<int, string>
+                    ?? new System.Collections.Generic.Dictionary<int, string>();
+
+    // 절별 KO+EN 페어 그룹핑
+    var verseGroups = bible?.eBibleDatas?
+        .GroupBy(v => new { v.Jang, v.zul })
+        .OrderBy(g => g.Key.Jang).ThenBy(g => g.Key.zul)
+        .ToList();
+
+    var totalVerses = verseGroups?.Count ?? 0;
+    var readVerses  = verseGroups?.Count(g => g.FirstOrDefault(v => v.LangCD == "ko")?.readDone == "t") ?? 0;
+    bool isAllRead  = totalVerses > 0 && readVerses == totalVerses;
+
+    // 성경 전체 통독률
+    var totalProgressRate   = (decimal)(ViewBag.TotalProgressRate ?? 0m);
+    var todayReadVerseCount = (int)(ViewBag.TodayReadVerseCount   ?? 0);
+    int overallPct = (int)Math.Round(totalProgressRate);
+
+    // 유튜브
+    string y1="",y2="",y3="",y4="",y5="";
+    int s1=0,e1=0,s2=0,e2=0,s3=0,e3=0,s4=0,e4=0,s5=0,e5=0;
+
+    var wordDataList = ViewBag.TodayWordToReadDataList as List<BulletinBoard.Models.TodayWordToReads>;
+
+    if (wordDataList != null && wordDataList.Count > 1)
+    {
+        // ✅ 다중 행(다중 장): 각 행의 URL을 순서대로 세그먼트로 사용
+        //    예) 49장 row → y1/s1/e1,  50장 row → y2/s2/e2
+        void SetSeg(BulletinBoard.Models.TodayWordToReads w, out string yo, out int so, out int eo) {
+            yo = w.URL ?? ""; so = (w.YouTuBuStartMM*60)+w.YouTuBuStartSS; eo = (w.YouTuBuEndMM*60)+w.YouTuBuEndSS;
+        }
+        if (wordDataList.Count >= 1) { SetSeg(wordDataList[0], out y1, out s1, out e1); }
+        if (wordDataList.Count >= 2) { SetSeg(wordDataList[1], out y2, out s2, out e2); }
+        if (wordDataList.Count >= 3) { SetSeg(wordDataList[2], out y3, out s3, out e3); }
+        if (wordDataList.Count >= 4) { SetSeg(wordDataList[3], out y4, out s4, out e4); }
+        if (wordDataList.Count >= 5) { SetSeg(wordDataList[4], out y5, out s5, out e5); }
+    }
+    else if (todayWordToRead != null)
+    {
+        // ✅ 단일 행: URL/URL2/.../URL5 컬럼 사용 (기존 방식)
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL))  { y1=todayWordToRead.URL;  s1=(todayWordToRead.YouTuBuStartMM*60)+todayWordToRead.YouTuBuStartSS;  e1=(todayWordToRead.YouTuBuEndMM*60)+todayWordToRead.YouTuBuEndSS; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL2)) { y2=todayWordToRead.URL2; s2=(todayWordToRead.YouTuBuStartMM2*60)+todayWordToRead.YouTuBuStartSS2; e2=(todayWordToRead.YouTuBuEndMM2*60)+todayWordToRead.YouTuBuEndSS2; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL3)) { y3=todayWordToRead.URL3; s3=(todayWordToRead.YouTuBuStartMM3*60)+todayWordToRead.YouTuBuStartSS3; e3=(todayWordToRead.YouTuBuEndMM3*60)+todayWordToRead.YouTuBuEndSS3; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL4)) { y4=todayWordToRead.URL4; s4=(todayWordToRead.YouTuBuStartMM4*60)+todayWordToRead.YouTuBuStartSS4; e4=(todayWordToRead.YouTuBuEndMM4*60)+todayWordToRead.YouTuBuEndSS4; }
+        if (!string.IsNullOrWhiteSpace(todayWordToRead.URL5)) { y5=todayWordToRead.URL5; s5=(todayWordToRead.YouTuBuStartMM5*60)+todayWordToRead.YouTuBuStartSS5; e5=(todayWordToRead.YouTuBuEndMM5*60)+todayWordToRead.YouTuBuEndSS5; }
+    }
+    bool hasYouTube = !string.IsNullOrWhiteSpace(y1);
+
+    // ── 구절 범위 모드 (/DailyMission4/BibleReadRange) ──
+    //    점수와 무관한 읽기: 날짜·말씀 미션 링크 대신 "돌아가기"와 출처 띠를 보여 준다.
+    bool   rangeMode       = ViewBag.RangeMode is bool rm && rm;
+    string rangeReturnUrl  = (ViewBag.RangeReturnUrl  as string) ?? "/DailyMission4/Index";
+    string rangeReturnText = (ViewBag.RangeReturnText as string) ?? "미션홈으로";
+    string rangeLabel      = (ViewBag.RangeLabel      as string) ?? "";
+    bool   rangeFromWeekly = string.Equals(ViewBag.RangeFrom as string, "weekly", StringComparison.OrdinalIgnoreCase);
+    if (rangeMode) hasYouTube = false;   // 오늘 말씀용 영상은 범위 모드와 맞지 않는다
+}
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;400;500&family=Inter:wght@200;300;400;500&family=Gothic+A1:wght@400;600;700&display=swap">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   성경 읽기 — /Bible2/Read 와 같은 Bone 스킨 (먹색 + 금색 + 종이색)
+   ⚠️ id·class(verse-card-r, vtext-*, mode-pill, lang-pill, completeMega …)는
+      아래 스크립트가 그대로 쓰므로 이름을 바꾸지 말 것.
+   ══════════════════════════════════════════════════════════════ */
+.bible-reader {
+    --bg: #F7F6F3; --tx: #16181C; --dim: #83868C; --dim2: #5C5F66;
+    --rule: #E2E0DB; --line: #E7E5E1; --acc: #9A7B4F; --mark: #EDE5D8;
+    --card: #FFFFFF; --head: #16181C; --headtx: #F7F6F3; --headk: #C9AE82; --headdim: #9A9690;
+    --pad: 0px;                                 /* 본문은 레이아웃 여백에 그대로 맞춘다 */
+    --bleed: 14px;                              /* 레이아웃(.wrap) 좌우 여백 = 통째 띠가 넘어가는 폭 */
+    --brfs: 1;                                  /* 글자 크기 4단계 */
+    max-width: 720px; margin: 0 auto; padding: 0 var(--pad) 10px;
+    background: var(--bg); color: var(--tx);
+    font-family: "Gothic A1", sans-serif;
+}
+@@media (max-width: 520px) { .bible-reader { --bleed: 12px; } }
+body { background: #F7F6F3; }
+.bible-reader a { text-decoration: none; color: inherit; }
+
+/* ── 짙은 머리 ── */
+.brHead { background: var(--head); color: var(--headtx); margin: 0 calc(var(--bleed) * -0.5); padding: 0 16px 22px; }
+.brCrumb { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 16px 0 18px; }
+.brNav { display: flex; flex: 1; min-width: 0; gap: 8px; flex-wrap: wrap; }
+.brNav a { font-size: 12.5px; color: var(--headdim); border: 1px solid #3A3C40; padding: 6px 12px; white-space: nowrap; }
+.brNav a:hover { color: #16181C; background: var(--headk); border-color: var(--headk); }
+.brFs { display: flex; flex: none; border: 1px solid #3A3C40; }
+.brFs button { font-family: "Noto Serif KR", serif; background: none; border: 0; color: var(--headdim); padding: 2px 6px; line-height: 1.35; cursor: pointer; }
+.brFs button:nth-child(1) { font-size: 10.5px; }
+.brFs button:nth-child(2) { font-size: 12.5px; }
+.brFs button:nth-child(3) { font-size: 14.5px; }
+.brFs button:nth-child(4) { font-size: 17px; }
+.brFs button.on { background: #D9C29B; color: #16181C; }
+.brK { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--headk); margin-top: 6px; }
+.brT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 30px; line-height: 1.3; margin: 14px 0 0; color: var(--headtx); word-break: keep-all; }
+.brRange { font-family: "Gothic A1", sans-serif; font-size: 15px; color: var(--headk); margin-left: 10px; letter-spacing: .02em; white-space: nowrap; }
+.brMeta { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--headdim); margin-top: 18px; font-variant-numeric: tabular-nums; }
+.brProg { height: 2px; background: #3A3C40; margin-top: 14px; }
+.brProg i { display: block; height: 2px; background: #D9C29B; transition: width .3s; }
+
+/* 범위 모드 출처 띠 */
+.brSrc { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+         margin-top: 14px; padding: 10px 12px; background: var(--mark); font-size: 12.5px; color: var(--dim2); }
+.brSrc b { color: var(--acc); font-weight: 600; }
+.brSrc small { font-size: 11px; color: var(--dim); }
+
+/* ── 보기 판 : 읽기 단위 · 번역 · 듣기 ── */
+.brSheet { margin: 12px calc(var(--bleed) * -0.5) 0; background: var(--card); border: 1px solid var(--rule); padding: 6px 16px 14px; }
+.brLbl { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--dim); margin: 10px 0 6px; }
+.mode-pills, .lang-pills, .media-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; border: 0; background: none; border-radius: 0; overflow: visible; box-shadow: none; padding: 0; }
+.media-bar-label { display: none; }
+.mode-pill, .lang-pill, .media-btn {
+    font-family: inherit; font-size: 12px; line-height: 1.3; padding: 6px 11px; cursor: pointer;
+    border: 1px solid var(--rule) !important; background: var(--bg) !important; color: var(--dim2) !important;
+    border-radius: 0 !important; font-weight: 400; box-shadow: none !important; transform: none !important;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.mode-pill:hover, .lang-pill:hover, .media-btn:hover { border-color: var(--acc) !important; filter: none; }
+.mode-pill.active, .lang-pill.active { background: var(--tx) !important; color: var(--bg) !important; border-color: var(--tx) !important; font-weight: 600; }
+.media-btn-icon { font-size: 13px; }
+.media-btn-text { display: inline; }
+.media-btn-title { font-size: 12px; font-weight: 400; color: var(--dim2); }
+.media-btn-sub { display: none; }
+
+/* 페이지 이동 */
+.reader-progress { display: none; }         /* 진도는 짙은 머리 안으로 옮겼다 */
+.page-nav-r { display: flex; align-items: center; justify-content: space-between; margin: 14px 0 0; font-size: 12px; color: var(--dim); }
+.page-btn { font-family: inherit; font-size: 12px; background: var(--card); color: var(--tx); border: 1px solid var(--rule); padding: 7px 14px; cursor: pointer; border-radius: 0; }
+.page-btn:disabled { opacity: .4; cursor: default; }
+
+/* ── 개요 (접힘 줄) ── */
+.ov-card { margin: 0; border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: none; box-shadow: none; }
+.ov-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 13px 0; background: none !important; border: 0; cursor: pointer; font-family: inherit; color: var(--tx); text-align: left; }
+.ov-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ov-icon { display: none; }
+.ov-title { font-size: 13px; font-weight: 400; color: var(--dim2); }
+.ov-mode-badge { font-size: 10px; letter-spacing: .08em; color: var(--acc); border: 1px solid var(--rule); background: none; padding: 1px 6px; border-radius: 0; }
+.ov-chevron { font-size: 12px; color: var(--dim); transition: transform .2s; }
+.ov-card.is-open .ov-chevron { transform: rotate(180deg); }
+.ov-body { display: none; padding: 0 0 16px; border: 0; }
+.ov-card.is-open .ov-body { display: block; }
+.ov-switch-bar { display: flex; gap: 0; margin: 2px 0 10px; }
+.ov-sw-btn { font-family: inherit; font-size: 11.5px; padding: 5px 12px; background: var(--card); color: var(--dim2); border: 1px solid var(--rule); border-radius: 0; cursor: pointer; box-shadow: none; }
+.ov-sw-btn + .ov-sw-btn { border-left: 0; }
+.ov-sw-btn.ov-sw-active { background: var(--tx); color: var(--bg); border-color: var(--tx); }
+.ov-row { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.ov-row:last-child { border-bottom: 0; }
+.ov-label { flex: 0 0 72px; min-width: 72px; font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--acc); padding-top: 2px; }
+.ov-val, .ov-sec-body { font-family: "Noto Serif KR", serif; font-size: calc(14px * var(--brfs)); line-height: 1.8; color: var(--tx); word-break: keep-all; padding-left: 0; }
+.ov-section { padding: 10px 0; margin: 0; border-bottom: 1px solid var(--line); }
+.ov-section:last-child { border-bottom: 0; }
+.ov-sec-title { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: var(--acc); margin-bottom: 4px; border: 0; padding: 0; display: block; }
+.ov-sec-body p { margin: 4px 0 0; }
+.ov-kw-chip { display: inline-block; margin: 3px 4px 3px 0; padding: 2px 8px; font-family: "Gothic A1", sans-serif; font-size: 11.5px; border: 1px solid var(--rule); background: none; color: var(--dim2); border-radius: 0; font-weight: 400; }
+.ov-list { margin: 0; padding-left: 18px; color: var(--tx); }
+.ov-list li { margin-bottom: 3px; font-size: calc(14px * var(--brfs)); }
+.ov-final-note { margin: 8px 0 0; border-left: 2px solid var(--acc); border-radius: 0; background: none; padding: 2px 0 2px 10px; color: var(--dim2); font-weight: 400; }
+
+/* ── 요약 카드 ── */
+.summary-card { border: 0; border-left: 2px solid var(--acc); border-radius: 0; padding: 2px 0 2px 12px; margin: 20px 0 8px; background: none; box-shadow: none; }
+.summary-range { font-size: 10px; font-weight: 600; letter-spacing: .14em; color: var(--acc); margin: 0; }
+.summary-keyword { font-family: "Noto Serif KR", serif; font-size: calc(16px * var(--brfs)); font-weight: 500; color: var(--tx); margin: 4px 0 0; line-height: 1.45; }
+.summary-body { font-size: calc(13px * var(--brfs)); line-height: 1.75; color: var(--dim2); margin-top: 3px; word-break: keep-all; }
+
+/* ── 절 (문장 끝에 ✓ · ★ 동그라미) ── */
+.verse-card-r { display: flex; gap: 10px; align-items: flex-start; padding: 11px 0; border: 0 !important; border-bottom: 1px solid var(--line) !important; background: none !important; border-radius: 0; box-shadow: none; margin: 0; }
+.vnum { flex: 0 0 22px; height: 22px; margin-top: 5px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-size: 11px; font-weight: 500; color: var(--acc); background: none; border-radius: 50%; min-width: 0; padding: 0; transition: background .15s; }
+.verse-card-r.is-read .vnum { background: var(--mark); font-weight: 600; }
+.vtext-wrap { flex: 1; min-width: 0; display: block; }
+.vtext-ko-line, .vtext-modern-line, .vtext-en-line { display: block; border: 0; margin: 0; padding: 0; }
+.vtext-modern-line, .vtext-en-line { margin-top: 6px; }
+.vtext-ko, body.lang-modern .vtext-modern, body.lang-en .vtext-en {
+    font-family: "Noto Serif KR", serif; font-weight: 400; font-size: calc(16.5px * var(--brfs));
+    line-height: 1.9; color: var(--tx); word-break: keep-all;
+}
+/* 읽은 절도 글자를 흐리게 하지 않는다 (다시 읽을 때 잘 보여야 함) */
+.verse-card-r.bookmarked .vtext-ko { background: linear-gradient(transparent 64%, var(--mark) 64%); }
+.vtext-modern { font-family: "Noto Serif KR", serif; font-size: calc(14px * var(--brfs)); line-height: 1.8; color: var(--dim2); }
+.vtext-en { font-family: "Inter", sans-serif; font-size: calc(13.5px * var(--brfs)); line-height: 1.7; color: var(--dim2); font-style: italic; }
+body.lang-en .vtext-en { font-style: normal; }
+.vactions-inline { display: inline-flex; gap: 5px; margin-left: 7px; vertical-align: 2px; white-space: nowrap; }
+.vactions-inline .vbtn {
+    width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 0; cursor: pointer;
+    display: inline-grid; place-items: center; font-family: "Inter", sans-serif; font-size: 11.5px; line-height: 1;
+    background: var(--line); color: #A9A59D; transition: background .15s, color .15s, transform .12s;
+}
+.vactions-inline .vbtn:hover { transform: scale(1.1); background: var(--line); }
+.vactions-inline .vbtn:active { transform: scale(.92); }
+.vactions-inline .vbtn-read.done { background: var(--acc); color: #fff; }
+.vactions-inline .vbtn-bm.bm-on { background: #B4531F; color: #fff; }
+
+/* 저장 대기 — 누른 동그라미 안에서 금색 원이 돈다 */
+.vactions-inline .vbtn.wait { position: relative; color: transparent !important; background: var(--card) !important; box-shadow: inset 0 0 0 1px var(--rule); cursor: progress; }
+.vactions-inline .vbtn.wait::after { content: ""; position: absolute; inset: 4px; border: 2px solid var(--rule); border-top-color: var(--acc); border-radius: 50%; animation: brSpin .8s linear infinite; }
+.verse-card-r.busy { background: linear-gradient(90deg, transparent, var(--mark), transparent) !important; background-size: 200% 100% !important; animation: brShine 1.2s ease-in-out infinite; }
+@@keyframes brSpin { to { transform: rotate(360deg); } }
+@@keyframes brShine { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+.brToast { position: fixed; left: 50%; bottom: 20px; z-index: 2500; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; width: calc(100% - 36px); max-width: 420px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--head); color: var(--headtx); font-size: 12.5px; box-shadow: 0 10px 24px rgba(0,0,0,.25); transition: opacity .2s, transform .2s; }
+.brToast.show { opacity: 1; transform: translate(-50%, 0); }
+.brToast i { flex: none; width: 16px; height: 16px; border: 2px solid #3A3C40; border-top-color: #D9C29B; border-radius: 50%; animation: brSpin .8s linear infinite; }
+
+.chapter-done-banner { display: none; margin: 14px 0 0; padding: 10px 14px; font-size: 12.5px; font-weight: 600; color: var(--acc); border-left: 2px solid var(--acc); background: var(--card); border-radius: 0; box-shadow: none; }
+.chapter-done-banner.show { display: block; }
+
+/* ── 통독률 카드 ── */
+.bible-overall-card { background: var(--card); border: 1px solid var(--rule); border-radius: 0; box-shadow: none; padding: 14px; margin: 16px 0 0; }
+.boc-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.boc-title { font-family: "Noto Serif KR", serif; font-size: 15px; font-weight: 400; color: var(--tx); }
+.boc-sub { font-size: 11.5px; color: var(--dim); }
+.boc-pct { font-family: "Inter", sans-serif; font-weight: 300; font-size: 22px; color: var(--acc); font-variant-numeric: tabular-nums; }
+.boc-bar-track { height: 4px; background: var(--rule); border-radius: 0; margin-top: 10px; overflow: hidden; }
+.boc-bar-fill { height: 4px; background: var(--acc); border-radius: 0; }
+.boc-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; font-size: 11.5px; color: var(--dim); }
+.boc-link { color: var(--acc); border-bottom: 1px solid var(--rule); }
+
+/* ── 이 페이지 읽음 — 검정 띠 ── */
+.mark-all-wrap { margin: 22px calc(var(--bleed) * -0.5) 0; }
+.complete-mega { width: 100%; display: flex; align-items: center; gap: 14px; padding: 18px 16px; border: 0; border-radius: 0; background: var(--head) !important; color: var(--headtx); cursor: pointer; font-family: inherit; text-align: left; box-shadow: none !important; transform: none !important; }
+.complete-mega::before, .complete-mega::after { display: none !important; }
+.complete-mega:hover { background: #2A2C31 !important; }
+.complete-mega:disabled { opacity: .6; cursor: progress; }
+.complete-mega.is-done { background: var(--acc) !important; color: #fff; }
+.cm-body { flex: 1; min-width: 0; }
+.complete-mega-title { display: block; font-family: "Noto Serif KR", serif; font-size: 16px; font-weight: 400; letter-spacing: 0; }
+.complete-mega-desc { display: block; font-size: 11px; color: var(--headdim); margin-top: 3px; opacity: 1; font-weight: 400; }
+.complete-mega.is-done .complete-mega-desc { color: rgba(255,255,255,.8); }
+.complete-mega-desc.desc-hide { display: none !important; }
+.cm-badge { display: none; }
+.complete-mega-count { display: block; font-family: "Inter", sans-serif; font-size: 11.5px; color: var(--headk); background: none; border: 0; padding: 0; margin-top: 4px; border-radius: 0; backdrop-filter: none; font-weight: 400; white-space: nowrap; }
+.complete-mega.is-done .complete-mega-count { color: #fff; font-weight: 500; }
+.cm-mark { flex: none; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; line-height: 1; color: var(--headk); opacity: 1; }
+.complete-mega.is-done .cm-mark { color: #fff; }
+.cm-arrow, .cm-icon-circle { display: none; }
+
+/* ── 날짜 이동 ── */
+.chapter-nav-r { display: flex; gap: 12px; margin: 14px 0 0; }
+.chapter-nav-r a { flex: 1; background: var(--card); border: 1px solid var(--line); padding: 13px 16px; font-size: 13.5px; color: var(--tx); text-decoration: none; text-align: left; border-radius: 0; }
+.chapter-nav-r a.nx { text-align: right; }
+.chapter-nav-r a:hover { border-color: var(--acc); color: var(--acc); }
+
+.dashboard-btn-wrap { display: flex; justify-content: center; gap: 20px; margin: 16px 0 28px; }
+.dashboard-btn { font-size: 12px; color: var(--dim); border: 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: none; padding: 0 0 2px; box-shadow: none; transform: none; }
+.dashboard-btn:hover { color: var(--acc); border-color: var(--acc); background: none; transform: none; box-shadow: none; }
+
+/* ── 영상 창 ── */
+#ytModal { display: none; position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.75); align-items: center; justify-content: center; padding: 16px; }
+.yt-modal-box { background: var(--bg); width: 100%; max-width: 640px; overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--tx); border-radius: 0; }
+.yt-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.yt-modal-title { font-family: "Noto Serif KR", serif; font-size: 15px; color: var(--tx); font-weight: 400; }
+.yt-modal-controls { display: flex; gap: 6px; }
+.yt-ctrl-btn { font-family: inherit; font-size: 11.5px; padding: 6px 12px; border: 1px solid var(--rule) !important; background: var(--card) !important; color: var(--tx) !important; cursor: pointer; border-radius: 0; font-weight: 400; }
+.yt-iframe-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; background: #000; overflow: hidden; }
+#ytFrameHost, #ytFrameHost iframe { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; border: 0; }
+.yt-modal-foot { padding: 9px 16px; display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--dim); }
+.yt-loop-badge { background: none; color: var(--acc); border-radius: 0; padding: 0; font-weight: 400; }
+
+@@media (max-width: 400px) {
+    .bible-reader .brT { font-size: 26px; }
+    .brFs button { padding: 2px 4px; }
+}
+</style>
+
+<form id="antiForm" method="post" style="display:none;">@Html.AntiForgeryToken()</form>
+
+<div class="bible-reader">
+    @{
+        var bookTitle = bible?.BibleText ?? detail?.BibleText ?? "성경";
+        var rangeStr  = bible != null && !string.IsNullOrWhiteSpace(bible.JanZulString)
+                        ? bible.JanZulString
+                        : (detail != null ? $"{detail.FromJang}:{detail.FromZul} ~ {detail.ToJang}:{detail.ToZul}" : "");
+        int _readPct = totalVerses == 0 ? 0 : (int)Math.Round(readVerses * 100.0 / totalVerses);
+
+        // 범위 문구에 책 이름이 겹쳐 들어오는 경우가 있어 앞의 책 이름을 떼어 낸다.
+        var rangeOnly = rangeStr ?? "";
+        if (!string.IsNullOrWhiteSpace(bookTitle) && rangeOnly.StartsWith(bookTitle, StringComparison.Ordinal))
+        {
+            rangeOnly = rangeOnly.Substring(bookTitle.Length).TrimStart(' ', ':', '·', '-');
+        }
+    }
+
+    @* ── 짙은 머리 (/Bible2/Read 와 같은 구성) ── *@
+    <header class="brHead">
+        <div class="brCrumb">
+            <span class="brNav">
+                @if (rangeMode)
+                {
+                    <a href="@rangeReturnUrl">← @rangeReturnText</a>
+                }
+                else
+                {
+                    <a href="/DailyMission4?date=@d">미션홈</a>
+                    <a href="/DailyMission4/Word?date=@d">말씀미션</a>
+                }
+            </span>
+            <span class="brFs" role="group" aria-label="글자 크기">
+                <button type="button" data-fs="s" aria-label="작게">가</button><button type="button" data-fs="m" aria-label="보통">가</button><button type="button" data-fs="l" aria-label="크게">가</button><button type="button" data-fs="xl" aria-label="아주 크게">가</button>
+            </span>
+        </div>
+        <div class="brK">@(rangeMode ? "성경 읽기" : "오늘의 말씀")</div>
+        <h1 class="brT">@bookTitle<span class="brRange">@rangeOnly</span></h1>
+        <div class="brMeta">
+            <span id="progLbl">@(totalVerses)절 · @(readVerses)절 읽음</span>
+            <span id="progPct">@(_readPct)%</span>
+        </div>
+        <div class="brProg"><i id="progFill" style="width:@(_readPct)%"></i></div>
+    </header>
+
+    @if (rangeMode)
+    {
+        @* 출처 띠 — 어디서 온 구절인지 *@
+        <div class="brSrc">
+            <span>@(rangeFromWeekly ? "주일공과" : "성경 읽기")@(string.IsNullOrWhiteSpace(rangeLabel) ? "" : " · ")<b>@rangeLabel</b></span>
+            <small>점수와 상관없이 읽고, 읽음 표시는 통독률에 반영돼요</small>
+        </div>
+    } 
+    <!-- ── 완료 배너 ── -->
+    <div id="chapterDoneBanner"
+         class="chapter-done-banner @(isAllRead ? "show" : "")"
+         style="display:none !important;">
+        이 페이지 다 읽었어요
+    </div>
+
+    <!-- ── 보기 판 : 읽기 단위 · 번역 · 듣기 (/Bible2/Read 와 같은 구성) ── -->
+    <section class="brSheet">
+        <div class="brLbl">읽기 단위</div>
+        <div class="mode-pills">
+            <button class="mode-pill" data-mode="1" type="button" onclick="setMode(1)">한 절</button>
+            <button class="mode-pill" data-mode="3" type="button" onclick="setMode(3)">3절</button>
+            <button class="mode-pill" data-mode="5" type="button" onclick="setMode(5)">5절</button>
+            <button class="mode-pill" data-mode="0" type="button" onclick="setMode(0)">전체</button>
+        </div>
+
+        <div class="brLbl">번역</div>
+        <div class="lang-pills">
+            <button class="lang-pill" data-lang="ko"     type="button" onclick="toggleLang('ko')">개역개정</button>
+            <button class="lang-pill" data-lang="modern" type="button" onclick="toggleLang('modern')">현대인</button>
+            <button class="lang-pill" data-lang="en"     type="button" onclick="toggleLang('en')">NIV</button>
+            <button class="lang-pill" data-lang="all"    type="button" onclick="toggleLang('all')">모두</button>
+        </div>
+
+        @if (hasYouTube)
+        {
+            <div class="brLbl">듣기</div>
+            <div class="media-bar">
+                <button class="media-btn media-btn--yt" type="button" onclick="openYoutube()">말씀 듣기</button>
+            </div>
+        }
+    </section>
+    <!-- ── 진도 바 ── -->
+    <div class="reader-progress">
+        <div class="prog-label">
+            <span id="progLbl">📊 @readVerses / @totalVerses 절</span>
+            <span id="progPct">@(totalVerses == 0 ? 0 : (int)Math.Round(readVerses * 100.0 / totalVerses))%</span>
+        </div>
+        <div class="prog-track">
+            <div class="prog-fill green" id="progFill"
+                 style="width:@(totalVerses == 0 ? 0 : readVerses * 100.0 / totalVerses)%"></div>
+        </div>
+    </div>
+
+    <!-- ── 페이지 이동 ── -->
+    <div class="page-nav-r" id="pageNav" style="display:none">
+        <button class="page-btn" id="prevPg" type="button" onclick="prevPage()">◀ 이전</button>
+        <span id="pgInfo" style="color:var(--text2);font-size:.9rem"></span>
+        <button class="page-btn" id="nextPg" type="button" onclick="nextPage()">다음 ▶</button>
+    </div>
+
+    <!-- ── 개요 카드 ── -->
+    @if (ov != null || bi != null)
+    {
+        <div class="ov-card" id="ovCard">
+            <button class="ov-head" type="button" onclick="ovToggleOpen()" aria-expanded="false" id="ovHead">
+                <span class="ov-head-left">
+                    
+                    <span class="ov-title">@(ov?.BookName ?? bookTitle) 개요</span>
+                </span>
+                <span class="ov-chevron" id="ovChevron">▾</span>
+            </button>
+            <div class="ov-body" id="ovBody">
+                @if (bi != null)
+                {
+                    <div class="ov-switch-bar">
+                        <button class="ov-sw-btn ov-sw-active" id="ovBtnSimple" type="button" onclick="ovSetMode('simple')">간략본</button>
+                        <button class="ov-sw-btn" id="ovBtnDetail" type="button" onclick="ovSetMode('detail')">상세본</button>
+                    </div>
+                    <div id="ovSimple">
+                        @if (!string.IsNullOrWhiteSpace(bi.Author))
+                        { <div class="ov-row"><span class="ov-label">저자</span><span class="ov-val">@bi.Author</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.WhenWritten))
+                        { <div class="ov-row"><span class="ov-label">기록 시기</span><span class="ov-val">@bi.WhenWritten</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.OverView))
+                        { <div class="ov-row"><span class="ov-label">개요</span><span class="ov-val">@bi.OverView</span></div> }
+                        @if (!string.IsNullOrWhiteSpace(bi.Purpose))
+                        { <div class="ov-row"><span class="ov-label">기록 목적</span><span class="ov-val">@bi.Purpose</span></div> }
+                    </div>
+                }
+                @if (ov != null)
+                {
+                    <div id="ovDetail" style="@(bi != null ? "display:none" : "")">
+                        @if (!string.IsNullOrWhiteSpace(ov.Author))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">저자</div>
+                                <div class="ov-sec-body"><strong>@ov.Author</strong>
+                                    @if (!string.IsNullOrWhiteSpace(ov.AuthorDescription))
+                                    { <p>@ov.AuthorDescription</p> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.WrittenDateFrom))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">저작 연대</div>
+                                <div class="ov-sec-body">@ov.WrittenDateFrom @(!string.IsNullOrWhiteSpace(ov.WrittenDateTo) ? " ~ " + ov.WrittenDateTo : "")
+                                    @if (!string.IsNullOrWhiteSpace(ov.AlternativeDate)) { <p>@ov.AlternativeDate</p> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.WrittenPlace))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">기록 장소</div>
+                                <div class="ov-sec-body">@ov.WrittenPlace</div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.Keywords))
+                        {
+                            <div class="ov-section">
+                                <div class="ov-sec-title">핵심어</div>
+                                <div class="ov-sec-body">
+                                    @foreach (var kw in ov.Keywords.Split(new[]{",","·","、"}, StringSplitOptions.RemoveEmptyEntries))
+                                    { <span class="ov-kw-chip">@kw.Trim()</span> }
+                                </div>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(ov.ContentSummary))
+                        {
+                            var cLines = ov.ContentSummary.Split(new[]{"\\n","\n"}, StringSplitOptions.RemoveEmptyEntries);
+                            var nItems = new List<string>();
+                            var fNote  = "";
+                            foreach (var ln in cLines)
+                            {
+                                if (Regex.IsMatch(ln.Trim(), @"^\d+\.\s"))
+                                    nItems.Add(Regex.Replace(ln.Trim(), @"^\d+\.\s*",""));
+                                else fNote = ln.Trim();
+                            }
+                            <div class="ov-section">
+                                <div class="ov-sec-title">핵심 내용 요약</div>
+                                <div class="ov-sec-body">
+                                    @if (nItems.Any())
+                                    { <ol class="ov-list">@foreach(var n in nItems){<li>@n</li>}</ol> }
+                                    @if (!string.IsNullOrWhiteSpace(fNote))
+                                    { <p class="ov-final-note">💡 @fNote</p> }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- ── 절 목록 ── -->
+    <div id="verseList">
+        @if (verseGroups == null || verseGroups.Count == 0)
+        {
+            <div style="padding:32px;text-align:center;color:#64748b;">
+                @(detail == null ? "본문 데이터를 불러오지 못했어요." : "표시할 절이 없습니다.")
+            </div>
+        }
+        else
+        {
+            int gIdx = 0;
+            @foreach (var grp in verseGroups)
+            {
+                var ko = grp.FirstOrDefault(v => v.LangCD == "ko");
+                var en = grp.FirstOrDefault(v => v.LangCD == "en");
+                var rep = ko ?? en;
+                if (rep == null) { gIdx++; continue; }
+
+                var isRead       = ko?.readDone == "t";
+                var isBookmarked = ko?.bookmarkDone == "t";
+                var useId        = ko?.Id ?? en?.Id ?? 0;
+                var keyword      = ko?.BibleKeyWord ?? en?.BibleKeyWord;
+                var summary      = ko?.BibleSummary ?? en?.BibleSummary;
+
+                // 요약 카드
+                if (!string.IsNullOrWhiteSpace(keyword))
+                {
+                    var ss = BulletinBoard.Common.SharedComm.MakeBibleSerialJangZul(
+                        rep.BibleText, rep.FromJang, rep.FromZul, rep.ToJang, rep.ToZul);
+                    <div class="summary-card" data-idx="@gIdx">
+                        <div class="summary-range">@ss</div>
+                        @if (!string.IsNullOrWhiteSpace(keyword))
+                        { <div class="summary-keyword">@keyword</div> }
+                        @if (!string.IsNullOrWhiteSpace(summary))
+                        { <div class="summary-body">@summary</div> }
+                    </div>
+                }
+
+                <!-- 절 카드 -->
+                <div class="verse-card-r @(isRead ? "is-read" : "") @(isBookmarked ? "bookmarked" : "")"
+                     id="vc-@useId"
+                     data-idx="@gIdx"
+                     data-zul="@rep.zul"
+                     data-verse-id="@useId"
+                     style="scroll-margin-top:80px">
+
+                    <div class="vnum">@rep.zul</div>
+                    <div class="vtext-wrap">
+                        <div class="vtext-ko-line">
+                            <span class="vtext vtext-ko">@(ko?.BibleData ?? "")</span>
+                            <span class="vactions-inline">
+                                <button class="vbtn vbtn-read @(isRead ? "done" : "unread")"
+                                        id="vr-@useId" type="button"
+                                        onclick="toggleVerse(@useId, @rep.Jang, @rep.zul, this)">
+                                    ✓
+                                </button>
+                                <button class="vbtn vbtn-bm @(isBookmarked ? "bm-on" : "")"
+                                        id="vbm-@useId" type="button"
+                                        onclick="toggleBm(@useId, @rep.Jang, @rep.zul, this)">
+                                    ★
+                                </button>
+                            </span>
+                        </div>
+                       @{
+                            var koId = ko?.Id ?? 0;
+                            var modernText = (koId > 0 && modernMap.TryGetValue(koId, out var mt)) ? mt : null;
+                        }
+                        @if (!string.IsNullOrWhiteSpace(modernText))
+                        {
+                            <div class="vtext-modern-line">
+                                <span class="vtext-modern">@modernText</span>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(en?.BibleData))
+                        {
+                            <div class="vtext-en-line">
+                                <span class="vtext-en">@en.BibleData</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+                gIdx++;
+            }
+        }
+    </div>
+
+    <!-- ── 성경 전체 통독률 ── -->
+    <div class="bible-overall-card">
+        <div class="boc-header">
+            <div class="boc-title">성경 전체 통독률</div>
+            <div class="boc-pct" id="bocPct">@overallPct<span style="font-size:.9rem;font-weight:800">%</span></div>
+        </div>
+        <div class="boc-bar-track">
+            <div class="boc-bar-fill" id="bocBarFill" style="width:@overallPct%"></div>
+        </div>
+        <div class="boc-footer">
+            <div class="boc-sub">
+                오늘 읽은 절: <b id="bocTodayCnt">@todayReadVerseCount</b>절
+                &nbsp;·&nbsp;
+                누적 통독률 <b id="bocPctSub">@totalProgressRate.ToString("0.##")</b>%
+            </div>
+            <a class="boc-link" href="/Bible/Welcome">
+                📚 성경통독 바로가기 →
+            </a>
+        </div>
+    </div>
+
+    <!-- ── 완료 버튼 ── -->
+    <div class="mark-all-wrap">
+        <button class="complete-mega @(isAllRead ? "is-done" : "is-not-done")"
+                id="completeMega" type="button"
+                onclick="markPageAjax()">
+            <div class="cm-body">
+                <span class="complete-mega-title" id="completeMegaTitle">
+                    @(isAllRead ? "이 페이지 읽음 표시를 취소할까요?" : "이 페이지 읽음으로 표시")
+                </span>
+                <span class="complete-mega-desc @(isAllRead ? "desc-hide" : "")"
+                      id="completeMegaDesc">누르면 성경통독에 반영돼요</span>
+                <span class="complete-mega-count" id="completeMegaCount">오늘 읽은 절 @readVerses / @totalVerses</span>
+            </div>
+            <div class="cm-mark" id="cmMark">@(isAllRead ? "✓" : "→")</div>
+        </button>
+    </div>
+
+    <!-- ── 하단 네비 ── -->
+    <div class="dashboard-btn-wrap">
+        @if (rangeMode)
+        {
+            <a href="@rangeReturnUrl" class="dashboard-btn">← @rangeReturnText 돌아가기</a>
+        }
+        else
+        {
+            <a href="/DailyMission4?date=@d" class="dashboard-btn">미션 홈</a>
+            <a href="/Bible2/Welcome" class="dashboard-btn">성경통독</a>
+            <a href="/Home/Index" class="dashboard-btn">@ConstatsCommon.ToHome</a>
+        }
+    </div>
+
+</div><!-- /bible-reader -->
+
+<!-- ── 유튜브 모달 ── -->
+@if (hasYouTube)
+{
+    <div id="ytModal" onclick="closeYoutube(event)" style="display:none;">
+        <div class="yt-modal-box" onclick="event.stopPropagation()">
+            <div class="yt-modal-head">
+                <div class="yt-modal-title">🎵 말씀 듣기</div>
+                <div class="yt-modal-controls">
+                    <button class="yt-ctrl-btn yt-stop-btn"  type="button" onclick="ytStop(event)">⏹ 정지</button>
+                    <button class="yt-ctrl-btn yt-close-btn" type="button" onclick="closeYoutube(event)">✕ 닫기</button>
+                </div>
+            </div>
+            <div class="yt-iframe-wrap"><div id="ytFrameHost"></div></div>
+            <div class="yt-modal-foot">
+                <span id="ytStatusMsg">▶ 준비 중...</span>
+                <span class="yt-loop-badge">∞ 무한 반복</span>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ── 로딩 모달 ── -->
+<div id="loadingModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:20px;padding:36px 44px;text-align:center;box-shadow:0 12px 48px rgba(0,0,0,.35);min-width:220px;">
+        <div style="display:flex;justify-content:center;margin-bottom:18px">
+            <div style="width:44px;height:44px;border-radius:50%;border:5px solid #e2e8f0;border-top-color:#f97316;animation:spinAnim .75s linear infinite;"></div>
+        </div>
+        <div style="font-size:1.05rem;font-weight:800;color:#1e293b;margin-bottom:6px">처리 중...</div>
+        <div style="font-size:.85rem;color:#64748b">잠시만 기다려 주세요</div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    /* ── 현대인 안내 배너 dismiss ── */
+    (function () {
+        var KEY = 'hdNoticeDismissed_dm2';
+        var el  = document.getElementById('hdNotice');
+        if (!el) return;
+        if (localStorage.getItem(KEY) === '1') { el.style.display = 'none'; return; }
+        el.style.display = '';
+    })();
+    window.dismissHdNotice = function () {
+        var el = document.getElementById('hdNotice');
+        if (el) {
+            el.style.transition = 'opacity .25s, transform .25s, max-height .3s';
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(-6px)';
+            setTimeout(function () { el.style.display = 'none'; }, 280);
+        }
+        localStorage.setItem('hdNoticeDismissed_dm2', '1');
+    };
+
+    /* ── 상수 ── */
+    var D          = '@d';
+    var LANG_PARAM = '@lang';
+    var BIBLE_TEXT = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(bible?.BibleText ?? ""));
+    var FROM_JANG  = @(bible?.FromJang ?? 0);
+    var FROM_ZUL   = @(bible?.FromZul  ?? 0);
+    var TO_JANG    = @(bible?.ToJang   ?? 0);
+    var TO_ZUL     = @(bible?.ToZul    ?? 0);
+    var TOTAL      = @totalVerses;
+    var OV_MODE_KEY = 'bibleOvMode';
+    var OV_OPEN_KEY = 'bibleOvOpen';
+
+    /* ── 개요 토글 ── */
+    function ovInit() {
+        var savedMode = localStorage.getItem(OV_MODE_KEY) || 'simple';
+        _applyMode(savedMode, false);
+        if (localStorage.getItem(OV_OPEN_KEY) === '1') _setOpen(true, false);
+    }
+    function _setOpen(open, save) {
+        var card = document.getElementById('ovCard');
+        var head = document.getElementById('ovHead');
+        if (!card) return;
+        card.classList.toggle('is-open', open);
+        if (head) head.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (save) localStorage.setItem(OV_OPEN_KEY, open ? '1' : '0');
+    }
+    function _applyMode(mode, save) {
+        var simple = document.getElementById('ovSimple');
+        var detail = document.getElementById('ovDetail');
+        var btnS   = document.getElementById('ovBtnSimple');
+        var btnD   = document.getElementById('ovBtnDetail');
+        if (!simple && !detail) return;
+        var isDetail = (mode === 'detail');
+        if (simple) simple.style.display = isDetail ? 'none' : '';
+        if (detail) detail.style.display = isDetail ? ''     : 'none';
+        if (btnS)   btnS.classList.toggle('ov-sw-active', !isDetail);
+        if (btnD)   btnD.classList.toggle('ov-sw-active',  isDetail);
+        if (save) localStorage.setItem(OV_MODE_KEY, mode);
+    }
+    window.ovToggleOpen = function () {
+        var card = document.getElementById('ovCard');
+        if (!card) return;
+        _setOpen(!card.classList.contains('is-open'), true);
+    };
+    window.ovSetMode = function (mode) { _applyMode(mode, true); };
+
+    /* ── 언어 (다중 토글 Set 기반) ── */
+    function _loadLangSet() {
+        var s = localStorage.getItem('bibleLang') || '@lang';
+        if (s==='all'||s==='al')   return new Set(['ko','modern','en']);
+        if (s==='both')            return new Set(['ko','en']);
+        if (s==='ko+modern')       return new Set(['ko','modern']);
+        var parts = s.split(',').filter(function(x){ return x==='ko'||x==='modern'||x==='en'; });
+        return parts.length > 0 ? new Set(parts) : new Set(['ko']);
+    }
+    var activeLangs = _loadLangSet();
+    function _saveLang(){ localStorage.setItem('bibleLang', Array.from(activeLangs).join(',')); }
+
+    function toggleLang(l) {
+        var ALL = ['ko','modern','en'];
+        if (l === 'all') {
+            activeLangs = ALL.every(function(x){ return activeLangs.has(x); }) ? new Set(['ko']) : new Set(ALL);
+        } else {
+            if (activeLangs.has(l)) { activeLangs.delete(l); if (activeLangs.size===0) activeLangs.add('ko'); }
+            else activeLangs.add(l);
+        }
+        _saveLang(); applyLang();
+    }
+    window.toggleLang = toggleLang;
+
+    function applyLang() {
+        var showKo=activeLangs.has('ko'), showModern=activeLangs.has('modern'), showEn=activeLangs.has('en');
+        var isAll = showKo && showModern && showEn;
+
+        document.querySelector('[data-lang="all"]').classList.toggle('active', isAll);
+        document.querySelector('[data-lang="ko"]').classList.toggle('active', showKo);
+        document.querySelector('[data-lang="modern"]').classList.toggle('active', showModern);
+        document.querySelector('[data-lang="en"]').classList.toggle('active', showEn);
+
+        document.body.classList.remove('lang-ko','lang-en','lang-modern','lang-ko_modern','lang-all','lang-both','lang-al');
+        if (showKo&&!showModern&&!showEn)       document.body.classList.add('lang-ko');
+        else if (!showKo&&showModern&&!showEn)  document.body.classList.add('lang-modern');
+        else if (!showKo&&!showModern&&showEn)  document.body.classList.add('lang-en');
+
+        document.querySelectorAll('.verse-card-r').forEach(function (card) {
+            var koLine     = card.querySelector('.vtext-ko-line');
+            var modernLine = card.querySelector('.vtext-modern-line');
+            var enLine     = card.querySelector('.vtext-en-line');
+            var koText     = card.querySelector('.vtext-ko');
+            var actions    = card.querySelector('.vactions-inline');
+
+            if (koText)     koText.style.display    = showKo     ? '' : 'none';
+            if (modernLine) modernLine.style.display = showModern ? '' : 'none';
+            if (enLine)     enLine.style.display     = showEn     ? '' : 'none';
+
+            if (actions) {
+                if (!showKo && showModern && modernLine) modernLine.appendChild(actions);
+                else if (!showKo && !showModern && showEn && enLine) enLine.appendChild(actions);
+                else if (koLine) koLine.appendChild(actions);
+            }
+        });
+    }
+
+    /* ── 표시 모드 ── */
+    var mode    = parseInt(localStorage.getItem('bibleMode') || '0', 10);
+    var curPage = 0;
+    function setMode(m) { mode = m; localStorage.setItem('bibleMode', m); curPage = 0; applyMode(m); }
+    function applyMode(m) {
+        document.querySelectorAll('.mode-pill').forEach(function (b) { b.classList.toggle('active', parseInt(b.dataset.mode, 10) === m); });
+        var nav = document.getElementById('pageNav');
+        if (m === 0) { if (nav) nav.style.display = 'none'; showAll(); }
+        else         { if (nav) nav.style.display = 'flex'; showPage(0); }
+    }
+    function showAll() {
+        document.querySelectorAll('.verse-card-r').forEach(function(c){ c.style.display=''; });
+        document.querySelectorAll('.summary-card').forEach(function(s){ s.style.display=''; });
+    }
+    function showPage(p) {
+        var cards = document.querySelectorAll('.verse-card-r');
+        var totalPage = Math.ceil(cards.length / mode);
+        curPage = Math.max(0, Math.min(p, totalPage - 1));
+        var startIdx = curPage * mode, endIdx = (curPage + 1) * mode;
+        cards.forEach(function(c,i){ c.style.display = (i>=startIdx && i<endIdx) ? '' : 'none'; });
+        document.querySelectorAll('.summary-card').forEach(function(s){
+            var idx = parseInt(s.dataset.idx, 10);
+            s.style.display = (idx>=startIdx && idx<endIdx) ? '' : 'none';
+        });
+        document.getElementById('pgInfo').textContent = (curPage+1) + ' / ' + totalPage + ' 페이지';
+        document.getElementById('prevPg').disabled = (curPage === 0);
+        document.getElementById('nextPg').disabled = (curPage >= totalPage-1);
+    }
+    function prevPage() { showPage(curPage - 1); }
+    function nextPage() { showPage(curPage + 1); }
+    window.setMode  = setMode;
+    window.prevPage = prevPage;
+    window.nextPage = nextPage;
+
+    /* ── 진도 업데이트 ── */
+    function updateProg(readCnt, totalCnt) {
+        var pct = totalCnt > 0 ? Math.round(readCnt / totalCnt * 100) : 0;
+        var fill  = document.getElementById('progFill');
+        var lbl   = document.getElementById('progLbl');
+        var pctEl = document.getElementById('progPct');
+        var cnt   = document.getElementById('completeMegaCount');
+        if (fill)  fill.style.width = pct + '%';
+        if (lbl)   lbl.textContent  = '📊 ' + readCnt + ' / ' + totalCnt + ' 절';
+        if (pctEl) pctEl.textContent = pct + '%';
+        if (cnt)   cnt.textContent   = '오늘 읽은 절 ' + readCnt + ' / ' + totalCnt;
+    }
+    function checkDone() {
+        var readCards = document.querySelectorAll('.verse-card-r.is-read').length;
+        var allCards  = document.querySelectorAll('.verse-card-r').length;
+        var banner    = document.getElementById('chapterDoneBanner');
+        var mega      = document.getElementById('completeMega');
+        var title     = document.getElementById('completeMegaTitle');
+        var desc      = document.getElementById('completeMegaDesc');
+        var isDone    = (allCards > 0 && readCards === allCards);
+        if (banner) banner.classList.toggle('show', isDone);
+        if (mega)   { mega.classList.toggle('is-done', isDone); mega.classList.toggle('is-not-done', !isDone); }
+        if (title)  title.textContent = isDone ? '이 페이지 읽음 표시를 취소할까요?' : '이 페이지 읽음으로 표시';
+        if (desc)   desc.classList.toggle('desc-hide', isDone);
+        var mark = document.getElementById('cmMark');
+        if (mark)   mark.textContent = isDone ? '✓' : '→';
+        updateProg(readCards, allCards);
+    }
+
+    /* ── 로딩 표시 헬퍼 ── */
+    function showLoading() { var m = document.getElementById('loadingModal'); if (m) m.style.display = 'flex'; }
+    function hideLoading() { var m = document.getElementById('loadingModal'); if (m) m.style.display = 'none'; }
+
+    /* ── 페이지 전체 읽음/취소 (AJAX 토글, 반복 가능) ── */
+    window.markPageAjax = async function () {
+        var btn = document.getElementById('completeMega');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true;
+        showLoading();
+        try {
+            /* JSON 전송 — application/json은 UTF-8이 보장되어 한글 깨짐 없음 */
+            var res = await fetch('/DailyMission4/ToggleBibleRange', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'RequestVerificationToken': getToken()
+                },
+                body: JSON.stringify({
+                    bibleText: BIBLE_TEXT,
+                    fromJang:  FROM_JANG,
+                    fromZul:   FROM_ZUL,
+                    toJang:    TO_JANG,
+                    toZul:     TO_ZUL
+                }),
+                credentials: 'same-origin'
+            });
+
+            if (!res.ok) {
+                console.error('ToggleBibleRange HTTP', res.status);
+                return;   /* finally 에서 btn 복구 */
+            }
+
+            var json = null;
+            try { json = await res.json(); } catch(pe) { console.error('JSON parse error', pe); }
+            if (!json || !json.ok) { console.error('ToggleBibleRange ok=false', json); return; }
+
+            /* ── UI 업데이트 ── */
+            document.querySelectorAll('.verse-card-r').forEach(function (card) {
+                var vid = card.dataset.verseId;
+                var rb  = document.getElementById('vr-' + vid);
+                if (json.isRead) {
+                    card.classList.add('is-read');
+                    if (rb) { rb.textContent = '✓'; rb.classList.add('done'); rb.classList.remove('unread'); }
+                } else {
+                    card.classList.remove('is-read');
+                    if (rb) { rb.textContent = '✓'; rb.classList.remove('done'); rb.classList.add('unread'); }
+                }
+            });
+            checkDone();
+
+            /* ── 전체 통독률 갱신 (비동기, 실패해도 무시) ── */
+            refreshOverallProgress();
+
+        } catch (e) {
+            console.error('markPageAjax error', e);
+        } finally {
+            /* 성공·실패·예외 모든 경우에 반드시 복구 */
+            hideLoading();
+            btn.disabled = false;
+        }
+    };
+
+    /* ── 전체 통독률 카드 갱신 ── */
+    async function refreshOverallProgress() {
+        try {
+            var res = await fetch('/DailyMission4/GetBibleProgressJson', {
+                method: 'GET', cache: 'no-store',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            });
+            if (!res.ok) return;
+            var j = await res.json().catch(function() { return null; });
+            if (!j || !j.ok) return;
+
+            var pct = Math.round(j.progressRate);
+            var pctEl   = document.getElementById('bocPct');
+            var fillEl  = document.getElementById('bocBarFill');
+            var subEl   = document.getElementById('bocPctSub');
+            var todayEl = document.getElementById('bocTodayCnt');
+            if (pctEl)   pctEl.innerHTML = pct + '<span style="font-size:.9rem;font-weight:800">%</span>';
+            if (fillEl)  fillEl.style.width = pct + '%';
+            if (subEl)   subEl.textContent  = j.progressRate.toFixed(2).replace(/\.?0+$/, '') || '0';
+            if (todayEl) todayEl.textContent = j.todayReadVerseCount;
+        } catch(e) { /* 조용히 무시 */ }
+    }
+
+    /* ── 안티포저리 토큰 ── */
+    function getToken() {
+        var el = document.querySelector('#antiForm input[name="__RequestVerificationToken"]');
+        return el ? el.value : '';
+    }
+    async function postJson(url, data) {
+        var fd = new FormData();
+        Object.keys(data).forEach(function(k){ fd.append(k, data[k]); });
+        var res = await fetch(url, {
+            method:'POST',
+            headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json','RequestVerificationToken':getToken()},
+            body: fd, credentials:'same-origin'
+        });
+        var ct = res.headers.get('content-type')||'';
+        if (!ct.includes('application/json')) { window.location.reload(); return null; }
+        return await res.json();
+    }
+
+    /* ── 절 읽음 · 책갈피 저장 대기 (/Bible2/Read 와 같은 방식) ──
+       누르는 즉시 그 동그라미 안에서 금색 원이 돌고, 그 절이 살짝 반짝인다.
+       0.8초 넘게 걸리면 아래 알림 띠를 띄운다. 기다리는 동안 같은 버튼은 다시 못 누른다. */
+    var _waitCnt = 0, _toastTimer = null;
+    function beginWait(btn, card, msg) {
+        if (btn.classList.contains('wait')) return false;
+        btn.classList.add('wait');
+        btn.disabled = true;
+        if (card) card.classList.add('busy');
+        _waitCnt++;
+        clearTimeout(_toastTimer);
+        _toastTimer = setTimeout(function () {
+            if (_waitCnt > 0) {
+                var el = document.getElementById('brToast');
+                if (el) { el.querySelector('span.m').textContent = msg; el.classList.add('show'); }
+            }
+        }, 800);
+        return true;
+    }
+    function endWait(btn, card) {
+        btn.classList.remove('wait');
+        btn.disabled = false;
+        if (card) card.classList.remove('busy');
+        _waitCnt = Math.max(0, _waitCnt - 1);
+        if (_waitCnt === 0) {
+            clearTimeout(_toastTimer);
+            var el = document.getElementById('brToast');
+            if (el) el.classList.remove('show');
+        }
+    }
+
+    /* ── 절 읽음 토글 ── */
+    window.toggleVerse = async function (verseId, jang, zul, btn) {
+        var card    = btn.closest('.verse-card-r');
+        var isRead  = card.classList.contains('is-read');
+        var url     = isRead ? '/DailyMission4/MarkVerseUnread' : '/DailyMission4/MarkVerseRead';
+        var data    = { date:D, lang:LANG_PARAM, bibleText:BIBLE_TEXT, jang:jang, zul:zul, Id:verseId };
+        if (!beginWait(btn, card, '읽음으로 표시하고 있어요')) return;
+        try {
+            var json = await postJson(url, data);
+            if (!json || !json.ok) return;
+            var nowRead = json.isRead;
+            card.classList.toggle('is-read', !!nowRead);
+            btn.textContent = '✓';
+            btn.classList.toggle('done', !!nowRead);
+            btn.classList.toggle('unread', !nowRead);
+            checkDone();
+            refreshOverallProgress();
+        } catch (e) {
+            console.error(e);
+            alert('저장하지 못했어요. 다시 눌러 주세요.');
+        } finally {
+            endWait(btn, card);
+        }
+    };
+
+    /* ── 북마크 토글 ── */
+    window.toggleBm = async function (verseId, jang, zul, btn) {
+        var card = document.getElementById('vc-' + verseId);
+        var data = { date:D, lang:LANG_PARAM, bibleText:BIBLE_TEXT, jang:jang, zul:zul, Id:verseId };
+        if (!beginWait(btn, card, '책갈피를 저장하고 있어요')) return;
+        try {
+            var json = await postJson('/DailyMission4/ToggleBookmark', data);
+            if (!json || !json.ok) return;
+            btn.textContent = '★';
+            btn.classList.toggle('bm-on', !!json.isBookmarked);
+            if (card) card.classList.toggle('bookmarked', !!json.isBookmarked);
+        } catch (e) {
+            console.error(e);
+            alert('저장하지 못했어요. 다시 눌러 주세요.');
+        } finally {
+            endWait(btn, card);
+        }
+    };
+    /* ── 유튜브 (IFrame API 기반 멀티 세그먼트 순차 재생) ── */
+    function extractId(url) {
+        if (!url) return null;
+        var u = url.trim(), m;
+        m = u.match(/[?&]v=([^&#\s]+)/);       if (m) return m[1];
+        m = u.match(/youtu\.be\/([^?&#\s]+)/);  if (m) return m[1];
+        m = u.match(/\/embed\/([^?&#\s]+)/);    if (m) return m[1];
+        if (/^[A-Za-z0-9_-]{11}$/.test(u)) return u;
+        return null;
+    }
+
+    // ✅ Razor 변수 → 재생 세그먼트 배열 [{id, start, end}, ...]
+    //    y1~y5 중 URL이 있는 것만 추가 (장이 바뀌면 y2, y3... 로 제공됨)
+    var ytSegs = (function () {
+        var list = [];
+        function add(url, s, e) { var id = extractId(url); if (id) list.push({ id:id, start:s, end:e }); }
+        add('@y1', @s1, @e1);
+        add('@y2', @s2, @e2);
+        add('@y3', @s3, @e3);
+        add('@y4', @s4, @e4);
+        add('@y5', @s5, @e5);
+        return list;
+    })();
+
+    var ytPlayer   = null;   // YT.Player 인스턴스
+    var ytIdx      = 0;      // 현재 재생 중인 세그먼트 인덱스
+    var ytApiOk    = false;  // IFrame API 준비 완료 여부
+    var ytPending  = false;  // API 로드 전 openYoutube() 호출 여부
+    var ytTimer    = null;   // ✅ 구간 종료 감지 폴링 타이머
+
+    // IFrame API 스크립트 동적 로드
+    (function () {
+        var s = document.createElement('script');
+        s.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(s);
+    })();
+
+    // ✅ 아이폰 · 아이패드 (2026-09-29)
+    //    iOS 사파리는 "누른 그 순간" 안에서 재생을 시작해야 소리 나는 자동 재생을 허락한다.
+    //    기존: 누른 뒤 플레이어를 만들고(비동기) autoplay → 그 순간이 지나 막혔다.
+    //    → iOS 는 API 가 준비되면 플레이어를 미리 만들어 두고(재생 안 함), 누르는 즉시 playVideo() 한다.
+    var IS_IOS    = /iPad|iPhone|iPod/.test(navigator.userAgent)
+                    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var ytReady   = false;  // 플레이어 onReady 완료 여부
+    var ytHintT   = null;   // 재생이 막혔는지 확인하는 타이머
+
+    function _ytHint() {
+        // 그래도 막히면 (저전력 모드 등) 화면의 재생 버튼을 한 번 누르도록 알려 준다
+        if (!IS_IOS) return;
+        clearTimeout(ytHintT);
+        ytHintT = setTimeout(function () {
+            var st = -1; try { st = ytPlayer.getPlayerState(); } catch (err) { }
+            var stat = document.getElementById('ytStatusMsg');
+            if (st !== 1 && st !== 3 && stat) stat.textContent = '▶ 화면의 재생 버튼을 눌러 주세요';
+        }, 1800);
+    }
+
+    // ✅ IFrame API 준비 완료 콜백 (YouTube SDK가 전역으로 호출)
+    window.onYouTubeIframeAPIReady = function () {
+        ytApiOk = true;
+        if (IS_IOS && !ytPlayer && ytSegs.length) _ytCreate(false);   // iOS — 미리 만들어 둔다
+        if (ytPending) { ytPending = false; _ytDoOpen(); }
+    };
+
+    function _ytUpdateStatus() {
+        var stat  = document.getElementById('ytStatusMsg');
+        var badge = document.querySelector('.yt-loop-badge');
+        var multi = ytSegs.length > 1;
+        var range = ytSegs.some(function (s) { return s.start > 0 || s.end > 0; });
+        if (stat) stat.textContent = multi
+            ? '▶ ' + (ytIdx + 1) + ' / ' + ytSegs.length + ' 재생 중...'
+            : (range ? '▶ 구간 반복 재생 중...' : '▶ 무한 반복 재생 중...');
+        if (badge) badge.textContent = multi
+            ? '🔁 ' + ytSegs.length + '개 순차'
+            : (range ? '🔁 구간 반복' : '∞ 무한 반복');
+    }
+
+    // ✅ 폴링 정지
+    function _ytStopCheck() {
+        if (ytTimer) { clearInterval(ytTimer); ytTimer = null; }
+    }
+
+    // ✅ 구간 종료 감지 폴링 시작
+    //    YouTube IFrame API의 endSeconds는 ENDED 이벤트를 보장하지 않으므로
+    //    getCurrentTime()을 직접 폴링해서 구간 끝을 감지한다.
+    function _ytStartCheck(endSec) {
+        _ytStopCheck();
+        if (!endSec || endSec <= 0) return;
+        ytTimer = setInterval(function () {
+            try {
+                if (!ytPlayer || typeof ytPlayer.getCurrentTime !== 'function') return;
+                var t = ytPlayer.getCurrentTime();
+                if (t >= endSec - 0.5) {               // 종료 0.5초 전에 전환
+                    _ytStopCheck();
+                    _ytLoadSeg((ytIdx + 1) % ytSegs.length);
+                }
+            } catch (err) { _ytStopCheck(); }
+        }, 300);   // 300ms 간격으로 체크
+    }
+
+    function _ytLoadSeg(idx) {
+        if (!ytPlayer || !ytSegs[idx]) return;
+        _ytStopCheck();                                  // 이전 폴링 중단
+        ytIdx = idx;
+        var seg  = ytSegs[idx];
+        var opts = { videoId: seg.id, startSeconds: seg.start || 0 };
+        if (seg.end > 0) opts.endSeconds = seg.end;
+        ytPlayer.loadVideoById(opts);
+        _ytUpdateStatus();
+        // 1.5초 후 폴링 시작 (seek 완료 대기)
+        if (seg.end > 0) {
+            setTimeout(function () { _ytStartCheck(seg.end); }, 1500);
+        }
+    }
+
+    // ✅ 플레이어 생성 — autoplay=false 는 iOS 미리 만들기용 (재생하지 않고 대기)
+    //    playerVars에 end를 넣지 않음 → loadVideoById의 endSeconds만 사용
+    function _ytCreate(autoplay) {
+        var host = document.getElementById('ytFrameHost');
+        if (!host || !ytSegs.length) return;
+        var seg0 = ytSegs[0];
+        ytIdx = 0; ytReady = false;
+        host.innerHTML = '<div id="_ytPlayerEl"></div>';
+        var pvars = { autoplay: autoplay ? 1 : 0, rel:0, modestbranding:1, playsinline:1 };
+        if (seg0.start > 0) pvars.start = seg0.start;
+        // pvars.end는 설정하지 않음 — 폴링으로 제어
+        ytPlayer = new YT.Player('_ytPlayerEl', {
+            width: '100%', height: '100%',
+            videoId: seg0.id,
+            playerVars: pvars,
+            events: {
+                onReady: function () { ytReady = true; },
+                onStateChange: function (ev) {
+                    if (ev.data === 1) {
+                        // ✅ 재생 시작(PLAYING) → 폴링 시작
+                        clearTimeout(ytHintT);
+                        _ytUpdateStatus();
+                        _ytStartCheck(ytSegs[ytIdx] ? ytSegs[ytIdx].end : 0);
+                    } else if (ev.data === 0) {
+                        // ✅ 자연 종료(ENDED) — 폴링 없이도 대비
+                        _ytStopCheck();
+                        _ytLoadSeg((ytIdx + 1) % ytSegs.length);
+                    }
+                }
+            }
+        });
+        // 최초 세그먼트 폴링: onStateChange(PLAYING)이 늦게 오는 경우 대비
+        if (autoplay && seg0.end > 0) {
+            setTimeout(function () { _ytStartCheck(seg0.end); }, 3000);
+        }
+    }
+
+    function _ytDoOpen() {
+        if (!ytSegs.length) return;
+        var modal = document.getElementById('ytModal');
+        var host  = document.getElementById('ytFrameHost');
+        if (!modal || !host) return;
+        modal.style.display = 'flex';                    // 재생보다 먼저 보이게 (iOS)
+        var prevIdx = ytIdx;
+        var seg0    = ytSegs[0];
+        if (ytPlayer && IS_IOS && ytReady && prevIdx === 0) {
+            // ✅ iOS — 미리 만든 플레이어를 누른 순간 안에서 바로 재생
+            ytIdx = 0;
+            try { ytPlayer.seekTo(seg0.start || 0, true); ytPlayer.playVideo(); } catch (err) { }
+        } else if (ytPlayer && ytReady) {
+            // ✅ 플레이어 재활용 — 첫 번째 세그먼트부터 다시 재생
+            _ytLoadSeg(0);
+        } else if (ytPlayer) {
+            // 미리 만드는 중 (아직 onReady 전) — 새로 만들어 자동 재생 시도
+            _ytCreate(true);
+        } else {
+            // ✅ 최초 플레이어 생성
+            _ytCreate(true);
+        }
+        _ytUpdateStatus();
+        _ytHint();
+    }
+
+    window.openYoutube = function () {
+        if (!ytApiOk) { ytPending = true; return; }
+        _ytDoOpen();
+    };
+    window.ytStop = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        _ytStopCheck(); clearTimeout(ytHintT);
+        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        var stat = document.getElementById('ytStatusMsg');
+        if (stat) stat.textContent = '⏹ 정지됨';
+    };
+    window.closeYoutube = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        _ytStopCheck(); clearTimeout(ytHintT);
+        if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+        var modal = document.getElementById('ytModal');
+        if (modal) modal.style.display = 'none';
+    };
+
+    /* ── 글자 크기 4단계 ── */
+    var FS_MAP = { s: .9, m: 1, l: 1.18, xl: 1.36 };
+    function applyFs(key) {
+        if (!FS_MAP[key]) key = 'm';
+        var root = document.querySelector('.bible-reader');
+        if (root) root.style.setProperty('--brfs', FS_MAP[key]);
+        document.querySelectorAll('.brFs button').forEach(function (b) {
+            b.classList.toggle('on', b.getAttribute('data-fs') === key);
+        });
+        try { localStorage.setItem('brFs', key); } catch (e) { }
+    }
+    function fsInit() {
+        var saved = 'm';
+        try { saved = localStorage.getItem('brFs') || 'm'; } catch (e) { }
+        applyFs(saved);
+        document.querySelectorAll('.brFs button').forEach(function (b) {
+            b.addEventListener('click', function () { applyFs(b.getAttribute('data-fs')); });
+        });
+    }
+
+    /* ── 초기화 ── */
+    document.addEventListener('DOMContentLoaded', function () {
+        fsInit();
+        applyMode(mode);
+        applyLang();
+        ovInit();
+        checkDone();
+        // 첫 미읽은 절로 스크롤
+        var firstUnread = Array.from(document.querySelectorAll('.verse-card-r')).find(function(c){ return !c.classList.contains('is-read'); });
+        if (firstUnread) setTimeout(function(){ firstUnread.scrollIntoView({ behavior:'smooth', block:'center' }); }, 300);
+    });
+})();
+</script>
+}
+
+<div class="brToast" id="brToast" role="status" aria-live="polite"><i aria-hidden="true"></i><span>잠시만 기다려 주세요 · <span class="m">저장하고 있어요</span></span></div>
+
+@* 페이지 이동 대기 카드 *@
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")

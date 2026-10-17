@@ -1,0 +1,80 @@
+﻿@inject IAuthService AuthService
+
+@using BulletinBoard.Enums
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Common
+@model BulletinBoard.Models.TodayCollectWeeklyWordToReadContainer
+
+@{
+    bool imageExits = false;
+
+
+
+     @foreach (UploadData uploadData in Model.todayCollectWeeklyWordToRead.UploadDatas)
+    {
+        string[] words = uploadData.URLData.Split('.');
+        string fileExt = words[words.Length - 1];
+        string fileName = words[words.Length - 2];
+        string guid = Guid.NewGuid().ToString();
+        if (@uploadData.checkData && uploadData.CategoryData == Model.category.ToString())
+        {
+            if (fileExt.ToLower() == "jpeg" || fileExt.ToLower() == "jpg" || fileExt.ToLower() == "webp" || fileExt.ToLower() == "gif" || fileExt.ToLower() == "png")
+            {
+                imageExits = true;
+            }
+        }
+    }
+
+}
+
+@*<div class="links">
+    <ul style="margin:0px;">
+*@
+@foreach (UploadData uploadData in Model.todayCollectWeeklyWordToRead.UploadDatas)
+    {
+        string[] words = uploadData.URLData.Split('.');
+        string fileExt = words[words.Length - 1];
+        string fileName = words[words.Length - 2];
+        string guid = Guid.NewGuid().ToString();
+        if (@uploadData.checkData && uploadData.CategoryData == Model.category.ToString())
+        {
+        if (fileExt.ToLower() == "html")
+        {
+
+            <a class="button-link" value="@uploadData.TEXTData" href="javascript:openPopup('@uploadData.URLData')">*@uploadData.TEXTData</a>
+
+        }
+@*            else
+            {
+
+                    <a class="button-link" href="javascript:openPopup('/HTML/BibileStudy/BibileStudy_8415bb15_f8dc_4ccc_a189_5101af96013f_lesson_22_reconciliation.html')">본문 정리 보기</a>
+
+                <a type="button" class="btn btn-primary" value="@uploadData.TEXTData" id="loadData" onclick="openPopup('@uploadData.URLData')">@uploadData.TEXTData @fileExt</a>
+            }
+*@        }
+    }
+@*    </ul>
+</div>
+*@
+@if (imageExits)
+{
+    <p><i>(아래 사진을 누루면 큰 사진을 볼수 있어요.)</i></p>
+}
+
+<div class="images">
+    @foreach (UploadData uploadData in Model.todayCollectWeeklyWordToRead.UploadDatas)
+    {
+        string[] words = uploadData.URLData.Split('.');
+        string fileExt = words[words.Length - 1];
+        string fileName = words[words.Length - 2];
+        string guid = Guid.NewGuid().ToString();
+        if (@uploadData.checkData && uploadData.CategoryData == Model.category.ToString())
+        {
+            if (fileExt.ToLower() == "jpeg" || fileExt.ToLower() == "jpg" || fileExt.ToLower() == "webp" || fileExt.ToLower() == "gif" || fileExt.ToLower() == "png")
+            {
+                <img src="@uploadData.URLData" alt="Your Image Description" class="thumbnail" id="@guid" onclick="openModal('@guid')">
+            }
+        }
+    }
+</div>
+

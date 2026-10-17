@@ -1,0 +1,1585 @@
+﻿@model BulletinBoard.Models.TodayCheckCompositeData
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    ViewData["Title"] = "미션 수행";
+    Layout = null;
+
+    int maxLimitPray = 13;
+    int maxLimitQuiz = 12;
+    int maxLimitRecite = 12;
+    int maxLimitWord = 29;
+
+    var todayDatePray = DateHelper.GetTodayDateDayString(maxLimitPray);
+    var todayDateQuiz = DateHelper.GetTodayDateDayString(maxLimitQuiz);
+    var todayDateRecite = DateHelper.GetTodayDateDayString(maxLimitRecite);
+    var todayDateWord = DateHelper.GetTodayDateDayString(maxLimitWord);
+
+    string formattedModResultDataPray = $"/images/mission/pray/pray_{todayDatePray}.webp";
+    string formattedModResultDataQuiz = $"/images/mission/quiz/quiz_{todayDateQuiz}.webp";
+    string formattedModResultDataRecite = $"/images/mission/recite/recite_{todayDateRecite}.webp";
+    string formattedModResultDataWord = $"/images/mission/word/word_{todayDateWord}.webp";
+
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    CheckPoint _CheckPoint = ViewBag._CheckPoint as CheckPoint;
+    string baseDayDiff = (string)ViewData["baseDayDiff"];
+
+    int totalTodayPoint = Model.TodayWordToReadCountToParent + Model.TodayWordToReadCountToMe + Model.WeeklyWordToReadCount
+        + Model.PrayPhraseCountToMe + Model.PrayPhraseCountToParent + Model.PrayPhraseCountToFriend + Model.QuestionCount;
+
+    int totalAllPoint = Model.TodayWordToReadCountToParent_All + Model.TodayWordToReadCountToMe_All + Model.WeeklyWordToReadCount_All
+        + Model.PrayPhraseCountToMe_All + Model.PrayPhraseCountToParent_All + Model.PrayPhraseCountToFriend_All + Model.QuestionCount_All;
+
+    string userName = await AuthService.GetUserName(User);
+
+    UserSettingsCookie __UserSettingsCookie = ViewBag._UserSettingsCookie as UserSettingsCookie;
+    bool showPopupCookieValue = (__UserSettingsCookie != null);
+
+    var sessionWorkDT = Context.Session.GetString(DateKind.WorkDT.ToString());
+    var sessionTodayDT = Context.Session.GetString(DateKind.TodayDT.ToString());
+
+    DateTime todayDT = BulletinBoard.Common.SharedComm.GetToday();
+    DateTime missionDT = todayDT;
+
+    if (sessionWorkDT != null) { missionDT = DateTime.Parse(sessionWorkDT); }
+    if (sessionTodayDT != null) { todayDT = DateTime.Parse(sessionTodayDT); }
+
+    string TodayMesssage = $"오늘은 {BulletinBoard.Common.SharedComm.GetTodayStringKor()} 입니다.";
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    var UserName = ViewData[HttpContextSessionCategory.UserName.ToString()] as string;
+
+    // ✅ 스탬프(미션 완료/달력 완료)
+    int stampMaxLimit = 9;
+    var stampDate = DateHelper.GetTodayDateDayString(stampMaxLimit);
+    string missioncompleted = $"/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_{stampDate}.png";
+
+    string Total_All_Desc = $"{@Model.Total_All}점";
+    string Total_All_Desc_Reach1000 = SharedComm.HowMuchItTakes(1000, @Model.Total_All);
+    string Total_All_Desc_Reach1500 = SharedComm.HowMuchItTakes(1500, @Model.Total_All);
+    string Total_All_Desc_Reach_MAX = SharedComm.HowMuchItTakes(@ViewBag.maxAwardLevel, @Model.Total_All);
+
+    string RoleCode = ViewData["RoleCode"] as string;
+    bool rerachPoint = ViewBag.PointAwardUserExists;
+
+    // ✅ 파셜에서 쓰던 값
+    TodayCollectQuestion todayCollectQuestion = ViewBag.todayCollectQuestion as TodayCollectQuestion;
+
+    string todayDString = BulletinBoard.Common.SharedComm.GetTodayString();
+    string MissionMesssage = $"{missionDT.Month}월{missionDT.Day}일자 미션을 보고 계시네요.";
+
+    // ✅ 상태 계산
+    int sumWord = (Model?.TodayWordToReadCountToMe ?? 0) + (Model?.TodayWordToReadCountToParent ?? 0);
+    bool doneWord = sumWord > 0;
+
+    bool quizFailed = (todayCollectQuestion?.questionProcessStatus?.Result == "f");
+    int quizTryCnt = (todayCollectQuestion?.questionProcessStatus?.TryCnt ?? 0);
+    bool quizHardFailed = quizFailed && quizTryCnt > 1;
+    bool doneQuiz = (Model?.QuestionCount ?? 0) > 0;
+
+    int sumPray = (Model?.PrayPhraseCountToMe ?? 0) + (Model?.PrayPhraseCountToParent ?? 0) + (Model?.PrayPhraseCountToFriend ?? 0);
+    bool donePray = sumPray > 0;
+
+    int sumWeekly = (Model?.WeeklyWordToReadCount ?? 0);
+    bool doneRecite = sumWeekly > 0;
+
+    // ✅ 카드별 포인트(원하시면 실제 점수 규칙으로 조정 가능)
+    int pWord = doneWord ? 2 : 0;
+    int pQuiz = doneQuiz ? 1 : 0;
+    int pPray = donePray ? 2 : 0;
+    int pRecite = doneRecite ? 1 : 0;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미션 수행</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+    <script src="/js/ProcessBar73.js"></script>
+
+    <style>
+        :root {
+            --bg0: #f6fbff;
+            --bg1: #f3fff7;
+            --card: #ffffff;
+            --ink: #0f172a;
+            --muted: #475569;
+            --line: #e2e8f0;
+            --brand: #22c55e;
+            --brand2: #10b981;
+            --sky: #38bdf8;
+            --vio: #8b5cf6;
+            --rose: #fb7185;
+            --amber: #f59e0b;
+            --shadow: 0 14px 40px rgba(15, 23, 42, .10);
+            --shadow2: 0 8px 18px rgba(15, 23, 42, .08);
+            --r-xl: 26px;
+            --r-lg: 18px;
+            --r-md: 14px;
+            --max: 980px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            /* font-family: "Noto Sans KR", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; */
+            color: var(--ink);
+            background: radial-gradient(900px 600px at 10% 0%, rgba(56,189,248,.22), transparent 60%), radial-gradient(900px 700px at 90% 10%, rgba(34,197,94,.20), transparent 60%), radial-gradient(700px 600px at 55% 110%, rgba(251,113,133,.12), transparent 60%), linear-gradient(180deg, var(--bg0), var(--bg1));
+        }
+
+        .page {
+            min-height: 100%;
+            padding: 18px 14px 28px;
+        }
+
+        .shell {
+            max-width: var(--max);
+            margin: 0 auto;
+        }
+
+        /* ✅ 상단 */
+        .topbar {
+            display: flex;
+            gap: 14px;
+            align-items: stretch;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .hero {
+            flex: 1 1 auto;
+            background: linear-gradient(135deg, rgba(56,189,248,.14), rgba(34,197,94,.12));
+            border: 1px solid rgba(226,232,240,.9);
+            border-radius: var(--r-xl);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(420px 260px at 10% 10%, rgba(56,189,248,.18), transparent 60%), radial-gradient(420px 260px at 90% 20%, rgba(34,197,94,.18), transparent 60%);
+                pointer-events: none;
+            }
+
+            .hero h1 {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 900;
+                letter-spacing: -.2px;
+                position: relative;
+            }
+
+            .hero p {
+                margin: 6px 0 0;
+                color: var(--muted);
+                font-weight: 800;
+                font-size: 13px;
+                position: relative;
+                line-height: 1.35;
+            }
+
+        /* ✅ chipRow를 2덩어리로 구분 */
+        .chipRow {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            position: relative;
+        }
+
+        @@media (min-width: 640px) {
+            .chipRow {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                align-items: start;
+            }
+        }
+
+        .chipGroup {
+            padding: 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(226,232,240,.95);
+            background: rgba(255,255,255,.72);
+            box-shadow: var(--shadow2);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-content: flex-start;
+            min-width: 0;
+        }
+
+        .chipGroupTitle {
+            width: 100%;
+            font-weight: 950;
+            font-size: 13px;
+            color: rgba(15,23,42,.78);
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chipGroupGoal {
+            background: linear-gradient(135deg, rgba(139,92,246,.10), rgba(56,189,248,.10));
+            border-color: rgba(139,92,246,.16);
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(226,232,240,.95);
+            background: rgba(255,255,255,.88);
+            box-shadow: var(--shadow2);
+            font-weight: 950;
+            font-size: 13px;
+            color: rgba(15,23,42,.92);
+            min-width: 0;
+        }
+
+            .chip small {
+                font-weight: 950;
+                color: rgba(71,85,105,.95);
+                min-width: 0;
+            }
+
+        .chipGoal {
+            background: rgba(255,255,255,.92);
+            border-color: rgba(139,92,246,.18);
+        }
+
+            .chipGoal small {
+                display: block;
+                margin-top: 2px;
+                font-weight: 950;
+                color: rgba(71,85,105,.92);
+            }
+
+        .chipGoalMax {
+            background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(251,113,133,.10));
+            border-color: rgba(245,158,11,.22);
+        }
+
+        /* ✅ 모바일에서는 기존처럼 가로/세로 전환 */
+        @@media (max-width: 860px) {
+            .topbar {
+                flex-direction: column;
+            }
+        }
+
+        /* ✅ 섹션 */
+        .section {
+            margin-top: 14px;
+            background: rgba(255,255,255,.72);
+            border: 1px solid rgba(226,232,240,.95);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .sectionHead {
+            padding: 14px 16px 10px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(34,197,94,.08));
+        }
+
+            .sectionHead h2 {
+                margin: 0;
+                font-size: 16px;
+                font-weight: 950;
+            }
+
+            .sectionHead .hint {
+                color: var(--muted);
+                font-weight: 900;
+                font-size: 12.5px;
+            }
+
+        /* ✅ 모바일에서 hint를 다음 줄로 */
+        @@media (max-width: 520px) {
+            .sectionHead {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+                .sectionHead .hint {
+                    width: 100%;
+                    text-align: left;
+                }
+        }
+
+        /* ✅ 캘린더 */
+        .calendarWrap {
+            padding: 12px 12px 16px;
+            background: rgba(255,255,255,.60);
+        }
+
+        .calendar {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 8px;
+        }
+
+            .calendar th {
+                padding: 10px 8px;
+                font-size: 13px;
+                font-weight: 950;
+                color: rgba(15,23,42,.85);
+                background: rgba(255,255,255,.92);
+                border: 1px solid rgba(226,232,240,.95);
+                border-radius: 14px;
+            }
+
+            .calendar td {
+                height: 54px;
+                text-align: center;
+                font-weight: 950;
+                background: rgba(255,255,255,.92);
+                border: 1px solid rgba(226,232,240,.95);
+                border-radius: 16px;
+                cursor: pointer;
+                position: relative;
+                transition: transform .12s ease, box-shadow .12s ease;
+                box-shadow: 0 6px 14px rgba(15,23,42,.06);
+            }
+
+                .calendar td:hover {
+                    transform: translateY(-1px);
+                    box-shadow: 0 10px 20px rgba(15,23,42,.10);
+                }
+
+                .calendar td.isOut {
+                    color: rgba(100,116,139,.85);
+                    background: rgba(255,255,255,.70);
+                }
+
+                .calendar td.isToday {
+                    outline: 3px solid rgba(56,189,248,.35);
+                    background: linear-gradient(135deg, rgba(56,189,248,.10), rgba(34,197,94,.08));
+                }
+
+            .calendar .dayBadge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 34px;
+                height: 34px;
+                border-radius: 999px;
+                background: rgba(34,197,94,.12);
+                border: 1px solid rgba(34,197,94,.22);
+            }
+
+        .calendar-icon {
+            position: absolute;
+            right: 6px;
+            bottom: 6px;
+            width: 26px;
+            opacity: .95;
+        }
+
+        /* ✅ 공용 카드 */
+        .container {
+            max-width: var(--max);
+            margin: 14px auto 0;
+        }
+
+        .reward-card,
+        .mission-card,
+        .logout-card,
+        .home-card,
+        .delete-card {
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(226,232,240,.95) !important;
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow);
+            padding: 16px;
+            margin: 14px 0;
+            text-align: left;
+        }
+
+        .mission-title {
+            /* font-family: "Jua", "Noto Sans KR", sans-serif; */
+            font-size: 18px;
+            font-weight: 900;
+            margin: 0;
+            color: rgba(15,23,42,.92);
+        }
+
+        .mission-desc {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 13.5px;
+            font-weight: 900;
+            line-height: 1.45;
+            margin-bottom: 10px;
+        }
+
+        .missionEmoji {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            border: 1px solid rgba(226,232,240,.95);
+            background: linear-gradient(135deg, rgba(251,191,36,.18), rgba(34,197,94,.14));
+            box-shadow: var(--shadow2);
+            flex: 0 0 auto;
+        }
+
+        .statusPill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-weight: 950;
+            font-size: 12.5px;
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: var(--shadow2);
+            white-space: nowrap;
+        }
+
+        .pillDone {
+            background: linear-gradient(135deg, rgba(34,197,94,.18), rgba(16,185,129,.12));
+            color: rgba(20,83,45,.96);
+            border-color: rgba(34,197,94,.28);
+        }
+
+        .pillTodo {
+            background: linear-gradient(135deg, rgba(245,158,11,.18), rgba(251,191,36,.12));
+            color: rgba(124,45,18,.92);
+            border-color: rgba(245,158,11,.28);
+        }
+
+        .pillFail {
+            background: linear-gradient(135deg, rgba(251,113,133,.20), rgba(244,63,94,.12));
+            color: rgba(153,27,27,.95);
+            border-color: rgba(244,63,94,.26);
+        }
+
+        .cuteSticker {
+            margin-top : 20px;
+            position: relative;
+            padding: 10px 12px;
+            border-radius: 16px;
+            border: 1px dashed rgba(148,163,184,.55);
+            background: rgba(241,245,249,.70);
+            color: rgba(15,23,42,.82);
+            font-weight: 900;
+            font-size: 13px;
+            line-height: 1.35;
+            /* ✅ 요청: 모바일/PC 모두 가운데 정렬 */
+            text-align: center;
+        }
+
+            .cuteSticker::before {
+                content: "💬";
+                position: absolute;
+                top: -12px;
+                font-size: 18px;
+                filter: drop-shadow(0 6px 10px rgba(2,6,23,.10));
+                /* ✅ 가운데로 이동 */
+                left: 50%;
+                transform: translateX(-50%);
+            }
+
+        /* ✅ 상단 우측 “포인트 스티커” */
+        .pointSticker {
+            flex: 0 0 auto;
+            padding: 10px 12px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(139,92,246,.12), rgba(56,189,248,.10));
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: var(--shadow2);
+            font-weight: 950;
+            text-align: center;
+            min-width: 104px;
+        }
+
+            .pointSticker b {
+                display: block;
+                font-size: 16px;
+                /* font-family: "Jua","Noto Sans KR",sans-serif; */
+            }
+
+            .pointSticker small {
+                display: block;
+                margin-top: 2px;
+                font-size: 12px;
+                color: rgba(71,85,105,.90);
+                font-weight: 900;
+            }
+
+        /* ✅ 버튼 */
+        .buttonCommon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 14px !important;
+            border-radius: 16px !important;
+            border: 1px solid rgba(226,232,240,.95) !important;
+            background: rgba(255,255,255,.92);
+            cursor: pointer;
+            font-weight: 950 !important;
+            box-shadow: 0 10px 22px rgba(15,23,42,.10);
+            transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+            user-select: none;
+        }
+
+            .buttonCommon:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 28px rgba(15,23,42,.12);
+            }
+
+            .buttonCommon:active {
+                transform: translateY(0px);
+            }
+
+        .colorBaseSoftTeal,
+        .colorBaseDeepTeal,
+        .colorBaseForestGreen,
+        .colorBaseWasabiGreen,
+        .colorBaseHome {
+            background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92)) !important;
+            color: white !important;
+            border-color: rgba(34,197,94,.20) !important;
+        }
+
+        .colorBasePastelRed {
+            background: linear-gradient(135deg, rgba(251,113,133,.92), rgba(244,63,94,.92)) !important;
+            color: white !important;
+            border-color: rgba(244,63,94,.22) !important;
+        }
+
+        .colorBaseGoldenOrange {
+            background: linear-gradient(135deg, rgba(245,158,11,.92), rgba(251,191,36,.92)) !important;
+            color: white !important;
+            border-color: rgba(245,158,11,.22) !important;
+        }
+
+        .colorBasePaleSilver {
+            background: rgba(241,245,249,.95) !important;
+            color: rgba(15,23,42,.88) !important;
+        }
+
+        /* 로딩 */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.32);
+            display: none;
+            z-index: 9999;
+        }
+
+        .loading-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%,-50%);
+            background: rgba(255,255,255,.96);
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: var(--shadow);
+            border-radius: 18px;
+            padding: 16px 22px;
+            font-weight: 950;
+            color: rgba(15,23,42,.88);
+            min-width: 220px;
+            text-align: center;
+            animation: pop .25s ease;
+        }
+
+        @@keyframes pop {
+            from {
+                opacity: 0;
+                transform: translate(-50%,-50%) scale(.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translate(-50%,-50%) scale(1);
+            }
+        }
+
+        /* 팝업 */
+        .popup-background {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.40);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            padding: 16px;
+        }
+
+        .popup {
+            width: min(560px, 96vw);
+            border-radius: 24px;
+            overflow: hidden;
+            background: rgba(255,255,255,.98);
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: 0 26px 70px rgba(15,23,42,.28);
+        }
+
+        .popup-header {
+            padding: 16px 16px 12px;
+            background: linear-gradient(135deg, rgba(245,158,11,.14), rgba(34,197,94,.12));
+            text-align: center;
+        }
+
+            .popup-header h2 {
+                margin: 0;
+                font-size: 20px;
+                font-weight: 950;
+            }
+
+            .popup-header h3 {
+                margin: 6px 0 0;
+                font-size: 14px;
+                color: var(--muted);
+                font-weight: 900;
+            }
+
+        .popup-content {
+            padding: 14px 16px;
+            text-align: center;
+            color: rgba(15,23,42,.86);
+            font-weight: 900;
+        }
+
+            .popup-content p {
+                margin: 6px 0;
+            }
+
+        .popup-checkboxes {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            padding: 12px 14px 16px;
+            background: rgba(241,245,249,.70);
+            border-top: 1px solid rgba(226,232,240,.95);
+        }
+
+            .popup-checkboxes label {
+                font-weight: 950;
+                color: rgba(15,23,42,.84);
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                padding: 10px 12px;
+                border-radius: 16px;
+                border: 1px solid rgba(226,232,240,.95);
+                background: rgba(255,255,255,.92);
+                cursor: pointer;
+                box-shadow: 0 10px 20px rgba(15,23,42,.08);
+            }
+
+        .no-select {
+            user-select: none;
+        }
+
+        .foot {
+            margin-top: 14px;
+            text-align: center;
+            color: rgba(71,85,105,.85);
+            font-weight: 900;
+            font-size: 12.5px;
+        }
+
+        /* ✅ 카드 블럭 가운데 배치 공통 */
+        .centerBlock {
+            width: min(720px, 100%);
+            margin: 14px auto;
+            text-align: center;
+        }
+
+        /* ✅ 로그아웃 / 홈 카드 내부 요소 가운데 정렬 */
+        .logout-card, .home-card {
+            text-align: center;
+        }
+
+            .logout-card .buttonCommon, .home-card .buttonCommon {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+        /* ✅ 로그아웃 + 홈 2열 배치 래퍼 */
+        .bottomRow {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        @@media (max-width: 640px) {
+            .bottomRow {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .bottomRow .logout-card,
+        .bottomRow .home-card {
+            width: 100%;
+            margin: 0;
+        }
+
+        /* ✅ hero 내부 버튼 영역 */
+        .heroActions {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        /* ✅ 태블릿/데스크탑: 3개 가로 배치 */
+        @@media (min-width: 740px) {
+            .heroActions {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
+
+                .heroActions .quickBtn {
+                    flex-direction: column;
+                    text-align: center;
+                    padding: 12px 10px;
+                    gap: 8px;
+                }
+
+                .heroActions .qIcon {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 16px;
+                }
+
+                .heroActions .qText b {
+                    font-size: 13px;
+                }
+
+                .heroActions .qText span {
+                    font-size: 11px;
+                }
+        }
+
+        /* ✅ Quick Button */
+        .quickBtn {
+            border: 1px solid rgba(226,232,240,.95);
+            background: rgba(255,255,255,.92);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            padding: 12px 14px;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: transform .14s ease, box-shadow .14s ease;
+        }
+
+            .quickBtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 18px 46px rgba(15,23,42,.12);
+            }
+
+        .qIcon {
+            width: 40px;
+            height: 40px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            background: linear-gradient(135deg, rgba(34,197,94,.18), rgba(56,189,248,.14));
+            border: 1px solid rgba(226,232,240,.95);
+            flex: 0 0 auto;
+        }
+
+        .qText {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+            .qText b {
+                display: block;
+                font-size: 14px;
+                font-weight: 950;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .qText span {
+                display: block;
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 900;
+                margin-top: 2px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+        /* =========================================================
+                   ✅ NEW: Mission Card Header (모바일 깨짐 방지)
+                   ========================================================= */
+        .missionHead {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 2px;
+        }
+
+        .mhLeft {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .mhTitles {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .mhTop {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+            .mhTop .mission-title {
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .mhTop .statusPill {
+                flex: 0 0 auto;
+            }
+
+        /* ✅ 버튼 중앙정렬 래퍼 */
+        .missionActions {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+        }
+
+        @@media (max-width: 520px) {
+            .missionHead {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .mhLeft {
+                justify-content: center;
+                width: 100%;
+            }
+
+            .mhTop {
+                justify-content: center;
+            }
+
+                .mhTop .mission-title {
+                    white-space: normal;
+                    text-overflow: clip;
+                    overflow: visible;
+                }
+
+            .missionHead .pointSticker {
+                width: min(260px, 100%);
+            }
+        }
+
+
+
+        /* =========================================================
+   ✅ 모바일에서 dayBadge(오늘 표시) 동그라미 찌그러짐 방지
+   - 원형 고정 + 중앙 정렬 + 셀 비율 개선
+   ========================================================= */
+
+/* 기본: badge는 무조건 정원(원형)으로 고정 */
+.calendar .dayBadge{
+    width: 34px;
+    height: 34px;
+    aspect-ratio: 1 / 1;        /* ✅ 최신 브라우저에서 비율 고정 */
+    border-radius: 999px;       /* ✅ 완전 원 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;             /* ✅ 글자 때문에 높이 늘어나는 것 방지 */
+    flex: 0 0 auto;
+}
+
+/* td 안에서 badge가 흔들리지 않도록 중앙 정렬 안정화 */
+.calendar td{
+    vertical-align: middle;
+}
+.calendar td > span{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ✅ 모바일: 셀 높이/패딩 조정해서 "찌그러진 느낌" 최소화 */
+@@media (max-width: 520px){
+    .calendar{
+        border-spacing: 6px; /* 너무 벌어지면 세로가 커 보여서 살짝 줄임 */
+    }
+
+    .calendar td{
+        height: 46px;        /* 54px -> 46px (모바일에서 세로 길쭉 느낌 완화) */
+        padding: 0;          /* 혹시 남는 패딩이 있으면 제거 */
+    }
+
+    .calendar th{
+        padding: 8px 6px;
+        font-size: 12px;
+    }
+
+    /* 모바일에서는 badge 살짝 작게(예쁘게) */
+    .calendar .dayBadge{
+        width: 32px;
+        height: 32px;
+        font-size: 13px;
+    }
+
+    /* 오늘 셀의 outline이 두꺼워 보이면 살짝 줄이기(옵션) */
+    .calendar td.isToday{
+        outline-width: 2px;
+    }
+}
+
+/* (옵션) "원형 대신 정사각 라운드"가 더 예쁘면 이렇게 바꿀 수 있어요.
+.calendar .dayBadge{
+    border-radius: 12px;   // 둥근 정사각형 느낌
+}
+*/
+
+
+    </style>
+
+    <script>
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none';
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto';
+        }
+        function goToPage(url) {
+            showLoading();
+            window.location.href = url;
+        }
+    </script>
+
+    <script>
+        function getFirstDayOfWeek(year, month) {
+            let firstDay = new Date(year, month - 1, 1);
+            while (firstDay.getDay() !== 6) firstDay.setDate(firstDay.getDate() + 1);
+            let sunday = new Date(firstDay);
+            sunday.setDate(sunday.getDate() - 6);
+            return sunday.getDate();
+        }
+        function formatDate2(year, month, day) {
+            const formattedMonth = String(month).padStart(2, '0');
+            const formattedDay = String(day).padStart(2, '0');
+            return `${year}-${formattedMonth}-${formattedDay}`;
+        }
+
+        function generateCalendar() {
+            const year = @todayDT.Year;
+            const month = @todayDT.Month;
+            const toDayDay = @todayDT.Day;
+            const homeworkInput = "@ViewData["MonString"]";
+            const homeworkDays = homeworkInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            let calendarHTML = `
+                <thead>
+                    <tr>
+                        <th>일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>토</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            let dayCount = 1;
+            let dayCountNext = 0;
+            let prevDay = getFirstDayOfWeek(year, month);
+
+            for (let i = 0; i < 6; i++) {
+                calendarHTML += "<tr>";
+                for (let j = 0; j < 7; j++) {
+
+                    if (i === 0 && j < firstDay) {
+                        let valueVariDay = formatDate2(year, month - 1, prevDay);
+                        calendarHTML += `<td class="isOut" onclick="goToPage('/Home/goWorkDT?workDT=${valueVariDay}')">${prevDay}</td>`;
+                        prevDay = prevDay + 1;
+                    }
+                    else if (dayCount > daysInMonth) {
+                        dayCountNext = dayCountNext + 1;
+                        let valueVariDay = formatDate2(year, month + 1, dayCountNext);
+                        calendarHTML += `<td class="isOut" onclick="goToPage('/Home/goWorkDT?workDT=${valueVariDay}')">${dayCountNext}</td>`;
+                    }
+                    else {
+                        let homeworkMark = homeworkDays.includes(dayCount) ? `<img src='@missioncompleted' class='calendar-icon'>` : "";
+                        let valueVariDay = formatDate2(year, month, dayCount);
+
+                        const isToday = (toDayDay == dayCount);
+                        calendarHTML += `<td class="${isToday ? "isToday" : ""}" onclick="goToPage('/Home/goWorkDT?workDT=${valueVariDay}')">`;
+
+                        if (isToday) {
+                            calendarHTML += `<span class="dayBadge">${dayCount}</span>`;
+                        } else {
+                            calendarHTML += `<span>${dayCount}</span>`;
+                        }
+
+                        calendarHTML += homeworkMark + "</td>";
+                        dayCount++;
+                    }
+                }
+                calendarHTML += "</tr>";
+                if (dayCount > daysInMonth) break;
+            }
+
+            calendarHTML += "</tbody>";
+            document.getElementById('calendar').innerHTML = calendarHTML;
+        }
+
+        window.onload = generateCalendar;
+    </script>
+</head>
+
+<body>
+    <div class="page">
+        <div class="shell">
+
+            <div id="loadingOverlay" class="loading-overlay">
+                <div class="loading-box">처리중입니다…</div>
+            </div>
+
+            <!-- ✅ 상단 -->
+            <div class="topbar">
+                <div class="hero">
+                    <h1 style="text-align:center;">@ConstatsCommon.MainKeyTitle ·</h1>
+                    <h2 style="text-align:center;">👋 안녕하세요, <span >@UserFullName</span>님!</h2>
+                    <p><b>"거룩한 습관 만들기"</b> 프로그램에 오심을 환영해요 😊</p>
+                    <br />
+
+                    <div class="chipRow">
+                        <!-- ✅ 현재 상태 그룹 -->
+                        <div class="chipGroup">
+                            <div class="chipGroupTitle">📌 오늘 & 누적</div>
+                            <div class="chip">📌 <small>@TodayMesssage</small></div>
+                            <div class="chip">⭐ 누적 <small>@Total_All_Desc</small></div>
+                        </div>
+
+                        <!-- ✅ 목표(도달 가능) 그룹 -->
+                        <div class="chipGroup chipGroupGoal">
+                            <div class="chipGroupTitle">🎯 목표까지 얼마나 남았을까?</div>
+
+                            <div class="chip chipGoal">
+                                🎯 1,000점까지
+                                <small>남은 점수: @Total_All_Desc_Reach1000</small>
+                            </div>
+
+                            <div class="chip chipGoal">
+                                🎯 1,500점까지
+                                <small>남은 점수: @Total_All_Desc_Reach1500</small>
+                            </div>
+
+                            <div class="chip chipGoal chipGoalMax">
+                                🏆 @ViewBag.maxAwardLevel.ToString("N0")점까지
+                                <small>남은 점수: @Total_All_Desc_Reach_MAX</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✅ hero 아래 버튼 -->
+                    <div class="heroActions">
+                        <button class="quickBtn" onclick="goToPage('/Home/NaviMonth?userName=@ViewData["UserName"]')">
+                            <div class="qIcon">📅</div>
+                            <div class="qText"><b>월별 보기</b><span>전체 현황 빠르게</span></div>
+                        </button>
+
+                        <button class="quickBtn" onclick="goToPage('/Home/NaviHistory?userName=@ViewData["UserName"]')">
+                            <div class="qIcon">🗂️</div>
+                            <div class="qText"><b>일자별 보기</b><span>수행 기록 확인</span></div>
+                        </button>
+
+                        <button class="quickBtn" onclick="location.href='/'">
+                            <div class="qIcon">🏠</div>
+                            <div class="qText"><b>홈</b><span>메인으로 이동</span></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ✅ 달력 섹션 -->
+            <div class="section">
+                <div class="sectionHead">
+                    <h2>📅 @BulletinBoard.Common.SharedComm.GetTodayStringKor2() 미션 달력</h2>
+                    <div class="hint">날짜를 누르면 그날 미션으로 이동해요</div>
+                </div>
+                <div class="calendarWrap no-select">
+                    <table id="calendar" class="calendar"></table>
+                </div>
+            </div>
+
+            <div class="container">
+
+                @* ✅ 날짜 다르면 알림 *@
+                @if (missionDT.ToString("yyyy-MM-dd") != todayDT.ToString("yyyy-MM-dd"))
+                {
+                    <div class="reward-card centerBlock">
+                        <div class="mission-title">📢 알림</div>
+                        <div class="mission-desc">@MissionMesssage</div>
+                        <button class="buttonCommon colorBaseSoftTeal" onclick="goToPage('/Home/goWorkDT?workDT=@todayDString')">오늘 날짜로 이동</button>
+                    </div>
+                }
+
+                @* ✅ 기록 보기 *@
+                <div class="reward-card centerBlock">
+                    <div class="mission-title">🍀 나의 미션 수행 🍀</div>
+                    <div class="mission-desc">나의 미션 수행 상세 현황을 보세요~</div>
+                    <div class="button-bar no-select" style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                        <div class="buttonCommon colorBaseSoftTeal" onclick="goToPage('/Home/NaviMonth?userName=@ViewData["UserName"]')">월별로 보기</div>
+                        <div class="buttonCommon colorBaseSoftTeal" onclick="goToPage('/Home/NaviHistory?userName=@ViewData["UserName"]')">일자별로 보기</div>
+                    </div>
+                </div>
+
+                @* ✅ 시상 도달 *@
+                @if (rerachPoint)
+                {
+                    <div class="reward-card">
+                        <div class="mission-title">🎁 선물선택하기 🎁</div>
+                        <div class="mission-desc">축하!!! 시상포인트에 도달 하셨어요</div>
+                        <div class="button-bar no-select" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                            <div class="buttonCommon colorBaseSoftTeal" style="background:#EB0A1E !important; color:white !important;"
+                                 onclick="goToPage('/DailyMission2Award/PickGifts')">
+                                선물선택
+                            </div>
+
+                            <div class="buttonCommon colorBaseSoftTeal" style="background:#EB0A1E !important; color:white !important;"
+                                 onclick="goToPage('/CheckPoint/MyAwardItemPick')">
+                                선택한 선물보기
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* ✅ 선생님/반 *@
+                @if (RoleCode == "T1001" || RoleCode == "T1002")
+                {
+                    <div class="reward-card">
+                        <div class="mission-title">👬 우리반 미션 수행 👬</div>
+                        <div class="mission-desc">우리반 미션 수행 상세 현황을 보세요~</div>
+                        <div class="buttonCommon colorBaseDeepTeal" onclick="goToPage('/CheckPoint/GetGroupByUsernameDataByClass')">보러가기</div>
+                    </div>
+                }
+
+                @* ============================================================
+                   ✅ 1) 오늘의 말씀 (✅ 모바일 깨짐 방지 NEW 헤더 적용)
+                   ============================================================ *@
+                <div class="mission-card">
+
+                    <div class="missionHead">
+                        <div class="mhLeft">
+                            <div class="missionEmoji">📖</div>
+
+                            <div class="mhTitles">
+                                <div class="mhTop">
+                                    <div class="mission-title">오늘의 말씀</div>
+
+                                    @if (doneWord)
+                                    {
+                                        <div class="statusPill pillDone">✅ 미션 완료!</div>
+                                    }
+                                    else
+                                    {
+
+                                        <div class="statusPill pillTodo">⏳ 미션 미완료!</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                       @*  <div class="pointSticker">
+                            <b>@(doneWord ? $"+{pWord}P" : "+2P")</b>
+                            <small>@(doneWord ? "획득했어요!" : "하면 받아요!")</small>
+                        </div> *@
+                    </div>
+
+                    @if (doneWord)
+                    {
+                        <div class="cuteSticker">잘했어요!<br /> 🎉 오늘 말씀을 읽었어요!</div>
+                    }
+                    else
+                    {
+
+                        <div class="cuteSticker">지금 읽으면 마음이 반짝✨<br /> 말씀 읽고 <b>포인트도 쑥쑥!</b></div>
+                    }
+
+                    <div class="mission-desc">성경 말씀을 읽고 마음을 채워요.</div>
+
+                    <div class="missionActions">
+                        @if (doneWord)
+                        {
+                            <div class="buttonCommon colorBasePaleSilver" style="padding:20px;" onclick="location.href='/DailyMission/TodayWordToRead'">
+                                말씀 읽기 (다시 보기)
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="buttonCommon colorBaseWasabiGreen" style="padding:20px;" onclick="location.href='/DailyMission/TodayWordToRead'">
+                                말씀 읽기
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* ============================================================
+                   ✅ 2) 퀴즈
+                   ============================================================ *@
+                <div class="mission-card">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-top:2px;">
+                        <div style="display:flex; gap:10px; min-width:0;">
+                            <div class="missionEmoji">❓</div>
+                            <div style="min-width:0;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <div class="mission-title">재미있는 퀴즈</div>
+
+                                    @if (quizHardFailed)
+                                    {
+                                        <div class="statusPill pillFail">❌ 오늘은 아쉽!</div>
+                                    }
+                                    else if (quizFailed && quizTryCnt == 1)
+                                    {
+
+                                        <div class="statusPill pillTodo">⚠️ 1차 실패(재도전!)</div>
+                                    }
+                                    else if (doneQuiz)
+                                    {
+
+                                        <div class="statusPill pillDone">✅ 미션 완료!</div>
+                                    }
+                                    else
+                                    {
+
+                                        <div class="statusPill pillTodo">⏳ 미션 미완료!</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                       @*  <div class="pointSticker">
+                            <b>@(doneQuiz ? $"+{pQuiz}P" : "+1P")</b>
+                            <small>@(doneQuiz ? "획득했어요!" : "하면 받아요!")</small>
+                        </div> *@
+                    </div>
+
+                    @if (quizHardFailed)
+                    {
+                        <div class="cuteSticker">앗! 오늘은 퀴즈가 조금 어려웠나봐요 🥲 <br /><b>내일 다시 도전!</b></div>
+                    }
+                    else if (quizFailed && quizTryCnt == 1)
+                    {
+
+                        <div class="cuteSticker">괜찮아요! 😊<br /> <b>한 번 더</b> 도전하면 성공할 수 있어요!</div>
+                    }
+                    else if (doneQuiz)
+                    {
+
+                        <div class="cuteSticker">짠! 정답 맞혔어요<br /> 🎉 <b>똑똑 스티커</b> 붙이기! 🧠</div>
+                    }
+                    else
+                    {
+
+                        <div class="cuteSticker">방금 읽은 말씀으로 퀴즈 풀면 더 쉬워요! <b>도전!</b> ✨</div>
+                    }
+
+                    <div class="mission-desc">성경 퀴즈를 풀어보세요!</div>
+
+                    <div class="missionActions">
+                        @if (doneQuiz || quizHardFailed)
+                        {
+                            <div class="buttonCommon colorBasePaleSilver" style="padding:20px;" onclick="location.href='/DailyMission/TodayQuestion'">
+                                퀴즈 풀기 (다시 보기)
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="buttonCommon colorBasePastelRed" style="padding:20px;" onclick="location.href='/DailyMission/TodayQuestion'">
+                                퀴즈 풀기
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* ============================================================
+                   ✅ 3) 기도
+                   ============================================================ *@
+                <div class="mission-card">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-top:2px;">
+                        <div style="display:flex; gap:10px; min-width:0;">
+                            <div class="missionEmoji">🙏</div>
+                            <div style="min-width:0;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <div class="mission-title">기도해요</div>
+
+                                    @if (donePray)
+                                    {
+                                        <div class="statusPill pillDone">✅ 미션 완료!</div>
+                                    }
+                                    else
+                                    {
+
+                                        <div class="statusPill pillTodo">⏳ 미션 미완료!</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                      @*   <div class="pointSticker">
+                            <b>@(donePray ? $"+{pPray}P" : "+2P")</b>
+                            <small>@(donePray ? "획득했어요!" : "하면 받아요!")</small>
+                        </div> *@
+                    </div>
+
+                    @if (donePray)
+                    {
+                        <div class="cuteSticker">하나님께 마음을 드렸어요 💚<br /> <b>기도 스티커</b> 붙이기!</div>
+                    }
+                    else
+                    {
+
+                        <div class="cuteSticker">짧게라도 좋아요!<br />🙏 “하나님 감사합니다” 한마디부터 시작!</div>
+                    }
+
+                    <div class="mission-desc">하나님께 마음을 드려요.</div>
+
+                    <div class="missionActions">
+                        @if (donePray)
+                        {
+                            <div class="buttonCommon colorBasePaleSilver" style="padding:20px;" onclick="location.href='/DailyMission/TodayPray'">
+                                기도 하기 (다시 보기)
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="buttonCommon colorBaseSoftTeal" style="padding:20px;" onclick="location.href='/DailyMission/TodayPray'">
+                                기도 하기
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @* ============================================================
+                   ✅ 4) 암송
+                   ============================================================ *@
+                <div class="mission-card">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-top:2px;">
+                        <div style="display:flex; gap:10px; min-width:0;">
+                            <div class="missionEmoji">📝</div>
+                            <div style="min-width:0;">
+                                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                    <div class="mission-title">말씀 암송</div>
+
+                                    @if (doneRecite)
+                                    {
+                                        <div class="statusPill pillDone">✅ 미션 완료!</div>
+                                    }
+                                    else
+                                    {
+
+                                        <div class="statusPill pillTodo">⏳ 미션 미완료!</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+
+                      @*   <div class="pointSticker">
+                            <b>@(doneRecite ? $"+{pRecite}P" : "+1P")</b>
+                            <small>@(doneRecite ? "획득했어요!" : "하면 받아요!")</small>
+                        </div> *@
+                    </div>
+
+                    @if (doneRecite)
+                    {
+                        <div class="cuteSticker">우와! 말씀을 외웠어요 🌟 <b>암송 마스터</b> 스티커!</div>
+                    }
+                    else
+                    {
+
+                        <div class="cuteSticker">한 줄씩! 천천히!<br />🐢 <b>가리고 말해보기</b>로 쉽게 암송해요!</div>
+                    }
+
+                    <div class="mission-desc">하나님의 말씀을 외워보아요!</div>
+
+                    <div class="missionActions">
+                        @if (doneRecite)
+                        {
+                            <div class="buttonCommon colorBasePaleSilver" style="padding:20px;" onclick="location.href='/DailyMission/WeeklyWordToRead'">
+                                암송 하기 (다시 보기)
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="buttonCommon colorBaseForestGreen" style="padding:20px;" onclick="location.href='/DailyMission/WeeklyWordToRead'">
+                                암송 하기
+                            </div>
+                        }
+                    </div>
+                </div>
+
+            </div>
+
+            @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+            {
+                <div class="delete-card centerBlock">
+                    <div class="mission-title">🗑 삭제</div>
+                    <div class="mission-desc">나의 포인트를 삭제합니다.</div>
+                    <div class="missionActions">
+                        <div class="buttonCommon colorBasePastelRed" style="padding:20px;" onclick="location.href='/DailyMission/DeleteClickHistory'">삭제하기</div>
+                    </div>
+                </div>
+            }
+
+            <div class="bottomRow">
+                <div class="logout-card">
+                    <div class="mission-title">🔒 로그아웃</div>
+                    <div class="mission-desc">안전하게 로그아웃하세요.</div>
+                    <div class="missionActions">
+                        <div class="buttonCommon colorBaseGoldenOrange" style="padding:20px;"
+                             onclick="document.querySelector('form').submit();">
+                            로그아웃
+                        </div>
+                    </div>
+                </div>
+
+                <div class="home-card">
+                    <div class="mission-title">🏠 홈으로 이동</div>
+                    <div class="mission-desc">처음 화면으로 돌아가기</div>
+                    <div class="missionActions">
+                        <div class="buttonCommon colorBaseHome" style="padding:20px;"
+                             onclick="location.href='/'">
+                            홈으로
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout"
+                  asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" style="display:none;">
+                <button type="submit">이동</button>
+            </form>
+
+            <!-- ✅ 팝업 -->
+            <div class="popup-background" id="popup-background">
+                <div class="popup">
+                    <div class="popup-header">
+                        <h2>🎉 축하드려요!!!</h2>
+                        <h3>시상 포인트에 도달 하셨어요.</h3>
+                    </div>
+                    <div class="popup-content">
+                        <p>이 페이지 중간에 <b>‘🎁 선물선택하기’</b> 박스에서</p>
+                        <p><b>‘선물선택’</b> 버튼을 눌러서 선물을 선택해 보세요 😊</p>
+                    </div>
+                    <div class="popup-checkboxes">
+                        <label><input type="checkbox" id="hideToday" onclick="handleCheckbox('hideToday', 1)"> 오늘 하루 안보기</label>
+                        <label><input type="checkbox" id="hide7Days" onclick="handleCheckbox('hide7Days', 7)"> 7일간 안보기</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="foot">© Bible · Mission</div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var shouldShowPopup = false;
+            var shouldShowPopupCookie = false;
+
+            @{
+                    bool shouldShow = false;
+                    if (rerachPoint) { shouldShow = true; }
+            }
+
+            shouldShowPopup = @(shouldShow.ToString().ToLower());
+            shouldShowPopupCookie = @(showPopupCookieValue.ToString().ToLower());
+
+            if (shouldShowPopup) {
+                if (shouldShowPopupCookie == false) {
+                    document.getElementById('popup-background').style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                }
+            }
+        });
+
+        function handleCheckbox(cookieName, days) {
+            setCookie(cookieName, 'true', days);
+            document.getElementById('popup-background').style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function setCookie(name, value, days) {
+            const data = {
+                UserId: "@UserId",
+                cookieName: "@CookieKey.MissionMainBoard_HideDay.ToString()",
+                cookieValue: "true",
+                cookieDays: days
+            };
+            doProcess(data, 'UpsertUserCookieSettings', 'n');
+
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+    </script>
+</body>
+</html>

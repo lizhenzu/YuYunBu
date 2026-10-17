@@ -1,0 +1,247 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model IEnumerable<BulletinBoard.Models.QuestionBankData>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>성경 퀴즈 뱅크</title>
+    <style>
+        /* 공통 스타일 */
+        body {
+            font-family: 'Noto Sans KR', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #eaf2f8;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fdfdfd;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            page-break-inside: avoid;
+        }
+
+        .title {
+            background: #6ab4f8;
+            color: white;
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            padding: 15px 0;
+            border-bottom: 5px solid #4a90e2;
+        }
+
+        /* 반응형 스타일 */
+        @@media screen and (max-width: 768px) {
+            .title {
+                font-size: 24px;
+            }
+        }
+
+        @@media screen and (max-width: 480px) {
+            .title {
+                font-size: 20px;
+            }
+        }
+
+        /* 퀴즈 카드 스타일 */
+        .quiz-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .quiz-card {
+            display: block;
+            width: calc(100% - 40px);
+            max-width: 600px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: left;
+            margin: 10px auto;
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        .question {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .verse {
+            color: green;
+            margin-top: 10px;
+            font-style: italic;
+        }
+
+        .answer {
+            color: blue;
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: right;
+        }
+
+        /* 출력 스타일 - 카드가 중간에서 잘리지 않도록 설정 */
+        @@media print {
+            body {
+                background-color: white;
+                padding: 0;
+                margin: 0;
+            }
+
+            .quiz-card {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            .footer {
+                display: none;
+            }
+        }
+
+        /* 버튼 스타일 */
+        .footer {
+            margin-top: 20px;
+            padding: 8px;
+            text-align: center;
+        }
+
+            .footer button {
+                padding: 10px 20px;
+                background-color: #28a745;
+                border: none;
+                color: #fff;
+                border-radius: 5px;
+                cursor: pointer;
+                transition: all 0.3s;
+            }
+
+                .footer button:hover {
+                    background-color: #218838;
+                    transform: translateY(-3px);
+                }
+    </style>
+</head>
+<body>
+    <h1 style="text-align:center;">성경퀴즈대회 예상문제집</h1>
+    <h3 style="text-align:center;">2025년 4월 13일</h3>
+    <div class="footer">
+        <button onclick="window.location.href='/'">Home</button>
+        @if (await AuthService.IsSignedIn(User) &&
+        (
+        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+        )
+        {
+            <button onclick="window.location.href='/BibleBulk/BibleMissingList'">Quiz</button>
+        }
+    </div>
+    @foreach (var item in Model)
+    {
+        string pdata = $"{@item.QuestionQ}";
+        <div class="quiz-container">
+            <div class="quiz-card">
+                <div class="question"><span style=" font-size: 34px;">@item.sequenceNo.</span> @pdata</div>
+                @if (!string.IsNullOrEmpty(@item.example1))
+                {
+                    <div class="question">@item.example1</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example2))
+                {
+                    <div class="question">@item.example2</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example3))
+                {
+                    <div class="question">@item.example3</div>
+                }
+                @if (!string.IsNullOrEmpty(@item.example4))
+                {
+                    <div class="question">@item.example4</div>
+                }
+                @if (item.QuestionType == "o")
+                {
+                    <ol>
+                        @if (!string.IsNullOrEmpty(@item.Question1))
+                        {
+                            <li>@item.Question1</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question2))
+                        {
+                            <li>@item.Question2</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question3))
+                        {
+                            <li>@item.Question3</li>
+                        }
+
+                        @if (!string.IsNullOrEmpty(@item.Question4))
+                        {
+                            <li>@item.Question4</li>
+                        }
+                    </ol>
+                }
+                @if (@item.Jang > 0)
+                {
+                    if (@item.Zul > 0 && @item.Zul1 > 0)
+                    {
+                        <div class="verse">성경구절: @item.BibleText @item.Jang:@item.Zul-@item.Zul1</div>
+                    }
+                    else
+                    {
+                        <div class="verse">성경구절: @item.BibleText @item.Jang:@item.Zul</div>
+                    }
+                }
+                <div class="answer" style="text-align:left;">정답: @item.CorrectAnswer</div>
+                @if (await AuthService.IsSignedIn(User) &&
+               (
+               await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+               )
+                {
+                    <div class="answer">
+                        <a href="/QuestionBank/DeleteQuestionBank?Id=@item.Id"> 삭제 </a> |
+                        <a href="/QuestionBank/ModifyQuestionBank?Id=@item.Id"> 수정 </a> |
+                        <a href="/QuestionBank/VerifyQuestionBank?Id=@item.Id"> Bottom </a> |
+                        <a href="/QuestionBank/MinifyQuestionBank?Id=@item.Id"> Top </a> |
+                        <a href="/QuestionBank/UpdatePrevRecordUpdateDT?Id=@item.Id"> Prev </a> |
+                        <a href="/QuestionBank/UpdateNextRecordUpdateDT?Id=@item.Id"> Next </a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    <div class="footer">
+        <button onclick="window.location.href='/'">홈으로</button>
+        <button onclick="window.location.href='/QuestionBank/Index/'">전체 퀴즈목록 보기</button>
+        @if (await AuthService.IsSignedIn(User))
+        {
+        }
+        else
+        {
+            <button onclick="window.location.href='/Identity/Account/Login'">로그인</button>
+        }
+    </div>
+    <script>
+        function ManageUserInfo(UserId) {
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+        }
+    </script>
+</body>
+</html>

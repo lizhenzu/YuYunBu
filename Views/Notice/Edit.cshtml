@@ -1,0 +1,240 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.ViewModels.Notice
+@model NoticeEditVm
+
+@{
+    Layout = null;
+    ViewData["Title"] = "공지 수정";
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - 공지사항</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        .sh { max-width: 720px; margin: 0 auto; padding: 0 20px; }
+        .hdTop { display: flex; justify-content: space-between; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; }
+
+        .fm { margin-top: 8px; }
+        .fRow { margin-top: 18px; }
+        .fGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+        @@media (max-width: 560px) { .fGrid { grid-template-columns: 1fr; } }
+        .fLbl { display: block; font-size: 12.5px; font-weight: 700; color: #6B7280; }
+        .fIn { display: block; width: 100%; margin-top: 6px; font-family: inherit; font-size: 15px; line-height: 1.7; padding: 11px 16px; border: 0; border-radius: 999px; background: #F4F6F9; color: #111827; outline: none; }
+        .fIn::placeholder { color: #9CA3AF; }
+        .fIn:focus { box-shadow: 0 0 0 2px #CFE0FA; }
+        .fIn[readonly], .fIn:disabled { color: #9CA3AF; }
+        textarea.fIn { min-height: 200px; border-radius: 12px; resize: vertical; padding: 12px 16px; }
+        input[type=file].fIn { border-radius: 12px; font-size: 13.5px; color: #6B7280; }
+        input[type=file].fIn::file-selector-button { margin-right: 12px; padding: 6px 14px; border: 0; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-family: inherit; font-weight: 700; cursor: pointer; }
+        .fChk { display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 9px 14px; border-radius: 999px; background: #F4F6F9; font-size: 13.5px; color: #6B7280; cursor: pointer; }
+        .fChk:has(input:checked) { background: #EAF2FD; color: #2B5FA8; font-weight: 700; }
+        .fChk input { accent-color: #2F80ED; margin: 0; }
+        .fHint { margin-top: 6px; font-size: 12px; line-height: 1.6; color: #9CA3AF; }
+        .text-danger { display: block; margin-top: 4px; font-size: 12px; color: #B4531F; }
+        .fl { list-style: none; margin: 8px 0 0; padding: 0; }
+        .fl li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #EEF0F3; font-size: 13.5px; }
+        .fl li:last-child { border-bottom: 0; }
+        .fl li label { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+        .fl li input[type=checkbox] { accent-color: #B4531F; margin: 0; }
+        .fl .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #111827; }
+        .fl .s { flex: none; font-size: 12px; color: #9CA3AF; }
+
+        .fAct { display: flex; gap: 8px; margin-top: 24px; }
+        .nbtn { flex: 1; font-family: inherit; font-size: 14px; font-weight: 700; text-align: center; padding: 13px 14px; border: 0; border-radius: 999px; background: #F4F6F9; color: #6B7280; cursor: pointer; }
+        .nbtn:hover { color: #2F80ED; }
+        .nbtn.pri { flex: 2; background: #2F80ED; color: #fff; font-weight: 800; }
+        .nbtn.pri:hover { background: #1F6FDB; color: #fff; }
+        .ft { margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop">
+            <span><a href="@Url.Action("Index", "Notice")">‹ 공지사항</a><span class="sep">·</span><a href="@Url.Action("Details", "Notice", new { id = Model.Id })">상세</a></span>
+            <span>No. @Model.Id</span>
+        </div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">공지 수정</h1>
+    </header>
+
+    <main class="sh">
+        <form asp-controller="Notice"
+              asp-action="Edit"
+              method="post"
+              enctype="multipart/form-data"
+              class="fm">
+
+            <input type="hidden" asp-for="Id" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="fRow">
+                <label asp-for="Title" class="fLbl">제목</label>
+                <input asp-for="Title" class="fIn" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="fRow">
+                <label asp-for="Content" class="fLbl">내용</label>
+                <textarea asp-for="Content" class="fIn" rows="10"></textarea>
+                <span asp-validation-for="Content" class="text-danger"></span>
+            </div>
+
+            <div class="fGrid">
+                <div class="fRow">
+                    <label asp-for="AuthorName" class="fLbl">작성자</label>
+                    <input asp-for="AuthorName" class="fIn" />
+                    <span asp-validation-for="AuthorName" class="text-danger"></span>
+                </div>
+
+                <div class="fRow">
+                    <span class="fLbl">표시 방법</span>
+                    <label class="fChk"><input asp-for="IsPinned" /> 목록 맨 위에 고정하기</label>
+                    <label class="fChk"><input asp-for="IsPopup" id="chkIsPopup" /> 메인에 팝업 공지로 띄우기</label>
+                </div>
+            </div>
+
+            <div class="fRow">
+                <label asp-for="PopupUntil" class="fLbl">팝업 공지 기간 (종료일)</label>
+                <input asp-for="PopupUntil" type="date" class="fIn" id="popupUntil" />
+                <div class="fHint">종료일(해당일)까지 메인 팝업으로 표시됩니다.</div>
+                <span asp-validation-for="PopupUntil" class="text-danger"></span>
+            </div>
+
+            <div class="fRow">
+                <span class="fLbl">기존 첨부파일</span>
+                @if (Model.Attachments != null && Model.Attachments.Count > 0)
+                {
+                    <ul class="fl">
+                        @foreach (var att in Model.Attachments)
+                        {
+                            <li>
+                                <label>
+                                    <input type="checkbox" name="deleteAttachmentIds" value="@att.Id" />
+                                    <a class="n" href="@Url.Action("DownloadAttachment", "Notice", new { id = att.Id })" title="@att.OriginalName">@att.OriginalName</a>
+                                </label>
+                                <span class="s">@(att.FileSize / 1024) KB</span>
+                            </li>
+                        }
+                    </ul>
+                    <div class="fHint">체크한 파일은 저장할 때 삭제됩니다.</div>
+                }
+                else
+                {
+                    <div class="fHint">첨부파일이 없습니다.</div>
+                }
+            </div>
+
+            <div class="fRow">
+                <label class="fLbl" for="files">첨부파일 추가 (여러 개 가능)</label>
+                <input type="file" name="files" id="files" class="fIn" multiple />
+                <div class="fHint">새로 고른 파일은 기존 첨부에 더해집니다.</div>
+                <ul id="fileList" class="fl" style="display:none;"></ul>
+            </div>
+
+            <div class="fAct">
+                <a href="@Url.Action("Details", "Notice", new { id = Model.Id })" class="nbtn">취소</a>
+                <button type="submit" class="nbtn pri">저장</button>
+            </div>
+        </form>
+
+        <div class="ft"><span>© 유년부 · 공지사항</span></div>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@3.2.12/dist/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        (function () {
+            const chk = document.getElementById('chkIsPopup');
+            const popupUntil = document.getElementById('popupUntil');
+
+            function syncPopupFields() {
+                const on = chk && chk.checked;
+                if (popupUntil) {
+                    popupUntil.disabled = !on;
+                    if (!on) popupUntil.value = "";
+                }
+            }
+            if (chk) {
+                chk.addEventListener('change', syncPopupFields);
+                syncPopupFields();
+            }
+
+            // 새 파일 목록 미리보기
+            const filesInput = document.getElementById('files');
+            const fileList = document.getElementById('fileList');
+
+            function renderFiles() {
+                if (!filesInput || !fileList) return;
+                const files = filesInput.files;
+
+                if (!files || files.length === 0) {
+                    fileList.style.display = "none";
+                    fileList.innerHTML = "";
+                    return;
+                }
+
+                fileList.style.display = "block";
+                fileList.innerHTML = "";
+
+                for (const f of files) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="n">${escapeHtml(f.name)}</span><span class="s">${formatBytes(f.size)}</span>`;
+                    fileList.appendChild(li);
+                }
+            }
+
+            function formatBytes(bytes) {
+                if (bytes === 0) return "0 B";
+                const k = 1024;
+                const sizes = ["B", "KB", "MB", "GB"];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+            }
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+
+            if (filesInput) {
+                filesInput.addEventListener('change', renderFiles);
+            }
+        })();
+    </script>
+</body>
+</html>

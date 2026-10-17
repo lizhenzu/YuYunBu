@@ -1,0 +1,239 @@
+@model BulletinBoard.Models.Jubo.AttendancePageViewModel
+@using BulletinBoard.Models.Jubo
+@{
+    ViewData["Title"] = "출석 관리";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+    var dateStr = Model.JuboDate.ToString("yyyy-MM-dd");
+}
+
+<link rel="stylesheet" href="~/css/jubo.css" />
+
+<div class="jubo-page">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-2">
+        <ol class="breadcrumb" style="background:transparent; padding:0; font-size:0.85rem;">
+            <li class="breadcrumb-item"><a href="/Jubo" style="color:#3B82F6;">📋 주보 목록</a></li>
+            <li class="breadcrumb-item">
+                <a href="/Jubo/Edit/@Model.JuboId" style="color:#3B82F6;">✏️ 편집</a>
+            </li>
+            <li class="breadcrumb-item active">📊 출석 관리</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="attend-page-header">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h2 style="font-size:1.6rem; font-weight:800; color:#2D5BE3; margin-bottom:0.3rem;">
+                    📊 출석 현황
+                </h2>
+                <div style="color:#6B8AC4; font-size:0.95rem;">
+                    📅 @Model.JuboDate.ToString("yyyy년 MM월 dd일 (ddd)")
+                    &nbsp;|&nbsp; 📋 @Model.JuboTitle
+                </div>
+            </div>
+            <a href="/Jubo/Edit/@Model.JuboId" class="btn-jubo btn-jubo-edit">← 주보 편집으로</a>
+        </div>
+    </div>
+
+    <!-- Summary Strip -->
+    <div class="attend-summary-strip">
+        <div class="attend-sum-card total">
+            <div class="attend-sum-icon">👥</div>
+            <div class="attend-sum-num" id="sumTotal">@Model.Summary.TotalCount</div>
+            <div class="attend-sum-lbl">총원</div>
+        </div>
+        <div class="attend-sum-card present">
+            <div class="attend-sum-icon">✅</div>
+            <div class="attend-sum-num" id="sumPresent">@Model.Summary.TotalPresent</div>
+            <div class="attend-sum-lbl">출석</div>
+        </div>
+        <div class="attend-sum-card absent">
+            <div class="attend-sum-icon">❌</div>
+            <div class="attend-sum-num" id="sumAbsent">@Model.Summary.TotalAbsent</div>
+            <div class="attend-sum-lbl">결석</div>
+        </div>
+        <div class="attend-sum-card newcomer">
+            <div class="attend-sum-icon">🌟</div>
+            <div class="attend-sum-num" id="sumNewcomer">@Model.Summary.TotalNewComer</div>
+            <div class="attend-sum-lbl">새친구</div>
+        </div>
+    </div>
+
+    <!-- Class Attendance -->
+    <div class="jubo-meta-card mb-4">
+        <div class="jubo-meta-card-header">
+            🏫 반별 출석
+            <button type="button" class="btn-jubo btn-jubo-save float-right"
+                    style="font-size:0.8rem; padding:0.3rem 0.8rem;"
+                    onclick="addClassRow('@dateStr')">+ 반 추가</button>
+        </div>
+        <div class="jubo-meta-card-body">
+            <!-- Column Labels -->
+            <div class="d-none d-sm-flex gap-2 mb-2 px-2" style="font-size:0.75rem; color:#94A3B8; font-weight:600;">
+                <span style="flex:1; min-width:130px;">반 이름</span>
+                <span style="width:65px; text-align:center;">총원</span>
+                <span style="width:65px; text-align:center;">출석</span>
+                <span style="width:65px; text-align:center;">새친구</span>
+                <span style="flex:1; min-width:100px;">메모</span>
+                <span style="width:120px;"></span>
+            </div>
+
+            <div id="classAttendContainer">
+                @foreach (var cls in Model.Summary.Classes)
+                {
+                    <div class="class-attend-card @(cls.IsLocked ? "locked" : "")"
+                         data-id="@cls.Id">
+                        <div style="flex:1; min-width:130px;">
+                            <input type="text"
+                                   class="jubo-input class-name-input"
+                                   value="@cls.ClassName"
+                                   @(cls.IsLocked ? "disabled" : "")
+                                   style="font-weight:700;" />
+                        </div>
+                        <div class="class-count-inputs">
+                            <div class="count-input-group">
+                                <span class="count-input-label">총원</span>
+                                <input type="number" class="count-input total-input"
+                                       value="@cls.TotalCount" min="0"
+                                       @(cls.IsLocked ? "disabled" : "") />
+                            </div>
+                            <div class="count-input-group">
+                                <span class="count-input-label">출석</span>
+                                <input type="number" class="count-input present-input"
+                                       value="@cls.PresentCount" min="0"
+                                       @(cls.IsLocked ? "disabled" : "") />
+                            </div>
+                            <div class="count-input-group">
+                                <span class="count-input-label">새친구</span>
+                                <input type="number" class="count-input newcomer-input"
+                                       value="@cls.NewComerCount" min="0"
+                                       @(cls.IsLocked ? "disabled" : "") />
+                            </div>
+                        </div>
+                        <div style="flex:1; min-width:100px;">
+                            <input type="text" class="jubo-input"
+                                   placeholder="메모"
+                                   value="@cls.Note"
+                                   @(cls.IsLocked ? "disabled" : "")
+                                   style="font-size:0.82rem;" />
+                        </div>
+                        @if (cls.IsLocked)
+                        {
+                            <span class="btn-jubo" style="background:#F1F5F9; color:#94A3B8; pointer-events:none;">
+                                🔒 잠금됨
+                            </span>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn-jubo btn-jubo-save"
+                                    onclick="saveClassRow(this, '@dateStr')">💾 저장</button>
+                            <button type="button" class="btn-jubo btn-jubo-danger"
+                                    onclick="removeClassRow(this)">🗑</button>
+                        }
+                        @if (!string.IsNullOrEmpty(cls.RecordedBy))
+                        {
+                            <div style="width:100%; font-size:0.72rem; color:#94A3B8; margin-top:0.2rem;">
+                                👤 @cls.RecordedBy · @cls.RecordedAt.ToString("HH:mm")
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (!Model.Summary.Classes.Any())
+            {
+                <div class="text-center py-3" style="color:#94A3B8; font-size:0.9rem;">
+                    아직 출석 데이터가 없어요.<br />
+                    <button type="button" class="btn-jubo btn-jubo-save mt-2"
+                            onclick="addClassRow('@dateStr')">+ 첫 번째 반 추가하기</button>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- New Comer Section -->
+    <div class="jubo-meta-card">
+        <div class="jubo-meta-card-header">
+            🌟 새친구 등록
+            <span class="badge badge-warning ml-2" id="newComerCount"
+                  style="background:var(--j-yellow); color:#7a5a1a; border-radius:50px; padding:0.2rem 0.6rem;">
+                @Model.NewComers.Count
+            </span>
+        </div>
+        <div class="jubo-meta-card-body">
+            <!-- Add Form -->
+            <div style="background:#FFFDF0; border-radius:14px; padding:1.2rem; margin-bottom:1.2rem; border:2px dashed #FFE066;">
+                <div class="row g-2">
+                    <div class="col-sm-6 col-md-3">
+                        <label class="jubo-label" style="font-size:0.78rem;">이름 <span class="text-danger">*</span></label>
+                        <input type="text" id="nc_name" class="jubo-input" placeholder="이름" />
+                    </div>
+                    <div class="col-sm-6 col-md-2">
+                        <label class="jubo-label" style="font-size:0.78rem;">나이</label>
+                        <input type="number" id="nc_age" class="jubo-input" placeholder="나이" min="1" max="20" />
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="jubo-label" style="font-size:0.78rem;">학년/반</label>
+                        <input type="text" id="nc_grade" class="jubo-input" placeholder="예: 초등 2학년" />
+                    </div>
+                    <div class="col-sm-6 col-md-4">
+                        <label class="jubo-label" style="font-size:0.78rem;">부모님 성함</label>
+                        <input type="text" id="nc_parent" class="jubo-input" placeholder="부모님 성함" />
+                    </div>
+                    <div class="col-sm-6 col-md-3">
+                        <label class="jubo-label" style="font-size:0.78rem;">연락처</label>
+                        <input type="text" id="nc_phone" class="jubo-input" placeholder="010-XXXX-XXXX" />
+                    </div>
+                    <div class="col-sm-6 col-md-5">
+                        <label class="jubo-label" style="font-size:0.78rem;">주소</label>
+                        <input type="text" id="nc_address" class="jubo-input" placeholder="주소 (선택)" />
+                    </div>
+                    <div class="col-sm-6 col-md-4">
+                        <label class="jubo-label" style="font-size:0.78rem;">메모</label>
+                        <input type="text" id="nc_note" class="jubo-input" placeholder="메모 (선택)" />
+                    </div>
+                    <div class="col-12 d-flex justify-content-end mt-1">
+                        <button type="button" class="btn-jubo btn-jubo-save"
+                                onclick="addNewComer('@dateStr')">
+                            🌟 새친구 등록
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Comer List -->
+            <div id="newComerList">
+                @foreach (var nc in Model.NewComers)
+                {
+                    <div class="newcomer-card" data-id="@nc.Id">
+                        <div style="flex:1;">
+                            <div class="newcomer-name">🌟 @nc.Name</div>
+                            <div class="newcomer-info">
+                                @(nc.Age.HasValue ? nc.Age + "세" : "")
+                                @(!string.IsNullOrEmpty(nc.Grade) ? " · " + nc.Grade : "")
+                                @(!string.IsNullOrEmpty(nc.ParentName) ? " · 학부모: " + nc.ParentName : "")
+                                @(!string.IsNullOrEmpty(nc.PhoneNumber) ? " · " + nc.PhoneNumber : "")
+                                @(!string.IsNullOrEmpty(nc.Note) ? " · " + nc.Note : "")
+                            </div>
+                        </div>
+                        <span style="font-size:0.75rem; color:#94A3B8; white-space:nowrap;">
+                            @nc.RecordedAt.ToString("HH:mm")
+                        </span>
+                        <button type="button" class="btn-jubo btn-jubo-danger"
+                                onclick="deleteNewComer(this, @nc.Id)">🗑 삭제</button>
+                    </div>
+                }
+            </div>
+
+            @if (!Model.NewComers.Any())
+            {
+                <div class="text-center py-2" style="color:#94A3B8; font-size:0.9rem;" id="newComerEmpty">
+                    아직 등록된 새친구가 없어요.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<script src="~/js/jubo.js"></script>

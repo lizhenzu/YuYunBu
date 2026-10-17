@@ -1,0 +1,94 @@
+@model BulletinBoard.Models.BessingACoupleData
+@using BulletinBoard.Common
+@*  ══════════════════════════════════════════════════════════════
+    부부 기도문 — 새로 쓰기 (?Kind=Husband · Wife)
+    · 2026-10-15 확정 — 수정 화면(ModifyView, A안)과 같은 밝은 흰색 결
+    · 쓸 수 있는 사람: SuperAdmin 역할 · Basic 계정 (컨트롤러가 막는다)
+    · 번호는 받지 않는다 — 맨 끝 번호(+1)로 자동. 새 기도문은 "검증 전"으로 시작
+    · 저장하면 EnrollProcess → 방금 쓴 기도문 화면(DetailWords?Kind=&Id=)
+    · 이전 화면은 EnrollView.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+
+    string kind = ViewBag.Kind as string ?? "Husband";
+    bool isForHusband = kind == "Husband";
+    string kindA = isForHusband ? "남편" : "아내";   // 기도를 받는 사람
+    string kindB = isForHusband ? "아내" : "남편";   // 기도하는 사람
+    string josa = isForHusband ? "을" : "를";
+    string josaB = isForHusband ? "가" : "이";
+    int nextNo = ViewBag.NextPageNo is int n ? n : 0;
+    string err = ViewBag.Error as string;
+
+    string listUrl = $"/BessingACouple/DetailList?Kind={kind}";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@(kindA)@(josa) 위한 새 기도문</title>
+    <partial name="~/Views/BessingChild/_BcStyle.cshtml" />
+    <partial name="~/Views/BessingChild/_BcFormStyle.cshtml" />
+    <style>
+        .h1 { font-size: 22px; line-height: 1.35; word-break: keep-all; }
+        .tipbox { display: flex; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--soft); color: var(--acc); font-size: 12.5px; line-height: 1.6; font-weight: 600; }
+        .errbox { padding: 10px 12px; border-radius: 12px; background: var(--delbg); color: var(--del); font-size: 13px; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="@listUrl">부부 기도</a><span class="sep">›</span>@(kindA)@(josa) 위해 · 새로 쓰기</span>
+        <a class="nb" href="@listUrl">목록 →</a>
+    </div>
+    <div class="prog"></div>
+
+    <div class="kk" style="margin-top:20px">부부 기도 · @(kindA)@(josa) 위해 · 새로 쓰기</div>
+    <h1 class="h1">새 기도문</h1>
+    <div class="sub">
+        @(kindB)@(josaB) 드리는 기도
+        @if (nextNo > 0)
+        {
+            <text> · @(nextNo)번째로 들어가요</text>
+        }
+    </div>
+
+    <form method="post" action="/BessingACouple/EnrollProcess" class="fm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Kind" value="@kind" />
+
+        @if (!string.IsNullOrEmpty(err))
+        {
+            <div class="errbox" role="alert">@err</div>
+        }
+
+        <div>
+            <label class="l" for="n-title">제목</label>
+            <input class="in" id="n-title" name="PrayTitle" value="@Model?.PrayTitle" placeholder="예) @(kindA)의 잠과 쉼을 위한 기도" required />
+        </div>
+        <div>
+            <label class="l" for="n-body">기도문 본문</label>
+            <textarea class="in" id="n-body" name="PrayText" required placeholder="쉼을 주시는 주님,&#10;&#10;…&#10;&#10;예수님의 이름으로 기도드립니다.&#10;아멘.">@Model?.PrayText</textarea>
+            <div class="hint">문단은 빈 줄로 나눠요. 짧고 쉼표로 끝나는 줄(예: 쉼을 주시는 주님,)은 굵은 호칭이 돼요.</div>
+        </div>
+        <div>
+            <label class="l" for="n-word">함께 읽는 말씀</label>
+            <textarea class="in short" id="n-word" name="PrayHolyWord" placeholder="책 장:절&#10;&quot;말씀&quot;">@Model?.PrayHolyWord</textarea>
+        </div>
+
+        <div class="tipbox">ⓘ 저장하면 맨 끝 번호로 들어가고 ‘검증 전’으로 시작해요. 저장한 뒤 기도문 화면에서 검증해 주세요.</div>
+
+        <div class="acts">
+            <a class="nb" href="@listUrl">목록으로</a>
+            <div class="grp">
+                <button class="nb pri" type="submit">저장</button>
+            </div>
+        </div>
+    </form>
+
+</div>
+</body>
+</html>

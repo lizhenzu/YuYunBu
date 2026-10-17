@@ -1,0 +1,1275 @@
+﻿@model BulletinBoard.Models.DailyMission2.ParticipantCardsVM
+@using BulletinBoard.Common
+@using BulletinBoard.Models.DailyMission2
+@using BulletinBoard.Enums
+@using System
+@using System.Linq
+@using System.Collections.Generic
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+@inject BulletinBoard.Services.Abstract.IAuthService AuthService
+
+@{
+    ViewData["Title"] = "가족팀 참여자";
+    Layout = null;
+
+    // ✅ Admin/SuperAdmin 권한 확인 (선물 지급 버튼 표시용)
+    var _user        = await AuthService.GetSignedUser(User);
+    var _isSignedIn  = await AuthService.IsSignedIn(User);
+    bool isStaff     = _isSignedIn && (
+        await AuthService.IsInRole(_user, nameof(Roles.Admin)) ||
+        await AuthService.IsInRole(_user, nameof(Roles.SuperAdmin))
+    );
+    // 가족이 직접 선택한 합산 선물 현황 (teamName → (ProductId, ProductName, Status))
+    var familyCombinedGiftInfo = ViewBag.FamilyCombinedGiftInfo
+        as System.Collections.Generic.Dictionary<string,(int ProductId, string ProductName, string Status)>
+        ?? new System.Collections.Generic.Dictionary<string,(int,string,string)>();
+
+    string FmtDate(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy-MM-dd") : "—";
+    string Safe(string? s) => (s ?? "").Trim();
+
+    // ✅ 학생 형제관계 라벨 (RelationCode)
+    string RelationLabel(int rc)
+    {
+        return rc switch
+        {
+            0 => "본인",
+            1 => "형",
+            2 => "동생",
+            3 => "언니",
+            4 => "누나",
+            _ => "미설정"
+        };
+    }
+
+    // ✅ 프로필 이미지: /images/profile/{userid}.png 가 실제로 있으면 사용, 없으면 기본 이미지
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var virtualPath = $"/images/profile/{uid}.png";
+            var physicalPath = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+
+            if (System.IO.File.Exists(physicalPath))
+                return virtualPath;
+        }
+
+        return "/images/icon/people/people_01.webp";
+    }
+
+    // ✅ 팀원 클릭 시 개인 월별 보기로 이동
+    string UserMonthlyUrl(string? userName)
+    {
+        var u = Safe(userName);
+        if (string.IsNullOrWhiteSpace(u)) return "#";
+        return "/DailyMission2/UserMonthlyPoints?userName=" + Uri.EscapeDataString(u);
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        :root {
+            --bg0: #f6f8ff;
+            --bg1: #eef3ff;
+            --card: rgba(255,255,255,.92);
+            --card2: rgba(255,255,255,.70);
+            --line: rgba(15,23,42,.12);
+            --txt: rgba(15,23,42,.92);
+            --muted: rgba(15,23,42,.55);
+            --muted2: rgba(15,23,42,.42);
+            --primary: rgba(79,124,255,.95);
+            --good: rgba(34,197,94,.95);
+            --warn: rgba(239,68,68,.95);
+            --shadow: 0 14px 30px rgba(15,23,42,.10);
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(900px 600px at 15% 10%, rgba(79,124,255,.18), transparent 60%), radial-gradient(900px 600px at 85% 0%, rgba(34,197,94,.10), transparent 55%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            color: var(--txt);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px 14px 28px;
+        }
+
+        .navbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            margin-bottom: 12px;
+        }
+
+        .navBtn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.70));
+            box-shadow: 0 10px 24px rgba(15,23,42,.10);
+            color: var(--txt);
+            text-decoration: none;
+            font-weight: 900;
+            letter-spacing: -.2px;
+            min-height: 48px;
+            flex: 1 1 220px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+        }
+
+            .navBtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 30px rgba(15,23,42,.12);
+                border-color: rgba(15,23,42,.18);
+            }
+
+            .navBtn:active {
+                transform: translateY(0px);
+                box-shadow: 0 8px 18px rgba(15,23,42,.10);
+            }
+
+            .navBtn.primary {
+                background: linear-gradient(180deg, rgba(79,124,255,.18), rgba(255,255,255,.85));
+                border-color: rgba(79,124,255,.26);
+            }
+
+            .navBtn.good {
+                background: linear-gradient(180deg, rgba(34,197,94,.16), rgba(255,255,255,.85));
+                border-color: rgba(34,197,94,.24);
+            }
+
+        .navIcon {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: rgba(15,23,42,.06);
+            border: 1px solid rgba(15,23,42,.10);
+            flex: 0 0 auto;
+        }
+
+        .navText {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.05;
+            min-width: 0;
+        }
+
+            .navText b {
+                font-size: 14px;
+            }
+
+            .navText span {
+                margin-top: 4px;
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 700;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+        /* ✅ topbar: 반드시 flex (가로 레이아웃) */
+        .topbar {
+            display: flex; /* ✅ 누락되어 있던 핵심 */
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        /* ✅ 타이틀 영역 (가운데) */
+        .title {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 0;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+            .title h1 {
+                margin: 0;
+                font-size: 22px;
+                letter-spacing: -.2px;
+                font-weight: 1000;
+                line-height: 1.15;
+            }
+
+            .title h2 {
+                margin: 12px 0 0;
+                font-size: 18px;
+                letter-spacing: -.2px;
+                font-weight: 900;
+                line-height: 1.15;
+            }
+
+            .title .sub {
+                margin-top: 10px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 800;
+            }
+
+            .title .subLine {
+                text-align: center;
+            }
+
+            .title .subCount {
+                text-align: center;
+                font-weight: 900;
+                color: var(--primary);
+            }
+
+        /* ✅ 컨트롤 영역: 가로 정렬 */
+        .controls {
+            display: flex;
+            flex-direction: row; /* ✅ 세로 -> 가로 */
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex: 0 0 auto;
+            flex-wrap: wrap; /* ✅ 화면 좁으면 자연스럽게 줄바꿈 */
+        }
+
+        .pill {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.88);
+            border-radius: 999px;
+            padding: 8px 10px;
+            box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        }
+
+            .pill input {
+                background: transparent;
+                border: 0;
+                outline: 0;
+                color: var(--txt);
+                min-width: 180px;
+            }
+
+        .pageSeg {
+            display: flex;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,.88);
+            box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        }
+
+            .pageSeg a {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                padding: 8px 12px;
+                text-decoration: none;
+                color: var(--txt);
+                font-size: 12px;
+                font-weight: 900;
+                letter-spacing: -.2px;
+                white-space: nowrap;
+            }
+
+                .pageSeg a.active {
+                    background: rgba(79,124,255,.16);
+                }
+
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            grid-column: span 4;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        @@media (max-width: 980px) {
+            .card {
+                grid-column: span 6;
+            }
+        }
+
+        @@media (max-width: 560px) {
+            .navbar {
+                gap: 10px;
+            }
+
+            .navBtn {
+                flex: 1 1 100%;
+            }
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            /* 모바일에서도 가로 유지 + 줄바꿈 */
+            .controls {
+                justify-content: flex-end;
+            }
+
+            .pill input {
+                min-width: 140px;
+                width: 100%;
+            }
+
+            .card {
+                grid-column: span 12;
+            }
+        }
+
+        .cardHead {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 14px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.55);
+        }
+
+        .avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            object-fit: cover;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(15,23,42,.04);
+            flex: 0 0 auto;
+        }
+
+        .who {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .nameRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .rank {
+            flex: 0 0 auto;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: #fff;
+            background: var(--primary);
+            box-shadow: 0 8px 18px rgba(79,124,255,.18);
+        }
+
+        .who .name {
+            font-weight: 900;
+            letter-spacing: -.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .who .meta {
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(79,124,255,.08);
+            color: rgba(15,23,42,.86);
+            font-weight: 800;
+        }
+
+        .cardBody {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .statRow {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stat {
+            flex: 1;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.72);
+            border-radius: 14px;
+            padding: 10px;
+        }
+
+            .stat .k {
+                font-size: 11px;
+                color: var(--muted);
+                font-weight: 800;
+            }
+
+            .stat .v {
+                margin-top: 4px;
+                font-size: 16px;
+                font-weight: 900;
+                letter-spacing: -.2px;
+                color: rgba(15,23,42,.92);
+            }
+
+            .stat .s {
+                margin-top: 4px;
+                font-size: 11px;
+                font-weight: 800;
+                color: var(--muted);
+            }
+
+        .barWrap {
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.72);
+            border-radius: 14px;
+            padding: 10px;
+        }
+
+        .barTop {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .bar {
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.08);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+            .bar > i {
+                display: block;
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, rgba(34,197,94,.90), rgba(79,124,255,.90));
+            }
+
+        /* ══════════════════════════════════════
+           Family Tree — 족보 스타일
+           ══════════════════════════════════════ */
+        .familyTree {
+            margin-top: 14px;
+            padding: 4px 4px 8px;
+            overflow-x: auto;
+        }
+        .ftWrap {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 100%;
+        }
+
+        /* ── 노드 ── */
+        .ftNode {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+            text-decoration: none;
+            transition: transform .15s;
+            padding: 0 4px;
+            position: relative;
+        }
+        .ftNode:hover { transform: translateY(-3px); }
+
+        .ftAvatar {
+            position: relative;
+            width: 58px; height: 58px;
+            flex-shrink: 0;
+        }
+        .ftAvatar.sm { width: 48px; height: 48px; }
+
+        .ftAvatar img {
+            width: 100%; height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #fff;
+            box-shadow: 0 4px 12px rgba(15,23,42,.22);
+            display: block;
+        }
+        .ftAvatar.grandma img { border-color: #f97316; }
+        .ftAvatar.grandpa img { border-color: #0ea5e9; }
+        .ftAvatar.mom img { border-color: #f472b6; }
+        .ftAvatar.dad img { border-color: #60a5fa; }
+        .ftAvatar.self img { border-color: #34d399; box-shadow: 0 4px 14px rgba(52,211,153,.40); }
+        .ftAvatar.sib img  { border-color: #a78bfa; }
+        .ftAvatar.other img { border-color: #94a3b8; }
+
+        .ftRoleBadge {
+            position: absolute;
+            bottom: -5px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px; font-weight: 900;
+            padding: 1px 6px;
+            border-radius: 999px;
+            white-space: nowrap;
+            border: 1.5px solid #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,.14);
+            z-index: 1;
+        }
+        .rb-grandma { background:#f97316; color:#fff; }
+        .rb-grandpa { background:#0ea5e9; color:#fff; }
+        .rb-mom   { background:#f472b6; color:#fff; }
+        .rb-dad   { background:#60a5fa; color:#fff; }
+        .rb-self  { background:#34d399; color:#fff; }
+        .rb-sib   { background:#a78bfa; color:#fff; }
+        .rb-other { background:#94a3b8; color:#fff; }
+
+        .ftName {
+            margin-top: 6px;
+            font-size: 11px; font-weight: 900;
+            color: var(--txt);
+            text-align: center;
+            max-width: 72px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .ftScore {
+            font-size: 10px; font-weight: 900;
+            padding: 1px 8px;
+            border-radius: 999px;
+            background: linear-gradient(135deg,#fef3c7,#fde68a);
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            white-space: nowrap;
+        }
+        .ftGrade {
+            font-size: 9px; color: #7c3aed; font-weight: 900;
+        }
+        .ftDate {
+            font-size: 9px; color: #94a3b8; font-weight: 600;
+        }
+
+        /* ── 부모행 (엄마 ─── 아빠) ── */
+        .ftParentRow {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            position: relative;
+        }
+        /* 부모 두 노드를 잇는 가로선 */
+        .ftParentRow.has-two::before {
+            content: '';
+            position: absolute;
+            top: 29px;              /* 아바타 중심 높이 */
+            left: 50%; right: 50%;
+            height: 2px;
+            background: rgba(100,116,139,.35);
+            transform: translateX(-50%);
+            width: 64px;            /* 두 아바타 사이 거리의 절반×2 */
+        }
+        /* JS로 정확히 하기 어려우니 CSS 그리드로 처리 */
+        .ftParentGrid {
+            display: grid;
+            grid-template-columns: 1fr 28px 1fr;
+            align-items: start;
+        }
+        .ftParentLine {
+            height: 2px;
+            background: rgba(100,116,139,.35);
+            margin-top: 28px;       /* 아바타 반지름(58/2=29) - 1 */
+            width: 100%;
+        }
+
+        /* ── 세로선 (부모→자녀) ── */
+        .ftVdown {
+            width: 2px;
+            height: 20px;
+            background: rgba(100,116,139,.35);
+            margin: 0 auto;
+        }
+
+        /* ── 자녀행 ── */
+        .ftKidsSection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+        /* 자녀가 여러명이면 가로 분기선 + 각자 위로 세로선 */
+        .ftKidsRow {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 0;
+            position: relative;
+        }
+        /* 자녀행 위 가로분기 바 */
+        .ftHBranch {
+            height: 2px;
+            background: rgba(100,116,139,.35);
+            position: absolute;
+            top: 0;
+            /* left/right는 JS 없이 percent로 */
+        }
+        /* 각 자녀 위에 세로 연결 */
+        .ftKidWrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 8px;
+            position: relative;
+        }
+        .ftKidWrap::before {
+            content: '';
+            display: block;
+            width: 2px;
+            height: 16px;
+            background: rgba(100,116,139,.35);
+            margin-bottom: 0;
+        }
+        /* 가로 분기선: 자녀 여러 명일 때 형제 사이 연결 */
+        .ftKidWrap + .ftKidWrap::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 50%; left: -50%;
+            height: 2px;
+            background: rgba(100,116,139,.35);
+        }
+        /* others (부모없는 구성원) */
+        .ftOthersRow {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1.5px dashed rgba(100,116,139,.25);
+        }
+
+        @@media (max-width: 480px) {
+            .ftAvatar { width: 48px; height: 48px; }
+            .ftAvatar.sm { width: 40px; height: 40px; }
+            .ftParentLine { margin-top: 23px; }
+            .ftVdown { height: 14px; }
+        }
+
+        /* 기존 호환용 */
+        .familyLastDate {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            background: #f1f5f9;
+            border-radius: 6px;
+            padding: 1px 6px;
+            white-space: nowrap;
+        }
+
+        .empty {
+            margin-top: 14px;
+            border: 1px dashed rgba(15,23,42,.18);
+            border-radius: 16px;
+            padding: 18px;
+            color: var(--muted);
+            text-align: center;
+            background: rgba(255,255,255,.70);
+            font-weight: 800;
+        }
+
+        .card.isFamily {
+            background: linear-gradient(180deg, rgba(255, 244, 214, .92), rgba(255, 255, 255, .72));
+            border-color: rgba(245, 158, 11, .28);
+            box-shadow: 0 14px 30px rgba(245, 158, 11, .10);
+        }
+
+            .card.isFamily .cardHead {
+                background: rgba(255, 244, 214, .55);
+                border-bottom-color: rgba(245, 158, 11, .22);
+            }
+
+            .card.isFamily .badge {
+                background: rgba(245, 158, 11, .12);
+                border-color: rgba(245, 158, 11, .22);
+            }
+
+            .card.isFamily .rank {
+                background: rgba(245, 158, 11, .95);
+                box-shadow: 0 8px 18px rgba(245, 158, 11, .18);
+            }
+
+        a.uLink, a.uLink:visited {
+            color: inherit;
+            text-decoration: none;
+        }
+
+            a.uLink:hover {
+                text-decoration: underline;
+            }
+
+        a.uBadge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        @{
+            var allRows = Model?.Rows ?? new List<ParticipantCardRow>();
+
+            var teamRows = allRows
+            .Where(x => x != null && x.IsFamily)
+            .ToList();
+
+            var totalTeamCount = teamRows.Count;
+
+            // var orderedTeams = teamRows
+            // .OrderByDescending(x =>
+            // (x.FamilyMembers?.Count ?? 0) > 0
+            // ? (decimal)x.YearPoint / x.FamilyMembers.Count
+            // : 0m
+            // )
+            // .ThenBy(x => Safe(x.FamilyTeamName))
+            // .ToList();
+
+            var orderedTeams = teamRows
+            .OrderByDescending(x => x.YearPoint)
+            .ThenBy(x => Safe(x.FamilyTeamName))
+            .ToList();
+
+            var no = 1;
+        }
+
+        <div class="topbar">
+            <div class="title">
+                <h1>@ConstatsCommon.MainKeyTitle</h1>
+                <h2>가족팀 참여자</h2>
+
+                <div class="sub">
+                    <div class="subLine">
+                        연도: @Model.Year / 달성율 기준 목표점수: @Model.TargetPoint 점
+                    </div>
+                    <div class="subCount">
+                        👥 총 카드: <span id="totalCount">@totalTeamCount</span> 개
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <a href="/" style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#4F46E5;color:#fff;border-radius:99px;font-size:13px;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(79,70,229,.3);">🏠 홈으로</a>
+
+                <div class="pageSeg" aria-label="view switch">
+                    <a href="/DailyMission2/ParticipantPersons">👤 개인</a>
+                    <a class="active" href="/DailyMission2/ParticipantTeams">👨‍👩‍👧 가족팀</a>
+                </div>
+
+                <div class="pill">
+                    🔎 <input id="q" type="text" placeholder="이름/아이디 검색" />
+                </div>
+            </div>
+        </div>
+
+        <div id="grid" class="grid">
+            @foreach (var r in orderedTeams)
+            {
+                var photo = ProfileOrDefault(r.UserId);
+
+                var isStudent = r.IsStudent;
+                var isFamily = r.IsFamily;
+
+                var isParent = r.IsParent || (!isFamily && !isStudent && string.IsNullOrWhiteSpace(r.RoleName));
+                var isTeacher = r.IsTeacher && !isParent && !isFamily && !isStudent;
+
+                var roleKey =
+                isFamily ? "family" :
+                isStudent ? "student" :
+                isParent ? "needcheck" :
+                isTeacher ? "teacher" :
+                "needcheck";
+
+                var familyKey = "";
+                if (isFamily && r.FamilyMembers != null && r.FamilyMembers.Count > 0)
+                {
+                    familyKey = string.Join(" ", r.FamilyMembers.Select(m => $"{Safe(m.RoleLabel)} {Safe(m.FullName)} {Safe(m.UserName)}"));
+                }
+
+                var dataName = $"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.DisplayRoleText)} {Safe(r.FamilyTeamName)} {Safe(familyKey)}".ToLowerInvariant();
+
+                var memberCount = r.FamilyMembers?.Count ?? 0;
+                var avgRaw = memberCount > 0 ? (decimal)r.YearPoint / memberCount : 0m;
+                var avgPoint = Math.Round(avgRaw, 1);
+
+                <div class="card isFamily" data-role="@roleKey" data-name="@dataName">
+                    <div class="cardHead">
+                        <img class="avatar" src="@photo" alt="photo" onerror="this.src='/images/icon/people/people_01.webp';" />
+
+                        <div class="who">
+                            <div class="nameRow">
+                                <span class="rank">@no</span>
+                                <div class="name">
+                                    @(
+                                                                    !string.IsNullOrWhiteSpace(r.FamilyTeamName)
+                                                                    ? r.FamilyTeamName
+                                                                    : (!string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName)
+                                                                    )
+                            </div>
+                        </div>
+
+                            <div class="meta">
+                                <span class="badge">가족</span>
+                                <span class="badge">@($"구성원 {memberCount}명")</span>
+                                @if (r.ClassYear.HasValue && r.ClassYear > 0)
+                                {
+                                    <span class="badge">@(r.ClassYear)학년</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cardBody">
+                        <div class="statRow">
+                            <div class="stat">
+                                <div class="k">현재 점수(총점)</div>
+                                <div class="v"> @(@r.YearPoint)점</div>
+                                <div class="s">평균 @(@avgPoint)점 / @(@memberCount)명</div>
+                            </div>
+
+                            <div class="stat">
+                                <div class="k">마지막 수행일</div>
+                                <div class="v" style="font-size:14px; font-weight:800;">@FmtDate(r.LastActionDate)</div>
+                            </div>
+                        </div>
+
+                        <div class="barWrap">
+                            <div class="barTop">
+                                <span>달성율</span>
+                                <span><b style="color:var(--txt)">@r.AchievePercent%</b></span>
+                            </div>
+                            <div class="bar">
+                                <i style="width:@r.AchievePercent%"></i>
+                            </div>
+                        </div>
+
+                    @if (isFamily && r.FamilyMembers != null && r.FamilyMembers.Count > 0)
+                        {
+                            var kids        = r.FamilyMembers.Where(x => x.RoleCode == 0)
+                                               .OrderBy(x => x.RelationCode == 0 ? 0 : 1)
+                                               .ThenBy(x => x.RelationCode)
+                                               .ThenBy(x => Safe(x.FullName)).ToList();
+                            var momList     = r.FamilyMembers.Where(x => x.RoleCode == 1).ToList();
+                            var dadList     = r.FamilyMembers.Where(x => x.RoleCode == 2).ToList();
+                            var grandList   = r.FamilyMembers.Where(x => x.RoleCode == 3 || x.RoleCode == 4)
+                                               .OrderBy(x => x.RoleCode).ThenBy(x => Safe(x.FullName)).ToList();
+                            var others      = r.FamilyMembers
+                                               .Where(x => x.RoleCode != 0 && x.RoleCode != 1 && x.RoleCode != 2 && x.RoleCode != 3 && x.RoleCode != 4)
+                                               .OrderBy(x => x.RoleCode).ThenBy(x => Safe(x.FullName)).ToList();
+
+                            bool hasGrand    = grandList.Count > 0;
+                            bool hasParent   = momList.Count > 0 || dadList.Count > 0;
+                            bool hasChildren = kids.Count > 0;
+                            int kidCount     = kids.Count;
+
+                            <div class="familyTree">
+                              <div class="ftWrap">
+
+                                @* ── 조부모행 (할머니/할아버지) ── *@
+                                @if (hasGrand)
+                                {
+                                    bool twoGrand = grandList.Count >= 2;
+                                    @if (twoGrand)
+                                    {
+                                        <div class="ftParentGrid">
+                                            @{
+                                                var g0 = grandList[0];
+                                                var g0Dn  = !string.IsNullOrWhiteSpace(g0.FullName) ? g0.FullName : g0.UserName;
+                                                var g0Pic = !string.IsNullOrWhiteSpace(g0.ProfilePicture) ? g0.ProfilePicture : ProfileOrDefault(null);
+                                                var g0Rc  = g0.RoleCode == 3 ? "rb-grandma" : "rb-grandpa";
+                                                var g0Ac  = g0.RoleCode == 3 ? "grandma" : "grandpa";
+                                            }
+                                            <a class="ftNode" href="@UserMonthlyUrl(g0.UserName)" style="justify-self:end;">
+                                                <div class="ftAvatar @g0Ac">
+                                                    <img src="@g0Pic" alt="@g0Dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge @g0Rc">@g0.RoleLabel</span>
+                                                </div>
+                                                <div class="ftName">@g0Dn</div>
+                                                <div class="ftScore">@(g0.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(g0.LastActionDate)</div>
+                                            </a>
+                                            <div class="ftParentLine"></div>
+                                            @{
+                                                var g1 = grandList[1];
+                                                var g1Dn  = !string.IsNullOrWhiteSpace(g1.FullName) ? g1.FullName : g1.UserName;
+                                                var g1Pic = !string.IsNullOrWhiteSpace(g1.ProfilePicture) ? g1.ProfilePicture : ProfileOrDefault(null);
+                                                var g1Rc  = g1.RoleCode == 3 ? "rb-grandma" : "rb-grandpa";
+                                                var g1Ac  = g1.RoleCode == 3 ? "grandma" : "grandpa";
+                                            }
+                                            <a class="ftNode" href="@UserMonthlyUrl(g1.UserName)" style="justify-self:start;">
+                                                <div class="ftAvatar @g1Ac">
+                                                    <img src="@g1Pic" alt="@g1Dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge @g1Rc">@g1.RoleLabel</span>
+                                                </div>
+                                                <div class="ftName">@g1Dn</div>
+                                                <div class="ftScore">@(g1.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(g1.LastActionDate)</div>
+                                            </a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div style="display:flex;justify-content:center;">
+                                        @foreach (var m in grandList)
+                                        {
+                                            var dn  = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+                                            var pic = !string.IsNullOrWhiteSpace(m.ProfilePicture) ? m.ProfilePicture : ProfileOrDefault(null);
+                                            var ac  = m.RoleCode == 3 ? "grandma" : "grandpa";
+                                            var rc  = m.RoleCode == 3 ? "rb-grandma" : "rb-grandpa";
+                                            <a class="ftNode" href="@UserMonthlyUrl(m.UserName)">
+                                                <div class="ftAvatar @ac">
+                                                    <img src="@pic" alt="@dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge @rc">@m.RoleLabel</span>
+                                                </div>
+                                                <div class="ftName">@dn</div>
+                                                <div class="ftScore">@(m.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(m.LastActionDate)</div>
+                                            </a>
+                                        }
+                                        </div>
+                                    }
+
+                                    @* 조부모→부모 세로선 *@
+                                    @if (hasParent || hasChildren)
+                                    {
+                                        <div class="ftVdown"></div>
+                                    }
+                                }
+
+                                @* ── 부모행 ── *@
+                                @if (hasParent)
+                                {
+                                    bool twoParents = momList.Count > 0 && dadList.Count > 0;
+
+                                    @if (twoParents)
+                                    {
+                                        @* 엄마 ─── 아빠 : grid 3열 (엄마 | 선 | 아빠) *@
+                                        <div class="ftParentGrid">
+                                            @{
+                                                var mom = momList[0];
+                                                var momDn  = !string.IsNullOrWhiteSpace(mom.FullName) ? mom.FullName : mom.UserName;
+                                                var momPic = !string.IsNullOrWhiteSpace(mom.ProfilePicture) ? mom.ProfilePicture : ProfileOrDefault(null);
+                                            }
+                                            <a class="ftNode" href="@UserMonthlyUrl(mom.UserName)" style="justify-self:end;">
+                                                <div class="ftAvatar mom">
+                                                    <img src="@momPic" alt="@momDn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge rb-mom">엄마</span>
+                                                </div>
+                                                <div class="ftName">@momDn</div>
+                                                <div class="ftScore">@(mom.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(mom.LastActionDate)</div>
+                                            </a>
+
+                                            <div class="ftParentLine"></div>
+
+                                            @{
+                                                var dad = dadList[0];
+                                                var dadDn  = !string.IsNullOrWhiteSpace(dad.FullName) ? dad.FullName : dad.UserName;
+                                                var dadPic = !string.IsNullOrWhiteSpace(dad.ProfilePicture) ? dad.ProfilePicture : ProfileOrDefault(null);
+                                            }
+                                            <a class="ftNode" href="@UserMonthlyUrl(dad.UserName)" style="justify-self:start;">
+                                                <div class="ftAvatar dad">
+                                                    <img src="@dadPic" alt="@dadDn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge rb-dad">아빠</span>
+                                                </div>
+                                                <div class="ftName">@dadDn</div>
+                                                <div class="ftScore">@(dad.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(dad.LastActionDate)</div>
+                                            </a>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @* 한 명 부모만 *@
+                                        <div style="display:flex;justify-content:center;">
+                                        @foreach (var m in momList.Concat(dadList))
+                                        {
+                                            var dn  = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+                                            var pic = !string.IsNullOrWhiteSpace(m.ProfilePicture) ? m.ProfilePicture : ProfileOrDefault(null);
+                                            var ac  = m.RoleCode == 1 ? "mom" : "dad";
+                                            var rc  = m.RoleCode == 1 ? "rb-mom" : "rb-dad";
+                                            var rl  = m.RoleCode == 1 ? "엄마" : "아빠";
+                                            <a class="ftNode" href="@UserMonthlyUrl(m.UserName)">
+                                                <div class="ftAvatar @ac">
+                                                    <img src="@pic" alt="@dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge @rc">@rl</span>
+                                                </div>
+                                                <div class="ftName">@dn</div>
+                                                <div class="ftScore">@(m.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(m.LastActionDate)</div>
+                                            </a>
+                                        }
+                                        </div>
+                                    }
+                                }
+
+                                @* ── 부모→자녀 세로선 ── *@
+                                @if (hasParent && hasChildren)
+                                {
+                                    <div class="ftVdown"></div>
+                                }
+
+                                @* ── 자녀행 ── *@
+                                @if (hasChildren)
+                                {
+                                    <div class="ftKidsSection">
+                                        <div class="ftKidsRow">
+                                            @foreach (var m in kids)
+                                            {
+                                                var dn  = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+                                                var pic = !string.IsNullOrWhiteSpace(m.ProfilePicture) ? m.ProfilePicture : ProfileOrDefault(null);
+                                                var rl  = RelationLabel(m.RelationCode);
+                                                var ac  = m.RelationCode == 0 ? "self" : "sib";
+                                                var rc  = m.RelationCode == 0 ? "rb-self" : "rb-sib";
+                                                var yr  = m.ClassYear.HasValue && m.ClassYear > 0 ? $"{m.ClassYear}학년" : "";
+                                                <div class="ftKidWrap">
+                                                    <a class="ftNode" href="@UserMonthlyUrl(m.UserName)">
+                                                        <div class="ftAvatar sm @ac">
+                                                            <img src="@pic" alt="@dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                            <span class="ftRoleBadge @rc">@rl</span>
+                                                        </div>
+                                                        <div class="ftName">@dn</div>
+                                                        @if (!string.IsNullOrEmpty(yr)) { <div class="ftGrade">@yr</div> }
+                                                        <div class="ftScore">@(m.YearPoint)점</div>
+                                                        <div class="ftDate">@FmtDate(m.LastActionDate)</div>
+                                                    </a>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+
+                                @* ── 기타 구성원 (교사 등) — 점선 구분 ── *@
+                                @if (others.Count > 0)
+                                {
+                                    <div class="ftOthersRow">
+                                        @foreach (var m in others)
+                                        {
+                                            var dn  = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+                                            var pic = !string.IsNullOrWhiteSpace(m.ProfilePicture) ? m.ProfilePicture : ProfileOrDefault(null);
+                                            var lbl = !string.IsNullOrWhiteSpace(m.RoleLabel) ? m.RoleLabel : "구성원";
+                                            <a class="ftNode" href="@UserMonthlyUrl(m.UserName)">
+                                                <div class="ftAvatar sm other">
+                                                    <img src="@pic" alt="@dn" loading="lazy" onerror="this.src='/images/icon/people/people_01.webp'"/>
+                                                    <span class="ftRoleBadge rb-other">@lbl</span>
+                                                </div>
+                                                <div class="ftName">@dn</div>
+                                                <div class="ftScore">@(m.YearPoint)점</div>
+                                                <div class="ftDate">@FmtDate(m.LastActionDate)</div>
+                                            </a>
+                                        }
+                                    </div>
+                                }
+
+                              </div>
+                            </div>
+                        }
+                    @{
+                        // 가족이 직접 선택한 선물 현황
+                        var tName = (r.FamilyTeamName ?? "").Trim();
+                        familyCombinedGiftInfo.TryGetValue(tName, out var familyGift);
+                        bool hasFamilyGift = familyGift.ProductId > 0;
+                    }
+
+                    @* ── 가족 합산 선물 현황 ── *@
+                    @if (r.YearPoint >= 1000)
+                    {
+                        <div style="padding:0 14px 10px;">
+                        @if (hasFamilyGift)
+                        {
+                            var gStatusKo = familyGift.Status?.ToUpperInvariant() switch
+                            {
+                                "DRAFT"     => ("신청중", "#f59e0b", "#fffbeb", "#fef3c7"),
+                                "PURCHASED" => ("지급완료", "#059669", "#f0fdf4", "#d1fae5"),
+                                "HIDDEN"    => ("전달완료", "#2563eb", "#eff6ff", "#bfdbfe"),
+                                _           => ("처리중", "#64748b", "#f8fafc", "#e2e8f0")
+                            };
+                            <!-- 가족이 선택한 선물 표시 -->
+                            <div style="border-radius:12px;border:1.5px solid @gStatusKo.Item4;background:@gStatusKo.Item3;display:flex;align-items:center;gap:10px;padding:8px 10px;">
+                                <div onclick="openLightbox('/images/AwardItem/@(familyGift.ProductId).jpg','@Html.Raw((familyGift.ProductName ?? "").Replace("'","\\'"))')"
+                                     style="flex-shrink:0;width:52px;height:52px;border-radius:8px;cursor:pointer;
+                                            background-image:url('/images/AwardItem/@(familyGift.ProductId).jpg');
+                                            background-size:cover;background-position:center;background-color:@gStatusKo.Item4;
+                                            border:1px solid @gStatusKo.Item4;"
+                                     title="클릭하면 크게 보기"></div>
+                                <div style="flex:1;min-width:0;">
+                                    <div style="font-size:12px;font-weight:900;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                        🎁 @(string.IsNullOrWhiteSpace(familyGift.ProductName) ? "선물" : familyGift.ProductName)
+                                    </div>
+                                    <div style="margin-top:3px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                                        <span style="padding:2px 7px;background:rgba(251,191,36,.20);color:#92400e;border-radius:999px;font-size:10px;font-weight:900;">🏠 가족 합산 시상</span>
+                                        <span style="padding:2px 7px;background:@gStatusKo.Item2;color:#fff;border-radius:999px;font-size:10px;font-weight:900;">@gStatusKo.Item1</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- 선물 미선택 -->
+                            <div style="border-radius:12px;border:1.5px dashed rgba(245,158,11,.35);background:rgba(251,191,36,.06);padding:10px 12px;text-align:center;font-size:12px;font-weight:800;color:#92400e;">
+                                🎁 가족 합산 1,000점 달성 — 선물 미선택
+                            </div>
+                        }
+                        </div>
+                    }
+                    </div>
+                </div>
+
+                no++;
+            }
+        </div>
+
+        @if (orderedTeams.Count == 0)
+        {
+            <div class="empty">표시할 가족팀 참여자가 없습니다.</div>
+        }
+
+        <div class="navbar">
+            <a class="navBtn primary" href="/">
+                <span class="navIcon">🏠</span>
+                <span class="navText">
+                    <b>홈으로 가기</b>
+                    <span>메인 화면으로 이동</span>
+                </span>
+            </a>
+
+            <a class="navBtn good" href="/DailyMission2/Index">
+                <span class="navIcon">📖</span>
+                <span class="navText">
+                    <b>도전 성경으로 가기</b>
+                </span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const q = document.getElementById('q');
+            const countEl = document.getElementById('totalCount');
+
+            function apply() {
+                const term = (q.value || '').trim().toLowerCase();
+                const cards = Array.from(document.querySelectorAll('.card'));
+
+                let visible = 0;
+
+                cards.forEach(c => {
+                    const okTerm = !term || (c.dataset.name || '').includes(term);
+                    c.style.display = okTerm ? '' : 'none';
+                    if (okTerm) visible++;
+                });
+
+                // ✅ 검색 결과에 따라 총 카드 수 갱신
+                if (countEl) countEl.textContent = String(visible);
+            }
+
+            q.addEventListener('input', apply);
+            apply();
+        })();
+    </script>
+
+<!-- ── 선물 이미지 라이트박스 (로그인 사용자 누구나 사용) ── -->
+<div id="giftLightbox" onclick="closeLightbox()"
+     style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.72);
+            backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;">
+    <div onclick="event.stopPropagation()"
+         style="background:#fff;border-radius:20px;overflow:hidden;max-width:420px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.4);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e2e8f0;">
+            <span id="lbTitle" style="font-size:14px;font-weight:800;color:#1e293b;"></span>
+            <button onclick="closeLightbox()" style="border:none;background:#f1f5f9;border-radius:8px;padding:6px 12px;cursor:pointer;font-weight:700;">✕</button>
+        </div>
+        <div style="background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:10px;">
+            <div id="lbImg"
+                 style="width:100%;max-width:380px;height:320px;
+                        background-size:contain;background-repeat:no-repeat;background-position:center;
+                        background-color:#f8fafc;"></div>
+        </div>
+    </div>
+</div>
+<script>
+function openLightbox(src, name) {
+    document.getElementById('lbImg').style.backgroundImage = "url('" + src + "')";
+    document.getElementById('lbTitle').textContent = name || '선물 이미지';
+    var lb = document.getElementById('giftLightbox');
+    lb.style.display = 'flex';
+}
+function closeLightbox() {
+    document.getElementById('giftLightbox').style.display = 'none';
+}
+</script>
+
+
+</body>
+</html>
+
+@*  (참고 메모)
+-- 예: FamilyTeamId = 10
+UPDATE dbo.DM2_FamilyMember
+SET RelationCode =
+    CASE UserName
+        WHEN N'choiroi' THEN 0   -- 본인
+        WHEN N'xxxx1'   THEN 1   -- 형
+        WHEN N'xxxx2'   THEN 2   -- 동생
+        WHEN N'xxxx3'   THEN 3   -- 언니
+        WHEN N'xxxx4'   THEN 4   -- 누나
+        ELSE RelationCode
+    END
+WHERE FamilyTeamId = 10 AND RoleCode = 0;
+
+RoleCode = “너는 누구냐?”
+RelationCode = “본인 기준으로 너는 누구냐?”
+*@

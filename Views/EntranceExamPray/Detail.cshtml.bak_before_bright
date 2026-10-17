@@ -1,0 +1,289 @@
+@model BulletinBoard.Models.EntranceExamPrays.EntranceExamPray
+@using BulletinBoard.Helpers
+@*  ══════════════════════════════════════════════════════════════
+    수험생 기도문 한 편 보기 — Bone 스킨 (Index 와 같은 짙은 머리 + 왼쪽 정렬 읽기형)
+    이전 화면은 Detail_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    int total    = ViewBag.TotalCount is int _t ? _t : 0;
+    int rotNo    = ViewBag.RotationNo is int _r ? _r : 0;
+    bool isToday = ViewBag.IsTodayPray is bool _td && _td;
+
+    var msg = TempData["Msg"] as string;
+    var err = TempData["Error"] as string;
+
+    DateTime? touched = Model.UpdatedAt ?? (Model.CreatedAt == DateTime.MinValue ? (DateTime?)null : Model.CreatedAt);
+    bool everEdited   = Model.UpdatedAt.HasValue;
+
+    DateTime kNow = ViewBag.TodayKst is DateTime _k ? _k : DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dayStr = $"{dayKor[(int)kNow.DayOfWeek]}요일";
+
+    string kicker = Model.IsOccasion ? "그날에 읽는 기도" : (isToday ? "오늘의 기도" : "수험생을 위한 기도");
+    string subTail = Model.IsOccasion ? " · 그날에 읽는 기도" : (total > 0 && rotNo > 0 ? $" · {rotNo} / {total}" : "");
+
+    string ogDomain = (ViewBag.Domain as string ?? "").TrimEnd('/');
+    string ogUrl    = $"{ogDomain}/EntranceExamPray/Detail?PrayId={Model.PrayId}";
+    string ogImage  = $"{ogDomain}/images/og/entrance-exam-pray.png";
+    string ogTitle  = "수험생을 위한 기도문";
+    string ogDesc   = !string.IsNullOrWhiteSpace(Model.Title) ? $"오늘의 기도 · {Model.Title}" : "수험생을 위해 오늘도 함께 기도해요";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#16181C" />
+    <title>@Model.Title · @ogTitle</title>
+    <meta name="description" content="@ogDesc" />
+
+    <meta property="og:type"        content="article" />
+    <meta property="og:site_name"   content="@ogTitle" />
+    <meta property="og:title"       content="@Model.Title" />
+    <meta property="og:description" content="@ogDesc" />
+    <meta property="og:url"         content="@ogUrl" />
+    <meta property="og:image"       content="@ogImage" />
+    <meta property="og:image:secure_url" content="@ogImage" />
+    <meta property="og:image:type"  content="image/png" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"   content="@ogTitle" />
+    <meta property="og:locale"      content="ko_KR" />
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="@Model.Title" />
+    <meta name="twitter:description" content="@ogDesc" />
+    <meta name="twitter:image"       content="@ogImage" />
+
+    <link rel="canonical" href="@ogUrl" />
+    <link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    :root { --fs: 1; }
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .epFs { display: flex; border: 1px solid var(--rule); }
+    .qz .epFs button { font-family: "Noto Serif KR", serif; background: none; border: 0; color: var(--dim); padding: 3px 8px; cursor: pointer; line-height: 1.4; }
+    .qz .epFs button:nth-child(1) { font-size: 11px; }
+    .qz .epFs button:nth-child(2) { font-size: 13px; }
+    .qz .epFs button:nth-child(3) { font-size: 15px; }
+    .qz .epFs button:nth-child(4) { font-size: 18px; }
+    .qz .epFs button.on { background: var(--tx); color: var(--bg); }
+
+    .qz .epHead { background: var(--tx); color: var(--bg); margin: 0 calc(var(--pad) * -1); padding: 30px var(--pad) 26px; }
+    .qz .epK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: #C9AE82; }
+    .qz .epH1 { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 25px; line-height: 1.4; margin: 10px 0 0; color: var(--bg); }
+    .qz .epDate { font-family: "Inter", sans-serif; font-weight: 200; font-size: 44px; line-height: 1; margin-top: 18px; color: #D9C29B; font-variant-numeric: tabular-nums; }
+    .qz .epDate small { font-size: 12px; font-weight: 400; color: #9A9690; margin-left: 8px; letter-spacing: .02em; }
+
+    .qz .epFlash { margin-top: 18px; padding: 11px 14px; font-size: 12.5px; border-left: 2px solid var(--acc); background: #fff; color: var(--dim2); }
+    .qz .epFlash.err { border-color: #B4531F; color: #B4531F; }
+
+    .qz .epTitle { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: calc(19px * var(--fs)); line-height: 1.5; margin: 26px 0 0; word-break: keep-all; }
+    .qz .epBody { font-family: "Noto Serif KR", serif; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: #2A2C30; margin: 16px 0 0; white-space: pre-line; word-break: keep-all; }
+    .qz .epBody .nm { color: inherit; font-weight: 500; background: linear-gradient(transparent 60%, var(--mark) 60%); padding: 0 2px; }
+    .qz .epQuote { border-left: 2px solid var(--acc); padding: 2px 0 2px 14px; margin-top: 24px; }
+    .qz .epVr { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--acc); }
+    .qz .epVt { font-family: "Noto Serif KR", serif; font-size: calc(13.5px * var(--fs)); line-height: 1.9; color: var(--dim2); margin: 8px 0 0; word-break: keep-all; }
+
+    .qz .epLike { margin-top: 30px; text-align: center; }
+    .qz .epLikeBtn { display: inline-flex; align-items: center; gap: 12px; font-family: inherit; border: 1px solid var(--acc); color: var(--acc); background: transparent; padding: 12px 22px; font-size: 13px; font-weight: 600; letter-spacing: .06em; cursor: pointer; border-radius: 1px; }
+    .qz .epLikeBtn u { text-decoration: none; font-family: "Inter", sans-serif; font-weight: 400; color: var(--tx); font-variant-numeric: tabular-nums; }
+    .qz .epLikeBtn.on { background: var(--acc); color: var(--bg); cursor: default; }
+    .qz .epLikeBtn.on u { color: var(--bg); }
+    .qz .epLikeBtn[disabled] { opacity: .6; }
+    .qz .epStat { display: flex; justify-content: center; gap: 14px; margin-top: 10px; font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .qz .epStat em { font-style: normal; color: var(--acc); }
+    .qz .epMsg { min-height: 16px; margin-top: 6px; font-size: 11.5px; color: var(--acc); }
+
+    .qz .epNav { display: flex; border-top: 1px solid var(--tx); border-bottom: 1px solid var(--rule); margin-top: 26px; }
+    .qz .epNav a { flex: 1; text-align: center; padding: 14px 0; font-size: 12.5px; color: var(--dim2); text-decoration: none; border-right: 1px solid var(--rule); }
+    .qz .epNav a:last-child { border-right: 0; }
+    .qz .epNav a:hover { color: var(--acc); }
+
+    /* 검증 완료 (관리자) */
+    .qz .epVerify { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+    .qz .epVerifyTx { flex: 1 1 200px; min-width: 0; font-size: 11.5px; color: var(--dim); line-height: 1.7; }
+    .qz .epVerifyTx b { color: var(--dim2); font-weight: 600; font-family: "Inter", sans-serif; font-variant-numeric: tabular-nums; }
+    .qz .epVerifyBtn { flex: none; background: var(--tx); color: var(--bg); border: 0; padding: 11px 18px; font-family: inherit; font-size: 12.5px; font-weight: 600; letter-spacing: .08em; cursor: pointer; }
+    .qz .epVerifyBtn:hover { background: var(--acc); }
+
+    .qz .epNote { margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--rule); }
+    .qz .epNoteT { font-family: "Noto Serif KR", serif; font-size: 16px; margin-bottom: 4px; }
+    .qz .epNi { padding: 13px 0; border-bottom: 1px solid var(--rule); font-size: 13px; }
+    .qz .epNi small { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; }
+    .qz .epBtn { display: block; text-align: center; background: var(--tx); color: var(--bg); padding: 14px; font-size: 12.5px; font-weight: 600; letter-spacing: .1em; margin-top: 16px; text-decoration: none; }
+    .qz .epBtn:hover { background: var(--acc); }
+    .qz .epFine { text-align: center; font-size: 10.5px; color: var(--dim); margin-top: 8px; }
+
+    @@media print { .qzBar, .epLike, .epNav, .epNote, .epVerify { display: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">홈</a><span class="qzHomeSep">·</span><a class="qzHome" href="/EntranceExamPray/List">기도 목록</a>
+            </div>
+            <div class="epFs" role="group" aria-label="기도문 글자 크기">
+                <button type="button" id="pfsS" onclick="setPFs('s')" aria-label="작게">가</button>
+                <button type="button" id="pfsM" onclick="setPFs('m')" aria-label="보통">가</button>
+                <button type="button" id="pfsL" onclick="setPFs('l')" aria-label="크게">가</button>
+                <button type="button" id="pfsXL" onclick="setPFs('xl')" aria-label="아주 크게">가</button>
+            </div>
+        </div>
+
+        <header class="epHead">
+            <div class="epK">@kicker</div>
+            <h1 class="epH1">수험생을 위한 기도문</h1>
+            <div class="epDate">@kNow.ToString("MM.dd")<small>@dayStr@subTail</small></div>
+        </header>
+
+        @if (!string.IsNullOrEmpty(msg)) { <div class="epFlash">@msg</div> }
+        @if (!string.IsNullOrEmpty(err)) { <div class="epFlash err">@err</div> }
+
+        <article>
+            <h2 class="epTitle">@Model.Title</h2>
+            <p class="epBody">@PrayTextHelper.MarkNames(Model.PrayText)</p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.BibleText) || !string.IsNullOrWhiteSpace(Model.BibleRef))
+            {
+                <div class="epQuote">
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleRef))
+                    {
+                        <div class="epVr">@Model.BibleRef</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleText))
+                    {
+                        <p class="epVt">@Model.BibleText</p>
+                    }
+                </div>
+            }
+        </article>
+
+        @if (isSuper)
+        {
+            <div class="epLike">
+                <button type="button" id="likeBtn" class="epLikeBtn" data-prayid="@Model.PrayId"
+                        aria-pressed="false" aria-label="이 기도문에 함께 기도했어요">
+                    함께 기도했어요 <u id="likeCount">@Model.LikeCount.ToString("N0")</u>
+                </button>
+                <div class="epStat">
+                    <span title="이 기도문을 읽은 수 (관리자 방문 제외)">조회 @Model.ClickCount.ToString("N0")</span>
+                    <span>기도 <b id="likeCountEcho" style="font-weight:400">@Model.LikeCount.ToString("N0")</b></span>
+                    <em>관리자만</em>
+                </div>
+                <div class="epMsg" id="likeMsg" aria-live="polite"></div>
+            </div>
+        }
+
+        <nav class="epNav">
+            <a href="/EntranceExamPray/List">기도 목록</a>
+            @if (isSuper)
+            {
+                <a href="/EntranceExamPray/Index">오늘의 기도</a>
+                <a href="/EntranceExamPray/Edit?PrayId=@Model.PrayId">수정</a>
+            }
+            else
+            {
+                <a href="/">홈</a>
+            }
+        </nav>
+
+        @if (isSuper)
+        {
+            @* 검증 완료 — 수정 시각만 올리고 가장 오래 손대지 않은 기도문으로 *@
+            <form class="epVerify" method="post" action="/EntranceExamPray/Verify">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="PrayId" value="@Model.PrayId" />
+                <div class="epVerifyTx">
+                    @if (touched.HasValue)
+                    {
+                        <text>@(everEdited ? "마지막 수정" : "등록") <b>@touched.Value.ToString("yyyy-MM-dd HH:mm")</b><br /></text>
+                    }
+                    검토를 마치면 수정 시각이 지금으로 바뀌고, 가장 오래 손대지 않은 기도문으로 넘어가요.
+                </div>
+                <button type="submit" class="epVerifyBtn">검증 완료</button>
+            </form>
+        }
+
+        <section class="epNote">
+            <div class="epNoteT">함께 만들어 가는 기도문</div>
+            <div class="epNi">오타나 어색한 곳이 있나요?<small>알려 주시면 살펴보고 고칠게요</small></div>
+            <div class="epNi">나누고 싶은 기도문이 있나요?<small>올려 드릴게요. 함께 기도해요</small></div>
+            <a class="epBtn" href="/Board/Create2?boardName=Anonymous">알려 주기</a>
+            <div class="epFine">이름을 남기지 않아도 돼요</div>
+        </section>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    var MAP = { s: 0.90, m: 1, l: 1.18, xl: 1.36 };
+    window.setPFs = function (k, silent) {
+        if (!MAP[k]) k = 'm';
+        document.documentElement.style.setProperty('--fs', MAP[k]);
+        ['S', 'M', 'L', 'XL'].forEach(function (x) {
+            var b = document.getElementById('pfs' + x);
+            if (b) b.classList.toggle('on', x.toLowerCase() === k);
+        });
+        if (!silent) { try { localStorage.setItem('ppFs', k); } catch (e) { } }
+    };
+    var saved = 'm';
+    try { saved = localStorage.getItem('ppFs') || 'm'; } catch (e) { }
+    setPFs(saved, true);
+})();
+
+(function () {
+    var btn = document.getElementById('likeBtn');
+    if (!btn) return;
+    var cntEl = document.getElementById('likeCount');
+    var msgEl = document.getElementById('likeMsg');
+    var prayId = btn.getAttribute('data-prayid');
+    var storeKey = 'eepLiked:' + prayId;
+
+    function say(t) { if (msgEl) msgEl.textContent = t || ''; }
+    function markDone(t) {
+        btn.classList.add('on');
+        btn.setAttribute('aria-pressed', 'true');
+        btn.disabled = false;
+        btn.style.pointerEvents = 'none';
+        say(t);
+    }
+
+    try { if (localStorage.getItem(storeKey) === '1') markDone('오늘 함께 기도하셨어요'); } catch (e) { }
+
+    btn.addEventListener('click', function () {
+        if (btn.classList.contains('on') || btn.disabled) return;
+        btn.disabled = true;
+        say('');
+        var body = new URLSearchParams();
+        body.append('prayId', prayId);
+        fetch('/EntranceExamPray/Like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+            body: body.toString(),
+            credentials: 'same-origin'
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d || !d.ok) { btn.disabled = false; say((d && d.msg) ? d.msg : '잠시 후 다시 눌러 주세요.'); return; }
+            var shown = Number(d.count).toLocaleString('ko-KR');
+            if (cntEl) cntEl.textContent = shown;
+            var echo = document.getElementById('likeCountEcho');
+            if (echo) echo.textContent = shown;
+            try { localStorage.setItem(storeKey, '1'); } catch (e) { }
+            markDone(d.already ? '이미 함께 기도하셨어요' : '함께 기도해 주셔서 고맙습니다');
+        })
+        .catch(function () { btn.disabled = false; say('연결이 불안정해요. 다시 눌러 주세요.'); });
+    });
+})();
+</script>
+
+</body>
+</html>

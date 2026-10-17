@@ -1,0 +1,267 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    var meName      = (ViewBag.MeFullName  as string) ?? "";
+    var isTeacher   = (bool)(ViewBag.IsTeacher   ?? false);
+    var meRoleNM    = (ViewBag.MeRoleNM    as string) ?? "";
+    var canGoAdmin  = (bool)(ViewBag.CanGoAdmin  ?? false);
+    var hasResponse = (bool)(ViewBag.HasResponse ?? false);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경학교 참석여부 조사</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --blue:   #2563eb; --blue2:  #1d4ed8; --blue-bg: #eff6ff;
+            --green:  #16a34a; --green2: #15803d; --green-bg: #f0fdf4;
+            --ink:    #0f172a; --mut: #64748b;
+            --line:   rgba(15,23,42,.10);
+            --card:   #ffffff;
+            --shadow: 0 12px 32px rgba(2,6,23,.10);
+        }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #dbeafe 0%, #dcfce7 60%, #f8fafc 100%);
+            font-family: system-ui,-apple-system,'Noto Sans KR',sans-serif;
+            color: var(--ink);
+        }
+        a { color: inherit; text-decoration: none; }
+
+        .wrap { max-width: 600px; margin: 0 auto; padding: 24px 16px 40px; }
+
+        /* ── 헤더 ── */
+        .hero { text-align: center; margin-bottom: 32px; }
+        .hero-icon { font-size: 48px; line-height: 1; margin-bottom: 10px; }
+        .hero-title { font-size: 22px; font-weight: 950; letter-spacing: -.3px; }
+        .hero-sub { margin-top: 6px; color: var(--mut); font-size: 13.5px; font-weight: 700; }
+        .hero-dates { margin-top: 10px; display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .date-chip {
+            padding: 5px 14px; border-radius: 999px; font-size: 12.5px; font-weight: 900;
+            background: rgba(255,255,255,.8); border: 1px solid var(--line);
+        }
+
+        /* ── 인사 배너 ── */
+        .greeting {
+            background: rgba(255,255,255,.80); border: 1px solid var(--line);
+            border-radius: 16px; padding: 14px 18px; margin-bottom: 24px;
+            display: flex; align-items: center; gap: 12px; backdrop-filter: blur(6px);
+        }
+        .greeting-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--blue), var(--green));
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; flex-shrink: 0;
+        }
+        .greeting-name { font-size: 15px; font-weight: 950; }
+        .greeting-role { font-size: 12.5px; color: var(--mut); font-weight: 700; margin-top: 2px; }
+        .resp-badge {
+            margin-left: auto; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 900;
+            flex-shrink: 0;
+        }
+        .resp-badge.done   { background: rgba(34,197,94,.14); color: #166534; border: 1px solid rgba(34,197,94,.3); }
+        .resp-badge.undone { background: rgba(239,68,68,.10); color: #991b1b; border: 1px solid rgba(239,68,68,.22); }
+
+        /* ── 섹션 라벨 ── */
+        .sec-label {
+            font-size: 11.5px; font-weight: 950; letter-spacing: .08em;
+            color: var(--mut); text-transform: uppercase; margin-bottom: 12px;
+        }
+
+        /* ── 선택 카드 ── */
+        .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+        @@media (max-width: 460px) { .choice-grid { grid-template-columns: 1fr; } }
+
+        .choice-card {
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            gap: 10px; padding: 24px 16px 20px;
+            border-radius: 20px; border: 2px solid transparent;
+            text-decoration: none; color: inherit;
+            transition: transform .12s ease, box-shadow .15s ease, border-color .15s;
+            position: relative; overflow: hidden;
+        }
+        .choice-card::before {
+            content: ''; position: absolute; inset: 0; opacity: .06;
+        }
+        .choice-card:hover  { transform: translateY(-3px); }
+        .choice-card:active { transform: translateY(0); }
+
+        /* 학생 카드 */
+        .cc-student {
+            background: linear-gradient(160deg, #dbeafe, #bfdbfe);
+            border-color: rgba(37,99,235,.20);
+            box-shadow: 0 8px 28px rgba(37,99,235,.18);
+        }
+        .cc-student:hover { box-shadow: 0 14px 40px rgba(37,99,235,.26); border-color: rgba(37,99,235,.40); }
+
+        /* 교사 카드 */
+        .cc-staff {
+            background: linear-gradient(160deg, #dcfce7, #bbf7d0);
+            border-color: rgba(22,163,74,.20);
+            box-shadow: 0 8px 28px rgba(22,163,74,.16);
+        }
+        .cc-staff:hover { box-shadow: 0 14px 40px rgba(22,163,74,.24); border-color: rgba(22,163,74,.40); }
+
+        /* 내 그룹 강조 */
+        .cc-mine { border-width: 2.5px; }
+        .cc-student.cc-mine { border-color: var(--blue); }
+        .cc-staff.cc-mine   { border-color: var(--green); }
+
+        .cc-mine-badge {
+            position: absolute; top: 10px; right: 10px;
+            padding: 3px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 900;
+        }
+        .cc-student .cc-mine-badge { background: var(--blue); color: #fff; }
+        .cc-staff   .cc-mine-badge { background: var(--green); color: #fff; }
+
+        .cc-icon { font-size: 38px; line-height: 1; }
+        .cc-title { font-size: 16px; font-weight: 950; }
+        .cc-desc  { font-size: 12px; color: var(--mut); font-weight: 700; line-height: 1.4; }
+        .cc-btn {
+            margin-top: 6px; padding: 9px 22px; border-radius: 50px;
+            font-size: 13px; font-weight: 950;
+        }
+        .cc-student .cc-btn { background: var(--blue); color: #fff; }
+        .cc-staff   .cc-btn { background: var(--green); color: #fff; }
+
+        /* ── 하단 링크 ── */
+        .extra-links { display: flex; flex-direction: column; gap: 10px; }
+        .extra-link {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 18px; border-radius: 16px;
+            background: rgba(255,255,255,.78); border: 1px solid var(--line);
+            backdrop-filter: blur(6px); transition: transform .1s, box-shadow .15s;
+        }
+        .extra-link:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+        .extra-link-icon { font-size: 22px; }
+        .extra-link-text { flex: 1; }
+        .extra-link-title { font-size: 14px; font-weight: 950; }
+        .extra-link-sub   { font-size: 12px; color: var(--mut); font-weight: 700; margin-top: 2px; }
+        .extra-link-arrow { font-size: 16px; color: var(--mut); }
+    </style>
+</head>
+<body>
+
+    @{
+        var startDate = ConstatsCommon.VBSParticipationStartDate;
+        var days = new[]
+        {
+        startDate,
+        startDate.AddDays(1),
+        startDate.AddDays(2)
+        };
+
+        string[] weekNames = { "일", "월", "화", "수", "목", "금", "토" };
+    }
+    <div class="wrap">
+        <!-- 히어로 -->
+        <div class="hero">
+            <div class="hero-icon">🏕️</div>
+            <div class="hero-title">성경학교 참석여부 조사</div>
+            <div class="hero-sub">2027년 7월 31일 ~ 8월 2일</div>
+            <div class="hero-dates">
+                @foreach (var day in days)
+                {
+                    <span class="date-chip">
+                        @day.ToString("M/d") (@weekNames[(int)day.DayOfWeek])
+                    </span>
+                }
+            </div>
+        </div>
+
+        <!-- 인사 배너 -->
+        <div class="greeting">
+            <div class="greeting-avatar">👤</div>
+            <div>
+                <div class="greeting-name">@meName 님</div>
+                <div class="greeting-role">@(isTeacher ? (string.IsNullOrWhiteSpace(meRoleNM) ? "교사" : meRoleNM) : "학생 참여자")</div>
+            </div>
+            @if (hasResponse)
+            {
+                <span class="resp-badge done">✅ 응답 완료</span>
+            }
+            else
+            {
+                <span class="resp-badge undone">⚠️ 미응답</span>
+            }
+        </div>
+
+        <!-- 선택 카드 -->
+        <div class="sec-label">참여 유형 선택</div>
+        <div class="choice-grid">
+            <a class="choice-card cc-student @(!isTeacher ? "cc-mine" : "")"
+               href="/VBSParticipationSurvey/Survey?who=student">
+                @if (!isTeacher) { <span class="cc-mine-badge">내 그룹</span> }
+                <div class="cc-icon">🎒</div>
+                <div class="cc-title">학생 참여자</div>
+                <div class="cc-desc">오전·오후 참석여부를<br/>입력해 주세요</div>
+                <div class="cc-btn">참석여부 입력 →</div>
+            </a>
+
+            <a class="choice-card cc-staff @(isTeacher ? "cc-mine" : "")"
+               href="/VBSParticipationSurvey/Survey?who=staff">
+                @if (isTeacher) { <span class="cc-mine-badge">내 그룹</span> }
+                <div class="cc-icon">👨‍🏫</div>
+                <div class="cc-title">교사 / 교역자</div>
+                <div class="cc-desc">교사·인도자·스탭<br/>참석여부를 입력해 주세요</div>
+                <div class="cc-btn">참석여부 입력 →</div>
+            </a>
+        </div>
+
+        <!-- 추가 링크 -->
+        <div class="extra-links">
+            @if (canGoAdmin)
+            {
+                <a class="extra-link" href="/VBSParticipationSurvey/ViewAll?view=Student">
+                    <span class="extra-link-icon">🎒</span>
+                    <div class="extra-link-text">
+                        <div class="extra-link-title">학생 참여자 목록</div>
+                        <div class="extra-link-sub">학생 명단 · 학년·반 · 날짜별 오전/오후 참석 현황</div>
+                    </div>
+                    <span class="extra-link-arrow">›</span>
+                </a>
+                <a class="extra-link" href="/VBSParticipationSurvey/ViewAll?view=Teacher">
+                    <span class="extra-link-icon">👨‍🏫</span>
+                    <div class="extra-link-text">
+                        <div class="extra-link-title">교사·스탭 목록</div>
+                        <div class="extra-link-sub">교사·교역자·스탭 명단 · 날짜별 참석 현황</div>
+                    </div>
+                    <span class="extra-link-arrow">›</span>
+                </a>
+                <a class="extra-link" href="/VBSParticipationSurvey/Stats">
+                    <span class="extra-link-icon">📊</span>
+                    <div class="extra-link-text">
+                        <div class="extra-link-title">전체 통계 보기</div>
+                        <div class="extra-link-sub">응답률 · 날짜별 참석 현황 · 미응답자 목록</div>
+                    </div>
+                    <span class="extra-link-arrow">›</span>
+                </a>
+                <a class="extra-link" href="/VBSParticipationSurvey/Admin?view=All">
+                    <span class="extra-link-icon">⚙️</span>
+                    <div class="extra-link-text">
+                        <div class="extra-link-title">관리자 직접 수정</div>
+                        <div class="extra-link-sub">타인의 참석여부 직접 편집</div>
+                    </div>
+                    <span class="extra-link-arrow">›</span>
+                </a>
+            }
+            <a class="extra-link" href="/Home/Index">
+                <span class="extra-link-icon">🏠</span>
+                <div class="extra-link-text">
+                    <div class="extra-link-title">홈으로</div>
+                    <div class="extra-link-sub">메인 홈페이지로 돌아가기</div>
+                </div>
+                <span class="extra-link-arrow">›</span>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

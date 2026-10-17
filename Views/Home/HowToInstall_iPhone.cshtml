@@ -1,0 +1,291 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+}
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>아이폰 설치 가이드</title>
+    <meta name="description" content="아이폰 Safari에서 PWA를 홈 화면에 설치하는 방법 안내" />
+
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: rgba(255,255,255,0.08);
+            --text: rgba(255,255,255,0.92);
+            --muted: rgba(255,255,255,0.7);
+            --line: rgba(255,255,255,0.14);
+            --shadow: 0 12px 30px rgba(0,0,0,0.3);
+            --radius: 18px;
+            --radius2: 14px;
+            --sans: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo",Arial,sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--text);
+            background: radial-gradient(900px 500px at 15% 10%, rgba(125,211,252,0.22), transparent 55%), radial-gradient(800px 500px at 85% 20%, rgba(167,243,208,0.18), transparent 60%), var(--bg);
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 16px 50px;
+        }
+
+        header {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+
+        .title {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            background: linear-gradient(135deg,rgba(125,211,252,.3),rgba(167,243,208,.2));
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .subtitle {
+            margin-top: 6px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        /* =======================
+                   GRID LAYOUT
+                   ======================= */
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* PC: 2 columns */
+            gap: 14px;
+        }
+
+        /* ✅ 모바일에서는 반드시 1열 */
+        @@media (max-width: 860px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: linear-gradient(180deg,var(--card),rgba(255,255,255,0.05));
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .hd {
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+            .hd h2 {
+                margin: 0;
+                font-size: 16px;
+            }
+
+        .bd {
+            padding: 14px 16px;
+        }
+
+        .step {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+        }
+
+        .num {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            background: rgba(125,211,252,0.2);
+            border: 1px solid rgba(125,211,252,0.3);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .t {
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+
+        .d {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .callout {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: var(--radius2);
+            border: 1px solid rgba(52,211,153,.3);
+            background: rgba(52,211,153,.12);
+            font-size: 13px;
+        }
+
+        .warn {
+            border-color: rgba(251,191,36,.35);
+            background: rgba(251,191,36,.12);
+        }
+
+        footer {
+            margin-top: 18px;
+            font-size: 12.5px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        <header>
+            <div class="title">
+                <div class="badge">🍎</div>
+                <div>
+                    <h1>아이폰 설치 가이드</h1>
+                    <div class="subtitle">
+                        자동 설치 팝업이 없을 때, <b>Safari</b>에서 홈 화면에 추가하는 방법입니다.
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+
+            <!-- 설치 방법 -->
+            <section class="card">
+                <div class="hd"><h2>📲 설치 방법</h2></div>
+                <div class="bd">
+
+                    <div class="step">
+                        <div class="num">1</div>
+                        <div>
+                            <div class="t">Safari로 사이트 접속</div>
+                            <div class="d">반드시 <b>아이폰 기본 브라우저 Safari</b>로 홈페이지 주소를 엽니다. (크롬·카카오앱 불가)</div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="num">2</div>
+                        <div>
+                            <div class="t">하단 공유 버튼 누르기</div>
+                            <div class="d">화면 아래 가운데에 있는 <b>공유 아이콘(□↑)</b>을 누르세요.</div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="num">3</div>
+                        <div>
+                            <div class="t">“홈 화면에 추가” 선택</div>
+                            <div class="d">메뉴를 아래로 스크롤하여 <b>홈 화면에 추가</b>를 선택합니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="num">4</div>
+                        <div>
+                            <div class="t">“추가” 버튼 누르기</div>
+                            <div class="d">이름을 확인 후 오른쪽 상단 <b>추가</b>를 누르면 설치 완료입니다 🎉</div>
+                        </div>
+                    </div>
+
+                    <div class="callout">
+                        ✅ 설치 후에는 바탕화면 아이콘을 눌러 일반 앱처럼 바로 실행할 수 있습니다.
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- 설치 안될 때 -->
+            <section class="card">
+                <div class="hd"><h2>⚠️ 설치가 안 될 때</h2></div>
+                <div class="bd">
+
+                    <div class="step">
+                        <div class="num">✔</div>
+                        <div>
+                            <div class="t">Safari로 열었나요?</div>
+                            <div class="d">다른 브라우저에서는 “홈 화면에 추가” 메뉴가 보이지 않습니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="num">✔</div>
+                        <div>
+                            <div class="t">주소에 https 보안 표시가 있나요?</div>
+                            <div class="d">보안 연결이 아니면 설치가 제한될 수 있습니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="num">✔</div>
+                        <div>
+                            <div class="t">이미 설치된 앱은 아닌가요?</div>
+                            <div class="d">홈 화면을 좌우로 넘겨 아이콘이 이미 있는지 확인하세요.</div>
+                        </div>
+                    </div>
+
+                    <div class="callout warn">
+                        ⚠️ 그래도 안 될 경우 Safari 탭을 모두 닫고 다시 실행한 후 재시도하세요.
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+
+        <footer>
+            <div>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+        </footer>
+
+    </div>
+</body>
+</html>

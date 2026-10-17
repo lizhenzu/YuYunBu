@@ -1,0 +1,578 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+
+@*  ══════════════════════════════════════════════════════════════
+    미션 홈 — Bone 스킨
+
+    호텔 객실에 놓인 "오늘의 일정표" 를 생각하고 짰다.
+      프로그램 안내 → 인사 → 이번 주 띠 → 오늘 할 일 네 줄
+      → 나의 기록 → 달력 → 우리 가족 → 더 보기
+
+    · 오늘 할 일은 01~04 번호가 붙은 한 줄짜리 항목이다.
+      각 줄에 그 미션의 '오늘 내용'(말씀 제목·기도 제목 …)을 같이 적는다.
+      들어가 보지 않아도 오늘 무엇을 하는지 알 수 있어야 한다.
+    · 달력은 날짜마다 '그날 받은 점수'를 숫자로 적는다.
+      네 가지를 다 한 날은 칸 전체를 옅은 브라스로 칠해 한눈에 세게 한다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = "_Layout_Mission3";
+
+    ViewBag.DM2Page = "dash";
+    ViewBag.DM2Done = false;
+
+    var d       = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var dPretty = Model.SelectedDate.ToString("yyyy.MM.dd", CultureInfo.InvariantCulture)
+                  + " " + Model.SelectedDate.ToString("ddd", new CultureInfo("en-US")).ToUpperInvariant();
+    var dateKo  = Model.SelectedDate.ToString("M월 d일 (ddd)", new CultureInfo("ko-KR"));
+    var toast   = (ViewBag.Toast ?? "").ToString();
+
+    bool canAct = Model.IsActionable;
+    int  total  = Model.YearPoint?.YearTotalPoint ?? 0;
+
+    string UrlWithDate(string baseUrl) => $"{baseUrl}?date={d}";
+
+    var okPopupMsg   = TempData["DM2_OK_POPUP"] as string;
+    var awardUrl     = TempData["DM2_AWARD_URL"] as string;
+    var awardPickUrl = TempData.Peek("DM2_AWARD_URL") as string;
+    bool needPickAward = !string.IsNullOrWhiteSpace(awardPickUrl);
+    var returnUrl = (Context?.Request?.Path.ToString() ?? "") + (Context?.Request?.QueryString.ToString() ?? "");
+
+    var st = Model.DayStatus;
+
+    bool mWord   = st?.WordDone   ?? false;
+    bool mQuiz   = st?.QuizDone   ?? false;
+    bool mPray   = st?.PrayDone   ?? false;
+    bool mRecite = st?.ReciteDone ?? false;
+    int  doneCnt = (mWord ? 1 : 0) + (mQuiz ? 1 : 0) + (mPray ? 1 : 0) + (mRecite ? 1 : 0);
+
+    var fullName    = (ViewData["UserFullName"] as string ?? "").Trim();
+    var displayName = !string.IsNullOrEmpty(fullName) ? fullName : Model.UserName;
+
+    var ptMap   = Model.CalendarDayPointMap ?? new Dictionary<string, int>();
+    var doneMap = Model.CalendarAllDoneMap  ?? new Dictionary<string, bool>();
+
+    int  PointOf(DateTime day) => ptMap.TryGetValue(day.ToString("yyyy-MM-dd"), out var p) ? p : 0;
+    bool AllDoneOf(DateTime day) => doneMap.TryGetValue(day.ToString("yyyy-MM-dd"), out var b) && b;
+
+    // ── 이어온 날 : 오늘(또는 어제)부터 거꾸로 세어, 점수가 있는 날이 몇 날 이어졌는지 ──
+    var today = Model.Today.Date;
+    int streak = 0;
+    {
+        // 오늘 아직 안 했더라도 어제까지 이어온 것은 끊긴 것이 아니다.
+        var cursor = PointOf(today) > 0 ? today : today.AddDays(-1);
+        while (PointOf(cursor) > 0 && streak < 400)
+        {
+            streak++;
+            cursor = cursor.AddDays(-1);
+        }
+    }
+
+    // ── 이달 수행 : 이번 달에 점수가 있는 날 / 오늘까지 지난 날 ──
+    var monthFirst = new DateTime(Model.SelectedDate.Year, Model.SelectedDate.Month, 1);
+    var monthLast  = monthFirst.AddMonths(1).AddDays(-1);
+    int monthDone = 0, monthElapsed = 0, monthPoint = 0;
+    for (var day = monthFirst; day <= monthLast; day = day.AddDays(1))
+    {
+        if (day > today) { break; }
+        monthElapsed++;
+        var p = PointOf(day);
+        if (p > 0) { monthDone++; monthPoint += p; }
+    }
+
+    // ── 각 미션의 '오늘 내용' ──
+    var _wr = ViewBag.TodayWordToReadRow as BulletinBoard.Models.DailyMission2.TodayWordDetailResult;
+    bool hasWord = Model.Content?.TodayWordToReadId != null;
+    // 말씀 제목과 성경 구절은 각각 한 줄로 보여 준다 (길면 줄 끝에서 … 로 자름)
+    string wordSub = (_wr == null) ? "" : (_wr.BibleSubject ?? "");
+    string wordRef = (_wr == null) ? "" :
+        $"{_wr.BibleText} {SharedComm.MakeBibleSerialJangZul(_wr.BibleText, _wr.FromJang, _wr.FromZul, _wr.ToJang, _wr.ToZul)}".Trim();
+
+    var  quiz        = Model.Content?.Quiz;
+    bool hasQuiz     = quiz?.QuestionId != null;
+    bool quizCorrect = st?.QuizCorrect ?? false;
+    int  quizTry     = st?.QuizTryCntMax ?? 0;
+
+    bool hasPray = Model.Content?.PrayPhraseId != null;
+    dynamic _pr = ViewBag.TodayPrayPhraseRow;
+    string praySub = "";
+    if (_pr != null && _pr?.PrayPhraseData != null)
+    {
+        try { praySub = (_pr.PrayPhraseData.PrayTitle ?? "").ToString(); } catch { }
+    }
+
+    bool hasRecite = Model.Content?.WeeklyWordToReadId != null;
+
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+
+    // 지난 날짜를 보고 있으면 '오늘 할 일'이 아니라 '그 날의 기록'이다.
+    bool isPast = Model.IsOtherDate || !canAct;
+
+    // ── 선물 (MyGiftBox 와 같은 기준) ──
+    //   통합 점수 = 미션 + 출석 + 세계관 + 감사 + 전도×50
+    //   100점을 채울 때마다 마일스톤이 오르고, 마일스톤마다 크레딧(원)이 쌓인다.
+    //   쓸 수 있는 크레딧 = 쌓인 크레딧 − 이미 고른 선물 값
+    int ToInt(object v) { try { return v == null ? 0 : Convert.ToInt32(v); } catch { return 0; } }
+
+    int  integrated   = ToInt(ViewBag.GiftIntegrated);
+    int  giftCredit   = ToInt(ViewBag.GiftAvailableCredit);
+
+    // 선물은 학생만 고를 수 있다. 학생이 아니면 선물 관련은 한 글자도 내보내지 않는다.
+    bool isStudent    = (ViewBag.GiftIsStudent is bool bStu) && bStu;
+    bool canPickGift  = isStudent && (ViewBag.GiftHasAffordable is bool b2) && b2 && giftCredit > 0;
+
+    // 다음 마일스톤(100점 단위)까지 남은 점수. 상한 2000점을 넘으면 더 오르지 않는다.
+    const int MilestoneCap = 2000;
+    int nextMilestone = (integrated >= MilestoneCap) ? 0 : ((integrated / 100) + 1) * 100;
+    int needPoint     = nextMilestone > 0 ? (nextMilestone - integrated) : 0;
+    double giftFill   = nextMilestone > 0 ? ((integrated % 100) / 100.0) : 1.0;
+
+    var missions = new[]
+    {
+        new {
+            No = "01", Title = "말씀", Sub = wordSub, Sub2 = wordRef, Point = 2,
+            Href = UrlWithDate("/DailyMission4/Word"),
+            Done = mWord, Has = hasWord, Note = (string)null
+        },
+        new {
+            No = "02", Title = "퀴즈", Sub = "오늘 말씀에서 한 문제", Sub2 = (string)null, Point = 1,
+            Href = UrlWithDate("/DailyMission4/Quiz"),
+            Done = mQuiz, Has = hasQuiz,
+            Note = (canAct && !quizCorrect && quizTry == 1) ? "한 번 더 도전할 수 있어요"
+                 : (canAct && !quizCorrect && quizTry >= 2) ? "오늘은 두 번 도전했어요" : (string)null
+        },
+        new {
+            No = "03", Title = "기도", Sub = praySub, Sub2 = (string)null, Point = 2,
+            Href = UrlWithDate("/DailyMission4/Pray"),
+            Done = mPray, Has = hasPray, Note = (string)null
+        },
+        new {
+            No = "04", Title = "암송", Sub = "이번 주 암송 구절", Sub2 = (string)null, Point = 1,
+            Href = UrlWithDate("/DailyMission4/Recite"),
+            Done = mRecite, Has = hasRecite, Note = (string)null
+        }
+    };
+
+    // ── 이번 주 띠 : 선택일이 든 주의 일요일부터 7일 ──
+    var weekStart = Model.SelectedDate.Date.AddDays(-(int)Model.SelectedDate.DayOfWeek);
+    var weekDayNames = new[] { "일", "월", "화", "수", "목", "금", "토" };
+
+    // ── 달력 : 1일이 든 주의 일요일부터 채운다 ──
+    var gridStart = monthFirst.AddDays(-(int)monthFirst.DayOfWeek);
+    int gridCells = (int)Math.Ceiling((monthLast - gridStart).TotalDays + 1) ;
+    gridCells = (int)(Math.Ceiling(gridCells / 7.0) * 7);
+}
+
+
+@*  ══════════════════════════════════════════════════════════════
+    미션 홈 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정 · 말씀 · 퀴즈 · 기도 · 암송과 같은 옷)
+      인사 → 나의 기록(7일 막대 · 네 가지 숫자 · 선물 막대) → 오늘 한 줄 → 오늘의 미션 카드 4장
+      → 이달의 달력 → 우리 가족 → 더 보기
+    · 카드 · 테두리 상자 없이 섹션 제목 + 가는 회색 줄로 나눈다.  강조색은 맑은 파랑.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    int   _dayPt     = PointOf(Model.SelectedDate.Date);
+    const int _dayMax = 6;
+    const double _ringLen = 2 * Math.PI * 15;   // r=15 (viewBox 36)
+    double _ringOff  = _ringLen * (1 - doneCnt / 4.0);
+    var   _endDay    = Model.SelectedDate.Date;
+    var   _days7     = Enumerable.Range(0, 7).Select(i => _endDay.AddDays(i - 6)).ToList();
+    int   _week7Sum  = _days7.Sum(PointOf);
+    int   _allDoneMonth = 0;
+    for (var _dd = monthFirst; _dd <= monthLast && _dd <= today; _dd = _dd.AddDays(1)) { if (AllDoneOf(_dd)) _allDoneMonth++; }
+    string[] _wk    = { "일", "월", "화", "수", "목", "금", "토" };
+    string[] _tone  = { "w", "q", "pr", "r" };
+    string[] _go    = { "읽기", "풀기", "기도", "외우기" };
+    var _nextNo = missions.FirstOrDefault(x => !x.Done && canAct && x.Has)?.No;
+}
+
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+
+<style>
+    /* ── 밝은 흰색 버전 : 이 화면만 (공통 bone.css 위에 덮어쓴다) ── */
+    body { background: #FFFFFF; }
+    .qz.hm { --hBlue: #2F80ED; --hBlueSoft: #EAF2FD; --hNoBlue: #7FA3DB; --hGreen: #16A34A; --hInk: #111827; --hTx: #374151; --hDim: #9CA3AF; --hDim2: #6B7280; --hLine: #EEF0F3; --hSoft: #F4F6F9;
+             background: #FFFFFF; font-family: "Gothic A1", "Malgun Gothic", system-ui, sans-serif; }
+    .qz.hm .qzBody { background: #FFFFFF; }
+    .qz.hm .qzBar { border-bottom-color: var(--hLine); }
+    .qz.hm .qzProg { display: none; }
+    .qz.hm .qzLock { background: #F3F7FD; color: var(--hDim2); border: 0; }
+
+    /* 인사 */
+    .qz.hm .hPg { margin-top: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--hLine); }
+    .qz.hm .hI { margin-top: 18px; }
+    .qz.hm .hK { font-size: 20px; font-weight: 800; color: var(--hBlue); letter-spacing: -.01em; }
+    .qz.hm .hKs { margin-top: 5px; font-size: 12px; color: var(--hDim2); }
+    .qz.hm .hK a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }   /* 링크인 티는 내지 않는다 (눌러서 예전 버전으로) */
+    .qz.hm .hI h2 { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--hInk); word-break: keep-all; }
+    .qz.hm .hD { margin-top: 4px; font-size: 13px; color: var(--hDim2); }
+    .qz.hm .hD b { color: var(--hBlue); font-weight: 800; }
+
+    /* 섹션 제목 */
+    .qz.hm .hSh { display: flex; justify-content: space-between; align-items: baseline; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--hLine); font-size: 16px; font-weight: 800; color: var(--hInk); }
+    .qz.hm .hSh small { font-size: 11.5px; font-weight: 600; color: var(--hDim); }
+    .qz.hm .hSh.first { margin-top: 22px; }
+
+    /* 나의 기록 — 7일 막대(연한 파랑, 오늘은 진한 파랑) · 네 가지 숫자 · 선물 막대 */
+    .qz.hm .hBars { display: flex; align-items: flex-end; gap: 8px; height: 120px; margin-top: 8px; padding-bottom: 32px; position: relative; }
+    .qz.hm .hBars::before { content: ""; position: absolute; left: 0; right: 0; bottom: 32px; border-top: 1px solid var(--hLine); }
+    .qz.hm .hBar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+    .qz.hm .hBar i { display: block; width: 100%; max-width: 24px; background: #CFE0FA; border-radius: 4px 4px 0 0; min-height: 2px; }
+    .qz.hm .hBar.all i { background: #8DB5F3; }
+    .qz.hm .hBar.end i { background: var(--hBlue); }
+    .qz.hm .hBar b { font-size: 10px; font-weight: 600; color: var(--hDim2); margin-bottom: 3px; }
+    .qz.hm .hBar.zero b { color: #D1D5DB; }
+    .qz.hm .hBar em { font-style: normal; position: absolute; bottom: -32px; font-size: 10px; color: var(--hDim); text-align: center; line-height: 1.25; white-space: nowrap; }
+    .qz.hm .hBar em small { display: block; font-size: 12px; color: var(--hTx); margin-top: 1px; }
+    .qz.hm .hBar.end em small { color: var(--hBlue); font-weight: 800; }
+    .qz.hm .hFacts { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hLine); }
+    .qz.hm .hFacts > div { text-align: center; min-width: 0; }
+    .qz.hm .hFacts > div + div { border-left: 1px solid var(--hLine); }
+    .qz.hm .hFacts .k { font-size: 10.5px; color: var(--hDim); }
+    .qz.hm .hFacts .v { font-size: 20px; font-weight: 300; color: var(--hInk); margin-top: 3px; font-variant-numeric: tabular-nums; }
+    .qz.hm .hFacts .v u { text-decoration: none; font-size: 10.5px; color: var(--hDim); margin-left: 1px; }
+    .qz.hm .hGift { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hLine); }
+    .qz.hm .hGift .h { display: flex; justify-content: space-between; font-size: 12px; color: var(--hDim2); }
+    .qz.hm .hGift .h b { color: var(--hBlue); }
+    .qz.hm .hGift .pb { height: 6px; border-radius: 3px; background: #E8ECF2; margin-top: 8px; overflow: hidden; }
+    .qz.hm .hGift .pb i { display: block; height: 100%; background: var(--hBlue); border-radius: 3px; }
+
+    /* 선물 고를 수 있음 — 한 줄 링크 */
+    .qz.hm a.hPick { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; padding: 14px; border-radius: 14px; background: var(--hBlueSoft); text-decoration: none; color: var(--hInk); -webkit-tap-highlight-color: transparent; }
+    .qz.hm a.hPick b { font-size: 15.5px; font-weight: 800; }
+    .qz.hm a.hPick span { font-size: 12.5px; font-weight: 800; color: var(--hBlue); white-space: nowrap; }
+
+    /* 오늘 한 줄 — 원 · 응원 문구 · 올해 점수 */
+    .qz.hm .hTop { display: flex; align-items: center; gap: 16px; margin-top: 14px; }
+    .qz.hm .hRing { position: relative; width: 84px; height: 84px; flex: none; }
+    .qz.hm .hRing svg { width: 84px; height: 84px; display: block; transform: rotate(-90deg); }
+    .qz.hm .hRingC { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .qz.hm .hRingC b { font-size: 19px; font-weight: 800; color: var(--hInk); line-height: 1.1; }
+    .qz.hm .hRingC small { font-size: 10px; color: var(--hDim2); margin-top: 2px; }
+    .qz.hm .hSum { min-width: 0; }
+    .qz.hm .hSumL { font-size: 12px; color: var(--hDim2); }
+    .qz.hm .hSumV { font-size: 40px; font-weight: 300; color: var(--hBlue); line-height: 1.1; font-variant-numeric: tabular-nums; }
+    .qz.hm .hSumV u { text-decoration: none; font-size: 15px; color: var(--hDim2); margin-left: 3px; }
+    .qz.hm .hSumT { font-size: 13px; color: var(--hTx); margin-top: 2px; }
+    .qz.hm .hSumT b { color: var(--hBlue); font-weight: 800; }
+    .qz.hm .hChd { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--hLine); font-size: 13px; color: var(--hTx); }
+    .qz.hm .hChT b { color: var(--hBlue); font-weight: 800; margin-left: 4px; }
+    .qz.hm .hChM { font-size: 11px; color: var(--hDim); }
+    .qz.hm .hCk { position: absolute; top: 0; left: 0; right: 0; text-align: center; font-size: 12px; line-height: 14px; font-weight: 800; color: var(--hBlue); }
+    .qz.hm .hLg { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 10.5px; color: var(--hDim); }
+    .qz.hm .hLg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+    .qz.hm .hParty { margin-top: 26px; padding: 16px 14px; text-align: center; background: linear-gradient(160deg, #FFF8E8, #F6E7C8); border-radius: 14px; }
+    .qz.hm .hSeal { width: 58px; height: 58px; margin: 0 auto; border-radius: 50%; border: 2.5px solid #C9A25A; color: #6E5530; background: #fff; display: grid; place-items: center; font-weight: 800; font-size: 12px; line-height: 1.2; transform: rotate(-8deg); }
+    .qz.hm .hParty b { display: block; font-size: 18px; font-weight: 800; color: #6E5530; margin-top: 8px; }
+    .qz.hm .hParty span { display: block; font-size: 12px; color: var(--hDim2); margin-top: 3px; }
+
+    /* 미션 카드 4장 (확정한 카드 그대로 — 이모지 없이 연한 색) */
+    .qz.hm .hMs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 12px; }
+    .qz.hm .hFacts + .hMs, .qz.hm .hGift + .hMs { margin-top: 24px; }
+    .qz.hm a.hM { position: relative; display: flex; flex-direction: column; min-height: 132px; padding: 12px 12px 11px; border-radius: 14px; text-decoration: none; overflow: hidden; -webkit-tap-highlight-color: transparent; transition: transform .12s; }
+    .qz.hm a.hM:active { transform: scale(.98); }
+    .qz.hm a.hM:focus-visible { outline: 3px solid var(--hBlue); outline-offset: 2px; }
+    .qz.hm a.hM.w  { background: #E8F0FB; color: #2F5E99; }
+    .qz.hm a.hM.q  { background: #FDF1E3; color: #A35B12; }
+    .qz.hm a.hM.pr { background: #F3ECFA; color: #6B4A9A; }
+    .qz.hm a.hM.r  { background: #E9F5EE; color: #2F7A52; }
+    .qz.hm .hNo { font-size: 12.5px; letter-spacing: .12em; opacity: .7; }
+    .qz.hm .hN  { font-weight: 800; font-size: 19px; margin-top: 4px; }
+    .qz.hm .hS  { display: block; font-size: 11px; line-height: 1.45; margin-top: 3px; opacity: .88; min-width: 0; }
+    .qz.hm .hS span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qz.hm .hNote { display: block; font-size: 10.5px; font-weight: 700; margin-top: 4px; }
+    .qz.hm .hP { margin-top: auto; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 800; }
+    .qz.hm .hGo { background: rgba(255,255,255,.78); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+    .qz.hm a.hM.next { box-shadow: inset 0 0 0 2.5px var(--hBlue); }
+    .qz.hm a.hM.next .hGo { background: var(--hBlue); color: #fff; }
+    .qz.hm a.hM.ok  { opacity: .62; }
+    .qz.hm a.hM.off { opacity: .5; }
+    .qz.hm .hStamp { position: absolute; right: 8px; top: 8px; width: 44px; height: 44px; border-radius: 50%; border: 2.5px solid #2F7A52; color: #2F7A52; background: rgba(255,255,255,.7);
+                     display: grid; place-items: center; font-weight: 800; font-size: 12px; transform: rotate(-12deg); }
+
+    /* 달력 — 가는 줄, 오늘은 파란 테두리, 네 가지 다 한 날은 연한 파랑 */
+    .qz.hm .hCalNav { display: inline-flex; gap: 14px; }
+    .qz.hm .hCalNav a { color: var(--hDim2); text-decoration: none; font-size: 18px; line-height: 1; }
+    .qz.hm .hCalG { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 8px; }
+    .qz.hm .hCalWd { text-align: center; font-size: 10.5px; color: var(--hDim); padding: 4px 0 6px; }
+    .qz.hm a.hCalD { display: block; text-align: center; padding: 6px 0 5px; border-top: 1px solid var(--hLine); font-size: 14px; color: var(--hTx); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+    .qz.hm .hCalP { display: block; font-size: 10px; color: var(--hDim); margin-top: 1px; }
+    .qz.hm a.hCalD.mute { color: #D1D5DB; } .qz.hm a.hCalD.mute .hCalP { color: #E5E7EB; }
+    .qz.hm a.hCalD.has .hCalP { color: var(--hBlue); font-weight: 800; }
+    .qz.hm a.hCalD.full { background: var(--hBlueSoft); border-radius: 8px; }
+    .qz.hm a.hCalD.today { box-shadow: inset 0 0 0 2px var(--hBlue); border-radius: 8px; font-weight: 800; }
+    .qz.hm a.hCalD.sel { background: var(--hSoft); border-radius: 8px; }
+    .qz.hm .hLeg { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 10.5px; color: var(--hDim); }
+    .qz.hm .hLeg i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+
+    /* 더 보기 — 글자 + 화살표 줄 */
+    .qz.hm .hMore { margin-top: 10px; }
+    .qz.hm .hMore a { display: flex; justify-content: space-between; align-items: center; padding: 13px 2px; border-top: 1px solid var(--hLine); font-size: 15px; font-weight: 700; color: var(--hInk); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+    .qz.hm .hMore a:last-child { border-bottom: 1px solid var(--hLine); }
+    .qz.hm .hMore a i { font-style: normal; color: var(--hNoBlue); font-size: 16px; }
+    .qz.hm .hMore a.hl { color: var(--hBlue); }
+    @@media (prefers-reduced-motion: reduce) { .qz.hm a.hM { transition: none; } }
+</style>
+
+<div class="qz hm">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div><a class="qzHome" href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="qzDate">@dPretty</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="qzLock">@toast</div>
+        }
+
+        @* ── 인사 — "도전! 성경말씀"은 작은 파란 글자 (누르면 예전 디자인 DailyMission2 로 간다) ── *@
+        <div class="hPg">
+            <div class="hK"><a href="/DailyMission2/Index">@ConstatsCommon.MainKeyTitle</a></div>
+            <div class="hKs">"거룩한 습관 만들기" 프로그램에 오심을 환영해요.</div>
+        </div>
+        <div class="hI">
+            @if (isPast)
+            {
+                <h2>@dateKo</h2>
+                <div class="hD">이 날은 네 가지 중 @(doneCnt)가지를 했어요</div>
+            }
+            else
+            {
+                <h2>@(displayName)님, 안녕하세요</h2>
+                <div class="hD">
+                    @dateKo
+                    @if (streak > 0)
+                    {
+                        <text> · </text><b>@(streak)일째 이어오는 중</b>
+                    }
+                </div>
+            }
+        </div>
+
+        @if (isPast)
+        {
+            <div class="qzLock" style="margin-top:16px">
+                <b>@Model.SelectedDate.ToString("M월 d일", new CultureInfo("ko-KR"))</b>을 보고 있어요<br>
+                오늘 · 어제 · 그저께만 할 수 있어요<br>
+                <a class="qzHome" style="line-height:2.4;color:var(--hBlue)" href="/DailyMission4?date=@today.ToString("yyyy-MM-dd")">오늘로 이동 →</a>
+            </div>
+        }
+
+        @* ── 나의 기록 — 인사 바로 아래. 예전 구성(진행 원 · 올해 총 포인트 · 7일 막대 · 네 칸 기록)을 밝은 톤으로 ── *@
+        <div class="hSh first">나의 기록</div>
+
+        <div class="hTop">
+            <div class="hRing" role="img" aria-label="@(isPast ? "이 날" : "오늘") 미션 4개 중 @(doneCnt)개 완료">
+                <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="#E8ECF2" stroke-width="3.6" />
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="#2F80ED" stroke-width="3.6" stroke-linecap="round"
+                            stroke-dasharray="@_ringLen.ToString("0.0", CultureInfo.InvariantCulture)"
+                            stroke-dashoffset="@_ringOff.ToString("0.0", CultureInfo.InvariantCulture)" />
+                </svg>
+                <span class="hRingC"><b>@doneCnt/4</b><small>@(isPast ? "이 날 미션" : "오늘 미션")</small></span>
+            </div>
+            <div class="hSum">
+                <div class="hSumL">올해 총 포인트</div>
+                <div class="hSumV">@total.ToString("N0")<u>점</u></div>
+                <div class="hSumT">@(isPast ? "이 날" : "오늘") <b>+@(_dayPt)</b>점 받았어요</div>
+            </div>
+        </div>
+
+        <div class="hChd">
+            <span class="hChT">최근 7일 <b>@(_week7Sum)점</b></span>
+            <span class="hChM">하루 최대 @(_dayMax)점</span>
+        </div>
+        <div class="hBars">
+            @foreach (var _day in _days7)
+            {
+                int  _p     = PointOf(_day);
+                bool _isEnd = _day == _endDay;
+                bool _all   = AllDoneOf(_day);
+                int  _h     = (int)Math.Round(Math.Min(_p, _dayMax) * 100.0 / _dayMax);
+                string _lab = _day == today ? "오늘" : _wk[(int)_day.DayOfWeek];
+                <a class="hBar @(_isEnd ? "end" : "") @(_all ? "all" : "") @(_p == 0 ? "zero" : "")"
+                   href="/DailyMission4?date=@_day.ToString("yyyy-MM-dd")" title="@_day.ToString("M/d") · @(_p)점">
+                    <b>@_p</b>
+                    <i style="height:@(_p == 0 ? "2px" : _h + "%")"></i>
+                    <em>@_lab<small>@_day.Day</small></em>
+                </a>
+            }
+        </div>
+        <div class="hLg">
+            <span><i style="background:#2F80ED"></i>@(isPast ? "보고 있는 날" : "오늘")</span>
+            <span><i style="background:#8DB5F3"></i>네 가지 다 한 날</span>
+            <span><i style="background:#CFE0FA"></i>그 외</span>
+        </div>
+
+        <div class="hFacts">
+            <div><div class="k">이어온 날</div><div class="v">@streak<u>일</u></div></div>
+            <div><div class="k">이달 수행</div><div class="v">@monthDone<u>/@monthElapsed</u></div></div>
+            <div><div class="k">이달 점수</div><div class="v">@monthPoint.ToString("N0")<u>점</u></div></div>
+            <div><div class="k">네 가지 다 한 날</div><div class="v">@_allDoneMonth<u>일</u></div></div>
+        </div>
+        @* 마일스톤 막대는 선물을 위한 것이라 학생에게만 보여 준다. *@
+        @if (isStudent && integrated > 0)
+        {
+            <div class="hGift">
+                <div class="h">
+                    <span>통합 @integrated.ToString("N0")점</span>
+                    @if (!canPickGift && nextMilestone > 0)
+                    {
+                        <span>다음 선물까지 <b>@needPoint.ToString("N0")점</b></span>
+                    }
+                    else
+                    {
+                        <span>@(nextMilestone > 0 ? nextMilestone.ToString("N0") + "점" : "최고 단계")</span>
+                    }
+                </div>
+                <div class="pb"><i style="width:@((int)Math.Round(giftFill * 100))%"></i></div>
+            </div>
+        }
+
+        @* ── 선물 고를 수 있음 ── *@
+        @if (canPickGift)
+        {
+            <a class="hPick" href="/StudentPointDashboard4/MyGiftBox3">
+                <b>선물을 고를 수 있어요</b>
+                <span>@giftCredit.ToString("N0") credit · 고르러 가기 →</span>
+            </a>
+        }
+
+        @* ── 네 가지를 다 하면 "오늘 완료" 도장 ── *@
+        @if (!isPast && doneCnt == 4)
+        {
+            <div class="hParty">
+                <div class="hSeal">오늘<br />완료</div>
+                <b>오늘 네 가지 모두 했어요</b>
+                <span>+@(_dayPt)점@(streak > 1 ? $" · {streak}일째 이어서 하고 있어요" : "")</span>
+            </div>
+        }
+
+        @* ── 오늘의 미션 카드 4장 ── *@
+        <div class="hMs">
+            @for (int _i = 0; _i < missions.Length; _i++)
+            {
+                var m = missions[_i];
+                bool _off = !canAct || !m.Has;
+                string _cls = $"hM {_tone[_i]}" + (m.Done ? " ok" : "") + (_off && !m.Done ? " off" : "") + (m.No == _nextNo ? " next" : "");
+                <a class="@_cls" href="@m.Href">
+                    @if (m.Done) { <span class="hStamp">완료</span> }
+                    <span class="hNo">@m.No</span>
+                    <span class="hN">@m.Title</span>
+                    <span class="hS">
+                        @if (!m.Has) { <text>준비된 내용이 없어요</text> }
+                        else
+                        {
+                            if (!string.IsNullOrWhiteSpace(m.Sub2)) { <span>@m.Sub2</span> }
+                            if (!string.IsNullOrWhiteSpace(m.Sub)) { <span>@m.Sub</span> }
+                        }
+                    </span>
+                    @if (!string.IsNullOrWhiteSpace(m.Note)) { <span class="hNote">@m.Note</span> }
+                    <span class="hP">
+                        <span>@(m.Done ? "+" : "")@(m.Point)점</span>
+                        @if (!m.Done && !_off) { <span class="hGo">@_go[_i] ›</span> }
+                    </span>
+                </a>
+            }
+        </div>
+
+        @* ── 이달의 달력 ── *@
+        <div class="hSh">
+            <span>@monthFirst.ToString("yyyy년 M월", new CultureInfo("ko-KR"))</span>
+            <span class="hCalNav">
+                <a href="/DailyMission4?date=@monthFirst.AddMonths(-1).ToString("yyyy-MM-dd")" title="지난달">←</a>
+                <a href="/DailyMission4?date=@monthFirst.AddMonths(1).ToString("yyyy-MM-dd")" title="다음달">→</a>
+            </span>
+        </div>
+        <div class="hCalG">
+            @foreach (var wd in weekDayNames)
+            {
+                <div class="hCalWd">@wd</div>
+            }
+            @for (int i = 0; i < gridCells; i++)
+            {
+                var day     = gridStart.AddDays(i);
+                var inMonth = (day.Month == monthFirst.Month);
+                var pt      = inMonth ? PointOf(day) : 0;
+                var full    = inMonth && AllDoneOf(day);
+                var isToday = (day.Date == today);
+                var isSel   = (day.Date == Model.SelectedDate.Date) && !isToday;
+
+                var cls = (inMonth ? "" : "mute ") + (pt > 0 ? "has " : "")
+                        + (full ? "full " : "") + (isToday ? "today " : "") + (isSel ? "sel" : "");
+
+                <a class="hCalD @cls" href="/DailyMission4?date=@day.ToString("yyyy-MM-dd")">
+                    @day.Day
+                    <span class="hCalP">@(pt > 0 ? pt.ToString() : "–")</span>
+                </a>
+            }
+        </div>
+        <div class="hLeg">
+            <span><i style="box-shadow:inset 0 0 0 2px #2F80ED"></i>오늘</span>
+            <span><i style="background:#EAF2FD"></i>네 가지 모두</span>
+            <span>숫자 = 그날 받은 점수</span>
+        </div>
+
+        @* ── 우리 가족 ── *@
+        @await Html.PartialAsync("~/Views/DailyMission4/Partials/_FamilyTreeBone.cshtml")
+
+        @* ── 더 보기 ── *@
+        <div class="hSh">더 보기</div>
+        <div class="hMore">
+            @* 더 보기의 선물 링크는 누구에게나 보여 준다. (관리자·부모도 선물함에서 가족팀 선물을 본다)
+               학생 전용으로 묶는 것은 위쪽 '선물을 고를 수 있어요' 줄뿐이다. *@
+            @if (needPickAward)
+            {
+                <a class="hl" href="@awardPickUrl"><span>선물 고르기 · 레벨 달성!</span><i>→</i></a>
+            }
+            <a href="/StudentPointDashboard4/MyGiftBox3"><span>나의 선물함</span><i>→</i></a>
+            <a href="/DailyMission4/ParticipantPersons"><span>참여자</span><i>→</i></a>
+            <a href="/DailyMission4/ParticipantTeams"><span>가족팀</span><i>→</i></a>
+            <a href="/DailyMission4/UserMonthlyPoints?userName=@ViewData["UserName"]"><span>월별 이력</span><i>→</i></a>
+            <a href="/DailyMission4/UserDailyPoints?userName=@ViewData["UserName"]"><span>일자별 이력</span><i>→</i></a>
+            <a href="/Board/Create2?boardName=Anonymous"><span>불편·개선 접수</span><i>→</i></a>
+            @if (isSuperAdmin)
+            {
+                <a href="/DailyMission4/DeleteClickHistory"><span>관리자 · 이력 삭제</span><i>→</i></a>
+            }
+        </div>
+    </div>
+</div>
+
+@await Html.PartialAsync(
+    "~/Views/DailyMission4/Partials/_OkPopup.cshtml",
+    new {
+        Message          = okPopupMsg,
+        RedirectUrl      = awardUrl,
+        ReturnUrl        = returnUrl,
+        AutoCloseSeconds = 10,
+        ShowActions      = true
+    }
+)
+
+<script src="/js/GlobalCookie.js"></script>
+<script>
+    (function () {
+        // 접힘 줄 (우리 가족)
+        document.querySelectorAll('.qz [data-fold]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var box = document.getElementById(b.dataset.fold);
+                if (!box) return;
+                box.hidden = !box.hidden;
+                var mark = b.querySelector('b');
+                if (mark) { mark.textContent = box.hidden ? '＋' : '−'; }
+            });
+        });
+    })();
+</script>
+

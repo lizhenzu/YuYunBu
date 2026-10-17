@@ -1,0 +1,95 @@
+@model BulletinBoard.Models.Jubo.JuboPreviewViewModel
+@{
+    ViewData["Title"] = "주보 출력";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Model.Title - 주일학교 주보</title>
+    <link rel="stylesheet" href="~/css/jubo.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #E8EDF2;
+            font-family: 'Noto Sans KR', 'Malgun Gothic', '맑은 고딕', sans-serif;
+        }
+        .print-toolbar {
+            max-width: 860px;
+            margin: 0 auto;
+            padding: 1rem 1rem 0;
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        @@keyframes floatCloud {
+            0%, 100% { transform: translateY(0px); }
+            50%       { transform: translateY(-10px); }
+        }
+        @@media print {
+            .print-toolbar { display: none !important; }
+            body { background: white !important; }
+            .jubo-print-root { background: white !important; padding: 0 !important; }
+            .jubo-a4-page {
+                width: 210mm !important;
+                min-height: 297mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            @@page { size: A4 portrait; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Print Toolbar (screen only) -->
+<div class="print-toolbar">
+    <button onclick="window.print()"
+            style="display:inline-flex; align-items:center; gap:0.3rem;
+                   padding:0.6rem 1.5rem; background:linear-gradient(135deg,#3B82F6,#2D5BE3);
+                   color:white; border:none; border-radius:50px; font-size:0.9rem;
+                   font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(59,130,246,0.35);">
+        🖨 인쇄하기
+    </button>
+    <button onclick="window.close()"
+            style="display:inline-flex; align-items:center; gap:0.3rem;
+                   padding:0.6rem 1.2rem; background:#F1F5F9; color:#64748B;
+                   border:none; border-radius:50px; font-size:0.9rem; font-weight:600; cursor:pointer;">
+        ✕ 닫기
+    </button>
+    <span style="font-size:0.82rem; color:#94A3B8;">
+        📅 @Model.JuboDate.ToString("yyyy년 MM월 dd일") · @Model.Title
+    </span>
+    <span style="margin-left:auto; font-size:0.75rem; color:#CBD5E0;">
+        💡 인쇄 시 '배경 그래픽' 옵션을 켜주세요
+    </span>
+</div>
+
+<!-- A4 Pages -->
+<div class="jubo-print-root">
+    @if (Model.TemplateType == "PalmSunday")
+    {
+        @await Html.PartialAsync("_Template_PalmSunday", Model)
+    }
+    else if (Model.TemplateType == "Easter")
+    {
+        @await Html.PartialAsync("_Template_Easter", Model)
+    }
+    else
+    {
+        @await Html.PartialAsync("_Template_Normal", Model)
+    }
+</div>
+
+<script>
+    // Auto print dialog after load (optional)
+    // window.addEventListener('load', () => { setTimeout(window.print, 500); });
+</script>
+</body>
+</html>

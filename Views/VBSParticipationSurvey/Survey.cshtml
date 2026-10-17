@@ -1,0 +1,544 @@
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@model Dictionary<(DateTime Date, string Slot), (bool? IsAttend, string? StatusNote)>
+
+@{
+    Layout = null;
+
+    var meName    = (ViewBag.MeFullName  as string) ?? "";
+    var meRole    = (ViewBag.MeRoleLabel as string) ?? "";
+    var canGoAdmin = (bool)(ViewBag.CanGoAdmin        ?? false);
+    var locked     = (bool)(ViewBag.IsLockedForStudent ?? false);
+    var who       = (ViewBag.Who as string) ?? "student";
+    var isStaff   = who == "staff";
+
+    DateTime[] days = new[]
+    {
+        ConstatsCommon.VBSParticipationStartDate,
+        ConstatsCommon.VBSParticipationStartDate.AddDays(1),
+        ConstatsCommon.VBSParticipationStartDate.AddDays(2)
+    };
+
+    string fmt(DateTime d) => d.ToString("M/d (ddd)", new System.Globalization.CultureInfo("ko-KR"));
+
+    (bool? IsAttend, string? StatusNote) get(DateTime d, string slot)
+        => (Model != null && Model.TryGetValue((d.Date, slot), out var v)) ? v : (null, null);
+
+    string stateStr((bool? IsAttend, string? StatusNote) s)
+    {
+        if (s.IsAttend == true) return "true";
+        if (s.IsAttend == false) return "false";
+        if (s.StatusNote == "CONDITIONAL") return "conditional";
+        if (s.StatusNote == "ABSENT_CONFIRM") return "absent_confirm";
+        if (s.StatusNote == "UNDECIDED") return "undecided";
+        return "null";
+    }
+
+    string badgeClass((bool? IsAttend, string? StatusNote) s)
+    {
+        if (s.IsAttend == true) return "on";
+        if (s.IsAttend == false) return "off";
+        if (!string.IsNullOrEmpty(s.StatusNote)) return "note";
+        return "wait";
+    }
+
+    string badgeText((bool? IsAttend, string? StatusNote) s)
+    {
+        if (s.IsAttend == true) return "참석";
+        if (s.IsAttend == false) return "미참석";
+        if (s.StatusNote == "CONDITIONAL") return "상황에 따라";
+        if (s.StatusNote == "ABSENT_CONFIRM") return "참석 불가";
+        if (s.StatusNote == "UNDECIDED") return "추후 결정";
+        return "미응답";
+    }
+
+    // 현재 대표 상태 (모든 슬롯이 동일한 StatusNote면 표시)
+    var allNotes = days.SelectMany(d => new[] { get(d, "AM").StatusNote, get(d, "PM").StatusNote }).ToList();
+    string? currentNote = allNotes.All(n => n == allNotes[0]) ? allNotes[0] : null;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경학교 참석여부 · @(isStaff ? "교사/교역자" : "학생")</title>
+
+    <style>
+        :root {
+            --bg0: #f6f9ff;
+            --bg1: #eff6ff;
+            --card: #ffffff;
+            --ink: #0f172a;
+            --mut: #64748b;
+            --line: rgba(15,23,42,.12);
+            --line2: rgba(15,23,42,.08);
+            --pri: #2563eb;
+            --pri2: #1d4ed8;
+            --ok: #22c55e;
+            --bad: #ef4444;
+            --amber: #f59e0b;
+            --amber2: #d97706;
+            --shadow: 0 10px 24px rgba(2,6,23,.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: radial-gradient(900px 380px at 20% -10%, rgba(37,99,235,.14), transparent 60%),
+                        radial-gradient(900px 380px at 90% 0%, rgba(34,197,94,.12), transparent 62%),
+                        linear-gradient(180deg, var(--bg1), var(--bg0));
+            color: var(--ink);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .wrap { max-width: 920px; margin: 0 auto; padding: 16px; }
+
+        .head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .title { font-weight: 950; font-size: 18px; letter-spacing: -.2px; }
+
+        .sub {
+            color: var(--mut);
+            font-weight: 750;
+            font-size: 13px;
+            line-height: 1.4;
+            margin-top: 6px;
+        }
+
+        .topBtns {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-weight: 950;
+            cursor: pointer;
+            box-shadow: 0 6px 14px rgba(2,6,23,.06);
+            transition: transform .06s ease, box-shadow .2s ease;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn:active { transform: translateY(1px); box-shadow: 0 4px 10px rgba(2,6,23,.06); }
+
+        .btnPri {
+            background: linear-gradient(180deg, var(--pri), var(--pri2));
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .btnAmber {
+            background: linear-gradient(180deg, var(--amber), var(--amber2));
+            color: #fff;
+            border-color: transparent;
+            font-size: 13px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 12px 0 6px 0;
+        }
+
+        .noteActions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 0 0 14px 0;
+        }
+
+        .noteActionsLabel {
+            width: 100%;
+            font-size: 12px;
+            font-weight: 750;
+            color: var(--mut);
+            margin-bottom: 2px;
+        }
+
+        .lockNote {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(239,68,68,.08);
+            border: 1px solid rgba(239,68,68,.22);
+            font-weight: 950;
+        }
+
+        .currentNoteBar {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            border-radius: 14px;
+            background: rgba(245,158,11,.10);
+            border: 1px solid rgba(245,158,11,.28);
+            font-weight: 950;
+            font-size: 13px;
+            color: #92400e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dis { opacity: .55; pointer-events: none; }
+
+        .card {
+            background: rgba(255,255,255,.78);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 14px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(6px);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 140px 1fr 1fr;
+            gap: 12px;
+            align-items: stretch;
+            padding: 12px 0;
+            border-bottom: 1px dashed var(--line2);
+        }
+
+        .row:last-child { border-bottom: none; }
+
+        .day {
+            font-weight: 950;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 10px;
+            border-radius: 14px;
+            background: rgba(37,99,235,.06);
+            border: 1px solid rgba(37,99,235,.12);
+        }
+
+        .slotBox { min-width: 0; }
+
+        .slotLbl {
+            font-weight: 950;
+            color: var(--mut);
+            font-size: 12px;
+            margin: 0 0 8px 2px;
+        }
+
+        .tog {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 12px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: rgba(255,255,255,.92);
+            box-shadow: 0 10px 18px rgba(2,6,23,.06);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        .leftPack {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-weight: 950;
+            font-size: 12px;
+            border: 1px solid var(--line);
+            background: rgba(15,23,42,.03);
+            flex: 0 0 auto;
+            white-space: nowrap;
+        }
+
+        .badge.wait { color: var(--mut); }
+        .badge.on { color: #0b3d21; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.22); }
+        .badge.off { color: #7f1d1d; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.22); }
+        .badge.note { color: #78350f; background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.30); }
+
+        .switch {
+            width: 48px;
+            height: 28px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .knob {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 12px rgba(0,0,0,.14);
+            transition: .2s;
+        }
+
+        .on .switch { background: var(--ok); }
+        .on .knob { left: 23px; }
+
+        .modalBack {
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .modal {
+            background: #fff;
+            border-radius: 18px;
+            padding: 18px 16px;
+            min-width: 260px;
+            border: 1px solid rgba(15,23,42,.16);
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(2,6,23,.18);
+        }
+
+        .mut { color: var(--mut); }
+
+        .spin {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 3px solid rgba(37,99,235,.18);
+            border-top-color: rgba(37,99,235,.95);
+            margin: 0 auto 10px auto;
+            animation: sp 1s linear infinite;
+        }
+
+        @@keyframes sp { to { transform: rotate(360deg); } }
+
+        /* ── who 테마 ── */
+        body.who-student {
+            background: radial-gradient(900px 380px at 20% -10%, rgba(37,99,235,.14), transparent 60%),
+                        radial-gradient(900px 380px at 90% 0%, rgba(34,197,94,.12), transparent 62%),
+                        linear-gradient(180deg, #eff6ff, #f6f9ff);
+        }
+        body.who-staff {
+            --pri:  #16a34a;
+            --pri2: #15803d;
+            background: radial-gradient(900px 380px at 20% -10%, rgba(22,163,74,.14), transparent 60%),
+                        radial-gradient(900px 380px at 90% 0%, rgba(21,128,61,.10), transparent 62%),
+                        linear-gradient(180deg, #f0fdf4, #f6faf6);
+        }
+        body.who-staff .day { background: rgba(22,163,74,.06); border: 1px solid rgba(22,163,74,.14); }
+        body.who-staff .spin { border-color: rgba(22,163,74,.20); border-top-color: #16a34a; }
+
+        @@media (max-width: 720px) {
+            .head { flex-direction: column; align-items: stretch; }
+            .topBtns { justify-content: flex-start; }
+        }
+
+        @@media (max-width: 560px) {
+            .wrap { padding: 14px; }
+            .card { padding: 12px; }
+            .row { grid-template-columns: 1fr; gap: 10px; padding: 12px 0; }
+            .day { justify-content: space-between; padding: 10px 12px; }
+            .slotBox { padding: 10px 10px 12px 10px; border-radius: 16px; background: rgba(255,255,255,.86); border: 1px solid var(--line2); }
+            .slotLbl { margin: 0 0 8px 0; }
+            .tog { padding: 12px 12px; }
+        }
+    </style>
+</head>
+
+<body class="who-@who">
+    <div class="wrap">
+        <div class="head">
+            <div>
+                <div class="title">@(isStaff ? "👨‍🏫" : "🎒") @meName (@meRole)</div>
+                <div class="sub">
+                    성경학교 참석여부 조사 · <b>
+                        @ConstatsCommon.VBSParticipationStartDate.ToString("M/d") ·
+                        @ConstatsCommon.VBSParticipationStartDate.AddDays(1).ToString("M/d") ·
+                        @ConstatsCommon.VBSParticipationStartDate.AddDays(2).ToString("M/d")</b><br />
+                    ✔ 변경사항은 자동 저장됩니다.
+                </div>
+
+                @if (locked)
+                {
+                    <div class="lockNote">⛔ 성경학교가 시작되어 참석여부 수정이 종료되었습니다.</div>
+                }
+            </div>
+
+            <div class="topBtns">
+                @if (canGoAdmin)
+                {
+                    <a class="btn" href="/VBSParticipationSurvey/Admin?view=All">(전체)참석여부체크</a>
+                    <a class="btn" href="/VBSParticipationSurvey/ViewAll?view=All">(전체)조사현황보기</a>
+                }
+                <a class="btn" href="/Home/Index">🏠 홈(메인)</a>
+                <a class="btn" href="/VBSParticipationSurvey/Index">🏠 홈(성경학교)</a>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(currentNote))
+        {
+            string noteEmoji = currentNote == "CONDITIONAL" ? "🔄" : currentNote == "ABSENT_CONFIRM" ? "❌" : "🤔";
+            string noteLabel = currentNote == "CONDITIONAL" ? "상황에 따라 달라질 수 있음" : currentNote == "ABSENT_CONFIRM" ? "참석 불가" : "추후 결정";
+            <div class="currentNoteBar">
+                <span>@noteEmoji</span>
+                <span>현재 상태: <b>@noteLabel</b> — 아래에서 개별 슬롯을 변경하거나 다른 옵션을 선택할 수 있어요.</span>
+            </div>
+        }
+
+        <div class="actions">
+            <button class="btn btnPri @(locked ? "dis" : "")" onclick="setAll(true)">전일 참석</button>
+            <button class="btn @(locked ? "dis" : "")" onclick="setAll(false)">전일 미참석</button>
+        </div>
+
+        <div class="noteActions">
+            <div class="noteActionsLabel">미확정 상태로 표시하기 (전체 날짜 일괄 적용)</div>
+            <button class="btn btnAmber @(locked ? "dis" : "")" onclick="setAllNote('CONDITIONAL')">🔄 상황에 따라 달라질 수 있음</button>
+            <button class="btn btnAmber @(locked ? "dis" : "")" onclick="setAllNote('ABSENT_CONFIRM')">❌ 참석 불가</button>
+            <button class="btn btnAmber @(locked ? "dis" : "")" onclick="setAllNote('UNDECIDED')">🤔 추후 결정</button>
+        </div>
+
+        <div class="card">
+            @foreach (var d in days)
+            {
+                var am = get(d, "AM");
+                var pm = get(d, "PM");
+
+                <div class="row">
+                    <div class="day">
+                        <span>@fmt(d)</span>
+                    </div>
+
+                    <div class="slotBox">
+                        <div class="slotLbl">오전</div>
+                        <div class="tog @(am.IsAttend == true ? "on" : "") @(locked ? "dis" : "")"
+                             data-state="@stateStr(am)"
+                             onclick="toggleSlot('@d.ToString("yyyy-MM-dd")','AM', this)">
+                            <div class="leftPack">
+                                <span class="badge @badgeClass(am)">@badgeText(am)</span>
+                            </div>
+                            <div class="switch"><div class="knob"></div></div>
+                        </div>
+                    </div>
+
+                    <div class="slotBox">
+                        <div class="slotLbl">오후</div>
+                        <div class="tog @(pm.IsAttend == true ? "on" : "") @(locked ? "dis" : "")"
+                             data-state="@stateStr(pm)"
+                             onclick="toggleSlot('@d.ToString("yyyy-MM-dd")','PM', this)">
+                            <div class="leftPack">
+                                <span class="badge @badgeClass(pm)">@badgeText(pm)</span>
+                            </div>
+                            <div class="switch"><div class="knob"></div></div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="modalBack" id="busy">
+        <div class="modal">
+            <div class="spin"></div>
+            <div style="font-weight:950">진행중…</div>
+            <div class="mut" style="margin-top:6px;font-weight:750;font-size:13px">서버 반영 중입니다</div>
+        </div>
+    </div>
+
+    <script>
+        const busy = (on) => document.getElementById('busy').style.display = on ? 'flex' : 'none';
+
+        async function postJson(url, body) {
+            busy(true);
+            try {
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const j = await r.json().catch(() => ({ ok: false, message: '응답 파싱 오류' }));
+                if (!r.ok || !j.ok) {
+                    alert(j.message || '저장에 실패했습니다.');
+                    return false;
+                }
+                return true;
+            } finally {
+                busy(false);
+            }
+        }
+
+        // null / status-note → 참석(true)
+        // 참석(true) → 미참석(false)
+        // 미참석(false) → 미응답(null)
+        function nextState(cur) {
+            if (cur === true) return false;
+            if (cur === false) return null;
+            return true;
+        }
+
+        function readStateFromEl(el) {
+            const s = (el.dataset.state || '').trim().toLowerCase();
+            if (s === 'true') return true;
+            if (s === 'false') return false;
+            return null; // null, conditional, absent_confirm, undecided 모두 null로 처리
+        }
+
+        function applyUi(el, next) {
+            const badge = el.querySelector('.badge');
+            el.classList.toggle('on', next === true);
+            el.dataset.state = (next === null) ? 'null' : (next ? 'true' : 'false');
+
+            if (badge) {
+                badge.classList.remove('wait', 'on', 'off', 'note');
+                if (next === null) { badge.classList.add('wait'); badge.innerText = '미응답'; }
+                else if (next === true) { badge.classList.add('on'); badge.innerText = '참석'; }
+                else { badge.classList.add('off'); badge.innerText = '미참석'; }
+            }
+        }
+
+        async function toggleSlot(dateStr, slot, el) {
+            if (el.classList.contains('dis')) return;
+            const cur = readStateFromEl(el);
+            const next = nextState(cur);
+
+            const ok = await postJson('/VBSParticipationSurvey/SaveSlot', { date: dateStr, slot: slot, isAttend: next });
+            if (!ok) return;
+            applyUi(el, next);
+        }
+
+        async function setAll(isAttend) {
+            const ok = await postJson('/VBSParticipationSurvey/SetAll', { isAttend });
+            if (!ok) return;
+            location.reload();
+        }
+
+        async function setAllNote(statusNote) {
+            const ok = await postJson('/VBSParticipationSurvey/SetAllNote', { statusNote });
+            if (!ok) return;
+            location.reload();
+        }
+    </script>
+</body>
+</html>

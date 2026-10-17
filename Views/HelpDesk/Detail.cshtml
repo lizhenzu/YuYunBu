@@ -1,0 +1,296 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+@model BoardViewModel
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Job Listings for AI, Software Development, and Marketing">
+    <meta name="keywords" content="jobs, AI, development, design, marketing">
+    <title>@ChurchName · @DepartmentName</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" rel="stylesheet" />
+
+    <style>
+        /* 기본 폰트 크기 및 레이아웃 설정 */
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+               /* Header */
+        header {
+            background-color: #27ae60;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+            header h1 {
+                font-size: 2.0em;
+                margin: 0;
+            }
+
+        .card-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0px;
+        }
+
+        .card-body {
+            margin-bottom: 20px;
+        }
+
+        .comment-card {
+            margin-left: 20px;
+        }
+
+        .reply-button {
+            margin-top: 10px;
+        }
+
+        .reply-area {
+            display: none;
+            margin-top: 10px;
+        }
+
+        
+        /* Footer */
+        footer {
+            background-color: #27ae60;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            font-size: 15px;
+        }
+
+        .footer-links a:hover {
+            
+
+        /* 모바일 화면을 위한 반응형 설정 */
+        @@media (max-width: 768px) {       
+
+                        header h1 {
+                            font-size: 2em;
+                        }
+
+            .card-container {
+                width: 100%; /* 모바일에서 카드가 화면 전체를 차지하도록 */
+                padding: 0px;
+            }
+
+            .card-header h2 {
+                font-size: 18px; /* 모바일에서 게시글 제목 크기 조정 */
+            }
+
+            .card-body p {
+                font-size: 16px; /* 모바일에서 본문 내용 폰트 크기 */
+            }
+
+            textarea {
+                font-size: 14px; /* 모바일에서 텍스트 입력 폰트 크기 */
+            }
+
+            .comment-card {
+                margin-left: 10px; /* 모바일에서 대댓글의 여백 조정 */
+            }
+
+            .btn {
+                font-size: 14px; /* 모바일 버튼의 폰트 크기 조정 */
+                padding: 8px 12px;
+            }
+        }
+    </style>
+
+    <style>
+        .title-banner {
+            background-color: #b29b75;
+            padding: 10px;
+            margin-bottom: 0px;
+            text-align: center;
+            border-radius: 0px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .board-title {
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            font-family: 'Arial', sans-serif;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+    </style>
+    <style>
+        <style >
+        /* 고정형 footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+        }
+
+        .footer .footer-link {
+            margin: 0 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+
+            .footer .footer-link:hover {
+                text-decoration: underline;
+            }
+
+        body {
+            margin-bottom: 60px; /* Footer 공간 확보 */
+        }
+    </style>
+    <style>
+        /* 고정형 footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 10px 0;
+            border-top: 1px solid #ddd;
+        }
+
+            .footer .footer-link {
+                margin: 0 15px;
+                color: #007bff;
+                text-decoration: none;
+            }
+
+                .footer .footer-link:hover {
+                    text-decoration: underline;
+                }
+
+        body {
+            margin-bottom: 60px; /* Footer 공간 확보 */
+        }
+    </style>
+     
+</head>
+@{
+    int maxLimitHelpDeskHorizontal = 4;
+
+    var todayDateHelpDeskHorizontal = DateHelper.GetTodayDateDayString(maxLimitHelpDeskHorizontal);
+
+    // 문자열을 생성합니다.
+    string formattedHelpDeskHorizontal = $"/images/home/HelpDesk/horizontal/HelpDesk_horizontal_{todayDateHelpDeskHorizontal}.webp";
+
+}
+<body>
+
+    <!-- Header Section -->
+    
+    <!-- Banner Image Below Header -->
+  @*  <img src="@formattedHelpDeskHorizontal" alt="Header Image" style="width: 100%; height: auto; margin: 0;">
+*@
+
+    <div class="container card-container">
+
+        <header>
+            <h1>게시판(톡!톡!)</h1>
+        </header>
+
+        <!-- 게시글 카드 -->
+        <div class="card">
+            <div class="card-header">
+                <h3>@Model.Board.Title</h3>
+                <h4>@Model.Board.Content</h4>
+                <small class="text-muted">작성일: @Model.Board.CreatedDate</small>
+            </div>
+        @*    <div class="card-body">
+                <p>@Model.Board.Content</p>
+            </div>*@
+        </div>
+
+        <!-- 댓글 영역 -->
+        <h3 class="mt-4">댓글</h3>
+        <ul class="list-unstyled">
+            @foreach (var comment in Model.Comments.Where(c => c.ParentCommentId == null))
+            {
+                <li>
+                    @Html.Partial("_CommentPartial", comment)
+                </li>
+            }
+        </ul>
+
+        <!-- 댓글 입력 -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h4>댓글 달기</h4>
+                <textarea id="commentContent" class="form-control" rows="3" placeholder="댓글을 입력하세요"></textarea>
+                <button class="btn btn-primary mt-2" onclick="submitComment(@Model.Board.Id)">댓글 등록</button>
+            </div>
+        </div>
+    </div>
+    <footer>
+        <div class="footer-links">
+            <a href="/">Home</a>
+            <a href="/HelpDesk/Index2">목록으로</a>
+        </div>
+    </footer>
+    <script>
+        function showReplyForm(commentId) {
+            document.getElementById('replyForm-' + commentId).style.display = 'block';
+        }
+
+        function submitComment(boardId) {
+            var content = document.getElementById('commentContent').value;
+            $.post('/HelpDesk/AddComment', { boardId: boardId, content: content }, function () {
+                location.reload();
+            });
+        }
+
+        function submitReply(boardId, parentCommentId) {
+            var content = document.getElementById('replyContent-' + parentCommentId).value;
+            $.post('/HelpDesk/AddComment', { boardId: boardId, content: content, parentCommentId: parentCommentId }, function () {
+                location.reload();
+            });
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,663 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.DailyMission2.AwardPickGiftsDoneVM
+@using System
+
+@{
+    Layout = "_Layout_Mission2_New";
+    bool isAdmin = Model.IsAdmin;
+
+    string Safe(string? s) => (s ?? "").Trim();
+}
+
+<style>
+    :root {
+        --bg0: #f6fbff;
+        --bg1: #ffffff;
+        --ink: #0f172a;
+        --muted: #475569;
+        --muted2: #64748b;
+        --line: rgba(148,163,184,.38);
+        --card: rgba(255,255,255,.92);
+        --shadow: 0 18px 55px rgba(15,23,42,.12);
+        --shadow2: 0 10px 30px rgba(15,23,42,.10);
+        --priA: #22c55e;
+        --priB: #10b981;
+        --amberA: #f59e0b;
+        --amberB: #fbbf24;
+        --indA: #6366f1;
+        --indB: #8b5cf6;
+        --danger: #ef4444;
+        --r: 22px;
+        --r2: 16px;
+    }
+
+    * {
+        box-sizing: border-box
+    }
+
+    body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(1200px 600px at 15% 0%, rgba(34,197,94,.14), transparent 60%), radial-gradient(900px 520px at 85% 10%, rgba(99,102,241,.14), transparent 55%), radial-gradient(900px 520px at 70% 95%, rgba(245,158,11,.13), transparent 55%), linear-gradient(180deg, var(--bg0), #ffffff 55%, #f8fafc);
+    }
+
+    .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 18px 16px 40px;
+    }
+
+    /* ===== Header ===== */
+    .hero {
+        display: flex;
+        gap: 14px;
+        align-items: stretch;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        padding: 18px;
+        border: 1px solid rgba(226,232,240,.9);
+        background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.72));
+        border-radius: var(--r);
+        box-shadow: var(--shadow2);
+        position: relative;
+        overflow: hidden;
+    }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            background: radial-gradient(800px 220px at 25% 0%, rgba(34,197,94,.14), transparent 70%), radial-gradient(720px 260px at 85% 0%, rgba(99,102,241,.14), transparent 70%);
+            pointer-events: none;
+            filter: saturate(1.1);
+        }
+
+        .hero > * {
+            position: relative
+        }
+
+    .titleRow {
+        min-width: 260px;
+    }
+
+    .title {
+        font-size: 22px;
+        font-weight: 950;
+        letter-spacing: -0.3px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .sub {
+        margin-top: 8px;
+        color: rgba(71,85,105,.95);
+        font-weight: 850;
+        line-height: 1.45;
+        font-size: 13px;
+    }
+
+    .pillRow {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        margin-left: auto;
+    }
+
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.85);
+        font-weight: 900;
+        color: rgba(15,23,42,.92);
+        text-decoration: none;
+        box-shadow: 0 10px 25px rgba(15,23,42,.06);
+        transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+        .pill:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 35px rgba(15,23,42,.10);
+            border-color: rgba(148,163,184,.55);
+        }
+
+    .pillPrimary {
+        border-color: rgba(34,197,94,.28);
+        background: linear-gradient(135deg, rgba(34,197,94,.92), rgba(16,185,129,.92));
+        color: #fff;
+    }
+
+    /* ===== Grid ===== */
+    .grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 12px;
+    }
+
+    .summaryCard {
+        grid-column: span 12;
+        border-radius: var(--r);
+        border: 1px solid rgba(226,232,240,.92);
+        background: rgba(255,255,255,.85);
+        box-shadow: var(--shadow2);
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(248,250,252,.95);
+        color: rgba(15,23,42,.88);
+        font-weight: 900;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(148,163,184,.9);
+        box-shadow: inset 0 0 0 2px rgba(255,255,255,.75);
+    }
+
+    .dotElig {
+        background: rgba(245,158,11,.95);
+    }
+
+    .dotSel {
+        background: rgba(34,197,94,.95);
+    }
+
+    .dotDel {
+        background: rgba(99,102,241,.95);
+    }
+
+    .hint {
+        color: rgba(100,116,139,.95);
+        font-weight: 850;
+        font-size: 12.5px;
+        line-height: 1.4;
+    }
+
+    /* ===== Cards ===== */
+    .card {
+        grid-column: span 12;
+        border-radius: var(--r);
+        border: 1px solid rgba(226,232,240,.92);
+        background: rgba(255,255,255,.9);
+        box-shadow: var(--shadow);
+        padding: 14px;
+        overflow: hidden;
+        position: relative;
+    }
+
+        .card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(900px 300px at 5% 0%, rgba(34,197,94,.08), transparent 55%);
+            pointer-events: none;
+        }
+
+        .card > * {
+            position: relative
+        }
+
+    .cardTop {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding-bottom: 10px;
+        border-bottom: 1px dashed rgba(148,163,184,.35);
+        margin-bottom: 10px;
+    }
+
+    .lvl {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .lvlBadge {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 950;
+        color: rgba(15,23,42,.92);
+        background: rgba(248,250,252,.95);
+        border: 1px solid rgba(226,232,240,.95);
+        box-shadow: 0 12px 24px rgba(15,23,42,.08);
+    }
+
+    .lvlText {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+        .lvlText .k {
+            font-weight: 950;
+            font-size: 15px;
+            letter-spacing: -.2px;
+        }
+
+        .lvlText .v {
+            font-weight: 900;
+            color: rgba(71,85,105,.95);
+            font-size: 12px;
+        }
+
+    .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-weight: 950;
+        font-size: 12px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(248,250,252,.95);
+        white-space: nowrap;
+    }
+
+    .sElig {
+        background: rgba(245,158,11,.12);
+        border-color: rgba(245,158,11,.25);
+        color: rgba(124,45,18,.95);
+    }
+
+    .sSel {
+        background: rgba(34,197,94,.12);
+        border-color: rgba(34,197,94,.25);
+        color: rgba(20,83,45,.95);
+    }
+
+    .sDel {
+        background: rgba(99,102,241,.12);
+        border-color: rgba(99,102,241,.25);
+        color: rgba(30,27,75,.95);
+    }
+
+    .body {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .product {
+        padding: 12px 12px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(248,250,252,.85);
+        border-radius: var(--r2);
+    }
+
+    .productName {
+        font-weight: 950;
+        letter-spacing: -.2px;
+    }
+
+    .productDesc {
+        margin-top: 6px;
+        color: rgba(15,23,42,.74);
+        font-weight: 850;
+        font-size: 12.5px;
+        line-height: 1.45;
+        white-space: pre-line;
+    }
+
+    .metaRow {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 6px;
+    }
+
+    .meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .metaItem {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.85);
+        font-weight: 900;
+        font-size: 12px;
+        color: rgba(15,23,42,.9);
+        white-space: nowrap;
+    }
+
+        .metaItem .mLabel {
+            color: rgba(100,116,139,.95);
+            font-weight: 950;
+        }
+
+        .metaItem .mVal {
+            color: rgba(15,23,42,.95);
+            font-weight: 950;
+        }
+
+    .actionsRow {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        align-items: center;
+        margin-top: 8px;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(226,232,240,.95);
+        background: rgba(255,255,255,.92);
+        font-weight: 950;
+        color: rgba(15,23,42,.9);
+        cursor: pointer;
+        text-decoration: none;
+        transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, opacity .12s ease;
+        box-shadow: 0 12px 24px rgba(15,23,42,.06);
+    }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(148,163,184,.55);
+            box-shadow: 0 18px 35px rgba(15,23,42,.10);
+        }
+
+        .btn:active {
+            transform: translateY(0px) scale(.99);
+        }
+
+    .btnDanger {
+        border-color: rgba(239,68,68,.22);
+        background: linear-gradient(135deg, rgba(239,68,68,.10), rgba(255,255,255,.92));
+        color: rgba(127,29,29,.95);
+    }
+
+    .btnDisabled {
+        cursor: not-allowed;
+        opacity: .65;
+        filter: grayscale(.1);
+        box-shadow: none;
+    }
+
+        .btnDisabled:hover {
+            transform: none;
+            box-shadow: none;
+            border-color: rgba(226,232,240,.95);
+        }
+
+    .empty {
+        border: 1px dashed rgba(148,163,184,.55);
+        background: rgba(255,255,255,.78);
+        border-radius: var(--r);
+        padding: 16px;
+        font-weight: 950;
+        box-shadow: var(--shadow2);
+    }
+
+        .empty .e1 {
+            font-size: 14px;
+        }
+
+        .empty .e2 {
+            margin-top: 6px;
+            font-size: 12.5px;
+            color: rgba(71,85,105,.95);
+            font-weight: 850;
+            line-height: 1.45;
+        }
+
+    /* ===== Responsive columns ===== */
+    @@media (min-width: 720px) {
+        .card
+
+    {
+        grid-column: span 6;
+        padding: 16px;
+    }
+
+    .summaryCard {
+        padding: 14px 18px;
+    }
+
+    .title {
+        font-size: 24px;
+    }
+
+    .sub {
+        font-size: 13.2px;
+    }
+
+    .body {
+        grid-template-columns: 1fr;
+    }
+
+    }
+    @@media (min-width: 1000px) {
+        .card
+
+    {
+        grid-column: span 4;
+    }
+
+    }
+</style>
+
+<div class="page">
+    <div class="hero">
+        <div class="titleRow">
+            <div class="title">🎉 나의 선물함</div>
+            <div class="sub">
+                @Model.cYear 년 · 선택한 선물 목록이에요.<br />
+                레벨별로 “다시 고르기”도 가능해요(Delivered는 잠금).
+            </div>
+        </div>
+
+        <div class="pillRow">
+            <a class="pill" href="/DailyMission2Award/PickGifts?year=@Model.cYear">✨ 미선택 레벨 있으면 계속 고르기</a>
+            <a class="pill pillPrimary" href="/DailyMission2?date=@(DateHelper.GetKoreaNow().ToString("yyyy-MM-dd"))">🏠 미션으로</a>
+        </div>
+    </div>
+
+    @{
+        var list = Model.Claims ?? new List<BulletinBoard.Models.DailyMission2.AwardClaimWithItemDTO>();
+        int cnt = (Model.Claims == null ? 0 : Model.Claims.Count);
+
+        int cntElig = 0, cntSel = 0, cntDel = 0, cntOther = 0;
+        if (Model.Claims != null)
+        {
+            foreach (var c in Model.Claims)
+            {
+                var st = Safe(c.Status).ToLowerInvariant();
+                if (st == "eligible") cntElig++;
+                else if (st == "selected") cntSel++;
+                else if (st == "delivered") cntDel++;
+                else cntOther++;
+            }
+        }
+    }
+
+    <div class="grid">
+        <div class="summaryCard">
+            <div class="chips">
+                <span class="chip"><span class="dot"></span> 전체 <b>@cnt</b>개</span>
+                <span class="chip"><span class="dot dotElig"></span> Eligible <b>@cntElig</b></span>
+                <span class="chip"><span class="dot dotSel"></span> Selected <b>@cntSel</b></span>
+                <span class="chip"><span class="dot dotDel"></span> Delivered <b>@cntDel</b></span>
+            </div>
+            <div class="hint">
+                카드형 목록이라 모바일/태블릿에서도 깔끔하게 보여요.
+                @if (isAdmin)
+                {
+                    <span> · (관리자) 가격 정보 포함</span>
+                }
+            </div>
+        </div>
+
+        @if (Model.Claims == null || Model.Claims.Count == 0)
+        {
+            <div class="empty" style="grid-column: span 12;">
+                <div class="e1">아직 시상 기록이 없어요.</div>
+                <div class="e2">선물 선택이 가능한 레벨이 생기면, 위 버튼으로 들어가서 선물을 골라주세요 🙂</div>
+            </div>
+        }
+        else
+        {
+            @foreach (var c in Model.Claims)
+            {
+                bool isDelivered = Safe(c.Status).Equals("Delivered", StringComparison.OrdinalIgnoreCase);
+                bool isSelected = Safe(c.Status).Equals("Selected", StringComparison.OrdinalIgnoreCase);
+                bool isEligible = Safe(c.Status).Equals("Eligible", StringComparison.OrdinalIgnoreCase);
+
+                string statusClass =
+                isEligible ? "status sElig" :
+                isSelected ? "status sSel" :
+                isDelivered ? "status sDel" :
+                "status";
+
+                <div class="card">
+                    <div class="cardTop">
+                        <div class="lvl">
+                            <div class="lvlBadge">@c.AwardLevel</div>
+                            <div class="lvlText">
+                                <div class="k">@c.AwardLevel 점 레벨</div>
+                                <div class="v">선택 내역</div>
+                            </div>
+                        </div>
+
+                        <span class="@statusClass">
+                            @if (isEligible)
+                            {
+                                <span>🟡 Eligible</span>
+                            }
+                            else if (isSelected)
+                            {
+
+                                <span>🟢 Selected</span>
+                            }
+                            else if (isDelivered)
+                            {
+
+                                <span>🟣 Delivered</span>
+                            }
+                            else
+                            {
+
+                                <span>@Safe(c.Status)</span>
+                            }
+                        </span>
+                    </div>
+
+                    <div class="body">
+                        <div class="product">
+                            @if (c.SelectedProductID.HasValue)
+                            {
+                                <div class="productName">[@c.SelectedProductID] @c.ProductName</div>
+                                <div class="productDesc">@c.ProductDescription</div>
+                            }
+                            else
+                            {
+                                <div class="productName">아직 선택 안 함</div>
+                                <div class="productDesc">선택 가능한 경우 위의 “계속 고르기” 버튼을 눌러 선물을 선택해 주세요.</div>
+                            }
+                        </div>
+
+                        <div class="metaRow">
+                            <div class="meta">
+                                <span class="metaItem">
+                                    <span class="mLabel">선택일</span>
+                                    <span class="mVal">@(c.SelectedDT.HasValue? c.SelectedDT.Value.ToString("yyyy-MM-dd HH:mm") : "-")</span>
+                                </span>
+
+                                @if (isAdmin)
+                                {
+                                    <span class="metaItem">
+                                        <span class="mLabel">가격</span>
+                                        <span class="mVal">@(c.UnitPrice.HasValue ? $"{c.UnitPrice.Value}원" : "-")</span>
+                                    </span>
+                                }
+                            </div>
+
+                            <div class="actionsRow">
+                                @if (isDelivered)
+                                {
+                                    <span class="btn btnDisabled">🔒 전달 완료 (잠금)</span>
+                                }
+                                else
+                                {
+                                    <form method="post" action="/DailyMission2Award/ResetGiftSelection" style="margin:0;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="cYear" value="@Model.cYear" />
+                                        <input type="hidden" name="awardLevel" value="@c.AwardLevel" />
+
+                                        <button type="submit"
+                                                class="btn btnDanger"
+                                                onclick="return confirm('[@c.AwardLevel 점] 선물을 다시 고를까요?');">
+                                            🔁 다시 고르기
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@{
+    var okPopupMsg = TempData["DM2_OK_POPUP"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission2/Partials/_OkPopup.cshtml", new { Message = okPopupMsg, AutoCloseSeconds = 3 })

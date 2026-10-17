@@ -1,0 +1,133 @@
+@model IEnumerable<BulletinBoard.Models.JuManNas>
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 말씀 정리 — 날짜별 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · option: minimal(본문만) · rough(주제까지) · detail(전체 내용).  위 칩으로 같은 달의 다른 방식 · 영상 구간으로 바로 이동
+    · 비어 있는 칸은 주황 꼬리표(주제 없음 · 줄거리 없음 · 요약 없음)
+    · 보기(IndexByID) · 수정(ModifyJuManNa) 주소는 예전 그대로
+    · 예전 _Layout_Mission 대신 단독 화면.  이전 화면은 Index.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var list = (Model ?? Enumerable.Empty<BulletinBoard.Models.JuManNas>()).ToList();
+    string opt = (ViewBag.option as string ?? "minimal").ToLower();
+    string ym = ViewBag.YYYYMM as string ?? (list.Count > 0 ? list[0].ExposeDate.ToString("yyyy-MM") : "");
+
+    string monthLabel = "";
+    if (DateTime.TryParse(ym + "-01", out var firstDay)) { monthLabel = $"{firstDay.Year}년 {firstDay.Month}월"; }
+
+    bool showSubject = opt == "rough" || opt == "detail";
+    bool showDetail = opt == "detail";
+    int missing = list.Count(x => string.IsNullOrWhiteSpace(x.BibleSubject));
+
+    string Range(int sm, int ss, int em, int es) => $"{sm}:{ss:D2} ~ {em}:{es:D2}";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>날짜별 말씀</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><span class="sep">›</span>@(string.IsNullOrEmpty(monthLabel) ? "날짜별" : monthLabel)</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">@(string.IsNullOrEmpty(monthLabel) ? "DAILY WORD" : monthLabel) · @(list.Count)일</div>
+    <h1 class="qb-h1">
+        날짜별 말씀
+        @if (missing > 0)
+        {
+            <small>주제 없음 @missing</small>
+        }
+    </h1>
+
+    @if (!string.IsNullOrEmpty(ym))
+    {
+        <div class="jm-chips">
+            <a class="@(opt == "minimal" ? "on" : "")" href="/JuManNa/IndexQueryByYYYYMM?option=Minimal&YYYYMM=@ym">본문만</a>
+            <a class="@(opt == "rough" ? "on" : "")" href="/JuManNa/IndexQueryByYYYYMM?option=Rough&YYYYMM=@ym">주제까지</a>
+            <a class="@(opt == "detail" ? "on" : "")" href="/JuManNa/IndexQueryByYYYYMM?option=Detail&YYYYMM=@ym">전체 내용</a>
+            <a href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@ym">영상 구간</a>
+        </div>
+    }
+
+    @if (list.Count == 0)
+    {
+        <div class="qb-empty">이 달에 등록된 말씀이 없어요</div>
+    }
+
+    @foreach (var item in list)
+    {
+        string janZul = SharedComm.MakeBibleSerialJangZul(item.BibleText, item.FromJang, item.FromZul, item.ToJang, item.ToZul);
+        bool sun = item.ExposeDate.DayOfWeek == DayOfWeek.Sunday;
+        var segs = new List<string>();
+        if (!string.IsNullOrWhiteSpace(item.URL))  segs.Add(Range(item.YouTuBuStartMM,  item.YouTuBuStartSS,  item.YouTuBuEndMM,  item.YouTuBuEndSS));
+        if (!string.IsNullOrWhiteSpace(item.URL2)) segs.Add(Range(item.YouTuBuStartMM2, item.YouTuBuStartSS2, item.YouTuBuEndMM2, item.YouTuBuEndSS2));
+        if (!string.IsNullOrWhiteSpace(item.URL3)) segs.Add(Range(item.YouTuBuStartMM3, item.YouTuBuStartSS3, item.YouTuBuEndMM3, item.YouTuBuEndSS3));
+        if (!string.IsNullOrWhiteSpace(item.URL4)) segs.Add(Range(item.YouTuBuStartMM4, item.YouTuBuStartSS4, item.YouTuBuEndMM4, item.YouTuBuEndSS4));
+        if (!string.IsNullOrWhiteSpace(item.URL5)) segs.Add(Range(item.YouTuBuStartMM5, item.YouTuBuStartSS5, item.YouTuBuEndMM5, item.YouTuBuEndSS5));
+
+        <div class="jm-day">
+            <span class="jm-dt @(sun ? "sun" : "")"><small>@(item.ExposeDate.Month)월</small><b>@item.ExposeDate.Day</b><i>@item.WeekDayKor</i></span>
+            <div class="c">
+                <div class="ref">@item.BibleText @janZul</div>
+
+                @if (showSubject)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.BibleSubject))
+                    {
+                        <a class="jm-day-link" href="/JuManNa/IndexByID?Id=@item.Id"><div class="sj">@item.BibleSubject</div></a>
+                    }
+                    else
+                    {
+                        <span class="jm-miss">주제 없음</span>
+                    }
+                }
+
+                @if (showDetail)
+                {
+                    if (!string.IsNullOrWhiteSpace(item.Synopsis))
+                    {
+                        <div class="jm-tx"><b>줄거리</b>@item.Synopsis</div>
+                    }
+                    else
+                    {
+                        <div><span class="jm-miss">줄거리 없음</span></div>
+                    }
+                    if (!string.IsNullOrWhiteSpace(item.BibleSummary))
+                    {
+                        <div class="jm-tx"><b>말씀 요약</b>@item.BibleSummary</div>
+                    }
+                    else
+                    {
+                        <div><span class="jm-miss">요약 없음</span></div>
+                    }
+                    <div class="jm-tm">영상 @(segs.Count > 0 ? string.Join(" · ", segs) : "없음") · 전체 @(item.TimeMM):@(item.TimeSS.ToString("00"))</div>
+                }
+
+                <div class="jm-ac">
+                    <a class="jm-pill s" href="/JuManNa/IndexByID?Id=@item.Id">보기</a>
+                    <a class="jm-pill" href="/JuManNa/ModifyJuManNa?Id=@item.Id">수정</a>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>날짜별 말씀</span>
+        <span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+</body>
+</html>

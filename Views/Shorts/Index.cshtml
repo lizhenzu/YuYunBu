@@ -1,0 +1,421 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model IEnumerable<ShortVideo>
+@{
+    ViewData["Title"] = "쇼츠 목록";
+    Layout = null;
+}
+
+
+@{
+   
+    ViewData["Title"] = "쇼츠 목록";
+    var q = ViewBag.q;
+
+
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+
+    <title>@ViewData["Title"]</title>
+    <style>
+        :root {
+            --bg: #0b1220;
+            --card: #111a2e;
+            --text: #e5e7eb;
+            --dim: #9ca3af;
+            --accent: #60a5fa;
+            --border: rgba(255,255,255,.08);
+            --ring: rgba(96,165,250,.6);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif
+        }
+
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Nanum Gothic", Arial, sans-serif;
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            /* justify-content: space-between;  ← 삭제하거나 그대로 둬도 됨 */
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap; /* ← 추가 */
+        }
+
+            header h1 {
+                font-size: 20px;
+                margin: 0
+            }
+
+        .hint {
+            font-size: 13px;
+            color: var(--dim)
+        }
+
+        .actions-top {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-basis: 100%; /* ← 추가: 다음 줄(전체폭)로 내려감 */
+            margin-top: 8px; /* ← 선택: 살짝 간격 */
+            justify-content: flex-start; /* ← 선택: 왼쪽 정렬 */
+        }
+
+            .actions-top a.btn {
+                text-decoration: none
+            }
+
+        .grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fill,minmax(220px,1fr))
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                border-color: var(--ring);
+                box-shadow: 0 14px 38px rgba(0,0,0,.35), 0 0 0 4px color-mix(in srgb, var(--ring) 40%, transparent)
+            }
+
+        .thumb {
+            position: relative;
+            aspect-ratio: 9/16;
+            background: #0b0e17 center/cover no-repeat;
+            display: block;
+            width: 100%
+        }
+
+            .thumb::before {
+                content: "";
+                display: block;
+                padding-top: 177.78%
+            }
+
+        .badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(0,0,0,.55);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,.2);
+            backdrop-filter: blur(4px)
+        }
+
+        .play {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%,-50%);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,.2);
+            background: rgba(0,0,0,.55);
+            color: #fff;
+            cursor: pointer;
+            user-select: none
+        }
+
+        .play-icon {
+            width: 0;
+            height: 0;
+            border-left: 12px solid #fff;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent
+        }
+
+        .body {
+            padding: 12px 14px
+        }
+
+        .title {
+            font-size: 15px;
+            margin: 0 0 8px;
+            line-height: 1.3
+        }
+
+        .meta {
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--dim)
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: #0f172a;
+            color: #e5e7eb;
+            padding: 8px 10px;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer
+        }
+
+            .btn:hover {
+                border-color: var(--accent)
+            }
+
+            .btn.accent {
+                background: #1f2a44;
+                border-color: var(--accent)
+            }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        form.inline {
+            display: inline
+        }
+
+        .search {
+            display: flex;
+            gap: 8px
+        }
+
+            .search input[type=text] {
+                padding: 8px 10px;
+                border-radius: 10px;
+                border: 1px solid var(--border);
+                background: #0f172a;
+                color: var(--text);
+                min-width: 220px
+            }
+    </style>
+
+    <style>
+        .thumb {
+            cursor: pointer;
+        }
+
+        .thumb-img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header>
+            <div>
+                <h1>10초 생활 영어</h1>
+                <div class="hint">Think in English for 10 Seconds a Day</div>
+            </div>
+
+            @if (isSuperAdmin)
+            {
+                <div class="actions-top">
+                    <form asp-action="Index" asp-controller="Shorts" method="get" class="search">
+                        <input type="text" name="q" value="@q" placeholder="제목/ID 검색" />
+                        <button class="btn" type="submit">검색</button>
+                    </form>
+                </div>
+                <div class="actions-top">
+                    <a class="btn accent" asp-action="Create" asp-controller="Shorts">+ 추가</a>
+                    <a class="btn" asp-controller="Shorts" asp-action="main">🏠 영어 홈으로</a>
+                    <a class="btn" asp-controller="Home" asp-action="Index">🏠 홈으로</a>
+                </div>
+            }
+            else
+            {
+                <div class="actions-top">
+                    <a class="btn" asp-controller="Shorts" asp-action="main">🏠 영어 홈으로</a>
+                    <a class="btn" asp-controller="Home" asp-action="Index">🏠 홈으로</a>
+                </div>
+            }
+        </header>
+
+        @if (TempData["msg"] != null)
+        {
+            <div class="hint">@TempData["msg"]</div>
+        }
+
+        <main class="grid" id="grid">
+            @foreach (var item in Model ?? Enumerable.Empty<ShortVideo>())
+            {
+                <article class="card">
+                    <div class="thumb" data-id="@item.YoutubeId" aria-label="재생: @Html.Encode(item.Title ?? item.YoutubeId)" role="button">
+                        <img class="thumb-img" src="https://i.ytimg.com/vi/@item.YoutubeId/hqdefault.jpg" alt="">
+                        <div class="badge">Shorts</div>
+                        <div class="play"><span class="play-icon"></span>재생</div>
+                    </div>
+                    <div class="body">
+                        <h3 class="title">@System.Net.WebUtility.HtmlDecode(item.Title ?? item.YoutubeId)</h3>
+                        <div class="meta">
+                            <span>ID: @item.YoutubeId</span>
+                            <span>|</span>
+                            <span>@(item.IsActive ? "활성" : "비활성")</span>
+                        </div>
+                        @if (isSuperAdmin)
+
+                        {
+                            <div class="row" style="margin-top:10px">
+                                <a class="btn" asp-action="Edit" asp-route-id="@item.ShortId">수정</a>
+                                <form class="inline" asp-action="Delete" asp-route-id="@item.ShortId" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <button class="btn" type="submit" onclick="return confirm('삭제하시겠습니까?');">삭제</button>
+                                </form>
+                            </div>
+                        }
+                        <div class="actions" style="display:flex; gap:20px">
+                            <button class="btn accent" type="button" data-play="@item.YoutubeId">▶ 카드에서 재생</button>
+
+                            <a class="btn" href="https://www.youtube.com/shorts/@item.YoutubeId" target="_blank" rel="noopener">YouTube에서 보기</a>
+                        </div>
+                    </div>
+                </article>
+            }
+        </main>
+
+        <div class="actions-top">
+            <a class="btn" asp-controller="Shorts" asp-action="main">🏠 영어 홈으로</a>
+            <a class="btn" asp-controller="Home" asp-action="Index">🏠 홈으로</a>
+        </div>
+
+    </div>
+
+
+    <script>
+        // 썸네일 URL
+        const thumbUrl = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+        function attachActions() {
+            const startInline = (thumbEl) => {
+                const id = thumbEl?.getAttribute('data-id');
+                if (!id) return;
+                if (thumbEl.dataset.played === '1') return; // 중복 삽입 방지
+                thumbEl.dataset.played = '1';
+                playInline(thumbEl, id);
+            };
+
+            // 썸네일(사진/영역) 클릭 시 바로 재생
+            document.querySelectorAll('.thumb').forEach(el => {
+                const handler = (e) => { e.preventDefault(); startInline(el); };
+                el.addEventListener('click', handler, { passive: false });
+                el.addEventListener('pointerdown', handler, { passive: false });
+            });
+
+            // 가운데 화살표(overlay) 클릭 시도 즉시 재생 (이동 방지)
+            document.querySelectorAll('.thumb .play').forEach(overlay => {
+                const handler = (e) => { e.preventDefault(); e.stopPropagation(); startInline(overlay.closest('.thumb')); };
+                overlay.addEventListener('click', handler, { passive: false });
+                overlay.addEventListener('pointerdown', handler, { passive: false });
+            });
+
+            // 하단 “카드에서 재생” 버튼
+            document.querySelectorAll('button[data-play]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.preventDefault();
+                    const id = btn.getAttribute('data-play');
+                    const card = btn.closest('.card');
+                    const thumbEl = card && card.querySelector('.thumb');
+                    if (thumbEl && id) {
+                        if (thumbEl.dataset.played === '1') return;
+                        thumbEl.dataset.played = '1';
+                        playInline(thumbEl, id);
+                    }
+                }, { passive: false });
+            });
+        }
+
+        // attachThumbs();  // ← 이 줄은 삭제(또는 주석)
+        attachActions();
+
+        function playInline(thumbEl, id) {
+            const src = `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&playsinline=1&modestbranding=1&rel=0&controls=1&loop=1&playlist=${id}`;
+            const iframe = document.createElement('iframe');
+            iframe.width = '100%';
+            iframe.height = '100%';
+            iframe.allow = 'autoplay; accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+            iframe.allowFullscreen = true;
+            iframe.loading = 'lazy';
+            iframe.title = 'YouTube Shorts player';
+            iframe.src = src;
+            iframe.style.position = 'absolute';
+            iframe.style.inset = '0';
+            iframe.style.border = '0';
+            thumbEl.innerHTML = '';
+            thumbEl.appendChild(iframe);
+        }
+
+        function attachActions() {
+            // 1) 카드 썸네일 클릭 시 재생
+            document.querySelectorAll('.thumb').forEach(el => {
+                el.addEventListener('click', e => {
+                    e.preventDefault();
+                    const id = el.getAttribute('data-id');
+                    playInline(el, id);
+                }, { passive: false });
+            });
+
+            // 2) "카드에서 재생" 버튼 클릭 시 재생
+            document.querySelectorAll('button[data-play]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.preventDefault();
+                    const id = btn.getAttribute('data-play');
+                    const card = btn.closest('.card');
+                    const thumbEl = card && card.querySelector('.thumb');
+                    if (thumbEl && id) playInline(thumbEl, id);
+                }, { passive: false });
+            });
+        }
+
+        attachThumbs();
+        attachActions();
+    </script>
+
+</body>
+</html>

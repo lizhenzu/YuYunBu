@@ -1,0 +1,195 @@
+@model List<BibleReadingThrough.Models.BookReadingViewModel>
+@*  ══════════════════════════════════════════════════════════════
+    구약 / 신약 목록 — Bone 스킨 (B안: 권 칸 모아 보기 + 고른 권의 장 판)
+    · 권 칸을 누르면 그 줄 바로 아래에 흰 판이 열려 장 번호가 나온다.
+    · 대시보드에서 #book=창세기 로 들어오면 그 권 판을 열고 스크롤한다.
+    이전 화면은 List_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    string testament = ViewBag.Testament as string ?? "구약";
+    ViewData["Title"] = testament + " 읽기";
+    ViewData["Page"]  = testament == "구약" ? "ot" : "nt";
+    bool isOt = testament == "구약";
+
+    int totalChapters = Model.Sum(b => b.Chapters.Count);
+    int totalRead     = Model.Sum(b => b.Chapters.Count(c => c.IsRead));
+    int totalPct      = totalChapters == 0 ? 0 : (int)Math.Round((double)totalRead / totalChapters * 100);
+
+    string Unit(string book) => book == "시편" ? "편" : "장";
+}
+
+<style>
+    .b2l { --pad: 18px; max-width: 880px; margin: 0 auto; padding: 4px var(--pad) 30px; color: var(--b2-tx); }
+    @@media (min-width: 769px) { .b2l { --pad: 32px; } }
+    .b2l a { text-decoration: none; color: inherit; }
+
+    .b2l .tabs { display: flex; margin-top: 8px; }
+    .b2l .tabs a { flex: 1; text-align: center; padding: 10px 0; font-size: 13px; border: 1px solid var(--b2-rule); background: var(--b2-card); }
+    .b2l .tabs a + a { border-left: 0; }
+    .b2l .tabs a.on { background: var(--b2-tx); color: var(--b2-bg); border-color: var(--b2-tx); }
+
+    .b2l .k { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--b2-acc); }
+    .b2l .sum { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 20px; }
+    .b2l .big { font-family: "Inter", sans-serif; font-weight: 200; font-size: 46px; line-height: 1; color: var(--b2-acc); margin-top: 6px; }
+    .b2l .big small { font-size: 14px; color: var(--b2-dim); margin-left: 4px; }
+    .b2l .sum .r { text-align: right; font-size: 12px; color: var(--b2-dim); line-height: 1.6; font-variant-numeric: tabular-nums; }
+    .b2l .pg { height: 3px; background: var(--b2-rule); margin-top: 10px; }
+    .b2l .pg i { display: block; height: 3px; background: var(--b2-acc); }
+
+    /* 권 칸 */
+    .b2l .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 16px; }
+    @@media (min-width: 560px) { .b2l .grid { grid-template-columns: repeat(4, 1fr); } }
+    @@media (min-width: 900px) { .b2l .grid { grid-template-columns: repeat(6, 1fr); } }
+    .b2l .bk {
+        font-family: inherit; text-align: left; cursor: pointer; color: var(--b2-tx);
+        border: 1px solid var(--b2-rule); background: var(--b2-card); padding: 9px 8px 11px; font-size: 12.5px;
+        position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; scroll-margin-top: 80px;
+    }
+    .b2l .bk:hover { border-color: var(--b2-acc); }
+    .b2l .bk small { display: block; font-family: "Inter", sans-serif; font-size: 10px; color: var(--b2-dim); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .b2l .bk i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--b2-acc); }
+    .b2l .bk.dn { background: var(--b2-mark); border-color: var(--b2-mark); }
+    .b2l .bk.dn small { color: var(--b2-acc); }
+    /* 고른 권 — 아래 판과 한 장으로 이어진다 */
+    .b2l .bk.sel { background: var(--b2-card); border-color: var(--b2-card); z-index: 2; overflow: visible; }
+    .b2l .bk.sel small { color: var(--b2-acc); }
+    .b2l .bk.sel::after { content: ""; position: absolute; left: -1px; right: -1px; bottom: -7px; height: 8px; background: var(--b2-card); }
+
+    /* 장 판 — 테두리 없이 옅은 그림자 */
+    .b2l .panel { grid-column: 1 / -1; background: var(--b2-card); box-shadow: 0 6px 18px -8px rgba(22,24,28,.22); padding: 14px 12px 12px; }
+    .b2l .panel[hidden] { display: none; }
+    .b2l .ph { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .b2l .ph b { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 17px; }
+    .b2l .ph small { font-size: 11px; color: var(--b2-dim); font-variant-numeric: tabular-nums; }
+    .b2l .chs { display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 4px; }
+    .b2l .chs a { height: 32px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-size: 12px; border: 1px solid var(--b2-line); background: var(--b2-bg); }
+    .b2l .chs a:hover { border-color: var(--b2-acc); }
+    .b2l .chs a.r { background: var(--b2-acc); border-color: var(--b2-acc); color: #fff; }
+    .b2l .chs a.nx { border-color: var(--b2-acc); color: var(--b2-acc); font-weight: 600; box-shadow: inset 0 -2px 0 var(--b2-acc); }
+    .b2l .go { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--b2-line); padding-top: 10px; margin-top: 12px; }
+    .b2l .go button { background: none; border: 0; font-family: inherit; font-size: 11.5px; color: var(--b2-dim); cursor: pointer; padding: 4px 0; }
+    .b2l .go a { background: var(--b2-head); color: var(--b2-headtx); padding: 8px 13px; font-size: 12px; }
+    .b2l .go a:hover { background: var(--b2-acc); }
+    .b2l .go .fin { font-size: 12px; color: var(--b2-acc); }
+</style>
+
+<div class="b2l">
+
+    <nav class="tabs">
+        <a href="/Bible2/List?testament=구약" class="@(isOt ? "on" : "")">구약</a>
+        <a href="/Bible2/List?testament=신약" class="@(!isOt ? "on" : "")">신약</a>
+    </nav>
+
+    <div class="sum">
+        <div>
+            <div class="k">@testament 전체</div>
+            <div class="big">@totalPct<small>%</small></div>
+        </div>
+        <div class="r">@(totalRead)장 읽음<br>@(totalChapters)장 중 · @(Model.Count)권</div>
+    </div>
+    <div class="pg"><i style="width:@(totalPct)%"></i></div>
+
+    <div class="grid" id="bkGrid">
+        @for (int bi = 0; bi < Model.Count; bi++)
+        {
+            var book = Model[bi];
+            int rc   = book.Chapters.Count(c => c.IsRead);
+            int cnt  = book.Chapters.Count;
+            bool done = cnt > 0 && rc == cnt;
+            int bpct = cnt == 0 ? 0 : (int)Math.Round((double)rc / cnt * 100);
+            var next = book.Chapters.FirstOrDefault(c => !c.IsRead);
+
+            <button type="button" class="bk @(done ? "dn" : "")" data-i="@bi" data-book="@book.Name" aria-expanded="false">
+                @book.Name<small>@rc/@cnt</small>
+                @if (rc > 0) { <i style="width:@(bpct)%"></i> }
+            </button>
+
+            <div class="panel" data-for="@bi" hidden>
+                <div class="ph"><b>@book.Name</b><small>@rc / @(cnt)@Unit(book.Name) · @(bpct)%</small></div>
+                <div class="chs">
+                    @foreach (var ch in book.Chapters)
+                    {
+                        string href = $"/Bible2/Read?bookName={Uri.EscapeDataString(book.Name)}&jang={ch.Jang}{(ch.IsRead ? "" : "#vc-1")}";
+                        bool isNext = next != null && ch.Jang == next.Jang;
+                        <a href="@href" class="@(ch.IsRead ? "r" : "") @(isNext ? "nx" : "")" title="@book.Name @(ch.Jang)@Unit(book.Name)@(ch.IsRead ? " · 읽음" : "")">@ch.Jang</a>
+                    }
+                </div>
+                <div class="go">
+                    <button type="button" data-close>닫기</button>
+                    @if (next != null)
+                    {
+                        <a href="/Bible2/Read?bookName=@Uri.EscapeDataString(book.Name)&jang=@next.Jang#vc-1">@(rc == 0 ? "읽기 시작" : "이어 읽기") @(next.Jang)@Unit(book.Name) →</a>
+                    }
+                    else
+                    {
+                        <span class="fin">다 읽었어요</span>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var grid = document.getElementById('bkGrid');
+    if (!grid) return;
+    var cells = Array.prototype.slice.call(grid.querySelectorAll('.bk'));
+    var openIdx = null;
+
+    // 고른 칸이 있는 줄의 마지막 칸 바로 뒤에 판을 옮겨 넣는다
+    function place(i) {
+        var panel = grid.querySelector('.panel[data-for="' + i + '"]');
+        var top = cells[i].offsetTop, last = cells[i];
+        for (var j = i + 1; j < cells.length; j++) {
+            if (cells[j].offsetTop !== top) break;
+            last = cells[j];
+        }
+        last.after(panel);
+        return panel;
+    }
+
+    function close() {
+        if (openIdx === null) return;
+        cells[openIdx].classList.remove('sel');
+        cells[openIdx].setAttribute('aria-expanded', 'false');
+        var p = grid.querySelector('.panel[data-for="' + openIdx + '"]');
+        if (p) p.hidden = true;
+        openIdx = null;
+    }
+
+    function open(i, scroll) {
+        close();
+        // 판들을 모두 닫힌 상태로 제자리(칸 뒤)에 모아 두어야 offsetTop 계산이 맞다
+        grid.querySelectorAll('.panel').forEach(function (p) { p.hidden = true; });
+        var panel = place(i);
+        panel.hidden = false;
+        cells[i].classList.add('sel');
+        cells[i].setAttribute('aria-expanded', 'true');
+        openIdx = i;
+        if (scroll) cells[i].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    cells.forEach(function (c, i) {
+        c.addEventListener('click', function () { openIdx === i ? close() : open(i, false); });
+    });
+    grid.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) close(); });
+
+    // 화면 폭이 바뀌면 줄 계산을 다시
+    var rt;
+    window.addEventListener('resize', function () {
+        clearTimeout(rt);
+        rt = setTimeout(function () { if (openIdx !== null) { var i = openIdx; open(i, false); } }, 150);
+    });
+
+    // 대시보드에서 특정 권으로 (#book=창세기)
+    var hash = decodeURIComponent(location.hash || '');
+    if (hash.indexOf('#book=') === 0) {
+        var name = hash.slice(6);
+        var idx = cells.findIndex(function (c) { return c.dataset.book === name; });
+        if (idx >= 0) setTimeout(function () { open(idx, true); }, 80);
+    }
+})();
+</script>
+}

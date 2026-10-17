@@ -1,0 +1,381 @@
+﻿@using BulletinBoard.ViewModels.Home
+
+
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+
+
+@model bool
+@*
+    홈 "축하해 주세요~~" — 도토리 선물 점수 타임라인 (2026-09-26 확정 시안)
+    · 아이마다 몇 점에 무슨 선물을 신청했는지 + 최종 상태 하나 (신청중 · 구매완료 · 전달완료)
+    · 전체 유저가 보는 공개 카드 — 신청중·구매완료 선물이 있는 친구만 (나의 선물은 Index 의 "나의 선물함" 카드)
+    · 지금 점수 표시 (다음 선물 칸은 NextPoint 가 있을 때만 — 지금은 컨트롤러가 넣지 않음)
+    · PC(640px 이상)는 가로 타임라인, 휴대폰은 세로 타임라인
+    Model = isStaff (관리자 → 링크)
+*@
+@{
+    bool isStaff = Model;
+    var kids = ViewBag.GiftTimelineKids as List<GiftTimelineKidVM> ?? new List<GiftTimelineKidVM>();
+    const int FirstShow = 3;
+    const string PickUrl = "/StudentPointDashboard4/GiftSelect?type=point&returnTo=home";
+    const string AdminUrl = "/StudentPointDashboard4/AdminPurchaseList";   // 관리자만 — 선물 칸을 누르면 이동
+}
+@functions {
+    // 한 아이의 칸들: 받은 선물 · (나) 안 고른 단계 · 다음 선물 — 점수 순
+    record Step(int Point, string Kind, GiftTimelineItemVM? Item);   // Kind: item · todo · next
+
+    static List<Step> Steps(GiftTimelineKidVM k)
+    {
+        var s = k.Items.Select(i => new Step(i.Milestone, "item", i)).ToList();
+        if (k.PendingMilestone is int pm) s.Add(new Step(pm, "todo", null));
+        s = s.OrderBy(x => x.Point).ToList();
+        if (k.NextPoint is int np && np > k.Total) s.Add(new Step(np, "next", null));
+        return s;
+    }
+    static (string css, string text) St(string status) => status switch
+    {
+        "HIDDEN"    => ("done", "전달완료"),
+        "PURCHASED" => ("buy", "구매완료"),
+        _           => ("req", "신청중")
+    };
+    static string N(int v) => v.ToString("N0");
+
+    // ── 날짜 (2026-09-26) — 선물 칸에는 최종 상태의 날짜 하나만, 글자 없이 "09/21" ──
+    //    전달완료 → 전달일 (DeliveredAt 은 2026-09-26 부터 저장 — 그 전 선물은 구매일, 그것도 없으면 신청일)
+    //    구매완료 → 구매일 · 신청중 → 신청일.  색(주황·파랑·초록)으로 어떤 날짜인지 구분한다
+    static DateTime FinalDate(GiftTimelineItemVM i) => i.Status switch
+    {
+        "HIDDEN"    => i.DeliveredAt ?? i.PurchasedAt ?? i.CreatedAt,
+        "PURCHASED" => i.PurchasedAt ?? i.CreatedAt,
+        _           => i.CreatedAt
+    };
+    static string D(DateTime d) => d.Year == DateHelper.GetKoreaNow().Year
+        ? d.ToString("M/d", System.Globalization.CultureInfo.InvariantCulture)         // 앞의 0 없이 "6/9" · InvariantCulture — "/" 가 "-" 로 바뀌지 않게
+        : d.ToString("yyyy.M/d", System.Globalization.CultureInfo.InvariantCulture);
+
+    // 소요일수 — 앞 선물을 신청한 날 → 이 선물을 신청한 날 (점수에 닿은 날은 따로 저장되지 않아 신청일로 잰다)
+    static string? Gap(List<Step> steps, int i)
+    {
+        if (i <= 0 || i >= steps.Count) return null;
+        var a = steps[i - 1].Item; var b = steps[i].Item;
+        if (a == null || b == null) return null;
+        int d = (b.CreatedAt.Date - a.CreatedAt.Date).Days;
+        if (d < 0) return null;
+        return d == 0 ? "같은 날" : $"{d}일";
+    }
+}
+
+@* 한 아이의 타임라인 (가로 + 세로 — 화면 폭으로 하나만 보인다) *@
+@{
+    async Task Kid(GiftTimelineKidVM k, string extraCss)
+    {
+        var steps = Steps(k);
+        int n = Math.Max(1, steps.Count);
+        int lastHit = steps.FindLastIndex(s => s.Kind != "next");
+        var next = steps.FirstOrDefault(s => s.Kind == "next");
+        double t = 0;
+        if (lastHit >= 0 && next != null && next.Point > steps[lastHit].Point)
+            t = Math.Clamp((k.Total - steps[lastHit].Point) / (double)(next.Point - steps[lastHit].Point), 0, 1);
+        int anchor = Math.Max(0, lastHit);
+        string pos = (anchor + t).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        string nn = n.ToString();
+        var cItems = steps.Where(x => x.Kind == "item" && x.Item != null).ToList();   // 휴대폰 축소판 칸
+
+        <div class="kid @extraCss">
+            <div class="kTop">
+                <div class="av"><img src="@k.Photo" alt="@k.DisplayName" onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp';" onclick="openPhotoModal(this.src, this.alt)" /></div>
+                <div class="who">
+                    <b>@k.DisplayName@if (k.IsMe) {<span class="me">나</span>}</b>
+                    <div class="s">@(k.ClassLabel == null ? "" : k.ClassLabel + " · ")지금 <b>@N(k.Total)</b>점</div>
+                </div>
+            </div>
+
+            @* 휴대폰 축소판 (2026-09-27) — 가족팀 마일스톤 축소판(.fmCs)과 같은 박스 : 점수 · 사진 · 선물 · 상태.  "상세히"를 누르면 세로 타임라인 *@
+            <div class="cmp" style="grid-template-columns: repeat(@(Math.Max(1, Math.Min(cItems.Count, 4))), 1fr);">
+                @foreach (var cs in cItems)
+                {
+                    var (ccss, ctext) = St(cs.Item!.Status);
+                    <div class="cbox">
+                        <div class="p">@N(cs.Point)</div>
+                        <div class="im"><img src="/images/AwardItem/@(cs.Item.ProductID).jpg" alt="" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove();" /></div>
+                        <div class="cn">@cs.Item.ProductName</div>
+                        <span class="bdg @ccss">@ctext</span>
+                    </div>
+                }
+            </div>
+
+            @* PC: 가로 *@
+            <div class="hz" style="--n:@nn">
+                <div class="axis">
+                    @if (lastHit >= 0) { <div class="fill" style="width:calc(@pos * 100% / @nn)"></div>
+                                         <span class="now" style="left:calc((@pos + .5) * 100% / @nn)">지금 @N(k.Total)</span> }
+                    @for (int i = 0; i < steps.Count; i++)
+                    {
+                        var s = steps[i];
+                        var gap = Gap(steps, i);   // 앞 점수와의 가운데(= 이 칸의 왼쪽 끝) 선 위에
+                        <div class="ms @(s.Kind == "next" ? "next" : "hit")">@if (gap != null) {<span class="gap">@gap</span>}<div class="dot"></div><div class="p">@N(s.Point)점</div></div>
+                    }
+                </div>
+                <div class="boxes">
+                    @foreach (var s in steps) { await Box(s, k, false); }
+                </div>
+            </div>
+
+            @* 휴대폰: 세로 *@
+            <div class="vt">
+                @for (int i = 0; i < steps.Count; i++)
+                {
+                    var s = steps[i];
+                    bool hit = s.Kind != "next";
+                    bool isFirst = i == 0;
+                    bool isLast = i == steps.Count - 1;
+                    bool nowAfter = i == lastHit;   // 이 칸 다음에 "지금" 줄
+                    string cls = (hit ? "hit" : "next") + (isFirst ? " first" : "") + (isLast && !nowAfter ? " last" : "")
+                               + (hit && !isFirst ? " up" : "") + (hit ? " dn" : "");
+                    var vgap = Gap(steps, i);
+                    if (vgap != null)
+                    {
+                        // 앞 칸과 이 칸 사이 — 걸린 날 수
+                        <div class="vr vgap up dn">
+                            <div class="pt"></div>
+                            <div class="rail"><span class="gap">@vgap</span></div>   @* 선 위에 걸쳐서 *@
+                        </div>
+                    }
+                    <div class="vr @cls">
+                        <div class="pt">@N(s.Point)<small>점</small></div>
+                        <div class="rail"><span class="dot"></span></div>
+                        @{ await Box(s, k, true); }
+                    </div>
+                    @if (nowAfter)
+                    {
+                        <div class="vr nowRow up @(isLast ? "last" : "")">
+                            <div class="pt"></div>
+                            <div class="rail"><span class="dot"></span></div>
+                            <span class="lbl">지금 @N(k.Total)점</span>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+
+    async Task Box(Step s, GiftTimelineKidVM k, bool vertical)
+    {
+        if (s.Kind == "item" && s.Item != null)
+        {
+            var (css, text) = St(s.Item.Status);
+            if (isStaff)
+            {
+                // 관리자만 — 선물 칸을 누르면 관리자 선물 구매 목록으로 (예전 "관리자 →" 버튼 대신)
+                <a class="gb @css lnk" href="@AdminUrl" title="관리자 — 선물 구매 목록으로">@{ await BoxIn(s.Item, css, text, vertical, false); }</a>
+            }
+            else
+            {
+                <div class="gb @css">@{ await BoxIn(s.Item, css, text, vertical, true); }</div>
+            }
+        }
+        else if (s.Kind == "todo")
+        {
+            <div class="gb todo">
+                @if (vertical) { <div class="tx"><div class="nm">아직 안 골랐어요</div></div> } else { <div class="nm">아직 안 골랐어요</div> }
+                <a class="go" href="@PickUrl">선물 고르기 →</a>
+            </div>
+        }
+        else
+        {
+            <div class="gb next">
+                @if (vertical) { <div class="tx"><div class="nm">다음 선물</div></div> } else { <div class="nm">다음 선물</div> }
+                <span class="sub">@N(s.Point - k.Total)점 남았어요</span>
+            </div>
+        }
+    }
+
+    // 선물 칸 속 — 사진 · 이름 · 상태 · 날짜.  zoom=false(관리자 링크)면 사진을 눌러도 크게 보기 대신 링크로 간다
+    async Task BoxIn(GiftTimelineItemVM item, string css, string text, bool vertical, bool zoom)
+    {
+        await Task.CompletedTask;
+        <div class="im">
+            @if (zoom)
+            {
+                <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" onerror="this.parentNode.classList.add('noimg');this.remove();" onclick="openPhotoModal(this.src, this.alt)" />
+            }
+            else
+            {
+                <img src="/images/AwardItem/@(item.ProductID).jpg" alt="@item.ProductName" onerror="this.parentNode.classList.add('noimg');this.remove();" />
+            }
+        </div>
+        if (vertical)
+        {
+            <div class="tx"><div class="nm">@item.ProductName</div></div>
+            <div class="side"><span class="bdg @css">@text</span><span class="dt @css">@D(FinalDate(item))</span></div>
+        }
+        else
+        {
+            <div class="nm">@item.ProductName</div>
+            <span class="bdg @css">@text</span>
+            <span class="dt @css">@D(FinalDate(item))</span>
+        }
+    }
+}
+
+@if (kids.Count > 0)
+{
+<style>
+    .gtl { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 18px; padding: 16px 18px 12px; margin: 10px 0; box-shadow: 0 1px 8px rgba(0,0,0,.05); text-align: left; }
+    .gtl .kick { font-size: 11px; font-weight: 800; color: #b45309; }
+    .gtl .hd { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; }
+    .gtl .hd .t { font-size: 15px; font-weight: 900; color: #2F4A33; }
+    .gtl .hd .s { font-size: 12px; color: #475569; margin-top: 2px; }
+    .gtl .pill { flex: none; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1.5px solid #e2e8f0; background: #fff; color: #1F2A22; text-decoration: none; }
+    .gtl .kid { margin-top: 14px; padding-top: 14px; border-top: 1px solid #EEF2F6; }
+    .gtl .kid:first-of-type, .gtl .kid.first { border-top: 0; padding-top: 4px; }
+    .gtl .kTop { display: flex; align-items: center; gap: 10px; }
+    .gtl .av { flex: none; width: 40px; height: 40px; border-radius: 50%; padding: 2px; background: conic-gradient(#F59E0B, #16A34A, #2563EB, #DB2777, #F59E0B); }
+    .gtl .av img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #fff; border: 2px solid #fff; cursor: pointer; display: block; }
+    .gtl .who { flex: 1; min-width: 0; }
+    .gtl .who b { font-size: 14.5px; font-weight: 900; color: #1F2A22; }
+    .gtl .who .me { font-size: 10.5px; font-weight: 800; color: #fff; background: #EA7A0C; padding: 1px 6px; border-radius: 999px; margin-left: 5px; vertical-align: 2px; }
+    .gtl .who .s { font-size: 12px; color: #475569; margin-top: 1px; }
+    .gtl .who .s b { font-size: 12.5px; font-family: "Inter", sans-serif; }
+
+    /* 칸 공통 */
+    .gtl .gb { border-radius: 14px; border: 1.5px solid; display: flex; align-items: center; gap: 6px; }
+    .gtl .gb .im { flex: none; width: 42px; height: 42px; border-radius: 11px; overflow: hidden; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .gtl .gb .im img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; display: block; }
+    .gtl .gb .im.noimg { display: flex; align-items: center; justify-content: center; font-size: 20px; }   /* 선물 사진이 없으면 🎁 */
+    .gtl .gb .im.noimg::before { content: "🎁"; }
+    .gtl .gb .nm { font-size: 12.5px; font-weight: 800; line-height: 1.3; color: #1F2A22; word-break: keep-all; }
+    .gtl .gb .sub { font-size: 11px; color: #475569; }
+    .gtl .bdg { flex: none; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+    .gtl .gb.req  { background: #FFF7E8; border-color: #FBD9A0; } .gtl .bdg.req  { background: #FDE7C2; color: #9A5B13; }
+    .gtl .gb.buy  { background: #EEF4FF; border-color: #C7D8FB; } .gtl .bdg.buy  { background: #DCE7FE; color: #1E40AF; }
+    .gtl .gb.done { background: #F0FAF3; border-color: #BFE5CC; } .gtl .bdg.done { background: #D3F1DD; color: #166534; }
+    .gtl .gb.todo { background: #FFF1F0; border-color: #F7C6C0; }
+    .gtl .gb.next { background: #FAFAFA; border-color: #E5E7EB; border-style: dashed; }
+    .gtl .gb.next .nm { color: #475569; font-weight: 700; }
+    /* 최종 날짜 — 상태 색으로 어떤 날짜인지 구분 (주황 신청 · 파랑 구매 · 초록 전달) */
+    .gtl .dt { font-family: "Inter", sans-serif; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gtl .dt.req { color: #9A5B13; } .gtl .dt.buy { color: #1E40AF; } .gtl .dt.done { color: #166534; }
+    /* 소요일수 — 두 점수 사이 */
+    .gtl .gap { font-size: 11px; font-weight: 800; color: #b45309; background: #fff; border: 1.5px solid #FBD9A0; border-radius: 999px; padding: 1px 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .gtl .ms .gap { position: absolute; top: 1px; left: 0; transform: translateX(-50%); z-index: 2; }
+    .gtl .vr .side { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }   /* 날짜를 배지 아래 가운데 */
+    .gtl .vr.vgap { padding: 2px 0; }
+    .gtl .vr.vgap .pt { height: 0; }
+    .gtl .vr.vgap .rail { min-height: 26px; }
+    .gtl .vr.vgap .rail .gap { position: relative; z-index: 2; }   /* 휴대폰 — 세로선 위에 걸쳐서 (배지 가운데 = 선 가운데) */
+    /* 관리자만 — 선물 칸이 링크 */
+    .gtl a.gb.lnk { text-decoration: none; color: inherit; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+    .gtl a.gb.lnk:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    .gtl .go { flex: none; font-size: 11px; font-weight: 800; color: #fff; background: #EA7A0C; padding: 5px 11px; border-radius: 999px; text-decoration: none; white-space: nowrap; }
+
+    /* ── PC: 가로 타임라인 ── */
+    .gtl .hz { margin-top: 4px; padding-top: 24px; overflow-x: auto; }   /* padding — "지금 N점" 말풍선이 스크롤 영역에 잘리지 않게 */
+    .gtl .axis, .gtl .boxes { display: grid; grid-template-columns: repeat(var(--n), minmax(110px, 1fr)); max-width: calc(var(--n) * 180px); }   /* 선물이 적어도 칸이 늘어나지 않게 */
+    .gtl .axis { position: relative; }
+    .gtl .axis::before { content: ""; position: absolute; left: calc(50% / var(--n)); right: calc(50% / var(--n)); top: 9px; height: 5px; border-radius: 5px; background: #EDF0F4; }
+    .gtl .axis .fill { position: absolute; left: calc(50% / var(--n)); top: 9px; height: 5px; border-radius: 5px; background: linear-gradient(90deg, #F59E0B, #EA7A0C); }
+    .gtl .ms { text-align: center; position: relative; }
+    .gtl .ms .dot { width: 23px; height: 23px; margin: 0 auto; border-radius: 50%; background: #fff; border: 4px solid #E2E8F0; position: relative; z-index: 1; }
+    .gtl .ms.hit .dot { background: #F59E0B; border-color: #FDE3B5; }
+    .gtl .ms.next .dot { border-color: #EA7A0C; }
+    .gtl .ms .p { margin-top: 5px; font-family: "Inter", sans-serif; font-size: 13px; font-weight: 800; color: #1F2A22; }
+    .gtl .ms.next .p { color: #94A3B8; }
+    .gtl .now { position: absolute; top: -21px; transform: translateX(-50%); font-size: 10.5px; font-weight: 800; color: #fff; background: #1F2A22; padding: 1px 7px; border-radius: 999px; white-space: nowrap; z-index: 2; }
+    .gtl .now::after { content: ""; position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%); border: 4px solid transparent; border-top-color: #1F2A22; border-bottom: 0; }
+    .gtl .boxes { gap: 8px; margin-top: 8px; }
+    .gtl .hz .gb { flex-direction: column; justify-content: center; text-align: center; padding: 10px 8px; min-height: 104px; gap: 4px; }
+
+    /* ── 휴대폰: 세로 타임라인 ── */
+    .gtl .vt { display: none; margin-top: 10px; }
+    .gtl .vr { position: relative; display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+    .gtl .vr .pt { flex: none; width: 40px; text-align: right; font-family: "Inter", sans-serif; font-size: 11.5px; font-weight: 800; color: #1F2A22; line-height: 1.15; }
+    .gtl .vr .pt small { display: block; font-size: 9.5px; font-weight: 500; color: #94A3B8; }
+    .gtl .vr.next .pt { color: #94A3B8; }
+    .gtl .vr .rail { flex: none; width: 20px; align-self: stretch; position: relative; display: flex; align-items: center; justify-content: center; }
+    .gtl .vr .rail::before, .gtl .vr .rail::after { content: ""; position: absolute; left: 8px; width: 4px; background: #EDF0F4; }
+    .gtl .vr .rail::before { top: -5px; height: calc(50% + 5px); }
+    .gtl .vr .rail::after { bottom: -5px; height: calc(50% + 5px); }
+    .gtl .vr.up .rail::before, .gtl .vr.dn .rail::after { background: #F59E0B; }
+    .gtl .vr.first .rail::before, .gtl .vr.last .rail::after { display: none; }
+    .gtl .vr .dot { width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 4px solid #E2E8F0; position: relative; z-index: 1; }
+    .gtl .vr.hit .dot { background: #F59E0B; border-color: #FDE3B5; }
+    .gtl .vr.next .dot { border-color: #EA7A0C; }
+    .gtl .vr .gb { flex: 1; min-width: 0; padding: 8px 10px; gap: 10px; }
+    .gtl .vr .gb .tx { flex: 1; min-width: 0; }
+    .gtl .vr .gb .im { width: 38px; height: 38px; }
+    .gtl .vr.nowRow { padding: 2px 0; }
+    .gtl .vr.nowRow .dot { width: 14px; height: 14px; border: 3px solid #fff; background: #1F2A22; box-shadow: 0 0 0 2px #1F2A22; }
+    .gtl .vr.nowRow span.lbl { font-size: 11px; font-weight: 800; color: #fff; background: #1F2A22; padding: 2px 9px; border-radius: 999px; }
+
+    /* ── 휴대폰 축소판 (2026-09-27) — PC 에서는 보이지 않는다 ── */
+    .gtl .cmp, .gtl .gtlMore { display: none; }
+    .gtl .gtlMore { flex: none; font: inherit; font-size: 11.5px; font-weight: 800; color: #b45309; background: #FFF7E8; border: 1px solid #FBD9A0;
+                    border-radius: 999px; padding: 5px 10px; cursor: pointer; white-space: nowrap; }
+    .gtl .gtlMore.on { background: #b45309; color: #fff; border-color: #b45309; }
+    /* 가족팀 마일스톤 축소판(.fmCs)과 같은 모양 — 칸마다 점수 · 사진 · 선물 · 상태를 세로로 */
+    .gtl .cmp { gap: 6px; margin-top: 10px; }
+    .gtl .cmp .cbox { border-radius: 12px; border: 1px solid #fde68a; background: #fffbeb; padding: 7px 5px; text-align: center;
+                      display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+    .gtl .cmp .cbox .p { font-family: "Inter", sans-serif; font-size: 11px; font-weight: 800; color: #0f172a; }
+    .gtl .cmp .cbox .im { width: 26px; height: 26px; border-radius: 7px; overflow: hidden; background: #fff; display: grid; place-items: center; font-size: 14px; }
+    .gtl .cmp .cbox .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .gtl .cmp .cbox .im.noimg::before { content: "🎁"; }
+    .gtl .cmp .cbox .cn { font-size: 11px; font-weight: 800; color: #1e293b; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gtl .cmp .cbox .bdg { font-size: 9.5px; padding: 1px 6px; }
+
+    @@media (max-width: 639px) {
+        .gtl .hz { display: none; }
+        .gtl .vt { display: none; }
+        .gtl .cmp { display: grid; }
+        .gtl .gtlMore { display: inline-flex; }
+        /* 상세히 — 카드 오른쪽 맨 위(키커 줄)로 올려 제목 · 설명이 가로폭을 다 쓰게 */
+        .gtl { position: relative; }
+        .gtl .gtlMore { position: absolute; top: 10px; right: 10px; font-size: 11px; padding: 4px 9px; }
+        .gtl .hd { margin-top: 10px; }   /* 버튼(키커 줄) 아래로 제목을 내려 겹치지 않게 — 아래 가족팀 카드와 같게 */
+        .gtl.open .vt { display: block; }     /* 상세히 — 지금 모습(세로 타임라인) */
+        .gtl.open .cmp { display: none; }
+        .gtl .kid { margin-top: 10px; padding-top: 10px; }
+    }
+
+    .gtl .more { display: none; }
+    .gtl.all .more { display: block; }
+    .gtl .ft { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #E2E8F0; font-size: 11.5px; color: #475569; }
+    .gtl .ft b { color: #1F2A22; }
+    .gtl .ft button { border: 0; background: none; font: inherit; font-weight: 800; color: #b45309; cursor: pointer; padding: 4px 0; }
+</style>
+
+@* ⚠️ 나의 선물은 여기서 보여 주지 않는다 — 본인 전용 "🎁 나의 선물함" 카드(Index.cshtml .gcb)에서 보여 준다 (2026-09-26) *@
+
+@if (kids.Count > 0)
+{
+    <section class="gtl" id="gtlFriends">
+        <div class="kick">🎁 @ConstatsCommon.myDoToRi 선물</div>
+        <div class="hd">
+            <div><div class="t">축하해 주세요~~</div><div class="s">@ConstatsCommon.myDoToRi 점수에 도달해 선물을 받는 친구들이에요.</div></div>
+            @* "관리자 →" 버튼은 없앴다 — 관리자는 선물 칸을 누르면 같은 곳으로 간다 (2026-09-26) *@
+            @* 휴대폰에서만 — 축소판 ↔ 지금 모습 *@
+            <button type="button" class="gtlMore" aria-expanded="false"
+                    onclick="var c=document.getElementById('gtlFriends'),o=c.classList.toggle('open');this.textContent=o?'접기 ▴':'상세히 ▾';this.classList.toggle('on',o);this.setAttribute('aria-expanded',o);">상세히 ▾</button>
+        </div>
+        @for (int i = 0; i < kids.Count; i++)
+        {
+            await Kid(kids[i], (i == 0 ? "first" : "") + (i >= FirstShow ? " more" : ""));
+        }
+        <div class="ft">
+            <span>선물은 <b>주일 예배 시간</b>에 전달돼요</span>
+            @if (kids.Count > FirstShow)
+            {
+                <button type="button" onclick="var c=document.getElementById('gtlFriends');c.classList.toggle('all');this.textContent=c.classList.contains('all')?'▲ 접기':'▼ @(kids.Count)명 모두 보기';">▼ @(kids.Count)명 모두 보기</button>
+            }
+        </div>
+    </section>
+}
+}

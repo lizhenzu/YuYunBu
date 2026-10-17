@@ -1,0 +1,61 @@
+﻿@* Views/Shared/DailyMission2Partials/_Dm2Block_Word.cshtml *@
+@model dynamic
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    int I(object v) { try { return v == null ? 0 : Convert.ToInt32(v); } catch { return 0; } }
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+}
+
+@{
+    // 기대 입력(유연):
+    // Model.Title, Model.Done, Model.ReadUrl
+    // Model.Subject, Model.SummaryOrGuide
+    // Model.FromJang, Model.FromZul, Model.ToJang, Model.ToZul
+    // Model.LangLabel (optional)
+    var title = S(Model?.Title); if (string.IsNullOrWhiteSpace(title)) title = "📖 오늘의 말씀";
+    var done = B(Model?.Done);
+    var readUrl = S(Model?.ReadUrl);
+
+    var subject = S(Model?.Subject);
+    var guide = S(Model?.SummaryOrGuide);
+
+    var fromJ = I(Model?.FromJang); var fromZ = I(Model?.FromZul);
+    var toJ = I(Model?.ToJang); var toZ = I(Model?.ToZul);
+
+    var langLabel = S(Model?.LangLabel);
+}
+
+<div class="card">
+    @await Html.PartialAsync("DailyMission2Partials/_Dm2Block_Header", new {
+    Title = title,
+        BadgeOk = done,
+        Subtitle = (string.IsNullOrWhiteSpace(langLabel) ? "" : $"언어: {langLabel}")
+        })
+
+    <div class="cardBody">
+        @if (!string.IsNullOrWhiteSpace(subject))
+        {
+            <div class="h4">@subject</div>
+        }
+
+        @if (fromJ > 0)
+        {
+            <div class="metaRow">
+                <span class="metaKey">범위</span>
+                <span class="metaVal">@fromJ:@fromZ ~ @toJ:@toZ</span>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(guide))
+        {
+            <div class="noteBox">@guide</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(readUrl))
+        {
+            <div class="btnRow">
+                <a class="btn primary" href="@readUrl">📖 본문 읽기</a>
+            </div>
+        }
+    </div>
+</div>

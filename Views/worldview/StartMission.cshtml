@@ -1,0 +1,679 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+}
+
+@{
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+    var displayName = (!string.IsNullOrWhiteSpace(UserFullName)) ? UserFullName : "익명";
+}
+@{
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+@{
+    Layout = null;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>하나 바이블교재 미션북 수행 가이드</title>
+
+    <style>
+        :root {
+            --bg1: #f6fbf8;
+            --bg2: #f2f7ff;
+            --card: rgba(255,255,255,.86);
+            --card2: rgba(255,255,255,.74);
+            --line: rgba(15,23,42,.10);
+            --ink: #0b1220;
+            --muted: rgba(11,18,32,.62);
+            --green: #1F6F5B;
+            --green2: #2a8a72;
+            --mint: #22c55e;
+            --sky: #38bdf8;
+            --amber: #f59e0b;
+            --shadow: 0 20px 60px rgba(15,23,42,.12);
+            --radius: 22px;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
+            color: var(--ink);
+            background: radial-gradient(1000px 600px at 10% 0%, rgba(34,197,94,.14), transparent 60%), radial-gradient(900px 520px at 95% 10%, rgba(56,189,248,.16), transparent 55%), radial-gradient(900px 520px at 70% 100%, rgba(245,158,11,.12), transparent 55%), linear-gradient(180deg, var(--bg1), var(--bg2));
+            min-height: 100vh;
+            padding: 22px 14px 36px;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            display: grid;
+            gap: 14px;
+        }
+
+        header {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 18px 18px 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            header:before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(420px 180px at 15% 10%, rgba(34,197,94,.22), transparent 65%), radial-gradient(420px 180px at 90% 20%, rgba(56,189,248,.22), transparent 60%);
+                filter: blur(10px);
+                opacity: .9;
+                pointer-events: none;
+            }
+
+        .topRow {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(31,111,91,.20);
+            background: rgba(31,111,91,.08);
+            color: rgba(31,111,91,1);
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        h1 {
+            position: relative;
+            margin: 10px 0 6px;
+            font-size: 22px;
+            letter-spacing: -.4px;
+            line-height: 1.25;
+        }
+
+        .lead {
+            position: relative;
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.6;
+            font-size: 14.5px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: 1fr;
+        }
+
+        @@media (min-width: 860px) {
+            .grid {
+                grid-template-columns: 1.2fr .8fr;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
+
+            .lead {
+                font-size: 15px;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .card.soft {
+                background: var(--card2);
+                backdrop-filter: blur(10px);
+            }
+
+        /* ✅ 카드 타이틀(기존) */
+        .cardTitle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 10px;
+            font-size: 16px;
+            font-weight: 900;
+            letter-spacing: -.2px;
+        }
+
+        .icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 14px;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.75);
+            box-shadow: 0 12px 30px rgba(15,23,42,.10);
+            flex: 0 0 auto;
+        }
+
+        .list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .li {
+            display: flex;
+            gap: 10px;
+            padding: 12px 12px;
+            border-radius: 18px;
+            background: rgba(255,255,255,.78);
+            border: 1px solid rgba(15,23,42,.08);
+        }
+
+            .li b {
+                display: block;
+                margin-bottom: 2px;
+                font-weight: 900;
+                letter-spacing: -.2px;
+            }
+
+            .li span {
+                display: block;
+                color: var(--muted);
+                line-height: 1.5;
+                font-size: 14px;
+            }
+
+        .pillRow {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .pill {
+            padding: 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.78);
+            color: rgba(11,18,32,.78);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .cta {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            border: 0;
+            border-radius: 18px;
+            padding: 14px 14px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: transform .06s ease, box-shadow .15s ease, filter .15s ease;
+            box-shadow: 0 18px 46px rgba(15,23,42,.14);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            letter-spacing: -.2px;
+        }
+
+            .btn:active {
+                transform: translateY(1px) scale(.99);
+            }
+
+            .btn.primary {
+                background: linear-gradient(135deg, var(--green), var(--green2));
+                color: #fff;
+            }
+
+            .btn.outline {
+                background: rgba(255,255,255,.85);
+                color: rgba(11,18,32,.88);
+                border: 1px solid rgba(15,23,42,.12);
+                box-shadow: 0 14px 40px rgba(15,23,42,.10);
+            }
+
+            .btn.ghost {
+                background: rgba(31,111,91,.08);
+                color: rgba(31,111,91,1);
+                border: 1px solid rgba(31,111,91,.16);
+                box-shadow: none;
+            }
+
+        .fine {
+            color: var(--muted);
+            font-size: 12.8px;
+            line-height: 1.55;
+            margin: 8px 0 0;
+        }
+
+        /* ✅ 로그인 배지 */
+        .loginBadge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border-radius: 999px;
+            background: rgba(31,111,91,.10);
+            border: 1px solid rgba(31,111,91,.25);
+            color: rgba(31,111,91,1);
+            font-weight: 900;
+            font-size: 14px;
+            box-shadow: 0 10px 28px rgba(15,23,42,.10);
+        }
+
+        /* ✅ 홈 버튼 */
+        .btn.home {
+            background: linear-gradient(135deg, rgba(56,189,248,.18), rgba(34,197,94,.16));
+            color: rgba(11,18,32,.88);
+            border: 1px solid rgba(15,23,42,.10);
+            box-shadow: 0 14px 40px rgba(15,23,42,.10);
+        }
+
+            .btn.home:hover {
+                filter: brightness(1.02);
+            }
+
+        /* ===== Modal ===== */
+        .modalBack {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(2,6,23,.45);
+            backdrop-filter: blur(10px);
+            z-index: 50;
+        }
+
+        .modal {
+            width: min(520px, 100%);
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(255,255,255,.45);
+            border-radius: 24px;
+            box-shadow: 0 28px 90px rgba(2,6,23,.28);
+            overflow: hidden;
+        }
+
+        .modalHead {
+            padding: 16px 16px 12px;
+            background: radial-gradient(420px 160px at 20% 10%, rgba(34,197,94,.18), transparent 60%), radial-gradient(420px 160px at 90% 20%, rgba(56,189,248,.18), transparent 60%), rgba(255,255,255,.75);
+            border-bottom: 1px solid rgba(15,23,42,.08);
+        }
+
+            .modalHead .t {
+                margin: 0;
+                font-size: 17px;
+                font-weight: 950;
+                letter-spacing: -.25px;
+            }
+
+        .modalBody {
+            padding: 14px 16px 16px;
+        }
+
+            .modalBody p {
+                margin: 0 0 10px;
+                color: rgba(11,18,32,.78);
+                line-height: 1.6;
+                font-size: 14.3px;
+            }
+
+        .two {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        @@media (min-width: 520px) {
+            .two {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        footer {
+            text-align: center;
+            color: rgba(11,18,32,.55);
+            font-size: 12.5px;
+            padding: 10px 0 0;
+        }
+
+        .spark {
+            position: absolute;
+            right: -40px;
+            top: -40px;
+            width: 160px;
+            height: 160px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 30% 30%, rgba(34,197,94,.24), transparent 55%), radial-gradient(circle at 60% 60%, rgba(56,189,248,.22), transparent 55%);
+            filter: blur(1px);
+            opacity: .9;
+            pointer-events: none;
+        }
+
+        /* ===== Header 타이틀 정렬 & 여백 개선 ===== */
+        header {
+            padding-top: 36px;
+        }
+
+            header h1 {
+                margin-top: 28px;
+                margin-bottom: 6px;
+                text-align: center;
+            }
+
+            header h5 {
+                margin: 0;
+                text-align: center;
+                font-weight: 600;
+                color: rgba(11,18,32,.65);
+            }
+
+        /* =========================================================
+                   ✅ 접기/펼치기(기본: 접힘)
+                   - 카드 타이틀을 클릭하면 본문이 열림/닫힘
+                   ========================================================= */
+        .foldTitle {
+            cursor: pointer;
+            user-select: none;
+            padding-right: 4px;
+        }
+
+            .foldTitle::after {
+                content: "▾";
+                margin-left: auto;
+                opacity: .65;
+                transition: transform .18s ease;
+                font-weight: 900;
+            }
+
+            .foldTitle.isOpen::after {
+                transform: rotate(180deg);
+            }
+
+        .foldBody {
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 1fr;
+            transition: grid-template-rows .22s ease, opacity .18s ease;
+        }
+
+            .foldBody.isClosed {
+                grid-template-rows: 0fr;
+                opacity: 0;
+            }
+
+            .foldBody > .inner {
+                min-height: 0;
+            }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <header>
+            <div class="spark"></div>
+            <div class="topRow">
+                <div class="badge">🌱 생각나무 · 성경적 세계관 미션</div>
+                <div class="badge" style="border-color: rgba(245,158,11,.22); background: rgba(245,158,11,.10); color: rgba(146,64,14,1);">
+                    ⭐ 포인트 적립 가능
+                </div>
+            </div>
+
+            <h1>미션북 수행 가이드</h1>
+            <h5>(하나 바이블교재)</h5>
+            @* <p class="lead">
+            아이들의 마음속에는 지금도 <b>‘생각나무’</b>가 자라고 있습니다.<br />
+            가정과 교회가 함께 말씀과 대화를 통해, 아이의 뿌리·줄기·열매를 건강하게 세워갑니다.
+        </p> *@
+        </header>
+
+        <div class="grid">
+            <!-- LEFT: Guide (✅ 기본 접힘) -->
+            <section class="card" id="guideCard">
+                <div class="cardTitle foldTitle" id="guideFoldTitle" role="button" tabindex="0" aria-controls="guideFoldBody" aria-expanded="false">
+                    <div class="icon">📘</div>
+                    미션북, 이렇게 함께 해주세요
+                </div>
+
+                <div class="foldBody isClosed" id="guideFoldBody">
+                    <div class="inner">
+                        <ul class="list">
+                            <li class="li">
+                                <div class="icon" style="width:34px;height:34px;border-radius:12px;">🗓️</div>
+                                <div>
+                                    <b>매주 1회, “함께”가 핵심</b>
+                                    <span>아이 혼자 숙제가 아니라, 부모님 지도 아래 <b>대화하며</b> 수행해 주세요.</span>
+                                </div>
+                            </li>
+
+                            <li class="li">
+                                <div class="icon" style="width:34px;height:34px;border-radius:12px;">💬</div>
+                                <div>
+                                    <b>정답보다 질문</b>
+                                    <span>“너는 어떻게 생각해?” “성경은 뭐라고 말할까?” 같은 질문으로 아이 생각을 꺼내 주세요.</span>
+                                </div>
+                            </li>
+
+                            <li class="li">
+                                <div class="icon" style="width:34px;height:34px;border-radius:12px;">🧭</div>
+                                <div>
+                                    <b>말씀으로 분별하기</b>
+                                    <span>미디어·친구·학교에서 만나는 이야기들을 말씀의 렌즈로 함께 비교하고 분별하는 연습을 해요.</span>
+                                </div>
+                            </li>
+
+                            <li class="li">
+                                <div class="icon" style="width:34px;height:34px;border-radius:12px;">🏁</div>
+                                <div>
+                                    <b>짧아도 꾸준히</b>
+                                    <span>10분이라도 좋습니다. <b>매주 한 번</b> 꾸준히 하면 아이의 세계관이 단단해집니다.</span>
+                                </div>
+                            </li>
+                        </ul>
+
+                        <div class="pillRow">
+                            <div class="pill">✅ 아이와 나란히 앉기</div>
+                            <div class="pill">✅ 질문 2개 준비</div>
+                            <div class="pill">✅ 칭찬 1번 꼭</div>
+                            <div class="pill">✅ 기도로 마무리</div>
+                        </div>
+
+                        <p class="fine">
+                            *가장 중요한 목표는 “점수”가 아니라, 아이 마음속 뿌리에 말씀의 기준이 세워지는 것입니다.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT: CTA -->
+            <aside class="card soft">
+                <div class="cta">
+                    @if (!isSignedIn)
+                    {
+                        <button class="btn primary" id="openModalBtn" type="button">
+                            ✨ 로그인하고 포인트 누적하기
+                        </button>
+
+                        <button class="btn outline" id="doOnlyBtn" type="button">
+                            📌 로그인 없이 수행만 할래요
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="loginBadge">
+                            👋 <b>@displayName</b> 님, 로그인 중입니다
+                        </div>
+
+                        <button class="btn primary" id="doOnlyBtn" type="button">
+                            🚀 미션 수행하러 가기
+                        </button>
+                    }
+
+                    <button class="btn ghost" id="goGuideBtn" type="button">
+                        📖 이 미션 수행 이유
+                    </button>
+
+                    <button class="btn home" id="goHomeBtn" type="button">
+                        🏠 홈으로 가기
+                    </button>
+                </div>
+            </aside>
+        </div>
+
+        <footer>
+          © @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName
+        </footer>
+    </div>
+
+    <!-- Modal -->
+    <div class="modalBack" id="modalBack" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal">
+            <div class="modalHead">
+                <p class="t" id="modalTitle"> 하실래요?</p>
+            </div>
+            <div class="modalBody">
+                <p>
+                    <b>“하나 바이블교재 미션북(성경적 세계관 미션북)”</b>을<br />
+                    부모님 지도 아래 아이와 함께 매주 수행해 주세요.<br />
+                    회원가입 후 포인트를 누적하면 <b>분기 · 연말 시상</b>에 참여할 수 있어요.
+                </p>
+
+                <div class="two">
+                    <button class="btn primary" id="signupBtn" type="button">✅ 네, 로그인 할래요</button>
+                    <button class="btn outline" id="noThanksBtn" type="button">🙋 아니오, 수행만 할래요</button>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <button class="btn ghost" id="closeBtn" type="button">닫기</button>
+                </div>
+
+                <p class="fine">
+                    *회원가입 없이도 미션 수행은 가능합니다. 다만 포인트 누적/시상 참여는 회원가입이 필요할 수 있어요.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ✅ 여기 URL만 프로젝트 실제 경로로 바꾸세요
+        const SIGNUP_URL = "/worldview/GoDashboardAuth";
+        const GUIDE_URL  = "https://gleaming-rabbit-hxuh3mp.gamma.site/";
+        const DO_ONLY_URL = "/worldview/DashBoard";
+        const HOME_URL = "/";
+
+        const modalBack = document.getElementById("modalBack");
+
+        const openModalBtn = document.getElementById("openModalBtn");
+        const closeBtn = document.getElementById("closeBtn");
+        const signupBtn = document.getElementById("signupBtn");
+        const noThanksBtn = document.getElementById("noThanksBtn");
+
+        const doOnlyBtn = document.getElementById("doOnlyBtn");
+        const goGuideBtn = document.getElementById("goGuideBtn");
+        const goHomeBtn = document.getElementById("goHomeBtn");
+
+        function openModal(){ modalBack.style.display = "flex"; }
+        function closeModal(){ modalBack.style.display = "none"; }
+
+        if (openModalBtn) openModalBtn.addEventListener("click", openModal);
+        if (closeBtn) closeBtn.addEventListener("click", closeModal);
+
+        if (modalBack) {
+            modalBack.addEventListener("click", (e) => {
+                if (e.target === modalBack) closeModal();
+            });
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeModal();
+        });
+
+        if (signupBtn) signupBtn.addEventListener("click", () => { location.href = SIGNUP_URL; });
+        if (noThanksBtn) noThanksBtn.addEventListener("click", () => { location.href = DO_ONLY_URL; });
+
+        if (doOnlyBtn) doOnlyBtn.addEventListener("click", () => { location.href = DO_ONLY_URL; });
+        if (goGuideBtn) goGuideBtn.addEventListener("click", () => { location.href = GUIDE_URL; });
+        if (goHomeBtn) goHomeBtn.addEventListener("click", () => { location.href = HOME_URL; });
+
+        // =========================================================
+        // ✅ "미션북, 이렇게 함께 해주세요" 접기/펼치기 (기본: 접힘)
+        // =========================================================
+        const guideTitle = document.getElementById("guideFoldTitle");
+        const guideBody  = document.getElementById("guideFoldBody");
+
+        function setGuideOpen(open){
+            if (!guideTitle || !guideBody) return;
+
+            guideTitle.classList.toggle("isOpen", open);
+            guideBody.classList.toggle("isClosed", !open);
+
+            guideTitle.setAttribute("aria-expanded", open ? "true" : "false");
+        }
+
+        // 기본은 접힘
+        setGuideOpen(false);
+
+        function toggleGuide(){
+            const isClosed = guideBody.classList.contains("isClosed");
+            setGuideOpen(isClosed);
+        }
+
+        if (guideTitle) {
+            guideTitle.addEventListener("click", toggleGuide);
+            guideTitle.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggleGuide();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

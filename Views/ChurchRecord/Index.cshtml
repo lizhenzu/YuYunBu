@@ -1,0 +1,168 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.ChurchRecordHomeVM
+@{
+    Layout = null;
+    // 교적부 — 전체 반에서 아이 찾기 + 학년별 반 목록(담임·연락처·학생 수)
+    var year = DateHelper.GetKoreaNow().Year;
+    var classes = Model.Classes;
+    int kids = classes.Sum(c => c.StudentCount);
+    int noTeacher = classes.Count(c => string.IsNullOrWhiteSpace(c.TeacherName));
+    var byYear = classes.GroupBy(c => c.ClassYear).OrderBy(g => g.Key).ToList();
+    var key = (Model.SearchName ?? "").Trim();
+    string Digits(string? s) => new string((s ?? "").Where(char.IsDigit).ToArray());
+    string ClassUrl(int y, int b) => $"/ChurchRecord/Class?year={y}&ban={b}";
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>교적부 · @year</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* DailyMission4 밝은 흰색 버전 — 색은 직접 지정한다 */
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        body { background: #FFFFFF; color: #374151; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; }
+        .sh { max-width: 900px; margin: 0 auto; padding: 0 20px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0 10px; border-bottom: 1px solid #EEF0F3; font-size: 12px; color: #9CA3AF; }
+        .hdTop a { color: #374151; }
+        .hdTop a:hover { color: #2F80ED; }
+        .hdTop .sep { margin: 0 6px; color: #D1D5DB; }
+        .hdK { margin-top: 18px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: #2F80ED; }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: #111827; display: flex; align-items: baseline; gap: 10px; }
+        .hdT small { font-size: 13px; font-weight: 400; letter-spacing: 0; color: #9CA3AF; }
+
+        .st { display: flex; gap: 28px; margin-top: 12px; flex-wrap: wrap; }
+        .st div { font-size: 11.5px; color: #9CA3AF; }
+        .st b { display: block; margin-top: 2px; font-weight: 300; font-size: 28px; line-height: 1.2; color: #111827; font-variant-numeric: tabular-nums; }
+        .st .k b { color: #2F80ED; }
+        .st .lo b { color: #B4531F; }
+
+        .srch { display: flex; gap: 8px; margin-top: 18px; }
+        .srch label { flex: 1; display: flex; align-items: center; height: 46px; padding: 0 18px; border-radius: 999px; background: #F4F6F9; }
+        .srch label:focus-within { box-shadow: 0 0 0 2px #CFE0FA; }
+        .srch input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-family: inherit; font-size: 15px; color: #111827; }
+        .srch input::placeholder { color: #9CA3AF; }
+        .srch button { flex: none; padding: 0 22px; border: 0; border-radius: 999px; background: #2F80ED; color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .srch button:hover { background: #1F6FDB; }
+        .last { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 11px 16px; border-radius: 12px; background: #EAF2FD; font-size: 13px; color: #2B5FA8; }
+        .last a { font-weight: 800; }
+
+        .blk { margin-top: 22px; padding-top: 16px; border-top: 1px solid #EEF0F3; }
+        .bT { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .bT b { font-size: 16px; font-weight: 800; color: #111827; }
+        .bT span { font-size: 12px; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .bT a { font-size: 12px; font-weight: 700; color: #2F80ED; }
+
+        .hit { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #EEF0F3; color: #111827; }
+        .hit:hover b { color: #2F80ED; }
+        .hit b { flex: 1; font-size: 15.5px; font-weight: 700; }
+        .hit b mark { background: #EAF2FD; color: #2B5FA8; border-radius: 4px; }
+        .hit span { padding: 2px 10px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 12px; font-weight: 700; }
+        .hit em { font-style: normal; font-size: 18px; font-weight: 300; color: #D1D5DB; }
+        .none { padding: 28px 0; text-align: center; font-size: 14px; color: #9CA3AF; }
+
+        .cls { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid #EEF0F3; }
+        .cls a.go { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; color: #111827; }
+        .cls a.go:hover .nm { color: #2F80ED; }
+        .cls .nm { width: 48px; flex: none; font-size: 16px; font-weight: 800; transition: color .15s; }
+        .cls .tc { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; }
+        .cls .tc small { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: #9CA3AF; font-variant-numeric: tabular-nums; }
+        .cls .tc.no { color: #B4531F; font-weight: 400; }
+        .cls .n { flex: none; font-size: 18px; font-weight: 300; color: #111827; font-variant-numeric: tabular-nums; }
+        .cls .n small { margin-left: 1px; font-size: 11.5px; color: #9CA3AF; }
+        .cls .tel { flex: none; padding: 7px 14px; border-radius: 999px; background: #EAF2FD; color: #2B5FA8; font-size: 12.5px; font-weight: 700; }
+        .cls .tel:hover { background: #DCEAFC; }
+        .cls em { font-style: normal; font-size: 18px; font-weight: 300; color: #D1D5DB; }
+        .hidden { display: none !important; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 24px; padding: 14px 0 40px; border-top: 1px solid #EEF0F3; font-size: 11.5px; color: #9CA3AF; }
+        .ft a { color: #2F80ED; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><span><a href="/Admin/TeacherOnly">‹ 교사전용</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">잠실새내 유년부 입니다.</div>
+        <h1 class="hdT">교적부<small>@year</small></h1>
+        <div class="st">
+            <div class="k">학생<b>@kids</b></div>
+            <div>반<b>@classes.Count</b></div>
+            @if (noTeacher > 0) { <div class="lo">담임 미배정<b>@noTeacher</b></div> }
+        </div>
+    </header>
+
+    <main class="sh">
+        <form class="srch" method="get" action="/ChurchRecord" role="search">
+            <label><input name="searchName" value="@key" autocomplete="off" placeholder="아이 이름으로 찾기 (전체 반)" aria-label="아이 이름" /></label>
+            <button type="submit">찾기</button>
+        </form>
+        <div class="last hidden" id="last"><span>마지막으로 본 반</span><a id="lastA" href="#"></a></div>
+
+        @if (key.Length > 0)
+        {
+            <section class="blk">
+                <div class="bT"><b>'@key' 찾은 결과</b><a href="/ChurchRecord">검색 지우기</a></div>
+                @if (Model.Hits.Count == 0)
+                {
+                    <div class="none">이 이름의 아이가 없어요.</div>
+                }
+                @foreach (var h in Model.Hits)
+                {
+                    var i = h.FullName.IndexOf(key, StringComparison.OrdinalIgnoreCase);
+                    var pre = i >= 0 ? h.FullName.Substring(0, i) : h.FullName;
+                    var mid = i >= 0 ? h.FullName.Substring(i, key.Length) : "";
+                    var post = i >= 0 ? h.FullName.Substring(i + key.Length) : "";
+                    <a class="hit" href="@ClassUrl(h.ClassYear, h.ClassBan)#p-@h.PersonId">
+                        <b>@pre<mark>@mid</mark>@post</b>
+                        <span>@(h.ClassYear)학년 @(h.ClassBan)반</span><em>›</em>
+                    </a>
+                }
+                @if (Model.Hits.Count >= 50) { <div class="none">50명까지만 보여요 · 이름을 더 입력해 보세요</div> }
+            </section>
+        }
+
+        @foreach (var g in byYear)
+        {
+            <section class="blk">
+                <div class="bT"><b>@(g.Key)학년</b><span>@(g.Count())개 반 · 학생 @(g.Sum(c => c.StudentCount))명</span></div>
+                @foreach (var c in g.OrderBy(c => c.ClassBan))
+                {
+                    var tel = Digits(c.TeacherPhone);
+                    var noT = string.IsNullOrWhiteSpace(c.TeacherName);
+                    <div class="cls">
+                        <a class="go" href="@ClassUrl(c.ClassYear, c.ClassBan)">
+                            <span class="nm">@(c.ClassBan)반</span>
+                            <span class="tc @(noT ? "no" : "")">@(noT ? "담임 미배정" : c.TeacherName + " 선생님")@if (!noT && tel.Length > 0) {<small>@c.TeacherPhone</small>}</span>
+                            <span class="n">@c.StudentCount<small>명</small></span>
+                        </a>
+                        @if (tel.Length >= 9) { <a class="tel" href="tel:@tel" aria-label="@c.TeacherName 선생님께 전화">전화</a> }
+                        <em aria-hidden="true">›</em>
+                    </div>
+                }
+            </section>
+        }
+        @if (classes.Count == 0) { <div class="none">등록된 반이 없어요.</div> }
+
+        <div class="ft"><span>반을 누르면 아이들 교적(연락처 · 주소 · 학교)을 보고 고칠 수 있어요</span><a href="/AddressBook">인명 검색</a></div>
+    </main>
+
+<script>
+    // 마지막으로 본 반 (이 기기에만 저장)
+    try {
+        const y = localStorage.getItem('LastClassYear'), b = localStorage.getItem('LastClassBan');
+        if (y && b) {
+            const a = document.getElementById('lastA');
+            a.textContent = `${y}학년 ${b}반 →`;
+            a.href = `/ChurchRecord/Class?year=${encodeURIComponent(y)}&ban=${encodeURIComponent(b)}`;
+            document.getElementById('last').classList.remove('hidden');
+        }
+    } catch (e) { }
+</script>
+</body>
+</html>

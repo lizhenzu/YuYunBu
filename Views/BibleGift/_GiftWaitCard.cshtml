@@ -1,0 +1,85 @@
+@*  ── 페이지 이동 대기 카드 '잠시만 기다려 주세요' (성경통독 선물 화면 공통) ──
+    · 대상: 같은 사이트 안의 링크 이동 + 폼 제출(선물 고르기 · 취소 · 구매/전달 완료)
+    · 제외: #앵커, javascript:, mailto:/tel:, 새 창, download, 다른 사이트, data-nowait
+    · 아이폰(Safari)은 이동이 시작되면 다시 그리지 않으므로 카드를 먼저 그린 뒤 이동한다. *@
+<style>
+    .gwait { position: fixed; inset: 0; z-index: 30000; background: rgba(22,24,28,.55); display: none; align-items: center; justify-content: center; padding: 20px; }
+    .gwait.show { display: flex; }
+    .gwait .card { width: 100%; max-width: 260px; background: #F7F6F3; color: #16181C; text-align: center; padding: 28px 18px 22px; }
+    .gwait .sp { width: 34px; height: 34px; margin: 0 auto; border: 2px solid #E2E0DB; border-top-color: #9A7B4F; border-radius: 50%; animation: gwspin .8s linear infinite; }
+    .gwait .t { font-family: "Noto Serif KR", serif; font-size: 17px; margin-top: 16px; }
+    .gwait .t span { animation: gwdots 1.2s infinite; }
+    .gwait .t span:nth-child(2) { animation-delay: .2s; }
+    .gwait .t span:nth-child(3) { animation-delay: .4s; }
+    .gwait .s { font-size: 12px; color: #83868C; margin-top: 6px; }
+    a.gwtap { color: #9A7B4F !important; transform: scale(.94); opacity: .75; display: inline-block; transition: transform .1s ease, opacity .1s ease, color .1s ease; }
+    @@media (prefers-reduced-motion: reduce) { a.gwtap { transform: none; } }
+    @@keyframes gwspin { to { transform: rotate(360deg); } }
+    @@keyframes gwdots { 0%, 20% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
+</style>
+<div class="gwait" id="gwait" role="status" aria-live="polite">
+    <div class="card">
+        <div class="sp" aria-hidden="true"></div>
+        <div class="t">잠시만 기다려 주세요<span>.</span><span>.</span><span>.</span></div>
+        <div class="s" id="gwaitMsg">화면을 불러오고 있어요</div>
+    </div>
+</div>
+<script>
+    (function () {
+        if (window.__gwaitReady) return;
+        window.__gwaitReady = true;
+
+        var box = document.getElementById('gwait'), msg = document.getElementById('gwaitMsg');
+
+        function message(url) {
+            var p = url.pathname.toLowerCase();
+            if (p === '/' || p === '/home' || p === '/home/index') return '홈으로 이동하고 있어요';
+            if (p.indexOf('/biblegift/admin')   === 0) return '선물 관리 화면을 불러오고 있어요';
+            if (p.indexOf('/biblegift/history') === 0) return '선물 이력을 불러오고 있어요';
+            if (p.indexOf('/biblegift/select')  === 0) return '선물 목록을 불러오고 있어요';
+            if (p.indexOf('/bible2')            === 0) return '성경통독으로 이동하고 있어요';
+            return '화면을 불러오고 있어요';
+        }
+        function show(text) { msg.textContent = text; box.classList.add('show'); }
+        function afterPaint(fn) {
+            requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(fn, 30); }); });
+        }
+
+        // ── 링크 ──
+        document.addEventListener('click', function (e) {
+            if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            var a = e.target.closest('a[href]');
+            if (!a || a.hasAttribute('data-nowait') || a.hasAttribute('download')) return;
+            if (a.target && a.target !== '_self') return;
+            var raw = (a.getAttribute('href') || '').trim();
+            if (!raw || raw.charAt(0) === '#' || /^(javascript|mailto|tel|sms):/i.test(raw)) return;
+
+            var url;
+            try { url = new URL(a.href, location.href); } catch (_) { return; }
+            if (url.origin !== location.origin) return;
+            if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+
+            e.preventDefault();
+            a.classList.add('gwtap');
+            show(message(url));
+            afterPaint(function () { window.location.href = url.href; });
+        });
+
+        // ── 폼 제출 (선물 고르기 · 취소 · 구매/전달 완료) ──
+        document.addEventListener('submit', function (e) {
+            var f = e.target;
+            if (e.defaultPrevented || !f || f.hasAttribute('data-nowait') || (f.target && f.target !== '_self')) return;
+            show('저장하고 있어요');
+            // 누른 버튼의 이름·formaction 을 살려야 하는 폼은 카드만 띄우고 그대로 보낸다
+            var sb = e.submitter;
+            if (sb && (sb.name || sb.hasAttribute('formaction'))) return;
+            e.preventDefault();
+            afterPaint(function () { HTMLFormElement.prototype.submit.call(f); });
+        });
+
+        window.addEventListener('pageshow', function () {
+            box.classList.remove('show');
+            document.querySelectorAll('a.gwtap').forEach(function (x) { x.classList.remove('gwtap'); });
+        });
+    })();
+</script>

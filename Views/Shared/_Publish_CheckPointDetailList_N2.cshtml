@@ -1,0 +1,93 @@
+﻿@model BulletinBoard.Models.PointByUserNameList
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+}
+<div class="container">
+    @{
+        int dataCount = 0;
+    }
+    @foreach (var item in Model.pointByUserNames)
+    {
+        string YearBan = string.Empty;
+
+        string dateString = $"{@item.maxclickDate.Month}월{@item.maxclickDate.Day}일";
+
+        if (@item.ClassYear > 0)
+        {
+            YearBan = $"{@item.ClassYear}학년{@item.ClassBan}반";
+        }
+        else
+        {
+            YearBan = $"교사";
+        }
+
+        if (item.DC_Total >= Model.FromPoint && item.DC_Total < Model.ToPoint)
+        {
+            <div class="card">
+                <img src="@item.ProfilePicturePath" alt="Profile Picture" onclick="ManageUserInfo('@item.UserId')">
+                <div class="info">
+                    <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@item.LastName @item.FirstName</span></div>
+                    <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">@YearBan</span></div>
+                    <div class="row"><span class="label">도전성경(포인트) : </span><span class="right">@item.DC_Total.ToString("N0") 점</span></div>
+                    @if (item.DC_Total != item.Total)
+                    {
+                       <div class="row"><span class="label">추가합산(포인트) : </span><span class="right">@item.Total.ToString("N0") 점</span></div>
+                    }
+                    @if (ViewBag.FromWhere != null && ViewBag.FromWhere == "Admin")
+                    {
+
+                        @if (await AuthService.IsSignedIn(User))
+                        {
+                            if (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)) ||
+                                await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.Admin)) )
+                            {
+                                <div class="row"><span class="label">보상한 점수:</span><span class="right">@item.AwardLevel 점</span></div>
+                                <div class="row"><span class="label">활동한 일자:</span><span class="right">@dateString</span></div>
+                                <button onclick="location.href='/CheckPoint/ManagePoint?UserId=@item.UserId'">점수관리</button>
+                                <button onclick="location.href='/Home/NaviMonth?userName=@item.UserName'">수행내역</button>
+                            }
+                        }
+                    }
+                    @{
+                        dataCount += 1;
+                    }
+                </div>
+            </div>
+        }
+    }
+
+    @if (dataCount == 0)
+    {
+        if (Model.displayNone == false)
+        {
+
+            <div class="card">
+                <img src="@ConstatsCommon.representFaceImage" alt="Profile Picture">
+                <div class="info">
+                    <div class="row" style="display: flex; justify-content: center; text-align: center;"><span style="font-weight: bold;">대상자 없어요.</span></div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<script>
+
+
+    function ManageUserInfo(UserId) {
+
+        window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+    }
+
+</script>

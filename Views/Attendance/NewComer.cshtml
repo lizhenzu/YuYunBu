@@ -1,0 +1,416 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.Attendance.NewComerIndexVM
+@using System
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 출석부 "새친구" — 몇 번 왔는지 한눈에 · ＋ 오늘 방문 한 번에
+    ViewData["AttTab"] = "new";
+
+    var msg = TempData["NewComerMsg"]?.ToString();
+    var today = DateHelper.GetKoreaToday();
+    int activeCount    = Model?.ActiveList?.Count    ?? 0;
+    int completedCount = Model?.CompletedList?.Count ?? 0;
+    int visitedToday   = (Model?.ActiveList ?? new()).Count(x => x.LastVisitDate?.Date == today);
+    const string NoPhoto = "/images/icon/people/people_01.webp";
+    const int CareWeeks = 4; // 4주 케어
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>출석부 · 새친구</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9;
+                --ok: #15803D; --okbg: #EAF7EF; --danger: #D9534F; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+        .hdTop { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .hdTop a { font-weight: 700; color: var(--tx); }
+        .hdTop a:hover { color: var(--blue); }
+        .hdK { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .hdT { margin: 6px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .prog { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; font-size: 13px; color: var(--dim2); flex-wrap: wrap; }
+        .prog b { font-weight: 300; font-size: 34px; line-height: 1; color: var(--ink); }
+        .prog i { font-style: normal; font-weight: 800; color: var(--blue); }
+
+        .top2 { display: flex; gap: 8px; margin-top: 14px; }
+        .addBtn { flex: none; display: inline-flex; align-items: center; justify-content: center; height: 46px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--soft); color: var(--blue); font-family: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer; }
+        .addBtn:hover { background: #DCE9FB; }
+        .srch { flex: 1; min-width: 0; display: flex; align-items: center; height: 46px; border-radius: 12px; background: var(--grey); }
+        .srch input { flex: 1; min-width: 0; height: 46px; padding: 0 4px 0 14px; border: 0; background: none; font-family: inherit; font-size: 15px; color: var(--ink); outline: none; }
+        .srch:focus-within { background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .srch button { flex: none; width: 44px; height: 46px; border: 0; background: none; font-size: 16px; color: var(--dim2); cursor: pointer; }
+        .ok { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--okbg); font-size: 13px; color: var(--ok); }
+
+        /* 섹션 제목 */
+        .sec { margin-top: 24px; }
+        .secH { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 16px 0 0; border-top: 1px solid var(--line); border-bottom: 0; }
+        .secK { font-size: 11.5px; font-weight: 800; letter-spacing: 0; color: var(--blue); }
+        .secT { font-family: inherit; font-size: 16px; font-weight: 800; color: var(--ink); margin-top: 1px; }
+        .secN { font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--dim); }
+        .empty { padding: 30px 0; text-align: center; color: var(--dim); font-size: 14px; border-bottom: 1px solid var(--line); }
+
+        /* 사진 · 이름 */
+        .nc { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+        .ph { flex: none; position: relative; width: 52px; height: 52px; padding: 0; border: 0; border-radius: 50%; background: var(--grey); cursor: pointer; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+        .nc .ph { width: 46px; height: 46px; }
+        .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ph span { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(17,24,39,.55); color: #fff; font-size: 9px; text-align: center; padding: 1px 0; }
+        .ncTx { flex: 1; min-width: 0; }
+        .ncN { display: block; font-size: 16.5px; font-weight: 800; color: var(--ink); }
+        .ncN:hover { color: var(--blue); }
+        .ncN small { font-weight: 400; font-size: 12px; color: var(--dim2); margin-left: 6px; }
+        .ncM { margin-top: 2px; font-size: 12.5px; color: var(--dim2); font-variant-numeric: tabular-nums; }
+        .ncM form { display: inline; margin: 0; }
+        .ncM .del { border: 0; background: none; padding: 0; font-family: inherit; font-size: 12px; color: var(--dim); text-decoration: underline; cursor: pointer; margin-left: 6px; }
+        .ncM .del:hover { color: var(--danger); }
+        .vb { display: flex; gap: 4px; margin-top: 7px; align-items: center; }
+        .vb i { width: 22px; height: 5px; border-radius: 3px; background: #E1E6EE; }
+        .vb i.on { background: var(--blue); }
+        .vb em { font-style: normal; font-size: 11px; color: var(--dim); margin-left: 4px; line-height: 5px; }
+        .ncA { flex: none; }
+        .ncA form { margin: 0; }
+
+        /* 케어 중 새친구: 두 줄 (윗줄 정보 / 아랫줄 큰 버튼) */
+        .ncItem { padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        .ncTop { display: flex; align-items: center; gap: 12px; }
+        .ncAct { display: flex; gap: 8px; margin-top: 12px; }
+        .ncAct form { margin: 0; display: flex; }
+        .bigB { height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 14px; font-family: inherit; font-size: 15px; font-weight: 800; border: 0; border-radius: 14px; background: var(--grey); color: var(--tx); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .08s; }
+        .bigB.add { flex: 1; width: 100%; background: var(--blue); color: #fff; }
+        .bigB.add:hover { background: #1F6FDB; }
+        .bigB.came { flex: 1; min-width: 0; background: var(--okbg); color: var(--ok); cursor: default; }
+        .bigB.undo { width: 96px; color: var(--dim2); font-weight: 700; }
+        .bigB.undo:hover { color: var(--danger); }
+        .bigB:active { transform: scale(.98); }
+        .grad { display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: var(--dim2); background: var(--grey); border-radius: 999px; padding: 5px 11px; }
+
+        .ft { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 16px 0 24px; font-size: 11.5px; color: var(--dim); }
+
+        /* 등록 · 사진 창 */
+        .mb { position: fixed; inset: 0; z-index: 1000; display: none; align-items: flex-end; justify-content: center; background: rgba(17,24,39,.45); }
+        .mb.show { display: flex; }
+        .mdl { width: min(560px, 100%); max-height: 92vh; overflow: auto; background: #FFFFFF; border-radius: 20px 20px 0 0; }
+        .mdl.wide { width: min(900px, 100%); }
+        @@media (min-width: 640px) { .mb { align-items: center; padding: 16px; } .mdl { border-radius: 20px; } }
+        .mH { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 10px; background: #FFFFFF; color: var(--ink); }
+        .mH b { font-weight: 800; font-size: 18px; }
+        .mH button { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--grey); color: var(--dim2); font-size: 15px; cursor: pointer; }
+        .mB { padding: 6px 18px 18px; }
+        .mF { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px 16px; background: #FFFFFF; border-top: 1px solid var(--line); }
+        .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+        .g2 .full { grid-column: 1 / -1; }
+        .fRow { margin-bottom: 14px; }
+        .fLbl { display: block; font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--dim2); margin-bottom: 4px; }
+        .fHint { font-size: 12px; color: var(--dim2); line-height: 1.6; margin-top: 8px; }
+        .fIn { width: 100%; font-family: inherit; font-size: 15px; color: var(--ink); background: var(--grey); border: 0; border-radius: 12px; padding: 12px 13px; outline: none; }
+        .fIn:focus { background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .req { color: var(--danger); margin-left: 2px; }
+        .rg { display: flex; gap: 8px; }
+        .rg label { flex: 1; position: relative; }
+        .rg input { position: absolute; opacity: 0; }
+        .rg span { display: block; text-align: center; padding: 12px 6px; border-radius: 12px; background: var(--grey); color: var(--dim2); font-size: 14px; letter-spacing: 0; margin: 0; cursor: pointer; }
+        .rg input:checked + span { background: var(--soft); color: var(--blue); font-weight: 800; box-shadow: inset 0 0 0 2px var(--blue); }
+
+        .nbtn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; font-size: 14px; font-weight: 700; line-height: 1.3; padding: 11px 18px; border: 0; border-radius: 12px; background: var(--grey); color: var(--dim2); cursor: pointer; }
+        .nbtn.pri { background: var(--blue); color: #fff; }
+        .nbtn.pri:hover { background: #1F6FDB; }
+        .nbtn.sm { font-size: 12px; padding: 7px 11px; }
+
+        .cropL { display: grid; grid-template-columns: 1fr 200px; gap: 14px; }
+        @@media (max-width: 700px) { .cropL { grid-template-columns: 1fr; } }
+        .cropT { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .cropW { min-height: 300px; background: var(--grey); border-radius: 14px; display: grid; place-items: center; overflow: hidden; }
+        .cropW img { max-width: 100%; display: block; }
+        .cropE { font-size: 13px; color: var(--dim); text-align: center; line-height: 1.7; padding: 20px; }
+        .nc-hidden, .file-hidden { display: none; }
+        .prev { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; background: var(--grey); display: block; }
+        .confirm { width: 100%; margin-top: 8px; }
+        .confirm.done { background: var(--okbg) !important; color: var(--ok) !important; }
+    </style>
+</head>
+<body>
+    <header class="sh">
+        <div class="hdTop"><a href="/Attendance/Index">출석부</a><a href="/">@ConstatsCommon.ToHome</a></div>
+        <div class="hdK">NEW FRIENDS</div>
+        <h1 class="hdT">새친구</h1>
+        <div class="prog"><b>@activeCount</b><span>명 케어 중 · 오늘 방문 <i>@visitedToday</i> · 등반 @completedCount</span></div>
+    </header>
+
+    <main class="sh">
+        <div class="top2">
+            <button type="button" class="addBtn" onclick="openNewComerModal()">＋ 새친구 등록</button>
+            <form method="get" action="@Url.Action("NewComer","Attendance")" class="srch">
+                <input type="search" name="keyword" value="@Model?.Keyword" placeholder="이름 · 보호자 · 전화" aria-label="새친구 검색" />
+                <button type="submit" aria-label="검색">⌕</button>
+            </form>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="ok">@msg</div>
+        }
+
+        <section class="sec" id="section-active">
+            <div class="secH">
+                <div><div class="secK">@(CareWeeks)주 케어</div><div class="secT">케어 중 · 최근 방문순</div></div>
+                <span class="secN">막대 = 방문 횟수</span>
+            </div>
+
+            @if (Model?.ActiveList == null || Model.ActiveList.Count == 0)
+            {
+                <div class="empty">케어 중인 새친구가 없습니다.</div>
+            }
+            else
+            {
+                foreach (var item in Model.ActiveList.OrderByDescending(x => x.LastVisitDate ?? x.FirstVisitDate))
+                {
+                    var pu = !string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : NoPhoto;
+                    bool cameToday = item.LastVisitDate?.Date == today;
+                    @* 두 줄: 윗줄 사진·이름·정보 / 아랫줄 화면 너비 큰 버튼 *@
+                    <div class="ncItem">
+                        <div class="ncTop">
+                            <button type="button" class="ph" onclick="openPhotoModal(@item.Id, this.dataset.name)" data-name="@item.ChildName" aria-label="@item.ChildName 사진 바꾸기">
+                                <img src="@pu" alt="" loading="lazy" onerror="this.onerror=null;this.src='@NoPhoto';" /><span>사진</span>
+                            </button>
+                            <div class="ncTx">
+                                <a class="ncN" href="@Url.Action("NewComerDetail","Attendance",new{id=item.Id})">@item.ChildName<small>@item.ClassText</small></a>
+                                <div class="ncM">
+                                    마지막 @(item.LastVisitDate?.ToString("M.d") ?? item.FirstVisitDate.ToString("M.d"))
+                                    · @(item.IsVoluntary ? "자진" : $"전도{(string.IsNullOrWhiteSpace(item.EvangelistName) ? "" : " · " + item.EvangelistName)}")
+                                    <form method="post" action="@Url.Action("DeleteNewComer","Attendance")" onsubmit="return confirm('@(item.ChildName) 새친구를 삭제할까요? 되돌릴 수 없어요.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@item.Id" />
+                                        <button type="submit" class="del">삭제</button>
+                                    </form>
+                                </div>
+                                <div class="vb" aria-label="방문 @item.VisitCount 번">
+                                    @for (int i = 1; i <= CareWeeks; i++) { <i class="@(i <= item.VisitCount ? "on" : "")"></i> }
+                                    @if (item.VisitCount > CareWeeks) { <em>+@(item.VisitCount - CareWeeks)</em> }
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ncAct">
+                            @if (cameToday)
+                            {
+                                <span class="bigB came" role="status">✓ 오늘 방문 · @(item.VisitCount)번째</span>
+                                <form method="post" action="@Url.Action("CancelNewComerVisitToday","Attendance")"
+                                      onsubmit="return confirm(this.dataset.name + ' 오늘 방문을 취소할까요?');" data-name="@item.ChildName">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="newComerId" value="@item.Id" />
+                                    <button type="submit" class="bigB undo">취소</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <form method="post" action="@Url.Action("AddNewComerVisitToday","Attendance")" style="flex:1">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="newComerId" value="@item.Id" />
+                                    <button type="submit" class="bigB add">＋ 오늘 방문 기록하기</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+
+        <section class="sec" id="section-completed">
+            <div class="secH">
+                <div><div class="secK">등반</div><div class="secT">등반한 새친구</div></div>
+                <span class="secN">@completedCount 명</span>
+            </div>
+            @if (Model?.CompletedList == null || Model.CompletedList.Count == 0)
+            {
+                <div class="empty">등반한 새친구가 없습니다.</div>
+            }
+            else
+            {
+                foreach (var item in Model.CompletedList)
+                {
+                    var pu = !string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : NoPhoto;
+                    <div class="nc">
+                        <button type="button" class="ph" onclick="openPhotoModal(@item.Id, this.dataset.name)" data-name="@item.ChildName" aria-label="@item.ChildName 사진 바꾸기">
+                            <img src="@pu" alt="" loading="lazy" onerror="this.onerror=null;this.src='@NoPhoto';" /><span>사진</span>
+                        </button>
+                        <div class="ncTx">
+                            <a class="ncN" href="@Url.Action("NewComerDetail","Attendance",new{id=item.Id})">@item.ChildName<small>@item.ClassText</small></a>
+                            <div class="ncM">
+                                첫 방문 @item.FirstVisitDate.ToString("yyyy.M.d") · @item.VisitCount 번
+                                <form method="post" action="@Url.Action("DeleteNewComer","Attendance")" onsubmit="return confirm('@(item.ChildName) 새친구를 삭제할까요? 되돌릴 수 없어요.');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="del">삭제</button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="ncA"><span class="grad">@item.NewComerStatus</span></div>
+                    </div>
+                }
+            }
+        </section>
+
+        <div class="ft"><span>이름을 누르면 방문 기록 · 정보 수정</span></div>
+    </main>
+
+    <!-- ══ 새친구 등록 창 ══ -->
+    <div id="newComerModal" class="mb" onclick="bdClose(event,'newComerModal',closeNewComerModal)">
+        <div class="mdl" role="dialog" aria-modal="true" aria-labelledby="ncTitle">
+            <div class="mH"><b id="ncTitle">새친구 등록</b><button type="button" onclick="closeNewComerModal()" aria-label="닫기">✕</button></div>
+            <form method="post" action="@Url.Action("SaveNewComer","Attendance")">
+                @Html.AntiForgeryToken()
+                <div class="mB">
+                    <div class="g2">
+                        <div class="fRow"><label class="fLbl">이름<span class="req">*</span></label><input class="fIn" type="text" name="ChildName" required /></div>
+                        <div class="fRow"><label class="fLbl">보호자<span class="req">*</span></label><input class="fIn" type="text" name="ParentName" required /></div>
+                        <div class="fRow"><label class="fLbl">전화번호<span class="req">*</span></label><input class="fIn" type="tel" name="Phone" inputmode="tel" required /></div>
+                        <div class="fRow"><label class="fLbl">첫 출석일<span class="req">*</span></label><input class="fIn" type="date" name="FirstVisitDate" required value="@today.ToString("yyyy-MM-dd")" /></div>
+                        <div class="fRow"><label class="fLbl">생일 · 월<span class="req">*</span></label><input class="fIn" type="number" name="BirthMonth" min="1" max="12" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">생일 · 일<span class="req">*</span></label><input class="fIn" type="number" name="BirthDay" min="1" max="31" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">학년<span class="req">*</span></label><input class="fIn" type="number" name="ClassYear" min="1" inputmode="numeric" required /></div>
+                        <div class="fRow"><label class="fLbl">반<span class="req">*</span></label><input class="fIn" type="number" name="ClassBan" min="1" inputmode="numeric" required /></div>
+                        <div class="fRow full"><label class="fLbl">학교</label><input class="fIn" type="text" name="School" placeholder="선택" /></div>
+                        <div class="fRow full">
+                            <span class="fLbl">어떻게 왔나요?<span class="req">*</span></span>
+                            <div class="rg">
+                                <label><input type="radio" name="IsVoluntary" value="true" checked onchange="toggleEv(this)" /><span>스스로 왔어요</span></label>
+                                <label><input type="radio" name="IsVoluntary" value="false" onchange="toggleEv(this)" /><span>전도로 왔어요</span></label>
+                            </div>
+                        </div>
+                        <div class="fRow full" id="evField" style="display:none;"><label class="fLbl">전도한 사람</label><input class="fIn" type="text" name="EvangelistName" placeholder="이름" /></div>
+                    </div>
+                </div>
+                <div class="mF">
+                    <button type="button" class="nbtn" onclick="closeNewComerModal()">취소</button>
+                    <button type="submit" class="nbtn pri">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ══ 사진 등록 창 ══ -->
+    <div id="photoModal" class="mb" onclick="bdClose(event,'photoModal',closePhotoModal)">
+        <div class="mdl wide" role="dialog" aria-modal="true" aria-labelledby="photoModalTitle">
+            <div class="mH"><b id="photoModalTitle">사진 등록</b><button type="button" onclick="closePhotoModal()" aria-label="닫기">✕</button></div>
+            <form method="post" action="@Url.Action("UploadNewComerPhoto","Attendance")" onsubmit="return submitPhoto();">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="photoNCId" name="newComerId" value="0" />
+                <input type="hidden" id="croppedData" name="croppedImageData" />
+                <div class="mB">
+                    <div class="cropL">
+                        <div>
+                            <div class="cropT">
+                                <span>
+                                    <input type="file" id="fileInput" class="file-hidden" accept="image/*" onchange="onFile(event)" />
+                                    <label for="fileInput" class="nbtn pri" style="cursor:pointer">사진 고르기</label>
+                                    <span id="fileName" style="font-size:12px;color:var(--dim);margin-left:6px"></span>
+                                </span>
+                                <span>
+                                    <button type="button" class="nbtn sm" onclick="rotC(-90)" aria-label="왼쪽으로 돌리기">↺</button>
+                                    <button type="button" class="nbtn sm" onclick="rotC(90)" aria-label="오른쪽으로 돌리기">↻</button>
+                                    <button type="button" class="nbtn sm" onclick="rstC()">원래대로</button>
+                                </span>
+                            </div>
+                            <div class="cropW">
+                                <img id="cropImg" class="nc-hidden" alt="자르기" />
+                                <div id="cropEmpty" class="cropE">사진을 고르면<br />여기서 얼굴 위치를 맞출 수 있어요.</div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="fLbl">미리보기</span>
+                            <img id="cropPreview" class="prev" src="@NoPhoto" alt="미리보기" />
+                            <button type="button" id="cropConfirmBtn" class="nbtn confirm" onclick="doConfirm()">자르기 확정</button>
+                            <div class="fHint">정사각형으로 저장돼요. 얼굴이 가운데 오게 맞춘 뒤 <b>자르기 확정</b>을 눌러 주세요.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mF">
+                    <button type="button" class="nbtn" onclick="closePhotoModal()">취소</button>
+                    <button type="submit" class="nbtn pri">사진 저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+    // ══ 창 공통 ══
+    function bdClose(e, id, fn) { if (e.target.id === id) fn(); }
+    function openNewComerModal() { document.getElementById('newComerModal').classList.add('show'); document.body.style.overflow = 'hidden'; }
+    function closeNewComerModal() { document.getElementById('newComerModal').classList.remove('show'); document.body.style.overflow = ''; }
+
+    // ══ 전도자 칸 ══
+    function toggleEv(r) { var f = document.getElementById('evField'); if (f) f.style.display = r.value === 'true' ? 'none' : ''; }
+
+    // ══ 사진 ══
+    let cropper = null;
+    function resetConfirm() { var b = document.getElementById('cropConfirmBtn'); b.classList.remove('done'); b.textContent = '자르기 확정'; }
+    function openPhotoModal(id, name) {
+        document.getElementById('photoNCId').value = id;
+        document.getElementById('photoModalTitle').textContent = (name || '새친구') + ' 사진';
+        document.getElementById('croppedData').value = '';
+        document.getElementById('cropPreview').src = '@NoPhoto';
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileName').textContent = '';
+        var img = document.getElementById('cropImg'); img.src = ''; img.classList.add('nc-hidden');
+        document.getElementById('cropEmpty').style.display = '';
+        resetConfirm();
+        if (cropper) { cropper.destroy(); cropper = null; }
+        document.getElementById('photoModal').classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    function closePhotoModal() {
+        document.getElementById('photoModal').classList.remove('show');
+        document.body.style.overflow = '';
+        if (cropper) { cropper.destroy(); cropper = null; }
+    }
+    function onFile(e) {
+        var file = e.target.files && e.target.files[0]; if (!file) return;
+        document.getElementById('fileName').textContent = file.name;
+        resetConfirm();
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+            var img = document.getElementById('cropImg');
+            img.src = ev.target.result; img.classList.remove('nc-hidden');
+            document.getElementById('cropEmpty').style.display = 'none';
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(img, {
+                aspectRatio: 1, viewMode: 1, dragMode: 'move', autoCropArea: 1, responsive: true, background: false,
+                checkOrientation: true, guides: true, center: true, highlight: false, cropBoxMovable: true, cropBoxResizable: true,
+                toggleDragModeOnDblclick: false
+            });
+        };
+        reader.readAsDataURL(file);
+    }
+    function rotC(deg) { if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; } cropper.rotate(deg); }
+    function rstC() { if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; } cropper.reset(); resetConfirm(); }
+    function doConfirm() {
+        if (!cropper) { alert('먼저 사진을 골라 주세요.'); return; }
+        var canvas = cropper.getCroppedCanvas({ width: 600, height: 600, imageSmoothingEnabled: true, imageSmoothingQuality: 'high' });
+        var url = canvas.toDataURL('image/jpeg', 0.92);
+        document.getElementById('croppedData').value = url;
+        document.getElementById('cropPreview').src = url;
+        var b = document.getElementById('cropConfirmBtn'); b.classList.add('done'); b.textContent = '✓ 자르기 완료';
+    }
+    function submitPhoto() {
+        var id = document.getElementById('photoNCId').value;
+        if (!id || id === '0') { alert('대상 새친구 정보가 없습니다.'); return false; }
+        if (!document.getElementById('croppedData').value) { alert('자르기 확정 버튼을 눌러 사진을 먼저 확정해 주세요.'); return false; }
+        return true;
+    }
+</script>
+</body>
+</html>

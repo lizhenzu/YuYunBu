@@ -1,0 +1,141 @@
+﻿@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IUserUiPreferenceService PrefSvc
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Models;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 교사 대시보드 — 큰 카드(출석·포인트) + 빠른 이동 목록 · 성경학교 참석은 작은 버튼만
+
+    var urlAttendance  = "/Attendance/Index";
+    var urlDevotion    = "/DevotionPoints/Home";
+    var urlVbs         = "/VBSParticipationSurvey/Index";
+    var urlHome        = "/";
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+    var today          = DateHelper.GetKoreaNow();
+    string[] dayKo     = { "일", "월", "화", "수", "목", "금", "토" };
+    var todayStr       = $"{today:yyyy년 M월 d일} ({dayKo[(int)today.DayOfWeek]})";
+}
+@{
+    var user         = await AuthService.GetSignedUser(User);
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isModerator  = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    bool isStaff     = (isAdmin || isSuperAdmin || isModerator);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>교사 대시보드 · @ChurchName</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; }
+        a { text-decoration: none; color: inherit; -webkit-tap-highlight-color: transparent; }
+        .sh { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+        .bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .bar b { font-weight: 700; color: var(--tx); }
+        .bar .r { display: flex; gap: 12px; align-items: center; }
+        .bar a { color: var(--tx); font-weight: 700; }
+        .bar a:hover { color: var(--blue); }
+        .bar a.vbs { background: var(--soft); color: var(--blue); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; }
+
+        .k { margin-top: 20px; font-size: 12px; font-weight: 800; color: var(--blue); letter-spacing: .02em; }
+        h1 { margin: 6px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+        .d { margin-top: 4px; font-size: 13px; color: var(--dim2); }
+
+        .tSecH { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); font-size: 16px; font-weight: 800; color: var(--ink); }
+
+        /* 자주 쓰는 일 — 큰 카드 2개 (색은 아주 연하게) */
+        .cards { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+        @@media (min-width: 700px) { .cards { grid-template-columns: 1fr 1fr; gap: 14px; } }
+        .card { display: flex; flex-direction: column; padding: 18px 18px 14px; border-radius: 18px; color: var(--tx); transition: transform .12s; }
+        .card:active { transform: scale(.98); }
+        .card.pri { background: #F1F6FD; }
+        .card.sec { background: var(--grey); }
+        .card .kk { font-size: 11.5px; font-weight: 800; color: #7FA3DB; }
+        .card h3 { margin: 4px 0 0; font-size: 22px; font-weight: 800; color: var(--ink); }
+        .card p { margin: 5px 0 0; font-size: 13px; line-height: 1.65; color: var(--dim2); word-break: keep-all; flex: 1; }
+        .card .tg { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+        .card .tg span { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #fff; color: var(--dim2); }
+        .card .go { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid #E1E6EE; font-size: 14px; font-weight: 800; color: var(--blue); }
+        .card.sec .go { color: var(--dim2); }
+        .card .go em { font-style: normal; font-size: 20px; font-weight: 300; transition: transform .14s; }
+        .card:hover .go em { transform: translateX(4px); }
+
+        /* 빠른 이동 목록 */
+        .qList { margin-top: 10px; }
+        @@media (min-width: 700px) { .qList { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+        .qIt { display: flex; align-items: center; gap: 12px; padding: 14px 2px; border-top: 1px solid var(--line); color: var(--tx); }
+        .qIt .bd { flex: 1; min-width: 0; }
+        .qIt b { display: block; font-size: 15.5px; font-weight: 700; color: var(--ink); }
+        .qIt small { display: block; font-size: 12px; color: var(--dim2); margin-top: 2px; }
+        .qIt em { font-style: normal; font-size: 18px; color: #7FA3DB; transition: transform .14s; }
+        .qIt:hover em { transform: translateX(3px); }
+        .qIt .ext { font-style: normal; font-size: 10.5px; font-weight: 800; color: var(--blue); background: var(--soft); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+
+        .tFt { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 26px; padding: 14px 0 30px; border-top: 1px solid var(--line); font-size: 12px; color: var(--dim); }
+        .tFt .sm { background: var(--grey); color: var(--dim2); border-radius: 999px; padding: 7px 12px; font-weight: 700; }
+        .tFt .sm:hover { color: var(--blue); }
+    </style>
+</head>
+<body>
+    <div class="sh">
+        <div class="bar">
+            <b>교사 대시보드</b>
+            <span class="r"><a class="vbs" href="@urlVbs">성경학교 참석</a><a href="@urlHome">@ConstatsCommon.ToHome</a></span>
+        </div>
+        <div class="k">TEACHERS · @ChurchName · @DepartmentName</div>
+        <h1>안녕하세요, 선생님</h1>
+        <div class="d">@todayStr</div>
+
+        <div class="tSecH">자주 쓰는 일</div>
+        <div class="cards">
+            <a class="card pri" href="@urlAttendance">
+                <span class="kk">출석</span>
+                <h3>출석 관리</h3>
+                <p>전체 반·내 반 출석을 한눈에 확인하고 빠르게 기록해요.</p>
+                <div class="tg"><span>출석 현황</span><span>내 반</span><span>반별 비교</span></div>
+                <div class="go"><span>출석부 열기</span><em>→</em></div>
+            </a>
+            <a class="card sec" href="@urlDevotion">
+                <span class="kk">포인트</span>
+                <h3>포인트 관리</h3>
+                <p>말씀·감사일기·신앙 미션 포인트를 학생별로 관리해요.</p>
+                <div class="tg"><span>말씀</span><span>감사</span><span>성장</span></div>
+                <div class="go"><span>포인트 열기</span><em>→</em></div>
+            </a>
+        </div>
+
+        <div class="tSecH">빠른 이동</div>
+        <div class="qList">
+            <a class="qIt" href="/Attendance/NewComer"><span class="bd"><b>새친구 관리</b><small>첫 출석 · 출석 이력</small></span><em>›</em></a>
+            <a class="qIt" href="/AddressBook"><span class="bd"><b>인명 검색</b><small>이름 · 전화번호로 찾기</small></span><em>›</em></a>
+            <a class="qIt" href="/ChurchRecord"><span class="bd"><b>교적부관리</b><small>학년 · 반별 명단과 정보 관리</small></span><em>›</em></a>
+            <a class="qIt" href="/Admin/PrintManage"><span class="bd"><b>출력 관리</b><small>반편성표 · A3 출력</small></span><em>›</em></a>
+            <a class="qIt" href="https://bit2001-001-site6.anytempurl.com/" target="_blank" rel="noopener"><span class="bd"><b>주보 관리<i class="ext">외부</i></b><small>주보 편집 · 요약 출력</small></span><em>›</em></a>
+            <a class="qIt" href="/PopMessage/PrayLetter?returnUrl=/Admin/TeacherOnly"><span class="bd"><b>기도 요청</b><small>기도 편지 보내기</small></span><em>›</em></a>
+        </div>
+
+        <div class="tFt">
+            <span>© @today.Year @ChurchName · @DepartmentName</span>
+            <a class="sm" href="@urlVbs">성경학교 참석체크 →</a>
+        </div>
+    </div>
+</body>
+</html>

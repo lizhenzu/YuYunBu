@@ -1,0 +1,163 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.Attendance.AttendanceSundayStudentsVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 주일 출석 명단 (모바일) — 반별로 누가 왔는지 · PC 명단(SundayStudentsPC)은 따로 그대로 둔다
+    ViewData["AttTab"] = "more";
+
+    var sunday = Model.SundayDate.Date;
+    var dateStr = sunday.ToString("yyyy-MM-dd");
+    var thisSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    bool atLatest = sunday >= thisSunday;
+    string Self(DateTime d) => $"/Attendance/SundayStudentsMobile?sunday={d:yyyy-MM-dd}";
+
+    var classes = Model.Classes.Where(c => c.Students.Count > 0).ToList();
+    int total = classes.Sum(c => c.Students.Count);
+    int present = classes.Sum(c => c.Students.Count(s => s.IsPresent));
+    int pct = total == 0 ? 0 : (int)Math.Round(present * 100.0 / total);
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>주일 출석 명단 · @sunday.ToString("M월 d일")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .dn { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+        .dn a, .dn span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--headdim); }
+        .dn a:hover { color: var(--headk); }
+        .dn span.off { opacity: .25; }
+        .dn h1 { margin: 0; text-align: center; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 23px; }
+        .dn h1 small { display: block; font-family: "Gothic A1", sans-serif; font-size: 11px; letter-spacing: .18em; color: var(--headk); margin-top: 2px; }
+        .prog { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 13px; color: var(--headdim); }
+        .prog b { font-family: "Inter", sans-serif; font-weight: 200; font-size: 36px; line-height: 1; color: var(--headtx); }
+        .prog i { font-style: normal; color: #E08A72; }
+        .bar { height: 2px; background: #3A3C40; margin-top: 12px; }
+        .bar i { display: block; height: 2px; background: var(--headk); }
+
+        .tools { position: sticky; top: 0; z-index: 30; background: var(--card); border-bottom: 1px solid var(--rule); }
+        .tools .sh { padding-top: 10px; padding-bottom: 10px; }
+        .seg { display: flex; border: 1px solid var(--rule); }
+        .seg button { flex: 1; font-family: inherit; font-size: 13px; padding: 9px 2px; background: var(--card); color: var(--dim2); border: 0; cursor: pointer; }
+        .seg button + button { border-left: 1px solid var(--rule); }
+        .seg button.on { background: var(--tx); color: var(--bg); font-weight: 600; }
+        .seg b { font-family: "Inter", sans-serif; font-weight: 500; }
+        .jump { display: flex; gap: 6px; overflow-x: auto; padding-top: 8px; scrollbar-width: none; }
+        .jump::-webkit-scrollbar { display: none; }
+        .jump a { flex: none; font-size: 12.5px; padding: 6px 9px; border: 1px solid var(--rule); background: var(--card); color: var(--dim2); }
+        .jump a b { font-family: "Inter", sans-serif; font-weight: 500; color: var(--tx); margin-left: 3px; }
+        .jump a.full { border-color: var(--ok); }
+        .jump a.zero { border-color: var(--danger); color: var(--danger); }
+
+        .cls { padding-top: 18px; scroll-margin-top: 110px; }
+        .cH { display: flex; align-items: baseline; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--tx); }
+        .cH b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 17px; }
+        .cH small { font-size: 12px; color: var(--dim); }
+        .cH .n { margin-left: auto; font-family: "Inter", sans-serif; font-size: 13px; color: var(--dim2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .cH .n b { font-family: "Inter", sans-serif; font-size: 15px; font-weight: 500; color: var(--ok); }
+        .cBar { height: 3px; background: var(--line); }
+        .cBar i { display: block; height: 3px; background: var(--ok); }
+        .kids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+        @@media (min-width: 560px) { .kids { grid-template-columns: repeat(4, 1fr); } }
+        .kid { height: 50px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; font-size: 15px; font-weight: 600; border: 1px solid var(--rule); background: var(--card); color: var(--dim); position: relative; }
+        .kid span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .kid.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+        .kid.on::after { content: "✓"; position: absolute; top: 3px; right: 5px; font-size: 11px; font-weight: 400; }
+        .kid.off { border-style: dashed; }
+        .nw { flex: none; font-style: normal; font-size: 10px; font-weight: 600; padding: 1px 4px; background: var(--acc); color: #fff; }
+        .kid.on .nw { background: #fff; color: var(--ok); }
+        .fix { display: flex; justify-content: flex-end; margin-top: 8px; }
+        .fix a { font-size: 12.5px; color: var(--dim2); border-bottom: 1px solid var(--rule); padding-bottom: 1px; }
+        .fix a:hover { color: var(--acc); border-color: var(--acc); }
+        .hidden { display: none !important; }
+        .none { padding: 40px 0; text-align: center; font-size: 14px; color: var(--dim); }
+        .links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 24px; }
+        .links a { flex: 1; min-width: 140px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 13.5px; border: 1px solid var(--rule); background: var(--card); }
+        .links a:hover { border-color: var(--acc); color: var(--acc); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/AdminTrend3Weeks?date=@dateStr">전체 출석현황</a><span class="sep">›</span>명단</span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="dn">
+                <a href="@Self(sunday.AddDays(-7))" aria-label="지난 주일">‹</a>
+                <h1>@sunday.ToString("M월 d일") 주일<small>출석 명단</small></h1>
+                @if (atLatest) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Self(sunday.AddDays(7))" aria-label="다음 주일">›</a> }
+            </div>
+            <div class="prog"><b>@present</b><span>/ @(total)명 출석 · @(pct)% · 결석 <i>@(total - present)</i></span></div>
+            <div class="bar"><i style="width:@(pct)%"></i></div>
+        </div>
+    </header>
+
+    <div class="tools">
+        <div class="sh">
+            <div class="seg" role="tablist" aria-label="보기">
+                <button type="button" data-f="all" class="on">전체 <b>@total</b></button>
+                <button type="button" data-f="off">결석 <b>@(total - present)</b></button>
+                <button type="button" data-f="on">출석 <b>@present</b></button>
+            </div>
+            <nav class="jump" aria-label="반으로 이동">
+                @foreach (var c in classes)
+                {
+                    int cp = c.Students.Count(s => s.IsPresent);
+                    <a href="#c-@c.ClassYear-@c.ClassBan" class="@(cp == c.Students.Count ? "full" : cp == 0 ? "zero" : "")">@($"{c.ClassYear}학년 {c.ClassBan}반")<b>@cp/@c.Students.Count</b></a>
+                }
+            </nav>
+        </div>
+    </div>
+
+    <main class="sh">
+        @if (classes.Count == 0)
+        {
+            <div class="none">이 주일 명단이 없습니다.</div>
+        }
+        @foreach (var c in classes)
+        {
+            int cp = c.Students.Count(s => s.IsPresent);
+            int cPct = (int)Math.Round(cp * 100.0 / c.Students.Count);
+            <section class="cls" id="c-@c.ClassYear-@c.ClassBan">
+                <div class="cH">
+                    <b>@c.ClassName</b>
+                    @if (!string.IsNullOrWhiteSpace(c.TeacherName)) { <small>@c.TeacherName</small> }
+                    <span class="n"><b>@cp</b> / @c.Students.Count</span>
+                </div>
+                <div class="cBar"><i style="width:@(cPct)%"></i></div>
+                <div class="kids">
+                    @foreach (var s in c.Students.OrderByDescending(s => s.IsPresent).ThenBy(s => s.StudentName))
+                    {
+                        <div class="kid @(s.IsPresent ? "on" : "off")" data-p="@(s.IsPresent ? "1" : "0")" title="@(s.IsPresent ? "출석" : "결석")"><span>@s.StudentName</span>@if (s.IsNewComer) {<em class="nw">새</em>}</div>
+                    }
+                </div>
+                <div class="fix"><a href="/Attendance/Index?date=@dateStr#g-@c.ClassYear-@c.ClassBan">출석 고치기 →</a></div>
+            </section>
+        }
+
+        <div class="links">
+            <a href="/Attendance/SundayStudentsPC?sunday=@dateStr">명단 보기 (PC)</a>
+            <a href="/Attendance/AdminTrendSundayDetail?sunday=@dateStr">반별 출석</a>
+        </div>
+        <div class="ft"><span>초록 = 출석 · 점선 = 결석 · 반 안에서 출석한 아이부터</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    const kids = document.querySelectorAll('.kid');
+    document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+        const f = b.dataset.f;
+        document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
+        kids.forEach(k => k.classList.toggle('hidden', (f === 'on' && k.dataset.p !== '1') || (f === 'off' && k.dataset.p !== '0')));
+        document.querySelectorAll('.cls').forEach(s => s.classList.toggle('hidden', !s.querySelector('.kid:not(.hidden)')));
+    }));
+})();
+</script>
+</body>
+</html>

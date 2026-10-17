@@ -1,0 +1,262 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Models.Gift
+@using System.Linq
+@model GiftBoxPageVM
+
+@*  ══════════════════════════════════════════════════════════════
+    통합 선물함 — DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정)
+
+    받을 수 있는 선물 네 가지를 한 칸씩 세로로 쌓는다. 카드 · 테두리 없이 가는 회색 줄로만 나눈다.
+      · 받을 수 있는 칸 : 번호 + 제목 + 오른쪽 큰 숫자, 아래에 고른 선물 / 고르기 띠
+      · 아직 못 받는 칸 : 흐리게, 눌러서 받는 방법을 펼친다
+    선물 목록은 이 화면에 두지 않는다. 고르기는 GiftSelect 로 넘긴다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var toast = (ViewBag.Toast ?? "").ToString();
+    string N(int v) => v.ToString("N0");
+    int _no = 0;
+}
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>내 선물함 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;800&display=swap">
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #FFFFFF; }
+    .qz.gb { --gBlue: #2F80ED; --gSoft: #EAF2FD; --gInk: #111827; --gTx: #374151; --gDim: #9CA3AF; --gDim2: #6B7280; --gLine: #EEF0F3; --gGrey: #F4F6F9; --gGreen: #15803D;
+             background: #FFFFFF; font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; color: var(--gTx); }
+    .qz.gb .qzBody { background: #FFFFFF; }
+    .qz.gb .qzBar { border-bottom-color: var(--gLine); }
+
+    /* 머리 */
+    .qz.gb .gxK { margin-top: 20px; font-size: 12px; font-weight: 800; color: var(--gBlue); letter-spacing: .02em; }
+    .qz.gb .gxH1 { margin: 6px 0 0; font-size: 24px; font-weight: 800; line-height: 1.35; letter-spacing: -.02em; color: var(--gInk); word-break: keep-all; }
+    .qz.gb .gxSum { margin-top: 4px; font-size: 13px; color: var(--gDim2); }
+    .qz.gb .gxSum b { color: var(--gBlue); font-weight: 800; }
+    .qz.gb .gxMsg { margin-top: 14px; padding: 11px 13px; border-radius: 12px; background: var(--gSoft); font-size: 13px; line-height: 1.6; color: var(--gTx); }
+
+    .qz.gb .gxSec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--gLine); font-size: 16px; font-weight: 800; color: var(--gInk); }
+    .qz.gb .gxSec small { font-size: 11.5px; font-weight: 600; color: var(--gDim); }
+
+    /* 칸 — 줄로만 나눈다 */
+    .qz.gb .gxCard { padding: 16px 0; border-bottom: 1px solid var(--gLine); }
+    .qz.gb .gxCard:last-of-type { border-bottom: 0; }
+    .qz.gb .gxCh { display: flex; align-items: flex-start; gap: 12px; }
+    .qz.gb .gxNo { flex: none; width: 15px; padding-top: 2px; font-size: 15px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+    .qz.gb .gxCt { flex: 1 1 auto; min-width: 0; }
+    .qz.gb .gxCn { font-size: 17px; font-weight: 800; line-height: 1.35; color: var(--gInk); word-break: keep-all; }
+    .qz.gb .gxCs { margin-top: 3px; font-size: 12px; line-height: 1.6; color: var(--gDim2); word-break: keep-all; }
+    .qz.gb .gxCr { flex: 0 0 auto; text-align: right; white-space: nowrap; }
+    .qz.gb .gxCrl { font-size: 10.5px; color: var(--gDim); }
+    .qz.gb .gxCrv { font-size: 20px; font-weight: 300; color: var(--gBlue); font-variant-numeric: tabular-nums; }
+    .qz.gb .gxCrv u { text-decoration: none; font-size: 10.5px; color: var(--gDim); margin-left: 2px; }
+    .qz.gb .gxCard.off .gxNo { color: #D1D5DB; }
+    .qz.gb .gxCard.off .gxCn,
+    .qz.gb .gxCard.off .gxCs,
+    .qz.gb .gxCard.off .gxCr { opacity: .55; }
+
+    /* 아랫줄 — 고른 선물 · 고르기 띠 · 안내 */
+    .qz.gb .gxPick { display: flex; align-items: center; gap: 11px; margin: 12px 0 0 27px; }
+    .qz.gb .gxTh { width: 52px; height: 52px; border-radius: 12px; background: var(--gGrey); flex: 0 0 auto; object-fit: cover; display: block; }
+    .qz.gb .gxPk { flex: 1 1 auto; min-width: 0; }
+    .qz.gb .gxPkn { font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--gInk); word-break: keep-all; }
+    .qz.gb .gxPkm { margin-top: 2px; font-size: 11.5px; color: var(--gDim2); font-variant-numeric: tabular-nums; }
+    .qz.gb .gxLinks { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+    .qz.gb .gxLn { border: 0; background: none; padding: 6px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--gBlue); text-decoration: none; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
+    .qz.gb .gxLn.q { color: var(--gDim); }
+    .qz.gb form.gxInline { margin: 0; }
+    .qz.gb .gxFixed { font-size: 11.5px; color: var(--gDim); white-space: nowrap; }
+
+    .qz.gb .gxNone { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 12px 0 0 27px; padding: 12px 14px; border-radius: 14px; background: var(--gSoft); }
+    .qz.gb .gxNone span { font-size: 13px; color: var(--gTx); }
+    .qz.gb .gxNone a { font-size: 13px; font-weight: 800; color: var(--gBlue); white-space: nowrap; text-decoration: none; }
+    .qz.gb .gxNote { margin: 12px 0 0 27px; font-size: 12px; color: var(--gDim); }
+
+    /* 잠긴 칸 — 눌러서 받는 방법 펼치기 */
+    .qz.gb .gxLockBtn { display: flex; justify-content: space-between; align-items: center; width: calc(100% - 27px); margin: 12px 0 0 27px; padding: 11px 0 0; border: 0; border-top: 1px solid var(--gLine);
+                        background: none; font: inherit; font-size: 12.5px; color: var(--gDim2); cursor: pointer; text-align: left; }
+    .qz.gb .gxLockBtn em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--gBlue); white-space: nowrap; }
+    .qz.gb .gxLock { margin: 10px 0 0 27px; padding: 11px 13px; border-radius: 12px; background: var(--gGrey); font-size: 12.5px; line-height: 1.75; color: var(--gTx); word-break: keep-all; }
+    .qz.gb .gxLock[hidden] { display: none; }
+
+    /* 받은 선물 */
+    .qz.gb .gxFold { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 18px; padding: 14px 2px; border: 0; border-top: 1px solid var(--gLine); border-bottom: 1px solid var(--gLine);
+                     background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--gInk); cursor: pointer; text-align: left; }
+    .qz.gb .gxFold em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--gBlue); }
+    .qz.gb .gxHist[hidden] { display: none; }
+    .qz.gb .gxHrow { display: flex; align-items: center; gap: 12px; padding: 12px 2px; border-bottom: 1px solid var(--gLine); }
+    .qz.gb .gxHrow img { width: 40px; height: 40px; border-radius: 10px; background: var(--gGrey); object-fit: cover; flex: 0 0 auto; display: block; }
+    .qz.gb .gxHtx { flex: 1 1 auto; min-width: 0; }
+    .qz.gb .gxHn { font-size: 13.5px; font-weight: 700; line-height: 1.35; color: var(--gInk); word-break: keep-all; }
+    .qz.gb .gxHm { margin-top: 2px; font-size: 11px; color: var(--gDim); font-variant-numeric: tabular-nums; }
+    .qz.gb .gxHs { flex: 0 0 auto; font-size: 11.5px; font-weight: 700; color: var(--gDim2); white-space: nowrap; }
+    .qz.gb .gxHs.done { color: var(--gGreen); }
+    .qz.gb .gxEmpty { padding: 22px 0; text-align: center; font-size: 13px; color: var(--gDim); }
+</style>
+</head>
+<body>
+
+<div class="qz gb">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4">미션홈</a>
+            </div>
+            <div class="qzDate">선물함</div>
+        </div>
+
+        <div class="gxK">MY GIFT BOX</div>
+        <h1 class="gxH1">@(string.IsNullOrWhiteSpace(Model.FullName) ? "나" : Model.FullName)님의 선물함</h1>
+        <div class="gxSum">받을 수 있는 선물 <b>@(Model.OpenCount)개</b> · 고른 선물 <b>@(Model.PickedCount)개</b></div>
+
+        @if (!string.IsNullOrWhiteSpace(toast))
+        {
+            <div class="gxMsg">@toast</div>
+        }
+
+        <div class="gxSec"><span>받을 수 있는 선물</span><small>@Model.OpenCount / @Model.Cards.Count</small></div>
+
+        @foreach (var c in Model.Cards)
+        {
+            _no++;
+            <div class="gxCard @(c.IsOpen ? "" : "off")">
+                <div class="gxCh">
+                    <span class="gxNo">@_no.ToString("00")</span>
+                    <div class="gxCt">
+                        <div class="gxCn">@c.Title</div>
+                        <div class="gxCs">@c.Reason</div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(c.RightValue))
+                    {
+                        <div class="gxCr">
+                            <div class="gxCrl">@c.RightLabel</div>
+                            <div class="gxCrv">@c.RightValue@if (!string.IsNullOrWhiteSpace(c.RightUnit)) {<u>@c.RightUnit</u>}</div>
+                        </div>
+                    }
+                </div>
+
+                @if (c.HasPick)
+                {
+                    <div class="gxPick">
+                        <img class="gxTh" src="/images/AwardItem/@(c.PickedProductId).jpg" alt="@c.PickedName" onerror="gxImgFail(this)" />
+                        <div class="gxPk">
+                            <div class="gxPkn">@c.PickedName</div>
+                            <div class="gxPkm">@c.PickedMeta</div>
+                        </div>
+                        @if (c.CanChange)
+                        {
+                            <div class="gxLinks">
+                                <a class="gxLn" href="@c.SelectUrl">바꾸기</a>
+                                <form class="gxInline" method="post" action="@c.CancelAction"
+                                      onsubmit="return confirm('고른 선물을 취소할까요?');">
+                                    @Html.AntiForgeryToken()
+                                    @foreach (var f in c.CancelFields)
+                                    {
+                                        <input type="hidden" name="@f.Key" value="@f.Value" />
+                                    }
+                                    <button type="submit" class="gxLn q">취소</button>
+                                </form>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="gxLinks">
+                                <span class="gxFixed">바꿀 수 없어요</span>
+                                @* 준비 중인 선물이 있어도 새로 고를 점수가 되면 하나 더 고를 수 있다 *@
+                                @if (c.IsOpen && !string.IsNullOrWhiteSpace(c.SelectUrl))
+                                {
+                                    <a class="gxLn" href="@c.SelectUrl">새 선물 고르기</a>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else if (c.IsOpen)
+                {
+                    <div class="gxNone">
+                        <span>아직 고른 선물이 없어요</span>
+                        <a href="@c.SelectUrl">선물 고르기 ›</a>
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(c.NotOwnerText))
+                {
+                    <div class="gxNote">@c.NotOwnerText</div>
+                }
+
+                @if (!c.IsOpen && !string.IsNullOrWhiteSpace(c.LockHint))
+                {
+                    <button type="button" class="gxLockBtn" data-lock>
+                        <span>어떻게 하면 받을 수 있나요?</span><em>보기</em>
+                    </button>
+                    <div class="gxLock" hidden>@c.LockHint</div>
+                }
+            </div>
+        }
+
+        @* ── 받은 선물 ── *@
+        <button type="button" class="gxFold" data-fold>
+            <span>받은 선물 @(Model.History.Count)건</span><em>펼치기</em>
+        </button>
+        <div class="gxHist" hidden>
+            @if (Model.History.Count == 0)
+            {
+                <div class="gxEmpty">아직 받은 선물이 없어요</div>
+            }
+            else
+            {
+                @foreach (var h in Model.History)
+                {
+                    <div class="gxHrow">
+                        <img src="/images/AwardItem/@(h.ProductId).jpg" alt="@h.ProductName" loading="lazy" decoding="async" onerror="gxImgFail(this)" />
+                        <div class="gxHtx">
+                            <div class="gxHn">@h.ProductName</div>
+                            <div class="gxHm">@h.Source@(h.Date.Year > 2000 ? " · " + h.Date.ToString("yyyy-MM-dd") : "")</div>
+                        </div>
+                        <span class="gxHs @(h.Status == "받음" ? "done" : "")">@h.Status</span>
+                    </div>
+                }
+            }
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 선물 사진이 없을 때 — 대체 이미지를 또 요청하면 onerror 가 무한히 돈다.
+    // 요청이 없는 투명 픽셀로 바꾸고 핸들러를 끊는다. 빈 자리는 배경색이 채운다.
+    function gxImgFail(el) {
+        el.onerror = null;
+        el.src = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+    }
+
+    document.addEventListener("click", function (e) {
+        var lock = e.target.closest ? e.target.closest("[data-lock]") : null;
+        if (lock) {
+            var box = lock.parentNode.querySelector(".gxLock");
+            if (!box) return;
+            var open = box.hasAttribute("hidden");
+            if (open) { box.removeAttribute("hidden"); } else { box.setAttribute("hidden", ""); }
+            var tag = lock.querySelector("em");
+            if (tag) { tag.textContent = open ? "닫기" : "보기"; }
+            return;
+        }
+
+        var fold = e.target.closest ? e.target.closest("[data-fold]") : null;
+        if (fold) {
+            var hist = document.querySelector(".gxHist");
+            if (!hist) return;
+            var show = hist.hasAttribute("hidden");
+            if (show) { hist.removeAttribute("hidden"); } else { hist.setAttribute("hidden", ""); }
+            var t = fold.querySelector("em");
+            if (t) { t.textContent = show ? "접기" : "펼치기"; }
+        }
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using BulletinBoard.ViewModels.Notice
+@model NoticeEditVm
+
+@{
+    Layout = null;
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+
+    ViewData["Title"] = "공지 작성";
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - 공지사항</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop">
+                <span><a href="@Url.Action("Index", "Home")">@ConstatsCommon.ToHome</a><span class="sep">›</span><a href="@Url.Action("Index", "Notice")">공지사항</a></span>
+            </div>
+            <div class="hdK">NEW NOTICE</div>
+            <h1 class="hdT">새 공지 작성</h1>
+            <div class="hdS">제목과 내용을 적고, 필요하면 상단 고정이나 팝업으로 띄울 수 있어요.</div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <form asp-controller="Notice"
+              asp-action="Create"
+              method="post"
+              enctype="multipart/form-data"
+              class="fm">
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="fRow">
+                <label asp-for="Title" class="fLbl">제목</label>
+                <input asp-for="Title" class="fIn" placeholder="공지 제목을 입력하세요" />
+                <span asp-validation-for="Title" class="text-danger"></span>
+            </div>
+
+            <div class="fRow">
+                <label asp-for="Content" class="fLbl">내용</label>
+                <textarea asp-for="Content" class="fIn" rows="10" placeholder="공지 내용을 입력하세요"></textarea>
+                <span asp-validation-for="Content" class="text-danger"></span>
+            </div>
+
+            <div class="fGrid">
+                <div class="fRow">
+                    <label asp-for="AuthorName" class="fLbl">작성자</label>
+                    @if (!string.IsNullOrWhiteSpace(UserFullName))
+                    {
+                        <input asp-for="AuthorName" class="fIn" value="@UserFullName" readonly />
+                    }
+                    else
+                    {
+                        <input asp-for="AuthorName" class="fIn" placeholder="작성자 이름 (선택)" />
+                    }
+                    <span asp-validation-for="AuthorName" class="text-danger"></span>
+                </div>
+
+                <div class="fRow">
+                    <span class="fLbl">표시 방법</span>
+                    <label class="fChk"><input asp-for="IsPinned" /> 목록 맨 위에 고정하기</label>
+                    <label class="fChk"><input asp-for="IsPopup" id="chkIsPopup" /> 메인에 팝업 공지로 띄우기</label>
+                </div>
+            </div>
+
+            <div class="fRow">
+                <label asp-for="PopupUntil" class="fLbl">팝업 공지 기간 (종료일)</label>
+                <input asp-for="PopupUntil" type="date" class="fIn" id="popupUntil" />
+                <div class="fHint">팝업 공지는 종료일(해당일)까지 메인에서 표시됩니다. 팝업을 끄면 이 값은 무시됩니다.</div>
+                <span asp-validation-for="PopupUntil" class="text-danger"></span>
+            </div>
+
+            <div class="fRow">
+                <label class="fLbl" for="files">첨부파일 (여러 개 가능)</label>
+                <input type="file" name="files" id="files" class="fIn" multiple />
+                <div class="fHint">여러 파일을 한 번에 고를 수 있어요. (PC에서는 Shift / Ctrl 로 다중 선택)</div>
+                <ul id="fileList" class="fl" style="display:none;"></ul>
+            </div>
+
+            <div class="fAct">
+                <a href="@Url.Action("Index", "Notice")" class="nbtn">취소</a>
+                <button type="submit" class="nbtn pri">등록</button>
+            </div>
+        </form>
+
+        <div class="ft"><span>© 유년부 · 공지사항</span></div>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.19.5/dist/jquery.validate.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery-validation-unobtrusive@3.2.12/dist/jquery.validate.unobtrusive.min.js"></script>
+
+    <script>
+        (function () {
+            const chk = document.getElementById('chkIsPopup');
+            const popupUntil = document.getElementById('popupUntil');
+
+            function syncPopupFields() {
+                const on = chk && chk.checked;
+                if (popupUntil) {
+                    popupUntil.disabled = !on;
+                    if (!on) {
+                        // 끄면 값은 서버에서 무시되지만 UX상 비워둠
+                        popupUntil.value = "";
+                    }
+                }
+            }
+
+            if (chk) {
+                chk.addEventListener('change', syncPopupFields);
+                syncPopupFields();
+            }
+
+            // 파일 목록 미리보기
+            const filesInput = document.getElementById('files');
+            const fileList = document.getElementById('fileList');
+
+            function renderFiles() {
+                if (!filesInput || !fileList) return;
+                const files = filesInput.files;
+
+                if (!files || files.length === 0) {
+                    fileList.style.display = "none";
+                    fileList.innerHTML = "";
+                    return;
+                }
+
+                fileList.style.display = "block";
+                fileList.innerHTML = "";
+
+                for (const f of files) {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span class="n">${escapeHtml(f.name)}</span><span class="s">${formatBytes(f.size)}</span>`;
+                    fileList.appendChild(li);
+                }
+            }
+
+            function formatBytes(bytes) {
+                if (bytes === 0) return "0 B";
+                const k = 1024;
+                const sizes = ["B", "KB", "MB", "GB"];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+            }
+
+            function escapeHtml(str) {
+                return String(str)
+                    .replaceAll("&", "&amp;")
+                    .replaceAll("<", "&lt;")
+                    .replaceAll(">", "&gt;")
+                    .replaceAll('"', "&quot;")
+                    .replaceAll("'", "&#039;");
+            }
+
+            if (filesInput) {
+                filesInput.addEventListener('change', renderFiles);
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model BulletinBoard.Models.DeptRoleUserAssoc
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    UserInfo __UserInfos = ViewData["userInfo"] as UserInfo;
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Information Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            /*   background-color: #fff;*/
+            padding: 20px;
+            border-radius: 8px;
+            /*   box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);*/
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .profile-pic {
+            width: 170px;
+            height: 170px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            object-fit: cover;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+            .buttons button {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin: 5px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>주일학교부서 정보변경</h2>
+
+        @*      <div>
+        <img id="myImage" src="@ViewData["ProfilePicturePath"]" alt="Profile Picture" class="profile-picture" style="width: 170px; height: 170px; border-radius: 50%; object-fit: cover;border: 3.5px solid #ffffff; box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);">
+
+        </div>*@
+
+        <h3>이름 : @__UserInfos.FullName</h3>
+
+        @if (!string.IsNullOrEmpty(__UserInfos.DeptCode))
+        {
+            @await Html.PartialAsync("_Display_Dept_Info", __UserInfos)
+
+            <h4>부서정보를 변경하시겠습니까?</h4>
+        }
+        else
+        {
+            <p style="color: red;">부서 정보가 없어요.</p>
+            <p style="color: red;">부서 정보를 입력이 필요합니다.</p>
+            <p style="color: red;">부서 정보를 입력 하시겠어요?</p>
+        }
+        <div class="buttons" style="flex-wrap: wrap;">
+            <button type="button" style="background-color:#00C853;" onclick="window.location.href='/HumanResource/ChangeUserDeptInfoMain?UserId=@__UserInfos.UserId';">예</button>
+            <button type="button" style="background-color:#00C853;" onclick="window.location.href='/HumanResource/ManageUserInfo?UserId=@__UserInfos.UserId';">아니오</button>
+        </div>
+        <input type="hidden" id="UserId" name="UserId" value="@__UserInfos.UserId" />
+
+        <div class="buttons">
+            <button type="button" onclick="window.location.href='/';">Home</button>
+            <button type="button" onclick="document.querySelector('form').submit();">로그아웃</button>
+        </div>
+    </div>
+    <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" style="display: none;">
+        <button type="submit" class="mission-button ">이동</button>
+    </form>
+
+    <script>
+        function loadLatestImage() {
+            const imageElement = document.getElementById('myImage');
+            const timestamp = new Date().getTime(); // 현재 시간을 밀리초로 가져옴
+            imageElement.src = `@__UserInfos.ProfilePicturePath?${timestamp}`;
+        }
+
+        // 페이지 로드 시 실행 또는 필요할 때 호출
+        window.onload = loadLatestImage;
+                        // 이미지 업데이트가 필요할 때 loadLatestImage() 호출 가능
+    </script>
+</body>
+</html>

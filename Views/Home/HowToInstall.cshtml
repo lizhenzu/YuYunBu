@@ -1,0 +1,306 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PWA 설치 가이드</title>
+    <meta name="description" content="기기별(PWA) 설치 가이드로 이동하는 분기 페이지" />
+    <style>
+        :root {
+            --bg: #070b14;
+            --text: rgba(255,255,255,0.92);
+            --muted: rgba(255,255,255,0.70);
+            --line: rgba(255,255,255,0.14);
+            --shadow: 0 18px 40px rgba(0,0,0,0.55);
+            --shadow2: 0 10px 18px rgba(0,0,0,0.35);
+            --radius: 22px;
+            --sans: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo",Arial,sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            color: var(--text);
+            min-height: 100vh;
+            background: radial-gradient(900px 600px at 10% 15%, rgba(124,58,237,0.30), transparent 55%), radial-gradient(900px 600px at 90% 25%, rgba(34,211,238,0.22), transparent 60%), radial-gradient(900px 700px at 50% 105%, rgba(251,191,36,0.16), transparent 60%), linear-gradient(180deg, #050814 0%, #070b14 35%, #070b14 100%);
+            overflow-x: hidden;
+        }
+
+        /* subtle animated noise */
+        .noise {
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+            opacity: .08;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+
+        .wrap {
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px 16px;
+        }
+
+        .panel {
+            width: min(860px, 100%);
+            border-radius: var(--radius);
+            border: 1px solid rgba(255,255,255,0.14);
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            position: relative;
+        }
+
+            .panel::before {
+                content: "";
+                position: absolute;
+                inset: -2px;
+                background: radial-gradient(700px 220px at 20% 0%, rgba(34,211,238,0.20), transparent 50%), radial-gradient(700px 220px at 80% 0%, rgba(124,58,237,0.22), transparent 55%);
+                filter: blur(0px);
+                pointer-events: none;
+                z-index: 0;
+            }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            padding: 34px 22px 28px;
+            text-align: center;
+        }
+
+        .logoRow {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .appMark {
+            width: 46px;
+            height: 46px;
+            border-radius: 16px;
+            display: grid;
+            place-items: center;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.16);
+            box-shadow: var(--shadow2);
+            backdrop-filter: blur(8px);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 26px;
+            letter-spacing: -0.4px;
+            line-height: 1.2;
+        }
+
+        .sub {
+            margin: 10px auto 0;
+            max-width: 52ch;
+            color: var(--muted);
+            font-size: 14.5px;
+            line-height: 1.6;
+        }
+
+        .btnRow {
+            margin-top: 22px;
+            display: flex;
+            gap: 14px;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* 3D buttons */
+        .btn3d {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 18px;
+            min-width: 240px;
+            border-radius: 18px;
+            text-decoration: none;
+            color: rgba(255,255,255,0.96);
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            border: 1px solid rgba(255,255,255,0.16);
+            background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+            box-shadow: 0 14px 0 rgba(0,0,0,0.35), 0 18px 34px rgba(0,0,0,0.55);
+            transform: translateY(0);
+            transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+            backdrop-filter: blur(10px);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+            .btn3d::before {
+                content: "";
+                position: absolute;
+                inset: -1px;
+                border-radius: 18px;
+                background: radial-gradient(600px 180px at 30% 0%, rgba(34,211,238,0.35), transparent 55%), radial-gradient(600px 180px at 70% 0%, rgba(124,58,237,0.42), transparent 58%);
+                opacity: .85;
+                z-index: -1;
+                filter: blur(0px);
+            }
+
+            .btn3d .icon {
+                width: 34px;
+                height: 34px;
+                border-radius: 14px;
+                display: grid;
+                place-items: center;
+                background: rgba(0,0,0,0.20);
+                border: 1px solid rgba(255,255,255,0.14);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
+                font-size: 18px;
+            }
+
+            .btn3d .label {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                line-height: 1.1;
+                text-align: left;
+            }
+
+                .btn3d .label small {
+                    font-weight: 650;
+                    color: rgba(255,255,255,0.78);
+                    letter-spacing: 0;
+                    margin-top: 2px;
+                    font-size: 12px;
+                }
+
+            .btn3d:active {
+                transform: translateY(10px);
+                box-shadow: 0 4px 0 rgba(0,0,0,0.35), 0 12px 26px rgba(0,0,0,0.52);
+                filter: brightness(1.02);
+            }
+
+            .btn3d:hover {
+                filter: brightness(1.05);
+            }
+
+        .fine {
+            margin-top: 18px;
+            font-size: 12.5px;
+            color: rgba(255,255,255,0.62);
+            line-height: 1.6;
+        }
+
+        .chips {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.14);
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.78);
+            font-size: 12.5px;
+        }
+
+        @@media (max-width: 520px) {
+            .btn3d
+
+        {
+            min-width: 100%;
+        }
+
+        .content {
+            padding: 28px 16px 22px;
+        }
+
+        h1 {
+            font-size: 23px;
+        }
+
+        }
+    </style>
+</head>
+<body>
+    <div class="noise" aria-hidden="true"></div>
+
+    <div class="wrap">
+        <main class="panel" role="main" aria-label="PWA 설치 가이드 분기 페이지">
+            <div class="content">
+                <div class="logoRow">
+                    <div class="appMark" aria-hidden="true">📲</div>
+                </div>
+
+                <h1>어떤 기기에서 설치하시나요?</h1>
+                <p class="sub">
+                    아래 버튼을 눌러 <b>기기별 설치 방법</b>으로 이동하세요.
+                    설치가 어렵다면 “Safari/Chrome으로 열기”부터 확인해 주세요.
+                </p>
+
+                <div class="btnRow">
+                    <a class="btn3d" href="/Home/HowToInstall_Android" aria-label="안드로이드 설치 가이드로 이동">
+                        <span class="icon" aria-hidden="true">🤖</span>
+                        <span class="label">
+                            안드로이드
+                            <small>Chrome에서 설치</small>
+                        </span>
+                    </a>
+
+                    <a class="btn3d" href="/Home/HowToInstall_iPhone" aria-label="아이폰 설치 가이드로 이동">
+                        <span class="icon" aria-hidden="true">🍎</span>
+                        <span class="label">
+                            아이폰
+                            <small>Safari에서 추가</small>
+                        </span>
+                    </a>
+
+                    <a class="btn3d" href="/" aria-label="홈으로 이동">
+                        <span class="icon" aria-hidden="true">🏠</span>
+                        <span class="label">
+                            홈으로 가기
+                            <small>메인 페이지</small>
+                        </span>
+                    </a>
+
+                </div>
+
+                <div class="chips" aria-hidden="true">
+                    <div class="chip">✅ 30초 설치</div>
+                    <div class="chip">📌 홈 화면 아이콘 생성</div>
+                    <div class="chip">🛠️ 안될 때 점검 포함</div>
+                </div>
+
+                <div class="fine">
+                    Tip: 링크가 새 탭으로 열리면, 설치는 <b>기본 브라우저</b>(Android: Chrome / iPhone: Safari)에서 진행해 주세요.
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

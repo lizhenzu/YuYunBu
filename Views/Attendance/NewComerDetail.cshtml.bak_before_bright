@@ -1,0 +1,677 @@
+@model BulletinBoard.ViewModels.Attendance.NewComerDetailVM
+@using System
+
+@{
+    ViewData["Title"] = "새친구 상세";
+    Layout = null;
+    string ToDateText(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy-MM-dd") : "-";
+    var item = Model?.Info;
+    var msg  = TempData["NewComerMsg"]?.ToString();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@(item?.ChildName ?? "새친구") 상세</title>
+
+    <style>
+        :root {
+            --bg:     #0d1117;
+            --bg2:    #161b22;
+            --bg3:    #21262d;
+            --border: #30363d;
+            --bord2:  #444c56;
+            --text:   #e6edf3;
+            --text2:  #8b949e;
+            --text3:  #6e7681;
+            --accent: #3fb950;
+            --acc2:   #238636;
+            --blue:   #58a6ff;
+            --blue2:  #1f6feb;
+            --orange: #f0883e;
+            --red:    #f85149;
+            --yellow: #e3b341;
+            --rs: 6px; --rm: 10px; --rl: 16px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        a { color: var(--blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        button, input, textarea { font: inherit; }
+
+        /* ══ 헤더 ══ */
+        .topbar {
+            position: sticky; top: 0; z-index: 100;
+            height: 52px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--text2);
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        .breadcrumb a { color: var(--text2); }
+        .breadcrumb a:hover { color: var(--text); text-decoration: none; }
+        .breadcrumb-sep { color: var(--text3); }
+        .breadcrumb-current { color: var(--text); font-weight: 600; }
+
+        .topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+        /* ══ 버튼 ══ */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            gap: 6px; padding: 6px 14px;
+            border-radius: var(--rm); border: 1px solid transparent;
+            font-size: 13px; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+            transition: background .12s, border-color .12s, opacity .12s;
+            text-decoration: none; color: inherit;
+        }
+        .btn:hover { opacity: .85; text-decoration: none; }
+
+        .btn-primary { background: var(--acc2); border-color: var(--accent); color: #fff; }
+        .btn-default { background: var(--bg3); border-color: var(--border); color: var(--text); }
+        .btn-edit    { background: transparent; border-color: var(--orange); color: var(--orange); }
+        .btn-edit:hover { background: rgba(240,136,62,.12); }
+        .btn-danger  { background: transparent; border-color: var(--red); color: var(--red); }
+        .btn-danger:hover { background: rgba(248,81,73,.12); }
+        .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: var(--rs); }
+
+        /* ══ 페이지 레이아웃 ══ */
+        .page { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+        /* ══ 토스트 ══ */
+        .toast {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 16px;
+            background: rgba(63,185,80,.1);
+            border: 1px solid rgba(63,185,80,.35);
+            border-radius: var(--rm);
+            color: var(--accent);
+            font-size: 13px; font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* ══ 프로필 패널 ══ */
+        .profile-panel {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--rl);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        /* 상단 컬러 바 */
+        .profile-top-bar {
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--blue));
+        }
+
+        .profile-body {
+            display: grid;
+            grid-template-columns: 200px minmax(0, 1fr);
+            gap: 0;
+        }
+
+        /* 왼쪽: 사진 + 뱃지 */
+        .profile-left {
+            padding: 24px 20px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .profile-photo {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid var(--border);
+            box-shadow: 0 0 0 6px rgba(63,185,80,.1);
+        }
+
+        .profile-name {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text);
+            text-align: center;
+            line-height: 1.3;
+        }
+        .profile-sub {
+            font-size: 12px;
+            color: var(--text3);
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex; align-items: center;
+            padding: 3px 10px;
+            border-radius: var(--rs);
+            font-size: 11px; font-weight: 700;
+            white-space: nowrap;
+        }
+        .badge-green  { background: rgba(63,185,80,.15);  color: var(--accent); border: 1px solid rgba(63,185,80,.3); }
+        .badge-gray   { background: var(--bg3);            color: var(--text2);  border: 1px solid var(--border); }
+        .badge-orange { background: rgba(240,136,62,.15); color: var(--orange); border: 1px solid rgba(240,136,62,.3); }
+        .badge-yellow { background: rgba(227,179,65,.15); color: var(--yellow); border: 1px solid rgba(227,179,65,.3); }
+        .badge-blue   { background: rgba(88,166,255,.12); color: var(--blue);   border: 1px solid rgba(88,166,255,.3); }
+
+        .profile-badges { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+
+        /* 오른쪽: 상세 정보 */
+        .profile-right { padding: 24px; }
+
+        .profile-right-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+        .profile-right-title { font-size: 13px; font-weight: 700; color: var(--text2); }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: var(--rm);
+            overflow: hidden;
+        }
+
+        .info-cell {
+            background: var(--bg2);
+            padding: 14px 16px;
+        }
+
+        .info-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 6px;
+        }
+        .info-value {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        /* ══ 출석 이력 패널 ══ */
+        .panel {
+            background: var(--bg2);
+            border: 1px solid var(--border);
+            border-radius: var(--rl);
+            overflow: hidden;
+        }
+
+        .panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg3);
+            flex-wrap: wrap;
+        }
+        .panel-title { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+
+        .add-visit-form {
+            display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+        }
+        .add-visit-input {
+            height: 32px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--rs);
+            color: var(--text);
+            padding: 0 10px;
+            font-size: 12px;
+            outline: none;
+            transition: border-color .12s;
+        }
+        .add-visit-input:focus { border-color: var(--blue2); }
+
+        /* 출석 리스트 */
+        .visit-list { padding: 0; }
+
+        .visit-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            transition: background .1s;
+        }
+        .visit-item:last-child { border-bottom: none; }
+        .visit-item:hover { background: rgba(255,255,255,.02); }
+
+        .visit-order {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            color: var(--blue);
+            font-size: 13px; font-weight: 800;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .visit-info { flex: 1; min-width: 0; }
+        .visit-date { font-size: 14px; font-weight: 700; color: var(--text); }
+        .visit-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+        .visit-actions { flex-shrink: 0; }
+
+        .empty-state {
+            padding: 36px 20px;
+            text-align: center;
+            color: var(--text3);
+            font-size: 13px;
+        }
+
+        /* ══ 모달 ══ */
+        .modal-backdrop {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,.72);
+            backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center;
+            padding: 20px; z-index: 9000;
+        }
+        .modal-backdrop.show { display: flex; }
+
+        .modal {
+            width: min(580px, 100%);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            background: var(--bg2);
+            border: 1px solid var(--bord2);
+            border-radius: var(--rl);
+            box-shadow: 0 24px 80px rgba(0,0,0,.7);
+            animation: mIn .16s ease;
+        }
+        @@keyframes mIn {
+            from { opacity: 0; transform: translateY(10px) scale(.97); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .modal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; background: var(--bg2); z-index: 2;
+        }
+        .modal-title { font-size: 15px; font-weight: 700; color: var(--text); }
+        .modal-close {
+            width: 30px; height: 30px;
+            border: 1px solid var(--border); border-radius: var(--rs);
+            background: var(--bg3); color: var(--text2);
+            font-size: 18px; cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .modal-close:hover { color: var(--text); }
+
+        .modal-body { padding: 18px; }
+
+        .modal-foot {
+            display: flex; justify-content: flex-end; gap: 8px;
+            padding: 12px 18px;
+            border-top: 1px solid var(--border);
+            position: sticky; bottom: 0; background: var(--bg2);
+        }
+
+        /* 폼 */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .form-item { display: flex; flex-direction: column; gap: 6px; }
+        .form-item-full { grid-column: 1 / -1; }
+        .form-label { font-size: 11px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .06em; }
+        .form-input {
+            height: 34px; background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--rs); color: var(--text); padding: 0 10px;
+            font-size: 13px; outline: none; width: 100%;
+            transition: border-color .12s, box-shadow .12s;
+        }
+        .form-input:focus { border-color: var(--blue2); box-shadow: 0 0 0 3px rgba(31,111,235,.2); }
+        .form-input::placeholder { color: var(--text3); }
+
+        /* 라디오 */
+        .radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .radio-label { display: flex; align-items: center; cursor: pointer; }
+        .radio-label input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+        .radio-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 6px 12px; border-radius: var(--rs);
+            font-size: 12px; font-weight: 700;
+            border: 1px solid var(--border); color: var(--text2); background: var(--bg3);
+            transition: all .12s; cursor: pointer;
+        }
+        .radio-label input[type="radio"]:checked + .rc-self {
+            background: rgba(63,185,80,.15); border-color: var(--accent); color: var(--accent);
+        }
+        .radio-label input[type="radio"]:checked + .rc-ev {
+            background: rgba(227,179,65,.12); border-color: var(--yellow); color: var(--yellow);
+        }
+
+        /* ══ 반응형 ══ */
+        @@media (max-width: 760px) {
+            .profile-body { grid-template-columns: 1fr; }
+            .profile-left { border-right: none; border-bottom: 1px solid var(--border); flex-direction: row; justify-content: flex-start; align-items: center; }
+            .profile-photo { width: 72px; height: 72px; }
+            .profile-name { text-align: left; font-size: 17px; }
+            .profile-sub { text-align: left; }
+            .info-grid { grid-template-columns: 1fr 1fr; }
+            .add-visit-form { flex-direction: column; align-items: stretch; }
+            .add-visit-input { width: 100%; }
+            .form-grid { grid-template-columns: 1fr; }
+        }
+
+        @@media (max-width: 480px) {
+            .info-grid { grid-template-columns: 1fr; }
+            .modal-backdrop { padding: 0; align-items: flex-end; }
+            .modal { border-radius: 16px 16px 0 0; max-height: 92vh; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ══ 상단 헤더 ══ -->
+    <header class="topbar">
+        <nav class="breadcrumb" aria-label="breadcrumb">
+            <a href="@Url.Action("Index","Home")">Home</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="@Url.Action("Index","Attendance")">출석</a>
+            <span class="breadcrumb-sep">/</span>
+            <a href="@Url.Action("NewComer","Attendance")">새친구</a>
+            <span class="breadcrumb-sep">/</span>
+            <span class="breadcrumb-current">@(item?.ChildName ?? "상세")</span>
+        </nav>
+
+        <div class="topbar-actions">
+            @if (item != null)
+            {
+                <form method="post"
+                      action="@Url.Action("AddNewComerVisitToday","Attendance")"
+                      onsubmit="return confirm('오늘 출석을 추가할까요?');"
+                      style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="newComerId" value="@item.Id" />
+                    <button type="submit" class="btn btn-primary">+ 오늘 출석</button>
+                </form>
+            }
+            <a href="@Url.Action("NewComer","Attendance")" class="btn btn-default">← 목록</a>
+        </div>
+    </header>
+
+    <div class="page">
+
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="toast">✓ @msg</div>
+        }
+
+        @if (item == null)
+        {
+            <div style="padding:40px;text-align:center;color:var(--text3);">
+                새친구 정보를 찾을 수 없습니다.
+            </div>
+        }
+        else
+        {
+            <!-- ══ 프로필 카드 ══ -->
+            <div class="profile-panel">
+                <div class="profile-top-bar"></div>
+                <div class="profile-body">
+
+                    <!-- 왼쪽 -->
+                    <div class="profile-left">
+                        <img src="@(!string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : "/images/icon/people/people_01.webp")"
+                             alt="@item.ChildName" class="profile-photo" />
+                        <div>
+                            <div class="profile-name">@item.ChildName</div>
+                            <div class="profile-sub">보호자 · @item.ParentName</div>
+                            <div class="profile-sub">@item.Phone</div>
+                            <div class="profile-badges" style="margin-top:10px;">
+                                <span class="badge @(item.NewComerStatus == "활성" ? "badge-green" : "badge-gray")">
+                                    @item.NewComerStatus
+                                </span>
+                                @if (item.IsVoluntary)
+                                {
+                                    <span class="badge badge-orange">🙋 자진출석</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-yellow">🤝 전도로 출석</span>
+                                }
+                                @if (!item.IsVoluntary && !string.IsNullOrWhiteSpace(item.EvangelistName))
+                                {
+                                    <span style="font-size:12px;color:var(--text3);">전도자: @item.EvangelistName</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 오른쪽 -->
+                    <div class="profile-right">
+                        <div class="profile-right-head">
+                            <span class="profile-right-title">기본 정보</span>
+                            <button type="button" class="btn btn-edit btn-sm" onclick="openEditModal()">
+                                ✏️ 수정
+                            </button>
+                        </div>
+
+                        <div class="info-grid">
+                            <div class="info-cell">
+                                <span class="info-label">생일</span>
+                                <span class="info-value">@item.BirthText</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="info-label">학년 / 반</span>
+                                <span class="info-value">@item.ClassText</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="info-label">학교</span>
+                                <span class="info-value">@(string.IsNullOrWhiteSpace(item.School) ? "—" : item.School)</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="info-label">첫 출석일</span>
+                                <span class="info-value">@ToDateText(item.FirstVisitDate)</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="info-label">방문 횟수</span>
+                                <span class="info-value" style="color:var(--blue);">@item.VisitCount 회</span>
+                            </div>
+                            <div class="info-cell">
+                                <span class="info-label">마지막 출석일</span>
+                                <span class="info-value">@ToDateText(item.LastVisitDate)</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ 출석 이력 패널 ══ -->
+            <div class="panel">
+                <div class="panel-head">
+                    <span class="panel-title">
+                        출석 이력
+                        <span class="badge badge-blue">@(Model?.Visits?.Count ?? 0) 건</span>
+                    </span>
+
+                    <form method="post"
+                          action="@Url.Action("AddNewComerVisitByDate","Attendance")"
+                          class="add-visit-form">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="newComerId" value="@item.Id" />
+                        <input class="add-visit-input"
+                               type="date"
+                               name="visitDate"
+                               value="@DateTime.Today.ToString("yyyy-MM-dd")"
+                               required />
+                        <button type="submit" class="btn btn-primary btn-sm">날짜 출석 추가</button>
+                    </form>
+                </div>
+
+                @if (Model?.Visits == null || Model.Visits.Count == 0)
+                {
+                    <div class="empty-state">
+                        아직 등록된 출석 이력이 없습니다.
+                    </div>
+                }
+                else
+                {
+                    <div class="visit-list">
+                        @foreach (var visit in Model.Visits)
+                        {
+                            <div class="visit-item">
+                                <div class="visit-order">@visit.VisitOrder</div>
+                                <div class="visit-info">
+                                    <div class="visit-date">@ToDateText(visit.VisitDate)</div>
+                                    <div class="visit-meta">등록: @ToDateText(visit.InsertDT)</div>
+                                </div>
+                                <div class="visit-actions">
+                                    <form method="post"
+                                          action="@Url.Action("DeleteNewComerVisit","Attendance")"
+                                          onsubmit="return confirm('이 출석 기록을 삭제할까요?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@visit.Id" />
+                                        <input type="hidden" name="newComerId" value="@visit.NewComerId" />
+                                        <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- ══ 기본정보 수정 모달 ══ -->
+            <div id="editModal" class="modal-backdrop" onclick="if(event.target.id==='editModal')closeEditModal()">
+                <div class="modal">
+                    <div class="modal-head">
+                        <span class="modal-title">✏️ 기본정보 수정</span>
+                        <button type="button" class="modal-close" onclick="closeEditModal()">×</button>
+                    </div>
+                    <form method="post" action="@Url.Action("UpdateNewComerInfo","Attendance")">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" value="@item.Id" />
+                        <div class="modal-body">
+                            <div class="form-grid">
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">이름</label>
+                                    <input class="form-input" type="text" name="ChildName"
+                                           value="@item.ChildName" placeholder="새친구 이름" maxlength="100" required />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">전화번호</label>
+                                    <input class="form-input" type="tel" name="Phone"
+                                           value="@item.Phone" placeholder="010-0000-0000" maxlength="50" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">생년월 (1~12)</label>
+                                    <input class="form-input" type="number" name="BirthMonth"
+                                           min="1" max="12" value="@item.BirthMonth" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">생년일 (1~31)</label>
+                                    <input class="form-input" type="number" name="BirthDay"
+                                           min="1" max="31" value="@item.BirthDay" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">학년</label>
+                                    <input class="form-input" type="number" name="ClassYear"
+                                           min="1" max="20" value="@item.ClassYear" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">반</label>
+                                    <input class="form-input" type="number" name="ClassBan"
+                                           min="1" max="20" value="@item.ClassBan" />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">학교</label>
+                                    <input class="form-input" type="text" name="School"
+                                           value="@item.School" placeholder="학교명 (선택)" />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">출석 유형</label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="IsVoluntary" value="true"
+                                                   @(item.IsVoluntary ? "checked" : "")
+                                                   onchange="toggleModalEv(this)" />
+                                            <span class="radio-chip rc-self">🙋 자진출석</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="IsVoluntary" value="false"
+                                                   @(!item.IsVoluntary ? "checked" : "")
+                                                   onchange="toggleModalEv(this)" />
+                                            <span class="radio-chip rc-ev">🤝 전도로 출석</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-item form-item-full" id="modalEvField"
+                                     style="@(!item.IsVoluntary ? "" : "display:none;")">
+                                    <label class="form-label">전도자 이름</label>
+                                    <input class="form-input" type="text" name="EvangelistName"
+                                           value="@item.EvangelistName" placeholder="전도한 분의 이름" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <button type="button" class="btn btn-default" onclick="closeEditModal()">취소</button>
+                            <button type="submit" class="btn btn-primary">저장</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+
+    </div>
+
+    <script>
+        function openEditModal() {
+            document.getElementById('editModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+        function toggleModalEv(radio) {
+            var f = document.getElementById('modalEvField');
+            if (f) f.style.display = radio.value === 'true' ? 'none' : '';
+        }
+    </script>
+</body>
+</html>

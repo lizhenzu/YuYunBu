@@ -1,0 +1,209 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Enums
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model Board
+
+@{
+    Layout = null; // Bone 톤 (wwwroot/css/board-bone.css) — 작성자는 BoardController.ResolveAnonymousSenderAsync 에서 한 번 더 검사
+
+    var churchName   = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var deptName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+    string boardName = ViewBag.BoardName as string ?? "";
+    bool isAnonBoard = boardName == BoardCategory.Anonymous.ToString();
+
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var signedUser   = isSignedIn ? await AuthService.GetSignedUser(User) : null;
+    var displayName  = signedUser != null ? $"{signedUser.LastName}{signedUser.FirstName}".Trim() : "";
+    if (string.IsNullOrEmpty(displayName) && signedUser != null)
+        displayName = signedUser.UserName ?? "";
+
+    // 이름으로 보낼 수 있는가 — 로그인해서 이름을 알 때만
+    bool canUseName = !string.IsNullOrWhiteSpace(displayName);
+    const string AnonLabel = "익명";
+    string initial = canUseName ? displayName.Substring(0, 1) : "";
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>@(isAnonBoard ? "익명 의견함" : "의견 남기기") · @churchName @deptName</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+<link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+<style>
+/* ── 보내는 사람 고르기 ── */
+.who { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.whoOpt { position: relative; display: block; cursor: pointer; }
+.whoOpt input { position: absolute; opacity: 0; pointer-events: none; }
+.whoCard { height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px 16px 16px; background: var(--card); border: 1px solid var(--rule); transition: border-color .15s, box-shadow .15s; }
+.whoOpt:hover .whoCard { border-color: var(--acc); }
+.whoOpt input:focus-visible + .whoCard { outline: 2px solid var(--acc); outline-offset: 2px; }
+.whoOpt input:checked + .whoCard { border-color: var(--tx); box-shadow: inset 0 3px 0 var(--acc); }
+.whoMark { width: 44px; height: 44px; display: grid; place-items: center; font-family: "Noto Serif KR", serif; font-size: 19px; background: var(--mark); color: var(--acc); }
+.whoOpt.anon .whoMark { background: var(--tx); color: var(--bg); font-family: "Inter", sans-serif; font-weight: 200; font-size: 22px; }
+.whoK { font-size: 10.5px; font-weight: 600; letter-spacing: .18em; color: var(--dim); }
+.whoN { font-family: "Noto Serif KR", serif; font-size: 18px; line-height: 1.35; margin-top: 2px; word-break: keep-all; }
+.whoD { font-size: 12.5px; color: var(--dim2); line-height: 1.6; }
+.whoChk { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid var(--rule); font-size: 11px; color: transparent; background: var(--card); }
+.whoOpt input:checked ~ .whoChk { background: var(--tx); border-color: var(--tx); color: var(--bg); }
+.whoOpt.off { cursor: not-allowed; }
+.whoOpt.off .whoCard { opacity: .5; }
+
+/* 서명 미리보기 — 편지 끝줄처럼 */
+.sign { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 12px 14px; background: var(--mark); border-left: 2px solid var(--acc); font-size: 13.5px; color: var(--dim2); }
+.sign b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 16px; color: var(--tx); }
+.sign small { font-size: 12px; color: var(--dim); text-align: right; }
+
+.cntRow { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.cnt { font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
+
+/* 보내기 — 검정 띠 */
+.sendBar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; padding: 18px 20px; background: var(--head); color: var(--headtx); border: 0; cursor: pointer; font-family: inherit; text-align: left; transition: background .15s; }
+.sendBar:hover { background: #24262B; }
+.sendBar:disabled { opacity: .6; cursor: progress; }
+.sendBar b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 17px; }
+.sendBar small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--headdim); }
+.sendBar i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; color: var(--headk); }
+
+.promise { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--rule); display: grid; gap: 8px; font-size: 13px; color: var(--dim2); line-height: 1.6; }
+.promise div { display: flex; gap: 10px; }
+.promise span { flex: none; font-family: "Inter", sans-serif; font-weight: 200; color: var(--acc); }
+
+@@media (max-width: 480px) {
+  .who { gap: 8px; }
+  .whoCard { padding: 14px 12px 13px; gap: 10px; }
+  .whoMark { width: 38px; height: 38px; font-size: 17px; }
+  .whoN { font-size: 16.5px; }
+  .whoD { font-size: 12px; }
+  .sign small { display: none; }
+}
+@@media (max-width: 320px) { .who { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="hd">
+  <div class="sh">
+    <div class="hdTop">
+      <a href="javascript:history.back()">← 뒤로</a>
+      <a href="/">@ConstatsCommon.ToHome</a>
+    </div>
+    <div class="hdK">@(isAnonBoard ? "FEEDBACK · ANONYMOUS" : "FEEDBACK")</div>
+    <h1 class="hdT">개선사항 · 불편사항<br/>편하게 남겨 주세요</h1>
+    <div class="hdS">작은 의견 하나가 더 나은 서비스를 만듭니다.</div>
+  </div>
+</header>
+
+<main class="sh">
+  <form method="post" action="@Url.Action("Create", "Board")" enctype="application/x-www-form-urlencoded" class="fm" id="fbForm">
+    <input type="hidden" name="boardName" value="@boardName"/>
+    @* 서버는 UserName 이 비면 로그인 이름을 채우므로, 익명일 때도 반드시 값을 보낸다 *@
+    <input type="hidden" name="UserName" id="userName" value="@(canUseName ? displayName : AnonLabel)"/>
+
+    <div class="fRow">
+      <span class="fLbl">누구의 이름으로 보낼까요?</span>
+      <div class="who" role="radiogroup" aria-label="보내는 사람">
+        <label class="whoOpt @(canUseName ? "" : "off")">
+          <input type="radio" name="sendAs" value="name" @(canUseName ? "checked" : "disabled") />
+          <span class="whoCard">
+            <span class="whoMark">@(canUseName ? initial : "–")</span>
+            <span>
+              <span class="whoK" style="display:block">내 이름으로</span>
+              <span class="whoN" style="display:block">@(canUseName ? displayName : "로그인 필요")</span>
+            </span>
+            <span class="whoD">@(canUseName ? "답이 필요하면 이쪽이 좋아요." : "로그인하면 이름으로 보낼 수 있어요.")</span>
+          </span>
+          <span class="whoChk">✓</span>
+        </label>
+
+        <label class="whoOpt anon">
+          <input type="radio" name="sendAs" value="anon" @(canUseName ? "" : "checked") />
+          <span class="whoCard">
+            <span class="whoMark">?</span>
+            <span>
+              <span class="whoK" style="display:block">이름 없이</span>
+              <span class="whoN" style="display:block">익명으로</span>
+            </span>
+            <span class="whoD">이름 대신 ‘익명’으로 저장돼요.</span>
+          </span>
+          <span class="whoChk">✓</span>
+        </label>
+      </div>
+
+      <div class="sign" aria-live="polite">
+        <span>보내는 사람 · <b id="signName">@(canUseName ? displayName : AnonLabel)</b></span>
+        <small id="signNote">@(canUseName ? "이름이 함께 전달돼요" : "이름·연락처는 적지 말아 주세요")</small>
+      </div>
+    </div>
+
+    <div class="fRow">
+      <label class="fLbl" for="title">제목 · 필수</label>
+      <input class="fIn" id="title" type="text" name="Title" maxlength="100" placeholder="예) 로그인 화면이 조금 불편해요" autocomplete="off" required/>
+    </div>
+
+    <div class="fRow">
+      <label class="fLbl" for="content">내용 · 필수</label>
+      <textarea class="fIn" id="content" name="Content" maxlength="2000" required
+                placeholder="어떤 점이 불편하셨나요?&#10;기종 · 브라우저를 함께 적어 주시면 더 빨리 고칠 수 있어요."></textarea>
+      <div class="cntRow">
+        <span class="fHint" id="contentHint">답이 필요하면 연락 방법을 함께 남겨 주세요.</span>
+        <span class="cnt"><span id="cnt">0</span> / 2000</span>
+      </div>
+    </div>
+
+    <button type="submit" class="sendBar" id="sendBtn">
+      <span><b id="sendLabel">@(canUseName ? $"{displayName} 이름으로 보내기" : "익명으로 보내기")</b><small>관리자에게 바로 전달됩니다</small></span>
+      <i>→</i>
+    </button>
+
+    <div class="promise">
+      <div><span>01</span>보내 주신 의견은 관리자가 모두 읽어요.</div>
+      <div><span>02</span>익명으로 보내면 이름 자리에 ‘익명’만 남아요.</div>
+      <div><span>03</span>개인정보(주소 · 전화번호)는 적지 말아 주세요.</div>
+    </div>
+  </form>
+
+  <div class="ft"><span>© @churchName @deptName · 의견함</span><a href="/">@ConstatsCommon.ToHome</a></div>
+</main>
+
+<script>
+(function () {
+  const NAME = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(displayName));
+  const ANON = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(AnonLabel));
+  const userName = document.getElementById('userName');
+  const signName = document.getElementById('signName');
+  const signNote = document.getElementById('signNote');
+  const sendLabel = document.getElementById('sendLabel');
+  const hint = document.getElementById('contentHint');
+
+  function sync() {
+    const anon = document.querySelector('input[name="sendAs"]:checked')?.value !== 'name';
+    const who = anon ? ANON : NAME;
+    userName.value = who;
+    signName.textContent = who;
+    signNote.textContent = anon ? '이름·연락처는 적지 말아 주세요' : '이름이 함께 전달돼요';
+    sendLabel.textContent = anon ? '익명으로 보내기' : NAME + ' 이름으로 보내기';
+    hint.textContent = anon ? '익명이라 답을 드리기 어려울 수 있어요.' : '답이 필요하면 연락 방법을 함께 남겨 주세요.';
+  }
+  document.querySelectorAll('input[name="sendAs"]').forEach(r => r.addEventListener('change', sync));
+  sync();
+
+  const c = document.getElementById('content'), n = document.getElementById('cnt');
+  const upd = () => n.textContent = (c.value || '').length;
+  c.addEventListener('input', upd); upd();
+
+  // 두 번 눌러 두 번 저장되는 것 막기
+  document.getElementById('fbForm').addEventListener('submit', function () {
+    sync();
+    document.getElementById('sendBtn').disabled = true;
+  });
+})();
+</script>
+</body>
+</html>

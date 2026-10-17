@@ -1,0 +1,158 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+@model BulletinBoard.Models.SurveyData
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+/*            font-family: 'Arial', sans-serif;*/
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #2980b9;
+            margin-top: 20px;
+            border-bottom: 2px solid #2980b9;
+            padding-bottom: 5px;
+            font-size: 20px;
+        }
+
+        h3 {
+            color: #34495e;
+            margin-top: 15px;
+            padding-left: 10px;
+            font-size: 16px;
+        }
+
+        textarea {
+            width: calc(100% - 40px); /* Adjusting width to leave equal left and right margins */
+            padding: 12px;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            margin: 10px 10px 0 10px; /* Apply left and right margin equally */
+            resize: vertical;
+            font-size: 14px;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+            .button-group button {
+                padding: 15px;
+                color: #fff;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+                transition: background-color 0.3s ease;
+                width: 48%;
+            }
+
+        .submit-btn {
+            background-color: #2980b9;
+        }
+
+            .submit-btn:hover {
+                background-color: #1f6391;
+            }
+
+        .home-btn {
+            background-color: #27ae60;
+        }
+
+            .home-btn:hover {
+                background-color: #1e8449;
+            }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>여름 성경학교 설문조사</h1>
+        <p style=" text-align: center;">(본 설문은 익명으로 처리 됩니다)</p>
+
+        <form asp-action="ProcessSurvey" method="post">
+            <h2>1. 프로그램 만족도</h2>
+
+            <h3>1.1 이번 여름 성경학교가 어땠나요? 좋았던 점이나 아쉬웠던 점을 적어주세요.</h3>
+            <textarea id="question11" name="question11" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h2>2. 프로그램 구성</h2>
+
+            <h3>2.1 이번 성경학교에서 가장 재미있었던 활동은 무엇이었나요? 왜 재미있었는지 적어주세요.</h3>
+            <textarea id="question21" name="question21" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h3>2.2 별로 재미없거나 개선이 필요하다고 생각한 활동이 있다면 무엇인지, 이유와 함께 적어주세요.</h3>
+            <textarea id="question22" name="question22" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h2>3. 시간 및 일정</h2>
+
+            <h3>3.1 성경학교 시간과 일정이 어땠나요? 불편했던 점이 있으면 적어주세요.</h3>
+            <textarea id="question31" name="question31" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h2>4. 전반적인 경험</h2>
+
+            <h3>4.1 이번 성경학교에서 가장 기억에 남는 일이나 배운 것이 무엇인가요?</h3>
+            <textarea id="question41" name="question41" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h3>4.2 다음 성경학교에 이런 활동이 추가되면 좋겠다고 생각하는 것이 있다면 적어주세요.</h3>
+            <textarea id="question42" name="question42" rows="3" placeholder="입력해주세요."></textarea>
+
+            <h2>5. 기타 의견</h2>
+
+            <h3>5.1 성경학교에 대해 더 하고 싶은 말이 있으면 적어주세요.</h3>
+            <textarea id="question51" name="question51" rows="3" placeholder="입력해주세요."></textarea>
+
+            <div class="button-group">
+                <button type="submit" class="submit-btn">제출하기</button>
+                <button type="button" class="home-btn" onclick="window.location.href='/';">Home</button>
+            </div>
+        </form>
+    </div>
+
+</body>
+</html>

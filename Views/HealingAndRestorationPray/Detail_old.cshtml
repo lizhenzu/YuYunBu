@@ -1,0 +1,113 @@
+﻿@model BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray
+@using BulletinBoard.Helpers
+@{
+    Layout = null;
+    bool isSuper = ViewBag.IsSuperAdmin is bool _s && _s;
+    DateTime kNow = ViewBag.TodayKst is DateTime _k ? _k : DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow:yyyy년 M월 d일} {dayKor[(int)kNow.DayOfWeek]}요일";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F4FAF7" />
+    <title>@Model.Title · 치유와 회복을 위한 기도문</title>
+    @await Html.PartialAsync("_Nature")
+    <style>
+    .dhero{ padding:30px 0 18px; text-align:center; }
+    .dhero h1{
+        margin:14px 0 0; font-size:clamp(21px,5vw,30px); font-weight:900;
+        letter-spacing:-.03em; line-height:1.3; text-wrap:balance; word-break:keep-all;
+    }
+    .dhero-rule{
+        margin:18px auto 0; width:52px; height:4px; border-radius:999px;
+        background:linear-gradient(90deg,var(--leaf),var(--water));
+    }
+    .prayer-sheet .ncard-bd{ padding:24px 20px; }
+    </style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        @if (isSuper)
+        {
+            <a class="nb-btn" href="/HealingAndRestorationPray/Index">← 오늘의 기도</a>
+        }
+        else
+        {
+            @* 일반 사용자에게는 홈으로만 노출합니다 *@
+            <a class="nb-btn" href="/">🏠 홈</a>
+        }
+        <div class="nb-mid">@dateStr</div>
+        <div class="fsgrp" role="group" aria-label="기도문 글자 크기">
+            <button type="button" id="pfsS" onclick="setPFs('s')" aria-label="작게">가</button>
+            <button type="button" id="pfsM" onclick="setPFs('m')" aria-label="보통">가</button>
+            <button type="button" id="pfsL" onclick="setPFs('l')" aria-label="크게">가</button>
+        </div>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="dhero">
+        <span class="chip chip-leaf">🌿 치유와 회복을 위한 기도문</span>
+        <h1>@Model.Title</h1>
+        <div class="dhero-rule"></div>
+    </section>
+
+    <article class="ncard prayer-sheet">
+        <div class="ncard-bd">
+            <p class="pray-body">@PrayTextHelper.MarkNames(Model.PrayText)</p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.BibleText) || !string.IsNullOrWhiteSpace(Model.BibleRef))
+            {
+                <div class="verse-box">
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleRef))
+                    {
+                        <div class="verse-ref">📖 @Model.BibleRef</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.BibleText))
+                    {
+                        <p class="verse-text">@Model.BibleText</p>
+                    }
+                </div>
+            }
+
+        </div>
+    </article>
+
+    @* ── 인사 : 슈퍼 유저(SuperAdmin · basic) 에게만 ──
+       조회수 숫자는 화면에 표시하지 않습니다.
+       숫자는 기도문 관리(/HealingAndRestorationPray/List) 목록에서 확인하세요. *@
+    @if (isSuper)
+    {
+        <div class="ncard">
+            <div class="ncard-bd" style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">
+                <span class="chip chip-sun">🌤 오늘도 평안하시길</span>
+            </div>
+        </div>
+    }
+
+    <div class="btn-row">
+        @if (isSuper)
+        {
+            <a class="btn btn-leaf" href="/HealingAndRestorationPray/Index">🌿 오늘의 기도로</a>
+            <a class="btn" href="/">🏠 홈으로</a>
+            @* 목록은 관리자 전용 화면이라 이 갈래(isSuper) 안에만 둡니다 *@
+            <a class="btn" href="/HealingAndRestorationPray/List">📂 목록으로</a>
+            <a class="btn" href="/HealingAndRestorationPray/Edit?PrayId=@Model.PrayId">✏️ 수정</a>
+        }
+        else
+        {
+            @* 일반 사용자 : 홈으로만 *@
+            <a class="btn btn-leaf" href="/">🏠 홈으로</a>
+        }
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,277 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers
+@*  ══════════════════════════════════════════════════════════════
+    성경통독 허브 — 두 버전 고르기
+    · 위: 참여자 수 → 큰 버튼 2개(지금 쓰던 버전 /Bible · 새 버전 /Bible2) → 새 버전 장점
+    · 아래: 의견(개선사항) 보내기 크게
+    · 목차(햄버거) 없이 전체 폭 (B2NoSide), 공통 상단 줄 없이 (B2NoTop)
+    이전 화면은 Welcome_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    ViewData["Title"]    = "허브";
+    ViewData["Page"]     = "welcome";
+    ViewData["B2NoTop"]  = true;
+    ViewData["B2NoSide"] = true;
+
+    var communityUsers = ViewBag.CommunityUsers as List<BulletinBoard.Models.BibleLastReadRateByUserSimple>
+                         ?? new List<BulletinBoard.Models.BibleLastReadRateByUserSimple>();
+    int moreCnt = Math.Max(0, communityUsers.Count - 6);
+    string hubTitle = ConstatsCommon.ReadBibleAllTitleButton;
+
+    // 버전 선택 클릭수 — 컨트롤러가 Basic · SuperAdmin · Admin 계정에게만 채운다 (테이블이 없으면 null)
+    var hubStats = ViewBag.HubClickStats as BibleReadingThrough.Models.HubClickStats;
+}
+
+<style>
+    .page-body { padding: 0 !important; }
+    .b2w { color: var(--b2-tx); }
+    .b2w a { text-decoration: none; color: inherit; }
+    .b2w .wrapIn { max-width: 760px; margin: 0 auto; padding: 0 20px 40px; }
+    @@media (min-width: 769px) { .b2w .wrapIn { padding: 0 40px 48px; } }
+
+    .b2w .top { height: 56px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--b2-dim); }
+    .b2w .top a:hover { color: var(--b2-acc); }
+    .b2w .top b { font-weight: 400; color: var(--b2-tx); }
+    .b2w .th { width: 30px; height: 28px; border: 1px solid var(--b2-rule); background: none; color: var(--b2-dim2); cursor: pointer; font-size: 13px; }
+
+    .b2w .cross { font-family: "Noto Serif KR", serif; font-size: 30px; color: var(--b2-acc); line-height: 1; margin-top: 8px; }
+    .b2w .k { font-size: 10px; font-weight: 600; letter-spacing: .24em; color: var(--b2-acc); margin-top: 14px; }
+    .b2w .T { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 28px; line-height: 1.4; margin: 6px 0 0; word-break: keep-all; }
+    .b2w .sub { font-size: 13.5px; color: var(--b2-dim2); margin-top: 6px; line-height: 1.7; }
+
+    /* 참여자 (상단) */
+    .b2w .peo { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 14px 10px 10px; background: var(--b2-card); box-shadow: 0 6px 16px -12px rgba(22,24,28,.35); }
+    .b2w .peo:hover em { color: var(--b2-acc); }
+    .b2w .fc { display: flex; flex: none; }
+    .b2w .fc span { position: relative; overflow: hidden; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--b2-card); margin-left: -9px; display: grid; place-items: center; font-family: "Noto Serif KR", serif; font-size: 12px; color: #fff; }
+    .b2w .fc span:first-child { margin-left: 0; }
+    .b2w .fc img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .b2w .fc .emo { font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif; font-size: 16px; line-height: 1; }
+    .b2w .fc .more { background: var(--b2-head); color: var(--b2-headtx); font-family: "Inter", sans-serif; font-size: 10px; }
+    .b2w .peo .t { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.4; }
+    .b2w .peo .t b { font-family: "Inter", sans-serif; font-weight: 400; font-size: 16px; color: var(--b2-acc); margin-right: 1px; }
+    .b2w .peo .t small { display: block; font-size: 11px; color: var(--b2-dim); }
+    .b2w .peo em { font-style: normal; font-size: 12.5px; border-bottom: 1px solid var(--b2-acc); white-space: nowrap; }
+    /* 좁은 화면 — 얼굴 줄은 위 한 줄, 문구와 "참여자 보기"는 아래 한 줄 */
+    @@media (max-width: 560px) {
+        .b2w .peo { flex-wrap: wrap; gap: 10px 12px; padding: 12px 14px; }
+        .b2w .fc { flex: 0 0 100%; }
+        .b2w .fc span { width: 28px; height: 28px; margin-left: -7px; }
+        .b2w .fc .emo { font-size: 14px; }
+        .b2w .peo .t { flex: 1 1 0; white-space: normal; word-break: keep-all; }
+        .b2w .peo em { flex: none; align-self: center; }
+    }
+    .b2w .live { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--b2-acc); margin-right: 6px; vertical-align: 2px; box-shadow: 0 0 0 3px var(--b2-mark); }
+
+    .b2w .ask { font-family: "Noto Serif KR", serif; font-size: 16px; margin: 28px 0 6px; }
+    .b2w .askSub { font-size: 12.5px; color: var(--b2-dim2); line-height: 1.75; margin: 0 0 12px; word-break: keep-all;
+                   border-left: 2px solid var(--b2-acc); padding-left: 12px; }
+    .b2w .askSub b { font-weight: 700; color: var(--b2-tx); }
+
+    /* 큰 버튼 2개 */
+    .b2w .pair { display: grid; grid-template-columns: 1fr; gap: 10px; }
+    @@media (min-width: 769px) { .b2w .pair { grid-template-columns: 1fr 1.25fr; } }
+    .b2w .big { position: relative; display: flex; align-items: center; gap: 14px; padding: 22px 20px; }
+    .b2w .big .tx { flex: 1; min-width: 0; }
+    .b2w .big .tg { font-size: 10px; font-weight: 700; letter-spacing: .18em; }
+    .b2w .big .nm { font-family: "Noto Serif KR", serif; font-size: 21px; margin-top: 5px; }
+    .b2w .big .ds { font-size: 12.5px; margin-top: 4px; line-height: 1.6; }
+    .b2w .big em { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 34px; line-height: 1; transition: transform .15s; }
+    .b2w .big:hover em { transform: translateX(3px); }
+    .b2w .big.cur { background: var(--b2-card); border: 1px solid var(--b2-rule); }
+    .b2w .big.cur .tg, .b2w .big.cur .ds { color: var(--b2-dim); }
+    .b2w .big.cur em { color: #A9A59D; }
+    .b2w .big.cur:hover { border-color: var(--b2-dim); }
+    .b2w .big.new { background: linear-gradient(135deg,#FFF8E9,#FDF1D8); border: 1.5px solid #C9AE82; color: var(--b2-tx) !important; }
+    .b2w .big.new .tg, .b2w .big.new em { color: #9A7B4F; }
+    .b2w .big.new .ds { color: #7A6A50; }
+    .b2w .big.new .badge { position: absolute; right: 0; top: 0; background: #9A7B4F; color: #FDF1D8; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; padding: 3px 8px; }
+
+    /* 버전 선택 클릭수 (A안) — Basic · SuperAdmin · Admin 계정만. 점선 = 관리자에게만 보이는 칸 */
+    .b2w .hubst { margin-top: 10px; padding: 12px 14px; border: 1px dashed #C9AE82; background: var(--b2-card); }
+    .b2w .hubst .hd { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .b2w .hubst .only { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: .14em; color: var(--b2-acc); }
+    .b2w .hubst .only::before { content: ""; width: 5px; height: 5px; background: var(--b2-acc); }
+    .b2w .hubst .seg { display: inline-flex; border: 1px solid var(--b2-rule); flex: none; }
+    .b2w .hubst .seg button { font-family: inherit; font-size: 11px; padding: 2px 9px; border: 0; background: none; color: var(--b2-dim); cursor: pointer; }
+    .b2w .hubst .seg button.on { background: var(--b2-tx); color: var(--b2-bg); }
+    .b2w .hubst .row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--b2-dim2); }
+    .b2w .hubst .row b { font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; color: var(--b2-tx); margin-right: 3px; font-variant-numeric: tabular-nums; }
+    .b2w .hubst .row .r { text-align: right; }
+    .b2w .hubst .row .r b { color: var(--b2-acc); }
+    .b2w .hubst .bar { display: flex; height: 8px; margin-top: 8px; background: var(--b2-rule); }
+    .b2w .hubst .bar i { display: block; transition: width .25s; }
+    .b2w .hubst .bar .o { background: #A9A59D; }
+    .b2w .hubst .bar .w { background: var(--b2-head); box-shadow: inset 0 2px 0 #D9C29B; }
+    .b2w .hubst .ft { display: flex; justify-content: space-between; font-size: 11px; color: var(--b2-dim); margin-top: 8px; font-family: "Inter", sans-serif; font-variant-numeric: tabular-nums; }
+    .b2w .hubst .none { font-size: 12px; color: var(--b2-dim); margin-top: 10px; }
+
+    /* 새 버전 장점 */
+    .b2w .adv { background: var(--b2-card); border-top: 2px solid #D9C29B; padding: 16px 20px 6px; margin-top: 10px; }
+    .b2w .adv .h { font-size: 10px; font-weight: 700; letter-spacing: .2em; color: var(--b2-acc); }
+    .b2w .adv .ht { font-family: "Noto Serif KR", serif; font-size: 17px; margin-top: 4px; }
+    .b2w .adv ul { list-style: none; margin: 10px 0 0; padding: 0; }
+    @@media (min-width: 769px) { .b2w .adv ul { display: grid; grid-template-columns: 1fr 1fr; column-gap: 24px; } }
+    .b2w .adv li { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--b2-line); }
+    .b2w .adv li > i { flex: none; width: 34px; height: 34px; display: grid; place-items: center; font-style: normal; background: var(--b2-bg); font-family: "Noto Serif KR", serif; color: var(--b2-acc); font-size: 14px; }
+    .b2w .adv li b { display: block; font-weight: 600; font-size: 13.5px; }
+    .b2w .adv li span { display: block; font-size: 12.5px; color: var(--b2-dim2); line-height: 1.65; margin-top: 2px; word-break: keep-all; }
+    .b2w .fsdemo { display: inline-flex !important; border: 1px solid var(--b2-rule); margin-top: 6px; }
+    .b2w .fsdemo s { text-decoration: none; font-family: "Noto Serif KR", serif; padding: 1px 6px; color: var(--b2-dim); line-height: 1.35; }
+    .b2w .fsdemo s:nth-child(1) { font-size: 10px; } .b2w .fsdemo s:nth-child(2) { font-size: 12px; }
+    .b2w .fsdemo s:nth-child(3) { font-size: 14px; background: #D9C29B; color: #16181C; } .b2w .fsdemo s:nth-child(4) { font-size: 16px; }
+    .b2w .swdemo { display: inline-flex !important; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--b2-dim); }
+    .b2w .swdemo u { width: 34px; height: 18px; border: 1px solid var(--b2-tx); position: relative; display: inline-block; }
+    .b2w .swdemo u::after { content: ""; position: absolute; top: 2px; left: 17px; width: 13px; height: 12px; background: var(--b2-acc); }
+
+    /* 의견 보내기 (크게) */
+    .b2w .fb { display: flex; align-items: center; gap: 14px; margin-top: 28px; padding: 22px 20px; border: 1px solid var(--b2-tx); }
+    .b2w .fb:hover { background: var(--b2-card); }
+    .b2w .fb > i { flex: none; width: 46px; height: 46px; display: grid; place-items: center; font-style: normal; background: var(--b2-head); color: #D9C29B; font-family: "Noto Serif KR", serif; font-size: 20px; }
+    .b2w .fb .tx { flex: 1; min-width: 0; }
+    .b2w .fb .tg { font-size: 10px; font-weight: 700; letter-spacing: .2em; color: var(--b2-acc); }
+    .b2w .fb .nm { font-family: "Noto Serif KR", serif; font-size: 19px; margin-top: 4px; }
+    .b2w .fb .ds { font-size: 12.5px; color: var(--b2-dim2); margin-top: 4px; line-height: 1.6; word-break: keep-all; }
+    .b2w .fb em { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 30px; color: var(--b2-acc); }
+
+    .b2w .links { display: flex; justify-content: center; gap: 20px; margin-top: 16px; font-size: 12.5px; color: var(--b2-dim); }
+    .b2w .links a:hover { color: var(--b2-acc); }
+    .b2w .quote { text-align: center; font-family: "Noto Serif KR", serif; font-size: 13px; color: var(--b2-acc); margin-top: 22px; }
+</style>
+
+<div class="b2w">
+    <div class="wrapIn">
+        <div class="top">
+            <span><a href="/Home/Index">홈</a> › <b>성경통독 허브</b></span>
+            <button type="button" class="th" onclick="toggleDark()" aria-label="밝게 / 어둡게 바꾸기">◐</button>
+        </div>
+
+        <div class="k">BIBLE READING HUB</div>
+        <h1 class="T">@(hubTitle)에 오신 것을 환영합니다</h1>
+
+
+        @* ── 두 버전 ── *@
+        <div class="ask">어느 화면으로 읽을까요?</div>
+        <p class="askSub">
+            <b>새 버전이 나왔어요.</b> 한번 읽어 보세요.
+            지금 쓰던 화면도 그대로 쓸 수 있고, <b>읽은 기록과 책갈피는 두 버전이 함께</b> 쓰니 어디서 읽어도 이어져요.
+        </p>
+        <div class="pair">
+            <a class="big cur" href="/Bible" data-hubv="old">
+                <div class="tx">
+                    <div class="tg">지금 쓰던 버전</div>
+                    <div class="nm">성경통독</div>
+                    <div class="ds">익숙한 화면 그대로 사용하기</div>
+                </div>
+                <em>›</em>
+            </a>
+            <a class="big new" href="/Bible2" data-hubv="new">
+                <span class="badge">NEW</span>
+                <div class="tx">
+                    <div class="tg">새 버전</div>
+                    <div class="nm">새 성경통독</div>
+                    <div class="ds">더 편하게 읽도록 새로 꾸몄어요</div>
+                </div>
+                <em>→</em>
+            </a>
+        </div>
+        <form id="hubClickForm" hidden>@Html.AntiForgeryToken()</form>
+
+        @* ── 버전 선택 클릭수 (Basic · SuperAdmin · Admin 계정만 — 컨트롤러가 판단) ── *@
+        @if (ViewBag.IsHubStatsViewer is bool _canSee && _canSee)
+        {
+            <section class="hubst" aria-label="버전 선택 클릭수 (관리자만 보여요)">
+                <div class="hd">
+                    <span class="only">관리자만 보여요 · 버전 선택</span>
+                    @if (hubStats != null)
+                    {
+                        <span class="seg" role="group" aria-label="기간">
+                            <button type="button" class="on" data-p="all" aria-pressed="true">전체</button><button type="button" data-p="today" aria-pressed="false">오늘</button><button type="button" data-p="week" aria-pressed="false">7일</button>
+                        </span>
+                    }
+                </div>
+                @if (hubStats == null)
+                {
+                    <div class="none">클릭 기록 테이블(BibleHubClickLog)이 아직 없어요 — SQL/CreateBibleHubClickLog.sql 을 실행해 주세요.</div>
+                }
+                else
+                {
+                    var periods = new (string Key, BibleReadingThrough.Models.HubClickPeriod P)[]
+                        { ("all", hubStats.All), ("today", hubStats.Today), ("week", hubStats.Week) };
+                    foreach (var (key, p) in periods)
+                    {
+                        <div class="per" data-p="@key" hidden="@(key != "all")">
+                            <div class="row">
+                                <span><b>@p.OldClicks</b>회 · 쓰던 버전</span>
+                                <span class="r"><b>@p.NewClicks</b>회 · 새 버전</span>
+                            </div>
+                            <div class="bar" role="img" aria-label="쓰던 버전 @(p.OldPct)% · 새 버전 @(p.NewPct)%">
+                                @if (p.Total > 0)
+                                {
+                                    <i class="o" style="width:@(p.OldPct)%"></i><i class="w" style="width:@(p.NewPct)%"></i>
+                                }
+                            </div>
+                            <div class="ft">
+                                <span>@(p.Total > 0 ? p.OldPct + "%" : "–") · @(p.OldUsers)명</span>
+                                <span>@(p.NewUsers)명 · @(p.Total > 0 ? p.NewPct + "%" : "–")</span>
+                            </div>
+                        </div>
+                    }
+                }
+            </section>
+        }
+
+
+
+        @* ── 의견 보내기 (크게) ── *@
+        <a class="fb" href="/Board/Create2?boardName=Anonymous">
+          
+            <div class="tx">
+                <div class="tg">여러분의 의견</div>
+                <div class="nm">개선사항 보내기</div>
+                <div class="ds">더 나은 성경통독을 위해 좋았던 점, 불편한 점을 알려 주세요. 이름을 남기지 않아도 돼요.</div>
+            </div>
+            <em>→</em>
+        </a>
+
+        <nav class="links">
+            <a href="/Home/Index">홈으로</a>
+        </nav>
+        <div class="quote">말씀을 읽는 것이 복입니다 — 요한계시록 1:3</div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            /* 두 버전 버튼 클릭 기록 — 이동을 막지 않게 sendBeacon 으로 보낸다 */
+            var tokenEl = document.querySelector('#hubClickForm input[name="__RequestVerificationToken"]');
+            document.querySelectorAll('a[data-hubv]').forEach(function (a) {
+                a.addEventListener('click', function () {
+                    try {
+                        var fd = new FormData();
+                        fd.append('v', a.getAttribute('data-hubv'));
+                        if (tokenEl) fd.append('__RequestVerificationToken', tokenEl.value);
+                        if (navigator.sendBeacon) navigator.sendBeacon('/Bible2/HubClick', fd);
+                        else fetch('/Bible2/HubClick', { method: 'POST', body: fd, keepalive: true });
+                    } catch (e) { }
+                });
+            });
+
+            /* 클릭수 기간 전환 (관리자 칸이 있을 때만) */
+            var box = document.querySelector('.hubst');
+            if (!box) return;
+            box.querySelectorAll('.seg button').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var p = b.getAttribute('data-p');
+                    box.querySelectorAll('.seg button').forEach(function (x) {
+                        var on = x === b;
+                        x.classList.toggle('on', on);
+                        x.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
+                    box.querySelectorAll('.per').forEach(function (el) { el.hidden = el.getAttribute('data-p') !== p; });
+                });
+            });
+        })();
+    </script>
+}

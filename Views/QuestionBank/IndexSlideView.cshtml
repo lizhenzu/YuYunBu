@@ -1,0 +1,418 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using BulletinBoard.Services.Abstract
+@using Newtonsoft.Json
+@model IEnumerable<BulletinBoard.Models.QuestionBankData>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    var list = (Model ?? Enumerable.Empty<BulletinBoard.Models.QuestionBankData>()).ToList();
+    var total = list.Count;
+
+    string RefText(BulletinBoard.Models.QuestionBankData q)
+    {
+        var refText = (q.BibleText ?? "").Trim();
+        var hasRange = q.Zul1 > 0 && q.Zul1 != q.Zul;
+        if (string.IsNullOrEmpty(refText)) return "";
+        return hasRange ? $"{refText} {q.Jang}:{q.Zul}–{q.Zul1}" : $"{refText} {q.Jang}:{q.Zul}";
+    }
+
+    var mapped = list.Select((q, i) => new
+    {
+        idx = i,
+        id = q.Id,
+        seq = q.sequenceNo,
+        refText = RefText(q),
+        q = q.QuestionQ,
+        a1 = q.Question1,
+        a2 = q.Question2,
+        a3 = q.Question3,
+        a4 = q.Question4,
+        ans = q.CorrectAnswer
+    }).ToList();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>성경 퀴즈</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --card: #ffffff;
+            --text: #111111;
+            --muted: #555555;
+            --line: #e5e7eb;
+            --radius: 20px;
+            --shadow: 0 10px 30px rgba(0,0,0,.06);
+            --accent: #111111;
+            --blink-bg: #fff7cc;
+            --blink-border: #f1c232;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            min-height: 100svh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .wrap {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .brand .mark {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                background: #111;
+            }
+
+            .brand h1 {
+                margin: 0;
+                font-weight: 800;
+                font-size: clamp(18px, 2.5vw, 28px);
+            }
+
+        .progress {
+            color: var(--muted);
+            font-size: clamp(13px, 1.8vw, 15px);
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 32px;
+            display: block;
+        }
+        @@media (max-width: 900px) {
+            .card
+
+        {
+            padding: 20px;
+        }
+
+        }
+
+        .question {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .q-bible {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            color: var(--muted);
+            font-size: clamp(12px, 1.6vw, 14px);
+        }
+
+        .chip {
+            border: 1px solid var(--line);
+            background: #fafafa;
+            padding: 6px 10px;
+            border-radius: 999px;
+        }
+
+        .q-title {
+            font-size: clamp(22px, 2.8vw, 36px);
+            line-height: 1.25;
+            font-weight: 800;
+        }
+
+        .choices {
+            display: grid;
+            gap: 12px;
+        }
+
+        .choice {
+            border: 1px solid var(--line);
+            background: #fff;
+            border-radius: 14px;
+            padding: 14px 16px;
+            font-size: clamp(15px, 2vw, 18px);
+        }
+
+            .choice.correct {
+                border-color: var(--blink-border);
+            }
+        @@keyframes blink {
+            0%
+
+        {
+            background: transparent;
+        }
+
+        50% {
+            background: var(--blink-bg);
+        }
+
+        100% {
+            background: transparent;
+        }
+
+        }
+
+        .choice.flash-infinite {
+            animation: blink 1.2s ease-out infinite;
+        }
+
+        .hint {
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .navs {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+
+        .btns-left, .btns-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            border: 1px solid var(--line);
+            background: #fff;
+            color: #111;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+            transition: transform .06s ease, box-shadow .2s ease, background .2s ease;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 8px 18px rgba(0,0,0,.06);
+            }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            border-color: #111;
+        }
+
+        .btn[hidden] {
+            display: none !important;
+        }
+
+        a.btn {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 48px 24px;
+            border-radius: 16px;
+            border: 1px dashed var(--line);
+            background: #fff;
+            font-size: 18px;
+            color: #222;
+        }
+    </style>
+
+        <style>
+        .formatted-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+    </style>
+
+</head>
+<body>
+    <div class="wrap">
+        <div class="header">
+            <div class="brand">
+                <span class="mark"></span>
+                <h1>성경 퀴즈</h1>
+            </div>
+            <div class="progress" id="progress">문제 0 / 0</div>
+        </div>
+
+        @if (total == 0)
+        {
+            <div class="empty">표시할 문제가 없습니다.</div>
+        }
+        else
+        {
+            <div class="card">
+                <section class="question">
+                    <div class="q-bible">
+                        <span class="chip" id="refChip">말씀 범위</span>
+                        <span class="chip" id="idChip">문항 ID</span>
+                    </div>
+                    <div class="q-title formatted-text" id="qTitle">질문 텍스트</div>
+                    <div class="choices">
+                        <div class="choice" id="c1"></div>
+                        <div class="choice" id="c2"></div>
+                        <div class="choice" id="c3"></div>
+                        <div class="choice" id="c4"></div>
+                    </div>
+                    <div class="hint">※ 정답은 숨겨져 있습니다. <strong>정답보기</strong>를 누르면 정답 보기가 계속 깜빡입니다.</div>
+                </section>
+            </div>
+
+            <div class="navs">
+                <div class="btns-left">
+                    <button type="button" class="btn" id="btnPrev">← 이전</button>
+                    <button type="button" class="btn btn-primary" id="btnAnswer">정답보기</button>
+                </div>
+                <div class="btns-right">
+                    <a class="btn" href="@Url.Content("~/")" id="btnHome">🏠 홈</a>
+                    <a class="btn" href="@Url.Content("/QuestionBank/IndexByCode?queryCode=@ConstatsCommon.currentQuizCode")" id="btnHome">🏘️ 퀴즈</a>
+                    <button type="button" class="btn" id="btnNext">다음 →</button>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (total > 0)
+    {
+        <script>
+            const QUESTIONS = @Html.Raw(JsonConvert.SerializeObject(mapped));
+        </script>
+
+        <script>
+            (function(){
+                const el = (id)=>document.getElementById(id);
+                const qTitle = el('qTitle');
+                const choiceEls = [el('c1'), el('c2'), el('c3'), el('c4')];
+                const refChip = el('refChip'), idChip = el('idChip');
+                const progress = el('progress');
+                const btnPrev = el('btnPrev'), btnNext = el('btnNext'), btnAnswer = el('btnAnswer');
+
+                const decode = (s) => {
+                    if (!s) return '';
+                    if (s.includes('&')) {
+                        const t = document.createElement('textarea');
+                        t.innerHTML = s;
+                        return t.value;
+                    }
+                    return s;
+                };
+                const normalize = (s) => {
+                    if (!s) return '';
+                    s = decode(s).trim();
+                    s = s.replace(/^(\d+[\.\)]|[①②③④])\s*/,'');
+                    return s.replace(/\s+/g,' ').trim();
+                };
+                function getCorrectIndex(d){
+                    const ansRaw = decode(d.ans || '').trim();
+                    if (/^[1-4]$/.test(ansRaw)) return parseInt(ansRaw,10)-1;
+                    const circ = { '①':0, '②':1, '③':2, '④':3 };
+                    if (circ.hasOwnProperty(ansRaw)) return circ[ansRaw];
+                    const ansNorm = normalize(ansRaw);
+                    const opts = [d.a1, d.a2, d.a3, d.a4].map(x => normalize(x||''));
+                    for (let i=0;i<4;i++){ if (opts[i] && opts[i] === ansNorm) return i; }
+                    return -1;
+                }
+
+                let index = 0;
+                const last = QUESTIONS.length - 1;
+                let isAnswerShown = false;
+                let currentCorrect = -1;
+
+                function clearChoiceEffects(){
+                    choiceEls.forEach(c=>{
+                        c.classList.remove('correct','flash-infinite');
+                    });
+                }
+
+                function render(i){
+                    const d = QUESTIONS[i];
+                    clearChoiceEffects();
+                    isAnswerShown = false;
+                    currentCorrect = -1;
+
+                    qTitle.textContent = decode(d.q) || '(질문 없음)';
+                    const texts = [d.a1, d.a2, d.a3, d.a4].map(x => decode(x||''));
+                    choiceEls[0].textContent = texts[0] ? `1.${texts[0]}` : '1.';
+                    choiceEls[1].textContent = texts[1] ? `2.${texts[1]}` : '2.';
+                    choiceEls[2].textContent = texts[2] ? `3.${texts[2]}` : '3.';
+                    choiceEls[3].textContent = texts[3] ? `4.${texts[3]}` : '4.';
+
+                    const ref = decode(d.refText) || '말씀 범위 미기재';
+                    refChip.textContent = ref;
+                    idChip.textContent = `ID #${d.id} • Seq ${d.seq}`;
+
+                    progress.textContent = `문제 ${i+1} / ${QUESTIONS.length}`;
+                    btnPrev.hidden = (i === 0);
+                    btnNext.hidden = (i === last);
+                }
+
+                function showAnswer(){
+                    const d = QUESTIONS[index];
+                    if (!isAnswerShown){
+                        currentCorrect = getCorrectIndex(d);
+                        if (currentCorrect >= 0){
+                            const elc = choiceEls[currentCorrect];
+                            elc.classList.add('correct','flash-infinite');
+                            elc.scrollIntoView({ behavior:'smooth', block:'center' });
+                        }
+                        isAnswerShown = true;
+                    }else{
+                        clearChoiceEffects();
+                        isAnswerShown = false;
+                    }
+                }
+
+                btnPrev?.addEventListener('click', ()=>{ if(index>0){ index--; render(index);} });
+                btnNext?.addEventListener('click', ()=>{ if(index<last){ index++; render(index);} });
+                btnAnswer?.addEventListener('click', showAnswer);
+
+                window.addEventListener('keydown', (e)=>{
+                    if(e.key === 'ArrowLeft'){ if(index>0){ index--; render(index);} }
+                    else if(e.key === 'ArrowRight'){ if(index<last){ index++; render(index);} }
+                    else if(e.key === 'Enter'){ showAnswer(); }
+                });
+
+                render(index);
+            })();
+        </script>
+    }
+</body>
+</html>

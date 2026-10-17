@@ -1,0 +1,55 @@
+﻿using BulletinBoard.Common;
+using Microsoft.Extensions.Logging;
+using BulletinBoard.Common;
+using System;
+using System.Data; 
+using System.Reflection;
+using System.Text;
+using Microsoft.AspNetCore.Mvc;
+using BulletinBoard.Helpers;
+
+namespace BulletinBoard.DataAccessLayer
+{
+    public class ControlLoginHistory
+    {      
+        public void AddLoginHistory(string ControllerName, string ActionName, string UserName, string requestIP)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendFormat(" insert into [dbo].[loginHistory] "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" ("); sb.Append(Environment.NewLine);
+            sb.AppendFormat("     ControllerName, ActionName, UserName, requestIP, InsertDT"); sb.Append(Environment.NewLine);
+            sb.AppendFormat("   )"); sb.Append(Environment.NewLine);
+            sb.AppendFormat($" values('{ControllerName}','{ActionName}','{UserName}','{requestIP}' ,  '{DateHelper.GetKoreaNowString()}'   )"); sb.Append(Environment.NewLine);
+         //   DbLogger.LogDebugAsync(sb.ToString() );
+            DataAccessModule.executeNonQuery(sb.ToString());
+        }
+
+        public DataSet fetchLoginHistory()
+        {
+            StringBuilder sb = new StringBuilder();
+             
+            sb.AppendFormat(" select top 1005 ROW_NUMBER() OVER(ORDER BY maxInsertDT desc )  sequenceNo , ");
+//            sb.AppendFormat(" ma.UserName, mb.Id UserId, ma.DC, ma.minInsertDT, ma.maxInsertDT, FullName, ClassYear, ClassBan, UserId, RoleCode, RoleNM "); sb.Append(Environment.NewLine);
+
+
+            sb.AppendFormat(" ma.UserName, mb.Id UserId, ma.DC, ma.minInsertDT, ma.maxInsertDT, FullName,  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" isnull(ClassYear,0) ClassYear, "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" isnull(ClassBan ,0) ClassBan, "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" UserId, RoleCode, RoleNM "); sb.Append(Environment.NewLine);
+
+
+            sb.AppendFormat(" from  [dbo].[view_loginHistory_groupBy]        ma "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" join  [Identity].[User]                        mb on ma.UserName = mb.UserName "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" left outer join [dbo].[view_UserCompositeInfo_2026] mc on ma.UserName = mc.UserName "); sb.Append(Environment.NewLine);
+            return DataAccessModule.commonQuery(sb.ToString());
+        }
+        public void DeleteLoginHistory(string UserName)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendFormat(" delete from [dbo].[loginHistory]  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" where [UserName] =  '{0}' ", UserName); sb.Append(Environment.NewLine);
+            DataAccessModule.executeNonQuery(sb.ToString());
+        }
+
+    }
+}

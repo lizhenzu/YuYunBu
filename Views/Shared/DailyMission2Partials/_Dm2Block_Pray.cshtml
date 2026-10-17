@@ -1,0 +1,44 @@
+﻿@* Views/Shared/DailyMission2Partials/_Dm2Block_Pray.cshtml *@
+@model dynamic
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+}
+
+@{
+    var title = S(Model?.Title); if (string.IsNullOrWhiteSpace(title)) title = "🙏 오늘의 기도";
+    var done = B(Model?.Done);
+
+    var text = S(Model?.PrayText);
+    var postUrl = S(Model?.PostUrl);
+    var prayPhraseId = S(Model?.PrayPhraseId);
+    var selectedDate = S(Model?.SelectedDate);
+}
+
+<div class="card">
+    @await Html.PartialAsync("DailyMission2Partials/_Dm2Block_Header", new { Title = title, BadgeOk = done })
+
+    <div class="cardBody">
+        @if (string.IsNullOrWhiteSpace(text))
+        {
+            <div class="warnBox">오늘의 기도문이 없습니다.</div>
+        }
+        else
+        {
+            <div class="prayText">@text</div>
+
+            @if (!string.IsNullOrWhiteSpace(postUrl))
+            {
+                <form method="post" action="@postUrl" class="form">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="prayPhraseId" value="@prayPhraseId" />
+                    <input type="hidden" name="selectedDate" value="@selectedDate" />
+
+                    <div class="btnRow">
+                        <button class="btn primary" type="submit">기도했어요</button>
+                    </div>
+                </form>
+            }
+        }
+    </div>
+</div>

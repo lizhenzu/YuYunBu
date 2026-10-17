@@ -1,0 +1,725 @@
+﻿@model IEnumerable<BulletinBoard.Models.BibleLastReadRateByUserSimple>
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString()) ?? "";
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    var list = (Model ?? Enumerable.Empty<BulletinBoard.Models.BibleLastReadRateByUserSimple>()).ToList();
+    var totalCount = list.Count;
+
+    decimal maxRate = 0;
+    foreach (var it in list)
+    {
+        try
+        {
+            var r = Convert.ToDecimal(it.TotalProgressRate);
+            if (r > maxRate) maxRate = r;
+        }
+        catch { }
+    }
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>@ConstatsCommon.ReadBibleAllTitleButton 대시보드</title>
+
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;800;900&display=swap');
+
+        :root {
+            --bg0: #070A12;
+            --bg1: #0B1020;
+            --card: rgba(255,255,255,.08);
+            --card2: rgba(255,255,255,.06);
+            --stroke: rgba(255,255,255,.10);
+            --stroke2: rgba(255,255,255,.16);
+            --text: rgba(255,255,255,.92);
+            --muted: rgba(255,255,255,.66);
+            --muted2: rgba(255,255,255,.55);
+
+            --brand: #7C3AED;
+            --brand2: #22D3EE;
+            --good: #34D399;
+            --warn: #FBBF24;
+
+            --shadow: 0 18px 50px rgba(0,0,0,.45);
+            --shadow2: 0 12px 30px rgba(0,0,0,.35);
+
+            --r: 20px;
+            --r2: 16px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+
+        body {
+            margin: 0;
+            background:
+                radial-gradient(1200px 700px at 10% -10%, rgba(124,58,237,.35), transparent 60%),
+                radial-gradient(1000px 600px at 110% 10%, rgba(34,211,238,.22), transparent 55%),
+                radial-gradient(900px 540px at 30% 110%, rgba(52,211,153,.16), transparent 55%),
+                linear-gradient(180deg, var(--bg0), var(--bg1));
+            color: var(--text);
+        }
+
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 18px 14px 96px;
+        }
+
+        /* ===========================================================
+           ✅ NEW TOPBAR DESIGN
+           - 큰 타이틀 + 넉넉한 여백
+           - subtitle은 줄바꿈(각각 다음줄)
+           - 우측 끝에 "수행일자" 버튼 고정
+           =========================================================== */
+
+        .topbar {
+            top: 0;
+            z-index: 30;
+            padding: 14px 0 12px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            background:
+                radial-gradient(900px 220px at 10% 0%, rgba(124,58,237,.20), transparent 60%),
+                radial-gradient(900px 220px at 90% 0%, rgba(34,211,238,.16), transparent 60%),
+                linear-gradient(180deg, rgba(7,10,18,.92), rgba(7,10,18,.62));
+            border-bottom: 1px solid rgba(255,255,255,.10);
+        }
+
+        .topbarInner {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 14px;
+            display: flex;
+            align-items: flex-start; /* ✅ 타이틀이 커지므로 위쪽 기준 */
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .titleBox {
+            min-width: 0;
+            flex: 1;
+             text-align: center;
+        }
+
+  .titleRow {
+    display: flex;
+    align-items: center;
+    text-align: center;        /* ⭐ 텍스트 중앙 */
+    justify-content: center;   /* ⭐ 가로 가운데 */
+    gap: 12px;
+    margin: 18px 0 12px;
+    text-align: center;        /* ⭐ 텍스트 중앙 */
+                margin-top: 36px; 
+                margin-bottom: 36px; 
+
+}
+
+        .logoDot {
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            background: radial-gradient(circle at 30% 30%, #fff, rgba(255,255,255,.0) 55%),
+                        linear-gradient(135deg, var(--brand), var(--brand2));
+            box-shadow: 0 0 0 8px rgba(124,58,237,.12);
+            flex-shrink: 0;
+            margin-top: 6px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(25px, 4.8vw, 34px); /* ✅ 큰 글자 */
+            font-weight: 950;
+            letter-spacing: -0.6px;
+            line-height: 1.15;
+        }
+
+        .subtitle {
+    align-items: center;
+    text-align: center;        /* ⭐ 텍스트 중앙 */
+    justify-content: center;   /* ⭐ 가로 가운데 */
+
+            display: flex;
+            flex-direction: column; /* ✅ 각각 다음줄 */
+            gap: 8px;
+            margin: 0 0 14px;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 14px;
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.12);
+            color: rgba(255,255,255,.86);
+            font-size: 13px;
+            line-height: 1;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .pill strong { color: #fff; font-weight: 950; }
+
+        .rightControls {
+            flex-shrink: 0;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding-top: 18px; /* ✅ 타이틀 높이와 균형 */
+        }
+
+        .btn {
+            border: 0;
+            cursor: pointer;
+            user-select: none;
+            color: rgba(255,255,255,.92);
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 14px;
+            padding: 10px 12px;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: -0.1px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform .12s ease, background .12s ease, border-color .12s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,.10);
+            border-color: rgba(255,255,255,.18);
+        }
+
+        .btnPrimary {
+            background: linear-gradient(135deg, rgba(124,58,237,.95), rgba(34,211,238,.70));
+            border: 1px solid rgba(255,255,255,.20);
+            box-shadow: 0 10px 26px rgba(124,58,237,.22);
+        }
+
+        .btnPrimary:hover {
+            background: linear-gradient(135deg, rgba(124,58,237,1), rgba(34,211,238,.78));
+        }
+
+        /* ✅ 모바일: 버튼은 아래로 내려가게(오른쪽 유지) */
+        @@media (max-width: 640px) {
+            .topbarInner {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .rightControls {
+                padding-top: 0;
+                justify-content: flex-end; /* 오른쪽 끝 */
+            }
+            .rightControls .btn {
+                width: fit-content;
+                margin-left: auto; /* ✅ 오른쪽 끝 */
+            }
+            .titleRow {
+                margin-top: 36px; 
+                margin-bottom: 36px; 
+            }
+            .subtitle {
+                    align-items: center;
+    text-align: center;        /* ⭐ 텍스트 중앙 */
+    justify-content: center;   /* ⭐ 가로 가운데 */
+
+                margin-bottom: 10px; }
+        }
+
+        /* ======= Note line ======= */
+        .noteLine {
+            margin-top: 12px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.10);
+            color: rgba(255,255,255,.78);
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        /* ======= Controls below ======= */
+        .controls {
+            margin: 16px 0 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .leftControls, .rightControls2 {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search {
+            position: relative;
+            min-width: 240px;
+            flex: 1 1 260px;
+            max-width: 420px;
+        }
+
+        .search input {
+            width: 100%;
+            padding: 11px 12px 11px 38px;
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,.12);
+            background: rgba(255,255,255,.06);
+            color: rgba(255,255,255,.92);
+            outline: none;
+            font-size: 13px;
+        }
+
+        .search input::placeholder { color: rgba(255,255,255,.45); }
+
+        .search .icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: .75;
+            font-size: 14px;
+        }
+
+        /* ======= Grid + Cards ======= */
+        .grid {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            grid-column: span 12;
+            position: relative;
+            border-radius: var(--r);
+            padding: 14px;
+            background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.05));
+            border: 1px solid rgba(255,255,255,.10);
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+        }
+
+        @@media (min-width: 680px) { .card { grid-column: span 6; } }
+        @@media (min-width: 980px) { .card { grid-column: span 4; } }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            background:
+                radial-gradient(400px 120px at 15% 0%, rgba(124,58,237,.18), transparent 55%),
+                radial-gradient(380px 120px at 100% 100%, rgba(34,211,238,.14), transparent 55%);
+            pointer-events: none;
+            opacity: .9;
+        }
+
+        .cardInner {
+            position: relative;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 1px solid rgba(255,255,255,.14);
+            background: rgba(255,255,255,.06);
+            box-shadow: 0 10px 22px rgba(0,0,0,.25);
+        }
+
+        .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+        .content {
+            min-width: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nameRow {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .nameLeft {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .name {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 900;
+            letter-spacing: -0.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .seq {
+            font-weight: 900;
+            color: rgba(255,255,255,.62);
+            font-size: 12px;
+        }
+
+        .metaRow {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.10);
+            color: rgba(255,255,255,.78);
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        .chip strong { color: #fff; font-weight: 900; }
+
+        .progress {
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.10);
+            overflow: hidden;
+        }
+
+        .bar {
+            height: 100%;
+            border-radius: 999px;
+            width: 0%;
+            background: linear-gradient(90deg, rgba(124,58,237,.95), rgba(34,211,238,.85));
+            box-shadow: 0 10px 24px rgba(124,58,237,.16);
+        }
+
+        .bar.good { background: linear-gradient(90deg, rgba(52,211,153,.95), rgba(34,211,238,.75)); }
+        .bar.soft { background: linear-gradient(90deg, rgba(255,255,255,.30), rgba(124,58,237,.65)); }
+
+        .rateLine {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 12px;
+            color: rgba(255,255,255,.72);
+        }
+
+        .rateLine strong { color: rgba(255,255,255,.95); font-weight: 900; }
+
+        .clickable { cursor: pointer; }
+        .clickable:active { transform: translateY(1px); }
+
+        .specialRing {
+            border-color: rgba(251,191,36,.35) !important;
+            box-shadow: 0 18px 50px rgba(251,191,36,.08), var(--shadow2);
+        }
+
+        .crown {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 900;
+            color: rgba(20,12,0,.92);
+            background: linear-gradient(135deg, rgba(251,191,36,.98), rgba(252,211,77,.78));
+            border: 1px solid rgba(255,255,255,.28);
+            box-shadow: 0 12px 24px rgba(251,191,36,.18);
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .crown .ico { font-size: 13px; }
+
+        .badgeComplete {
+            background: rgba(251,191,36,.12);
+            border: 1px solid rgba(251,191,36,.22);
+            color: rgba(255,243,207,.95);
+        }
+
+        /* ======= Bottom y Nav ======= */
+        .bottomNav {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 50;
+            padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+            background: linear-gradient(180deg, rgba(7,10,18,.0), rgba(7,10,18,.82) 30%, rgba(7,10,18,.96));
+            border-top: 1px solid rgba(255,255,255,.08);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .bottomInner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .navBtn {
+            border: 0;
+            cursor: pointer;
+            border-radius: 16px;
+            padding: 11px 10px;
+            font-weight: 900;
+            font-size: 13px;
+            color: rgba(255,255,255,.92);
+            background: rgba(255,255,255,.07);
+            border: 1px solid rgba(255,255,255,.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform .12s ease, background .12s ease, border-color .12s ease;
+            width: 100%;
+        }
+
+        .navBtn:hover {
+            transform: translateY(-1px);
+            background: rgba(255,255,255,.10);
+            border-color: rgba(255,255,255,.18);
+        }
+
+        .navBtn.primary {
+            background: linear-gradient(135deg, rgba(124,58,237,.92), rgba(34,211,238,.70));
+            border: 1px solid rgba(255,255,255,.20);
+        }
+
+        @@media (max-width: 600px) {
+            .bottomInner { grid-template-columns: 1fr; gap: 8px; }
+            .navBtn { padding: 14px 12px; border-radius: 14px; }
+        }
+
+        footer {
+            margin-top: 22px;
+            color: rgba(255,255,255,.55);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .hideBySearch { display: none !important; }
+    </style>
+</head>
+
+<body>
+    <!-- ✅ NEW TOPBAR -->
+    <div class="topbar">
+        <div class="topbarInner">
+            <div class="titleBox">
+                <div class="titleRow">
+                    <h1>@ConstatsCommon.ReadBibleAllTitleButton</h1>
+                </div>
+
+                <div class="subtitle">
+                    <span class="pill">👥 참여자 <strong>@totalCount</strong>명</span>
+
+                    @if (!string.IsNullOrWhiteSpace(ChurchName) || !string.IsNullOrWhiteSpace(DepartmentName))
+                    {
+                        <span class="pill">🏫 @ChurchName @DepartmentName</span>
+                    }
+                </div>
+            </div>
+
+            <!-- ✅ 오른쪽 끝 버튼 -->
+            <div class="rightControls">
+                <button class="btn btnPrimary" type="button"
+                        onclick="location.href='/bibleCenter/MyDashboardList?bilbeProcessOption=@BilbeProcessOption.ReadDate.ToString()'">
+                    📅 수행일자별로 정렬
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="wrap">
+        <div class="controls">
+            <div class="leftControls">
+                <button class="btn" type="button" onclick="location.href='/'">🏠 Home</button>
+                <button class="btn" type="button" onclick="location.href='/Home/MissionMainBoard'">🧭 @ConstatsCommon.MainKeyTitle</button>
+                <button class="btn" type="button" onclick="location.href='/bibleCenter/MyDashboard'">📖 @ConstatsCommon.ReadBibleAllTitleButton</button>
+            </div>
+
+            <div class="rightControls2">
+                <div class="search">
+                    <span class="icon">🔎</span>
+                    <input id="q" type="text" placeholder="이름으로 찾기 (예: 홍길동)" autocomplete="off" />
+                </div>
+            </div>
+        </div>
+
+                <div class="noteLine">
+            💡 <b>성경통독률</b>은 <b>@ConstatsCommon.MainKeyTitle 등수</b>와 상관없어요.<br />
+            성경책을 많이 읽을수록 통독률이 더 높아질 수 있어요.
+        </div>
+
+
+
+        <div id="grid" class="grid">
+            @foreach (var item in list)
+            {
+                string fullName = $"{item.LastName}{item.FirstName}";
+
+                decimal rate = 0;
+                try { rate = Math.Round(Convert.ToDecimal(item.TotalProgressRate), 2); } catch { rate = 0; }
+                if (rate < 0) rate = 0;
+                if (rate > 100) rate = 100;
+
+                bool isComplete = false;
+                try { isComplete = (item.readBibleAllCount > 0); } catch { isComplete = false; }
+
+                bool isTopRate = false;
+                try { isTopRate = (maxRate > 0 && Convert.ToDecimal(item.TotalProgressRate) == maxRate); } catch { }
+
+                string perText = $"{rate:0.##}%";
+                string barClass = isTopRate ? "bar good" : (rate >= 50 ? "bar" : "bar soft");
+
+                string cardClass = isComplete ? "card specialRing" : "card";
+                string nameClick = $"/bibleCenter/MyDashboard?userId={item.UserId}";
+
+                <div class="@cardClass" data-name="@fullName">
+                    <div class="cardInner">
+                        @if (isSuperAdmin)
+                        {
+                            <div class="avatar clickable"
+                                 onclick="window.location.href='/HumanResource/ManageUserInfo?UserId=@item.UserId';"
+                                 title="사용자 정보 관리">
+                                <img src="@item.ProfilePicturePath" alt="프로필" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="avatar">
+                                <img src="@item.ProfilePicturePath" alt="프로필" />
+                            </div>
+                        }
+
+                        <div class="content">
+                            <div class="nameRow">
+                                <div class="nameLeft clickable" onclick="location.href='@nameClick'">
+                                    <span class="seq">@item.sequenceNo)</span>
+                                    <h3 class="name">@fullName</h3>
+                                </div>
+
+                                @if (isComplete)
+                                {
+                                    <div class="crown" title="특별 참여자">
+                                        <span class="ico">👑</span>
+                                        1독완료
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="metaRow">
+                                <span class="chip">📈 달성률 <strong>@perText</strong></span>
+
+                                @if (isComplete)
+                                {
+                                    <span class="chip badgeComplete">✨ 통독 완료자</span>
+                                }
+
+                                <span class="chip">🗓 읽은날 <strong>@item.ReadDate.ToString("yy년 MM월 dd일")</strong></span>
+                            </div>
+
+                            <div class="progress" aria-label="진행률">
+                                <div class="@barClass" style="width:@rate%;"></div>
+                            </div>
+
+                            <div class="rateLine">
+                                <span>진행</span>
+                                <span><strong>@perText</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <footer>
+            @{
+                var churchString = $"{ChurchName} {DepartmentName}".Trim();
+                if (string.IsNullOrWhiteSpace(churchString)) { churchString = "Church"; }
+            }
+            &copy; @DateHelper.GetKoreaNow().Year @churchString All Rights Reserved.
+        </footer>
+    </div>
+
+    <div class="bottomNav">
+        <div class="bottomInner">
+            <button class="navBtn" type="button" onclick="location.href='/'">🏠 Home</button>
+            <button class="navBtn" type="button" onclick="location.href='/Home/MissionMainBoard'">🧭 @ConstatsCommon.MainKeyTitle</button>
+            <button class="navBtn primary" type="button" onclick="location.href='/bibleCenter/MyDashboard'">📖 @ConstatsCommon.ReadBibleAllTitleButton</button>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const input = document.getElementById('q');
+            const grid = document.getElementById('grid');
+            if (!input || !grid) return;
+
+            const cards = Array.from(grid.querySelectorAll('.card'));
+            input.addEventListener('input', function () {
+                const q = (input.value || '').trim().toLowerCase();
+                if (!q) {
+                    cards.forEach(c => c.classList.remove('hideBySearch'));
+                    return;
+                }
+                cards.forEach(c => {
+                    const name = (c.getAttribute('data-name') || '').toLowerCase();
+                    if (name.includes(q)) c.classList.remove('hideBySearch');
+                    else c.classList.add('hideBySearch');
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

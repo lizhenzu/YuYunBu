@@ -1,0 +1,782 @@
+﻿@model BulletinBoard.Models.TodayCheckCompositeData
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    ViewData["Title"] = "내 페이지 제목";
+    Layout = null;
+
+    int maxLimitPray = 13;
+    int maxLimitQuiz = 12;
+    int maxLimitRecite = 12;
+    int maxLimitWord = 29;
+
+    var todayDatePray = DateHelper.GetTodayDateDayString(maxLimitPray);
+    var todayDateQuiz = DateHelper.GetTodayDateDayString(maxLimitQuiz);
+    var todayDateRecite = DateHelper.GetTodayDateDayString(maxLimitRecite);
+    var todayDateWord = DateHelper.GetTodayDateDayString(maxLimitWord);
+
+    string formattedModResultDataPray = $"/images/mission/pray/pray_{todayDatePray}.webp";
+    string formattedModResultDataQuiz = $"/images/mission/quiz/quiz_{todayDateQuiz}.webp";
+    string formattedModResultDataRecite = $"/images/mission/recite/recite_{todayDateRecite}.webp";
+    string formattedModResultDataWord = $"/images/mission/word/word_{todayDateWord}.webp";
+    string DateString = $"{Model.WeekStatusDatas[0].MMM}월 {Model.WeekStatusDatas[0].DDD}일 ~ {Model.WeekStatusDatas[Model.WeekStatusDatas.Count - 1].MMM}월 {Model.WeekStatusDatas[Model.WeekStatusDatas.Count - 1].DDD}일 ";
+
+
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    CheckPoint _CheckPoint = ViewBag._CheckPoint as CheckPoint;
+
+    string baseDayDiff = (string)ViewData["baseDayDiff"];
+
+    int totalTodayPoint = Model.TodayWordToReadCountToParent + Model.TodayWordToReadCountToMe + Model.WeeklyWordToReadCount + Model.PrayPhraseCountToMe + Model.PrayPhraseCountToParent + Model.PrayPhraseCountToFriend + Model.QuestionCount;
+    //int totalMonthPoint = Model.TodayWordToReadCountToParent_Month + Model.TodayWordToReadCountToMe_Month + Model.WeeklyWordToReadCount_Month + Model.PrayPhraseCountToMe_Month + Model.PrayPhraseCountToParent_Month + Model.PrayPhraseCountToFriend_Month + Model.QuestionCount_Month;
+    int totalAllPoint = Model.TodayWordToReadCountToParent_All + Model.TodayWordToReadCountToMe_All + Model.WeeklyWordToReadCount_All + Model.PrayPhraseCountToMe_All + Model.PrayPhraseCountToParent_All + Model.PrayPhraseCountToFriend_All + Model.QuestionCount_All;
+    string userName = await AuthService.GetUserName(User);
+
+
+    UserSettingsCookie __UserSettingsCookie = ViewBag._UserSettingsCookie as UserSettingsCookie;
+
+    bool showPopupCookieValue = false;
+
+    if (__UserSettingsCookie != null)
+    {
+        showPopupCookieValue = true;
+    }
+
+    var sessionWorkDT = Context.Session.GetString(DateKind.WorkDT.ToString());
+    var sessionTodayDT = Context.Session.GetString(DateKind.TodayDT.ToString());
+
+    DateTime todayDT = BulletinBoard.Common.SharedComm.GetToday();
+    DateTime missionDT = todayDT;
+
+    if (sessionWorkDT != null)
+    {
+        missionDT = DateTime.Parse(sessionWorkDT);
+    }
+
+    if (sessionTodayDT != null)
+    {
+        todayDT = DateTime.Parse(sessionTodayDT);
+    }
+
+    string TodayMesssage = $"오늘은 {BulletinBoard.Common.SharedComm.GetTodayStringKor()} 입니다.";
+    string UserFullName = ViewData[HttpContextSessionCategory.UserFullName.ToString()] as string;
+    var UserName = ViewData[HttpContextSessionCategory.UserName.ToString()] as string;
+
+    int maxLimit = 9;
+
+    var todayDate = DateHelper.GetTodayDateDayString(maxLimit);
+
+
+    string missioncompleted = $"/images/mission/missioncompletedstamp/rorate/missionCompletedStamp_rotate_{todayDate}.png";
+
+    string Total_All_Desc = $"{@Model.Total_All}점";
+
+    string Total_All_Desc_Reach1000 = SharedComm.HowMuchItTakes(1000, @Model.Total_All);
+    string Total_All_Desc_Reach_MAX = SharedComm.HowMuchItTakes(@ViewBag.maxAwardLevel, @Model.Total_All);
+
+    string RoleCode = ViewData["RoleCode"] as string;
+
+    bool rerachPoint = ViewBag.PointAwardUserExists;
+
+
+    
+    //int total = _CheckPoint.DC_Total;
+    //int level = _CheckPoint.AwardLevel;
+    //int productId = _CheckPoint.ProductID;
+
+    int _DC_Total = _CheckPoint?.DC_Total ?? 0;
+    int _AwardLevel = _CheckPoint?.AwardLevel ?? 0;
+    int productId = _CheckPoint?.ProductID ?? 0;
+
+    bool isProductMissing = productId == 0;
+
+    // // if (isProductMissing)
+    // {
+    //     if (_DC_Total >= 1500 && (_AwardLevel == 1000 || _AwardLevel == 700 || _AwardLevel == 400 || _AwardLevel == 100 || _AwardLevel == 0))
+    //     {
+    //         rerachPoint = true;
+    //     }
+    //     else if (_DC_Total >= 1000 && (_AwardLevel == 700 || _AwardLevel == 400 || _AwardLevel == 100 || _AwardLevel == 0))
+    //     {
+    //         rerachPoint = true;
+    //     }
+    //     else if (_DC_Total >= 700 && (_AwardLevel == 400 || _AwardLevel == 100 || _AwardLevel == 0))
+    //     {
+    //         rerachPoint = true;
+    //     }
+    //     else if (_DC_Total >= 400 && (_AwardLevel == 100 || _AwardLevel == 0))
+    //     {
+    //         rerachPoint = true;
+    //     }
+    //     else if (_DC_Total >= 100 && _AwardLevel == 0)
+    //     {
+    //         rerachPoint = true;
+    //     }
+    // }
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>미션 수행</title>
+    <style>
+        @@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
+        body { 
+            background: linear-gradient(135deg, #d4e157, #aed581, #81c784);
+            background-size: 400% 400%;
+            animation: gradientBG 6s infinite linear alternate;
+            text-align: center;
+            padding: 1px;
+        }
+
+        @@keyframes gradientBG {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            100% {
+                background-position: 100% 50%;
+            }
+        }
+
+
+        .welcome-box {
+            max-width: 450px;
+            margin: 0 auto 20px;
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            font-size: 18px;
+            color: #2e7d32;
+            line-height: 1.6;
+        }
+
+            .welcome-box h2 {
+                margin-bottom: 5px;
+                color: #388e3c;
+            }
+
+            .welcome-box p {
+                margin: 5px 0;
+            }
+
+        .get-started {
+            font-size: 20px;
+            font-weight: bold;
+            color: #ff7043;
+        }
+
+        .recent-activity {
+            font-weight: bold;
+            color: #1976d2;
+        }
+
+
+        .home-card {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease-in-out;
+            border: 4px solid #a5d6a7;
+            max-width: 450px;
+        }
+
+            .home-card:hover {
+                transform: translateY(-5px);
+            }
+
+
+
+        .logout-card {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease-in-out;
+            border: 4px solid #ef9a9a;
+            max-width: 450px;
+        }
+
+            .logout-card:hover {
+                transform: translateY(-5px);
+            }
+ 
+
+
+
+        .calendar {
+            max-width: 450px;
+            margin: 0 auto 20px;
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+            .calendar table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            .calendar th, .calendar td {
+                width: 14%;
+                text-align: center;
+                padding: 10px;
+                font-size: 18px;
+            }
+
+            .calendar th {
+                background-color: #a5d6a7;
+                color: white;
+                border-radius: 10px;
+            }
+
+            .calendar td {
+                border: 1px solid #c8e6c9;
+                position: relative;
+            }
+
+        .highlighted {
+            position: relative;
+        }
+
+        .calendar-icon {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            
+        }
+
+        .container {
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        .mission-card {
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.1);
+            margin: 20px 0;
+            padding: 20px;
+            text-align: center;
+            border: 4px solid #a5d6a7;
+            position: relative;
+            transition: border-color 0.3s ease-in-out;
+        }
+
+            .mission-card:active {
+                border-color: #ff7043;
+            }
+
+            .mission-card img {
+                width: 96%;
+                border-radius: 5px;
+                transition: transform 0.3s ease-in-out;
+                border: 3px solid white;
+                box-shadow: 4px 4px 15px rgba(0, 0, 0, 0.3);
+            }
+
+        .quiz-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .quiz-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+
+        .mission-title {
+            font-size: 26px;
+            font-weight: bold;
+            color: #2e7d32;
+            margin-top: 15px;
+        }
+
+        .mission-desc {
+            font-size: 18px;
+            color: #4caf50;
+            margin: 10px 0 20px;
+        }
+
+        .mission-btn {
+            display: inline-block;
+            padding: 12px 25px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 30px;
+            border: none;
+            cursor: pointer;
+            color: white;
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+ 
+        .no-select {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+    </style>
+
+    <style>
+        /* Overlay for dark background */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5); /* Dark background */
+            display: none;
+            z-index: 9999;
+        }
+
+        /* Centered horizontal message box with animation */
+        .loading-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px 70px; /* Padding adjusted for horizontal layout */
+            font-size: 18px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            animation: fadeIn 0.5s forwards, pulse 1.5s infinite ease-in-out; /* Fade in and pulse animation */
+            white-space: nowrap; /* Ensure text stays in a single line */
+        }
+
+        /* Pulse effect */
+        @@keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        /* Fade in effect */
+        @@keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+    </style>
+    <style>
+        .mis11us {
+            padding: 1px 1px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+            background: #FF9800;
+            color: white;
+        }
+    </style>
+
+    <style>
+        /* 팝업 백그라운드 */
+        .popup-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* 배경 어둡게 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999; /* 화면에서 최상단에 표시되도록 설정 */
+        }
+
+        /* 팝업 스타일 */
+        .popup {
+            background-color: white;
+            text-align: center;
+            width: 90%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 팝업에 약간의 그림자 추가 */
+        }
+    </style>
+  
+    <style>
+    /* 영역 1 스타일 */
+    .popup-header {
+        background-color: #f0f4c3; /* 부드러운 연한 녹색 */
+        padding: 10px;
+        text-align: center;
+    }
+
+    /* 영역 2 스타일 */
+    .popup-content {
+        background-color: #fffde7; /* 연한 크림색 */
+        padding: 20px;
+        text-align: center;
+        border-bottom: 1px solid #eeeeee; /* 구분선 */
+    }
+
+    /* 영역 3 스타일 */
+    .popup-checkboxes {
+        background-color: #f1f8e9; /* 연한 그린 계열 */
+        padding: 15px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    /* 공통 스타일 */
+    .popup p {
+        margin: 5px 0;
+    }
+
+    .popup-checkboxes label {
+        font-weight: bold;
+    }
+</style>
+
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+    <script src="/js/ProcessBar73.js"></script>
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+        function goBack() {
+            window.history.back();
+        }
+
+    </script>
+    <script>
+
+        function getFirstDayOfWeek(year, month) {
+            // 해당 년월의 1일 날짜 객체 생성 (month는 0부터 시작하므로 -1 필요 없음)
+            let firstDay = new Date(year, month - 1, 1);
+
+            // 1일부터 시작하여 토요일을 찾음
+            while (firstDay.getDay() !== 6) { // getDay()가 6이면 토요일
+                firstDay.setDate(firstDay.getDate() + 1);
+            }
+
+            // 찾은 토요일의 주 첫날(일요일) 계산
+            let sunday = new Date(firstDay);
+            sunday.setDate(sunday.getDate() - 6);
+
+            // 일자만 반환
+            return sunday.getDate();
+        } 
+        function goToPage(url) {
+            showLoading();
+            window.location.href = url;
+        }
+        function formatDate(firstDay, dayCount) {
+            // firstDay 변수를 Date 객체로 변환합니다.
+            const firstDate = new Date(firstDay);
+
+            console.log(firstDay); 
+
+            // 새로운 날짜를 생성하기 위해 firstDate의 년, 월을 가져옵니다.
+            const year = firstDate.getFullYear();
+            const month = String(firstDate.getMonth() + 1).padStart(2, '0'); // 월은 0부터 시작하므로 +1을 해줍니다.
+
+            // dayCount 값을 사용하여 일자를 설정합니다.
+            const day = String(dayCount).padStart(2, '0');
+
+            // 새로운 날짜 형식의 문자열을 반환합니다.
+            return `${year}-${month}-${day}`;
+        }
+
+        function formatDate2(year, month, day) {
+            // 월과 일이 한 자리 숫자인 경우 두 자리로 포맷 (예: 01, 09)
+            const formattedMonth = String(month).padStart(2, '0');
+            const formattedDay = String(day).padStart(2, '0');
+            // 원하는 형식으로 반환
+            return `${year}-${formattedMonth}-${formattedDay}`;
+        }
+        function generateCalendar() {
+            const year = @todayDT.Year;
+            const month = @todayDT.Month;
+            const toDayDay = @todayDT.Day; 
+            const homeworkInput = "@ViewData["MonString"]";
+            const homeworkDays = homeworkInput.split(',').map(num => parseInt(num.trim())).filter(num => !isNaN(num));
+
+            const firstDay = new Date(year, month - 1, 1).getDay();
+            const daysInMonth = new Date(year, month, 0).getDate();
+
+            let calendarHTML = `
+                                <thead>
+                                    <tr>
+                                        <th>일</th>
+                                        <th>월</th>
+                                        <th>화</th>
+                                        <th>수</th>
+                                        <th>목</th>
+                                        <th>금</th>
+                                        <th>토</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                            `;
+
+            let dayCount = 1;
+            let dayCountNext = 0;
+            let prevDay = getFirstDayOfWeek(year, month );
+            for (let i = 0; i < 6; i++) {
+                calendarHTML += "<tr>";
+                for (let j = 0; j < 7; j++) {
+                    if (i === 0 && j < firstDay) {
+                        let valueVariDay = formatDate2(year, month - 1, prevDay);
+                        calendarHTML += "<td style='color:gray;' onclick=goToPage('/Home/goWorkDT?workDT=" + valueVariDay + "')>" + prevDay + "</td>";
+                        prevDay = prevDay + 1;
+                    } else if (dayCount > daysInMonth) {
+                        dayCountNext = dayCountNext + 1;
+                        let valueVariDay = formatDate2(year, month + 1, dayCountNext);
+                        calendarHTML += "<td style='color:gray;' onclick=goToPage('/Home/goWorkDT?workDT=" + valueVariDay + "')>" + dayCountNext + "</td>";
+                    } else {
+                        let homeworkMark = homeworkDays.includes(dayCount) ? "<img src='@missioncompleted' class='calendar-icon'>" : "";
+                    
+                        let valueVariDay = formatDate2(year, month, dayCount);
+                        calendarHTML += "<td onclick=goToPage('/Home/goWorkDT?workDT=" + valueVariDay + "')>";
+
+                        if (toDayDay == dayCount) {
+                            calendarHTML += "<div class='mis11us'><span>" + dayCount + "</span></div>";
+                        }
+                        else
+                        {
+                            calendarHTML += "<span>" + dayCount + "</span>";
+                        }
+                        calendarHTML += homeworkMark + "</td>";
+                        dayCount++;
+                    }
+                }
+                calendarHTML += "</tr>";
+                if (dayCount > daysInMonth) break;
+            }
+
+            calendarHTML += "</tbody>";
+            document.getElementById('calendar').innerHTML = calendarHTML;
+        }
+
+        window.onload = generateCalendar;
+    </script>
+</head>
+<body>
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+
+    <div class="welcome-box">
+        <h2>안녕하세요.</h2>
+        <p><strong>"@UserFullName"님!!</strong></p>
+        <p>@ConstatsCommon.MainKeyTitle <br><strong>"거룩한 습관 만들기"</strong>프로그램에 오심을 환영해요.</p>
+        @*<p class="get-started">Let's get started.</p>*@
+        <p><strong>@TodayMesssage</strong></p>
+        <p class="get-started">지금까지 누적 총 포인트 : @Total_All_Desc</p>
+        <p>1,000점 도달 일자 : @Total_All_Desc_Reach1000</p>
+        <p>@ViewBag.maxAwardLevel.ToString("N0")점 도달 일자 : @Total_All_Desc_Reach_MAX</p>
+    </div>
+
+
+    <h2>📅 @BulletinBoard.Common.SharedComm.GetTodayStringKor2() 미션 달력</h2>
+
+    <div class="calendar" style="no-select">
+
+        <table id="calendar"></table>
+
+    </div>
+
+    <div class="container">
+        @await Html.PartialAsync("_Publish_MissionContents_Date_Diff_2")
+        @await Html.PartialAsync("_Publish_MissionContents_Date_History")
+
+        @if (rerachPoint)
+        {
+            @await Html.PartialAsync("_Publish_MissionContents_Award")
+        }
+
+        @if (RoleCode == "T1001" || RoleCode == "T1002")
+        {
+            @await Html.PartialAsync("_Publish_MissionContents_Date_MyClass")
+        }
+
+        @await Html.PartialAsync("_Publish_MissionContents_2", new MissionContents_2 { missionTitle = "📖 오늘의 말씀" ,missionDesc = "성경 말씀을 읽고 마음을 채워요." , missionButtonClass = "colorBaseWasabiGreen",missionButtonText = "말씀 읽기" ,BackGround=@formattedModResultDataWord , MissionCount = (@Model.TodayWordToReadCountToMe + @Model.TodayWordToReadCountToParent), MissionURL = "TodayWordToRead" })
+
+        @await Html.PartialAsync("_Publish_MissionContents_Question_2", new MissionContents_2 {  missionTitle = "❓ 재미있는 퀴즈" ,missionDesc = "성경 퀴즈를 풀어보세요!" , missionButtonText = "퀴즈 풀기" , missionButtonClass = "colorBasePastelRed" ,BackGround=@formattedModResultDataQuiz , MissionCount = (@Model.QuestionCount), MissionURL = "TodayQuestion" })
+
+        @await Html.PartialAsync("_Publish_MissionContents_2", new MissionContents_2 { missionTitle = "🙏 기도해요" ,missionDesc = "하나님께 마음을 드려요." , missionButtonText = "기도 하기" , missionButtonClass = "colorBaseSoftTeal",BackGround=@formattedModResultDataPray , MissionCount = (@Model.PrayPhraseCountToMe + @Model.PrayPhraseCountToParent + @Model.PrayPhraseCountToFriend), MissionURL = "TodayPray" })
+
+        @await Html.PartialAsync("_Publish_MissionContents_2", new MissionContents_2 { missionTitle = "📝 말씀 암송" ,missionDesc = "하나님의 말씀을 외워보아요!" , missionButtonText = "암송 하기", missionButtonClass = "colorBaseForestGreen" ,BackGround=@formattedModResultDataRecite , MissionCount = (@Model.WeeklyWordToReadCount), MissionURL = "WeeklyWordToRead" })
+
+
+    </div>
+
+ 
+    @if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+    {
+        <div class="delete-card">
+            <div class="mission-title">🗑 삭제</div>
+            <div class="mission-desc">나의 포인트 삭제합니다.</div>
+            <div class="buttonCommon colorBasePastelRed" style="padding : 20px;" onclick="location.href='/DailyMission/DeleteClickHistory'">삭제하기</div>
+        </div>
+    }
+
+    <div class="logout-card">
+        <div class="mission-title">🔒 로그아웃</div>
+        <div class="mission-desc">안전하게 로그아웃하세요.</div>
+        <div class="buttonCommon colorBaseGoldenOrange" style="padding : 20px;" onclick="document.querySelector('form').submit();">로그아웃</div>
+    </div>
+
+
+    <div class="home-card">
+        <div class="mission-title">🏠 홈으로 이동</div>
+        <div class="mission-desc">처음 화면으로 돌아가기</div>
+        <div class="buttonCommon colorBaseHome" style="padding : 20px;" onclick="location.href='/'">홈으로</div>
+    </div>
+
+    <form class="form-inline" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" style="display: none;">
+        <button type="submit" class="mission-button ">이동</button>
+    </form>
+
+    <div class="popup-background" id="popup-background" style="display: none;">
+        <div class="popup">
+            <!-- 영역 1 -->
+            <div class="popup-header">
+                <h2>
+                    축하드려요!!!
+                </h2>
+                <h3>
+                   시상포인트에 도달 하셨어요.
+                </h3>
+            </div>
+
+            <!-- 영역 2 -->
+            <div class="popup-content">
+                <p>이 페이지 중간에 '🎁 선물선택하기' 박스에서 </p>
+                <p>'선물선택' 버튼을 눌러서 선물을 선택해 보세요.^^</p>
+            </div>
+
+            <!-- 영역 3 -->
+            <div class="popup-checkboxes">
+                <label><input type="checkbox" id="hideToday" onclick="handleCheckbox('hideToday', 1)"> 오늘 하루 안보기</label>
+                <label><input type="checkbox" id="hide7Days" onclick="handleCheckbox('hide7Days', 7)"> 7일간 안보기</label>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const hideToday = getCookie('hideToday');
+            const hide7Days = getCookie('hide7Days');
+             
+            var shouldShowPopup = false;
+            var shouldShowPopupCookie = false;
+
+     
+        @{
+            bool shouldShow = false;
+
+            // 시상 대상이면서 선물 미선택 시 팝업 표시
+            if (rerachPoint)
+            {
+                shouldShow = true;
+            }
+        }
+            shouldShowPopup = @(shouldShow.ToString().ToLower());
+            shouldShowPopupCookie = @(showPopupCookieValue.ToString().ToLower());
+
+            if (shouldShowPopup) {
+                if (shouldShowPopupCookie == false) { // cookie에 값이 없으면 
+                    document.getElementById('popup-background').style.display = 'flex'; // 팝업 표시
+                    document.body.style.overflow = 'hidden'; // 스크롤 비활성화
+                }
+            }
+
+        });
+
+        function handleCheckbox(cookieName, days) {
+            setCookie(cookieName, 'true', days); // 쿠키 설정
+            document.getElementById('popup-background').style.display = 'none'; // 팝업 숨김
+            document.body.style.overflow = 'auto'; // 스크롤 다시 활성화
+        }
+
+        // 쿠키 설정 함수
+        function setCookie(name, value, days) {
+            const data = {
+                UserId: "@UserId",
+                cookieName: "@CookieKey.MissionMainBoard_HideDay.ToString()",
+                cookieValue: "true",
+                cookieDays: days
+            };
+            console.log(data);
+            doProcess(data, 'UpsertUserCookieSettings','n');
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000)); // 쿠키 만료 시간 설정
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/"; // 쿠키 설정
+        }
+
+        // 쿠키 가져오기 함수
+        function getCookie(name) {
+            const cname = name + "=";
+            const decodedCookie = decodeURIComponent(document.cookie);
+            const ca = decodedCookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i].trim();
+                if (c.indexOf(cname) === 0) {
+                    return c.substring(cname.length, c.length);
+                }
+            }
+            return ""; // 쿠키가 없으면 빈 문자열 반환
+        }
+    </script>
+
+
+</body>
+</html>

@@ -1,0 +1,141 @@
+﻿@model List<BulletinBoard.Models.HealingAndRestorationPrays.HealingAndRestorationPray>
+@{
+    Layout = null;
+    int total = ViewBag.TotalCount is int _t ? _t : 0;
+    int rotNo = ViewBag.RotationNo is int _r ? _r : 0;
+    var msg   = TempData["Msg"] as string;
+    var err   = TempData["Error"] as string;
+
+    // 오늘 노출되는 기도문 — 줄 순서가 아니라 PrayId 로 찾습니다.
+    // (목록은 수정일 내림차순이라 "몇 번째 줄"이 순환 차례와 다릅니다)
+    int todayId = ViewBag.TodayPrayId is int _tp ? _tp : 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F4FAF7" />
+    <title>기도문 관리 · 치유와 회복을 위한 기도문</title>
+    @await Html.PartialAsync("_Nature")
+    <style>
+    .lhero{ padding:26px 0 16px; }
+    .lhero h1{ margin:10px 0 0; font-size:clamp(20px,4.6vw,27px); font-weight:900; letter-spacing:-.03em; }
+    .lhero-sub{ margin-top:8px; font-size:12.5px; color:var(--muted); font-weight:700; }
+    .stat-row{ display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
+    /* 총 건수 — 제목 아래 한 줄 */
+    .ltotal{ display:flex; align-items:baseline; gap:6px; margin-top:12px; }
+    .ltotal-num{ font-size:clamp(30px,7.4vw,40px); font-weight:900; line-height:1;
+                 letter-spacing:-.04em; color:var(--leaf-dk); font-variant-numeric:tabular-nums; }
+    .ltotal-unit{ font-size:15px; font-weight:800; color:var(--leaf-dk); }
+    .ltotal-cap{ margin-left:6px; font-size:12px; font-weight:700; color:var(--muted); }
+    /* 수정일 — 숫자가 줄마다 어긋나지 않게 고정폭 숫자를 씁니다 */
+    .row-when{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+    </style>
+</head>
+<body>
+
+<header class="nbar">
+    <div class="nbar-in">
+        <a class="nb-btn" href="/HealingAndRestorationPray/Index">← 오늘의 기도</a>
+        <div class="nb-mid">기도문 관리</div>
+        <a class="nb-btn" href="/HealingAndRestorationPray/Create">✚ 등록</a>
+    </div>
+</header>
+
+<div class="wrap">
+
+    <section class="lhero">
+        <span class="chip chip-leaf">🔒 관리자 전용</span>
+        <h1>기도문 관리</h1>
+
+        @* 총 건수 — 이 화면에서 가장 먼저 알고 싶은 숫자라 제목 바로 아래에 크게 둡니다 *@
+        <div class="ltotal">
+            <span class="ltotal-num">@(Model?.Count ?? 0)</span>
+            <span class="ltotal-unit">편</span>
+            <span class="ltotal-cap">등록된 기도문 총 건수</span>
+        </div>
+
+        <div class="lhero-sub">최근에 수정한 기도문이 위에 옵니다. 왼쪽 숫자는 매일 노출되는 순환 차례(순서)입니다.</div>
+    </section>
+
+    @if (!string.IsNullOrEmpty(msg)) { <div class="flash flash-ok">@msg</div> }
+    @if (!string.IsNullOrEmpty(err)) { <div class="flash flash-err">@err</div> }
+
+    <div class="stat-row">
+        <span class="chip chip-leaf">🌿 사용중 @(total)편</span>
+        <span class="chip chip-water">📅 오늘 @(rotNo)번째</span>
+        @{ int unusedCnt = (Model?.Count ?? 0) - total; }
+        @if (unusedCnt > 0) { <span class="chip chip-gray">💤 미사용 @(unusedCnt)편</span> }
+    </div>
+
+    <div class="ncard">
+        <div class="ncard-hd">
+            <div class="ncard-ico">📂</div>
+            <span class="ncard-tt">기도문 목록</span>
+            <span class="ncard-sub">최근 수정 순</span>
+        </div>
+
+        @if (Model == null || Model.Count == 0)
+        {
+            <div class="empty">
+                <div class="empty-ico">🌱</div>
+                <div class="empty-tt">등록된 기도문이 없습니다</div>
+                <div class="empty-sub">첫 기도문을 등록해 주세요.</div>
+                <div style="margin-top:18px;">
+                    <a class="btn btn-leaf" href="/HealingAndRestorationPray/Create">✚ 기도문 등록</a>
+                </div>
+            </div>
+        }
+        else
+        {
+            foreach (var p in Model)
+            {
+                bool isActive = string.Equals(p.UseYN, "Y", StringComparison.OrdinalIgnoreCase);
+                bool isToday  = isActive && todayId > 0 && p.PrayId == todayId;
+
+                // 수정일 — 한 번도 고치지 않았으면 등록일을 대신 보여 줍니다.
+                DateTime? touched = p.UpdatedAt ?? (p.CreatedAt == DateTime.MinValue ? (DateTime?)null : p.CreatedAt);
+                bool everEdited   = p.UpdatedAt.HasValue;
+
+                <div class="rowitem @(isToday ? "is-today" : "")">
+                    <div class="row-no">@p.SortOrder</div>
+                    <div class="row-bd">
+                        <div class="row-tt">
+                            @p.Title
+                            @if (isToday) { <span class="chip chip-leaf" style="margin-left:6px; padding:2px 8px; font-size:10.5px;">오늘</span> }
+                            @if (!isActive) { <span class="chip chip-gray" style="margin-left:6px; padding:2px 8px; font-size:10.5px;">미사용</span> }
+                        </div>
+                        <div class="row-meta">
+                            @if (touched.HasValue)
+                            {
+                                <span class="row-when" title="@(everEdited ? "마지막 수정" : "등록"): @touched.Value.ToString("yyyy-MM-dd HH:mm")">
+                                    @(everEdited ? "✏️" : "🌱") @touched.Value.ToString("yyyy-MM-dd")
+                                </span>
+                                <text> · </text>
+                            }
+                            👀 @p.ClickCount.ToString("N0")
+                            · 🙏 @p.LikeCount.ToString("N0")
+                            @if (!string.IsNullOrWhiteSpace(p.BibleRef)) { <text> · 📖 @p.BibleRef</text> }
+                        </div>
+                    </div>
+                    <div class="row-act">
+                        <a class="row-btn" href="/HealingAndRestorationPray/Detail?PrayId=@p.PrayId">👁<span> 보기</span></a>
+                        <a class="row-btn" href="/HealingAndRestorationPray/Edit?PrayId=@p.PrayId">✏️<span> 수정</span></a>
+                        <a class="row-btn del" href="/HealingAndRestorationPray/Delete?PrayId=@p.PrayId">🗑<span> 삭제</span></a>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="btn-row">
+        <a class="btn btn-leaf" href="/HealingAndRestorationPray/Create">✚ 새 기도문 등록</a>
+        <a class="btn" href="/HealingAndRestorationPray/Index">🌿 오늘의 기도</a>
+        <a class="btn" href="/">🏠 홈</a>
+    </div>
+
+</div>
+
+</body>
+</html>

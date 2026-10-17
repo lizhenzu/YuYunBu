@@ -1,0 +1,425 @@
+﻿@using System.Globalization
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.DailyMission2.UserDailyPointsVM
+
+@{
+    Layout = "_Layout_Mission2_New";
+    ViewData["Title"] = "월별 포인트 달력";
+
+    // 현재 선택 월
+    var monthStart = new DateTime(Model.FromDate.Year, Model.FromDate.Month, 1);
+    var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+    // 달력 그리드 시작(일요일 시작 기준)
+    int startOffset = (int)monthStart.DayOfWeek; // Sunday=0
+    var gridStart = monthStart.AddDays(-startOffset);
+
+    // 6주(42칸) 고정
+    const int totalCells = 42;
+
+    // 날짜별 총합 맵
+   var map = (Model.Rows ?? Enumerable.Empty<BulletinBoard.Models.DailyMission2.UserDailyPointRow>())
+    .GroupBy(x => x.DateBy.Date)
+    .ToDictionary(g => g.Key, g => g.Sum(x => x.TotalPoint));
+
+    // 월 이동 링크
+    var prev = monthStart.AddMonths(-1);
+    var next = monthStart.AddMonths(1);
+
+    string MonthLink(DateTime d) => $"/DailyMission2/UserMonthlyPoints?userName={Uri.EscapeDataString(Model.UserName ?? "")}&year={d.Year}&month={d.Month}";
+
+    // 월 탭(1~12)
+    string MonthTabLink(int m) => $"/DailyMission2/UserMonthlyPoints?userName={Uri.EscapeDataString(Model.UserName ?? "")}&year={monthStart.Year}&month={m}";
+
+    // ✅ 날짜 클릭 링크
+    string DayLink(DateTime d) => $"/DailyMission2?date={d:yyyy-MM-dd}";
+}
+
+<style>
+    /* =========================
+           Layout container
+        ========================== */
+    .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px;
+    }
+
+    /* 모바일에서 좌우 여백 줄이기 */
+    @@media (max-width: 640px) {
+        .wrap {
+            padding: 10px;
+        }
+    }
+
+    .topBar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap; /* 모바일에서 줄바꿈 */
+    }
+
+    .titleBox {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 220px;
+        flex: 1 1 auto;
+    }
+
+        .titleBox .t {
+            font-size: 18px;
+            font-weight: 1000;
+            line-height: 1.2;
+        }
+
+        .titleBox .s {
+            font-size: 12px;
+            opacity: .7;
+            font-weight: 800;
+            line-height: 1.3;
+            word-break: keep-all;
+        }
+
+    .navBtn {
+        border: 1px solid rgba(0,0,0,.12);
+        background: rgba(255,255,255,.85);
+        padding: 10px 12px;
+        border-radius: 14px;
+        font-weight: 900;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    /* =========================
+           Month tabs
+        ========================== */
+    .monthTabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 10px 0 16px;
+    }
+
+    .mTab {
+        padding: 8px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,.12);
+        background: rgba(255,255,255,.75);
+        font-weight: 900;
+        text-decoration: none;
+        color: inherit;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+        .mTab.active {
+            background: linear-gradient(135deg, rgba(99,102,241,.95), rgba(59,130,246,.92));
+            color: #fff;
+            border-color: transparent;
+        }
+
+    /* =========================
+           Calendar shell
+        ========================== */
+    .cal {
+        background: rgba(255,255,255,.72);
+        border: 1px solid rgba(0,0,0,.10);
+        border-radius: 18px;
+        overflow: hidden; /* ✅ 달력이 화면 밖으로 튀어나가는 것 방지 */
+        box-shadow: 0 12px 30px rgba(0,0,0,.06);
+    }
+
+    /* 요일줄 */
+    .dow {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr)); /* ✅ 모바일 overflow 방지 핵심 */
+        background: rgba(0,0,0,.03);
+        border-bottom: 1px solid rgba(0,0,0,.08);
+    }
+
+        .dow div {
+            padding: 10px 6px;
+            font-weight: 1000;
+            text-align: center;
+            font-size: 12px;
+            opacity: .75;
+            white-space: nowrap;
+        }
+
+    /* 달력 그리드 */
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr)); /* ✅ 모바일 overflow 방지 핵심 */
+        width: 100%;
+    }
+
+    /* =========================
+           Cell
+           - 점수는 "일자 아래 중앙" 고정
+           - 넓게 퍼지는 현상(좌우 배치) 제거
+        ========================== */
+    .cell {
+        min-height: 86px;
+        padding: 8px 6px 10px;
+        border-right: 1px solid rgba(0,0,0,.06);
+        border-bottom: 1px solid rgba(0,0,0,.06);
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* ✅ 중앙 정렬 */
+        justify-content: flex-start;
+        gap: 8px;
+        /* ✅ 셀 내부 내용이 폭을 늘리지 못하게 */
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .grid .cell:nth-child(7n) {
+        border-right: 0;
+    }
+
+    .outMonth {
+        background: rgba(0,0,0,.01);
+    }
+
+    /* 일자: 중앙 */
+    .dayNum {
+        font-weight: 1000;
+        font-size: 14px;
+        opacity: .92;
+        text-align: center;
+        line-height: 1;
+        margin-top: 2px;
+    }
+
+    .outMonth .dayNum {
+        opacity: .35;
+    }
+
+    /* 점수 pill: 일자 아래 중앙 */
+    .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 52px; /* ✅ 고정 폭 */
+        max-width: 90%;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-weight: 1000;
+        font-size: 12px;
+        background: rgba(99,102,241,.12);
+        border: 1px solid rgba(99,102,241,.22);
+        /* ✅ 숫자가 길어도 overflow 방지 */
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+        .pill.zero {
+            background: rgba(0,0,0,.04);
+            border-color: rgba(0,0,0,.08);
+            opacity: .65;
+        }
+
+    /* ✅ 달력 셀 클릭 링크 스타일 */
+    .calLink {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+    }
+
+        .calLink:hover {
+            background: rgba(34,197,94,.10);
+            box-shadow: 0 10px 20px rgba(15,23,42,.10);
+            transform: translateY(-1px);
+        }
+
+        .calLink:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        .calLink:focus-visible {
+            outline: 3px solid rgba(59,130,246,.35);
+            outline-offset: -3px;
+        }
+
+    /* 모바일: 셀 높이/글자/패딩 조금 축소 */
+    @@media (max-width: 640px) {
+        .titleBox .t {
+            font-size: 16px;
+        }
+
+        .titleBox .s {
+            font-size: 11px;
+        }
+
+        .dow div {
+            padding: 8px 4px;
+            font-size: 11px;
+        }
+
+        .cell {
+            min-height: 72px;
+            padding: 6px 4px 8px;
+            gap: 6px;
+        }
+
+        .dayNum {
+            font-size: 13px;
+        }
+
+        .pill {
+            width: 46px;
+            height: 24px;
+            font-size: 11px;
+        }
+    }
+
+    /* =========================
+           Summary cards
+        ========================== */
+    .sumRow {
+        display: grid; /* ✅ 모바일에서 줄바꿈 안정 */
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+    }
+
+    .sumCard {
+        background: rgba(255,255,255,.72);
+        border: 1px solid rgba(0,0,0,.10);
+        border-radius: 16px;
+        padding: 12px;
+        min-width: 0;
+    }
+
+        .sumCard .k {
+            font-size: 12px;
+            opacity: .75;
+            font-weight: 900;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sumCard .v {
+            font-size: 18px;
+            font-weight: 1000;
+            margin-top: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+    @@media (max-width: 900px) {
+        .sumRow {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @@media (max-width: 520px) {
+        .sumRow {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .sumCard .v {
+            font-size: 16px;
+        }
+    }
+</style>
+
+<div class="wrap">
+    <div class="topBar">
+        <div class="titleBox">
+            <div class="t">📅 @monthStart.ToString("yyyy년 M월") 포인트 달력</div>
+            <div class="s">사용자: @Model.UserName · 범위: @Model.FromDate.ToString("yyyy-MM-dd") ~ @Model.ToDate.ToString("yyyy-MM-dd")</div>
+        </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+    
+    <!-- ✅ 홈으로 가기 -->
+    <a class="navBtn" href="/" title="홈으로 이동">
+        🏠 홈
+    </a>
+    <a class="navBtn" href="/DailyMission2">
+    🎯 미션홈
+</a>
+ @*    <!-- 기존 버튼 -->
+    <a class="navBtn" href="@MonthLink(prev)">← 이전달</a>
+    <a class="navBtn" href="@MonthLink(next)">다음달 →</a> *@
+</div>
+    </div>
+
+    <div class="monthTabs">
+        @for (int m = 1; m <= 12; m++)
+        {
+            var cls = (m == monthStart.Month) ? "mTab active" : "mTab";
+            <a class="@cls" href="@MonthTabLink(m)">@(@m)월</a>
+        }
+    </div>
+
+    <div class="cal">
+        <div class="dow">
+            <div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div>
+        </div>
+
+        <div class="grid">
+            @for (int i = 0; i < totalCells; i++)
+            {
+                var day = gridStart.AddDays(i).Date;
+                bool inThisMonth = (day.Month == monthStart.Month && day.Year == monthStart.Year);
+
+                int pt = map.ContainsKey(day) ? map[day] : 0;
+
+                var cellCls = inThisMonth ? "cell" : "cell outMonth";
+
+                if (inThisMonth)
+                {
+                    <a class="@cellCls calLink" href="@DayLink(day)" title="@day.ToString("yyyy-MM-dd") 로 이동">
+                        <div class="dayNum">@day.Day</div>
+
+                        @if (pt > 0)
+                        {
+                            <span class="pill">@pt</span>
+                        }
+                        else
+                        {
+                            <span class="pill zero">0</span>
+                        }
+                    </a>
+                }
+                else
+                {
+                    <div class="@cellCls">
+                        <div class="dayNum">@day.Day</div>
+                        <span class="pill zero">&nbsp;</span>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <div class="sumRow">
+        <div class="sumCard"><div class="k">말씀 합</div><div class="v">@Model.SumWord</div></div>
+        <div class="sumCard"><div class="k">퀴즈 합</div><div class="v">@Model.SumQuiz</div></div>
+        <div class="sumCard"><div class="k">기도 합</div><div class="v">@Model.SumPray</div></div>
+        <div class="sumCard"><div class="k">암송 합</div><div class="v">@Model.SumRecite</div></div>
+        <div class="sumCard"><div class="k">총 포인트</div><div class="v">@Model.SumTotal</div></div>
+    </div>
+</div>

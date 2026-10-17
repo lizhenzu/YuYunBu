@@ -1,0 +1,812 @@
+﻿@model BulletinBoard.Models.DailyMission2.ParticipantCardsVM
+@using BulletinBoard.Common
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+
+@{
+    ViewData["Title"] = "참여자 목록";
+    Layout = null;
+
+    string FmtDate(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy-MM-dd") : "—";
+    string Safe(string? s) => (s ?? "").Trim();
+
+    // ✅ 프로필 이미지: /images/profile/{userid}.png 가 실제로 있으면 사용, 없으면 기본 이미지
+    string ProfileOrDefault(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var virtualPath = $"/images/profile/{uid}.png";
+            var physicalPath = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+
+            if (System.IO.File.Exists(physicalPath))
+                return virtualPath;
+        }
+
+        return "/images/icon/people/people_01.webp";
+    }
+
+    int no = 1; // ✅ 순번
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+
+    <style>
+        /* ===========================
+                   LIGHT THEME
+                   =========================== */
+        :root {
+            --bg0: #f6f8ff;
+            --bg1: #eef3ff;
+            --card: rgba(255,255,255,.92);
+            --card2: rgba(255,255,255,.70);
+            --line: rgba(15,23,42,.12);
+            --txt: rgba(15,23,42,.92);
+            --muted: rgba(15,23,42,.55);
+            --muted2: rgba(15,23,42,.42);
+            --primary: rgba(79,124,255,.95);
+            --good: rgba(34,197,94,.95);
+            --warn: rgba(239,68,68,.95);
+            --shadow: 0 14px 30px rgba(15,23,42,.10);
+        }
+
+        body {
+            margin: 0;
+            background: radial-gradient(900px 600px at 15% 10%, rgba(79,124,255,.18), transparent 60%), radial-gradient(900px 600px at 85% 0%, rgba(34,197,94,.10), transparent 55%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            color: var(--txt);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        }
+
+        .wrap {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px 14px 28px;
+        }
+
+        /* ✅ 상단 큰 버튼 영역 */
+        .navbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+            margin-bottom: 12px;
+        }
+
+        .navBtn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 14px;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.70));
+            box-shadow: 0 10px 24px rgba(15,23,42,.10);
+            color: var(--txt);
+            text-decoration: none;
+            font-weight: 900;
+            letter-spacing: -.2px;
+            min-height: 48px;
+            flex: 1 1 220px; /* ✅ 모바일에서 줄바꿈 + 크게 */
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+        }
+
+            .navBtn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 30px rgba(15,23,42,.12);
+                border-color: rgba(15,23,42,.18);
+            }
+
+            .navBtn:active {
+                transform: translateY(0px);
+                box-shadow: 0 8px 18px rgba(15,23,42,.10);
+            }
+
+            .navBtn.primary {
+                background: linear-gradient(180deg, rgba(79,124,255,.18), rgba(255,255,255,.85));
+                border-color: rgba(79,124,255,.26);
+            }
+
+            .navBtn.good {
+                background: linear-gradient(180deg, rgba(34,197,94,.16), rgba(255,255,255,.85));
+                border-color: rgba(34,197,94,.24);
+            }
+
+        .navIcon {
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: rgba(15,23,42,.06);
+            border: 1px solid rgba(15,23,42,.10);
+            flex: 0 0 auto;
+        }
+
+        .navText {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.05;
+            min-width: 0;
+        }
+
+            .navText b {
+                font-size: 14px;
+            }
+
+            .navText span {
+                margin-top: 4px;
+                font-size: 12px;
+                color: var(--muted);
+                font-weight: 700;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+        .topbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.72));
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(8px);
+        }
+
+        .title {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+            .title h1 {
+                margin: 0;
+                font-size: 18px;
+                letter-spacing: -.2px;
+            }
+
+            .title .sub {
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .pill {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.88);
+            border-radius: 999px;
+            padding: 8px 10px;
+            box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        }
+
+            .pill input {
+                background: transparent;
+                border: 0;
+                outline: 0;
+                color: var(--txt);
+                min-width: 180px;
+            }
+
+        .seg {
+            display: flex;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            overflow: hidden;
+            background: rgba(255,255,255,.88);
+            box-shadow: 0 8px 20px rgba(15,23,42,.06);
+        }
+
+            .seg button {
+                border: 0;
+                background: transparent;
+                color: var(--txt);
+                padding: 8px 12px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 800;
+            }
+
+                .seg button.active {
+                    background: rgba(79,124,255,.16);
+                    color: rgba(15,23,42,.92);
+                }
+
+                /* 확인필요 버튼만 살짝 강조 */
+                .seg button[data-role="needcheck"].active {
+                    background: rgba(239,68,68,.14);
+                }
+
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            grid-column: span 4;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.70));
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        @@media (max-width: 980px) {
+            .card {
+                grid-column: span 6;
+            }
+        }
+
+        @@media (max-width: 560px) {
+            .navbar {
+                gap: 10px;
+            }
+
+            .navBtn {
+                flex: 1 1 100%;
+            }
+            /* 모바일 1줄 크게 */
+
+            .topbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .controls {
+                justify-content: space-between;
+            }
+
+            .pill input {
+                min-width: 140px;
+                width: 100%;
+            }
+
+            .card {
+                grid-column: span 12;
+            }
+        }
+
+        .cardHead {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 14px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,.55);
+        }
+
+        .avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            object-fit: cover;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(15,23,42,.04);
+            flex: 0 0 auto;
+        }
+
+        .who {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .nameRow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .rank {
+            flex: 0 0 auto;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 4px 9px;
+            border-radius: 999px;
+            color: #fff;
+            background: var(--primary);
+            box-shadow: 0 8px 18px rgba(79,124,255,.18);
+        }
+
+        .who .name {
+            font-weight: 900;
+            letter-spacing: -.2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .who .meta {
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(79,124,255,.08);
+            color: rgba(15,23,42,.86);
+            font-weight: 800;
+        }
+
+            .badge.needcheck {
+                background: rgba(239,68,68,.12);
+                border-color: rgba(239,68,68,.22);
+                color: rgba(15,23,42,.92);
+            }
+
+        .cardBody {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .statRow {
+            display: flex;
+            gap: 10px;
+        }
+
+        .stat {
+            flex: 1;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.72);
+            border-radius: 14px;
+            padding: 10px;
+        }
+
+            .stat .k {
+                font-size: 11px;
+                color: var(--muted);
+                font-weight: 800;
+            }
+
+            .stat .v {
+                margin-top: 4px;
+                font-size: 16px;
+                font-weight: 900;
+                letter-spacing: -.2px;
+                color: rgba(15,23,42,.92);
+            }
+
+        .barWrap {
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.72);
+            border-radius: 14px;
+            padding: 10px;
+        }
+
+        .barTop {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .bar {
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(15,23,42,.08);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+            .bar > i {
+                display: block;
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, rgba(34,197,94,.90), rgba(79,124,255,.90));
+            }
+
+        /* ✅ 가족 구성원 리스트 */
+        .familyMembers {
+            margin-top: 8px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .familyMember {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 14px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.78);
+        }
+
+        .familyRole {
+            font-weight: 900;
+            font-size: 12px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            background: rgba(79,124,255,.10);
+            border: 1px solid rgba(79,124,255,.18);
+            color: rgba(15,23,42,.90);
+            flex: 0 0 auto;
+            min-width: 54px;
+            text-align: center;
+        }
+
+        .familyName {
+            font-weight: 900;
+            letter-spacing: -.2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .familyPoint {
+            margin-left: auto;
+            font-weight: 900;
+            color: rgba(15,23,42,.92);
+            flex: 0 0 auto;
+        }
+
+        .empty {
+            margin-top: 14px;
+            border: 1px dashed rgba(15,23,42,.18);
+            border-radius: 16px;
+            padding: 18px;
+            color: var(--muted);
+            text-align: center;
+            background: rgba(255,255,255,.70);
+            font-weight: 800;
+        }
+
+        /* ✅ 가족 카드만 배경/테두리 톤 다르게 */
+        .card.isFamily {
+            background: linear-gradient(180deg, rgba(255, 244, 214, .92), rgba(255, 255, 255, .72) );
+            border-color: rgba(245, 158, 11, .28);
+            box-shadow: 0 14px 30px rgba(245, 158, 11, .10);
+        }
+
+            .card.isFamily .cardHead {
+                background: rgba(255, 244, 214, .55);
+                border-bottom-color: rgba(245, 158, 11, .22);
+            }
+
+            .card.isFamily .badge {
+                background: rgba(245, 158, 11, .12);
+                border-color: rgba(245, 158, 11, .22);
+            }
+
+            .card.isFamily .rank {
+                background: rgba(245, 158, 11, .95);
+                box-shadow: 0 8px 18px rgba(245, 158, 11, .18);
+            }
+
+        /* ✅ 확인필요 카드 강조 */
+        .card[data-role="needcheck"] {
+            background: linear-gradient(180deg, rgba(255, 226, 226, .92), rgba(255, 255, 255, .72) );
+            border-color: rgba(239,68,68,.30);
+            box-shadow: 0 14px 30px rgba(239,68,68,.12);
+        }
+
+            .card[data-role="needcheck"] .cardHead {
+                background: rgba(255, 226, 226, .55);
+                border-bottom-color: rgba(239,68,68,.20);
+            }
+
+            .card[data-role="needcheck"] .rank {
+                background: rgba(239,68,68,.95);
+                box-shadow: 0 8px 18px rgba(239,68,68,.18);
+            }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+
+        @{
+            int totalCount = Model?.Rows?.Count ?? 0; // ✅ 총 카드 수
+        }
+
+        <div class="topbar">
+            <div class="title">
+                <h1>참여자 목록 (카드형)</h1>
+                <div class="sub">
+                    연도: @Model.Year / 달성율 기준 목표점수: @Model.TargetPoint 점
+                    <span style="margin-left:10px; font-weight:900; color:var(--primary);">
+                        👥 총 카드: @totalCount 개
+                    </span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <div class="pill">
+                    🔎 <input id="q" type="text" placeholder="이름/아이디 검색" />
+                </div>
+
+                <!-- ✅ 학생/교사/가족/확인필요 -->
+                <div class="seg" role="tablist" aria-label="role filter">
+                    <button type="button" class="active" data-role="all">전체</button>
+                    <button type="button" data-role="family">가족</button>
+                    <button type="button" data-role="student">학생</button>
+                    <button type="button" data-role="teacher">교사</button>
+                    <button type="button" data-role="needcheck">확인필요</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="grid" class="grid">
+            @foreach (var r in Model.Rows)
+            {
+                // ✅ 사진
+                var photo = ProfileOrDefault(r.UserId);
+
+                // =========================================================
+                // ✅ 핵심 수정: "확인필요(학부모)"를 교사보다 먼저 잡는다
+                // =========================================================
+                var isStudent = r.IsStudent;
+                var isFamily = r.IsFamily;
+
+                var isParent = r.IsParent || (!isFamily && !isStudent && string.IsNullOrWhiteSpace(r.RoleName));
+                var isTeacher = r.IsTeacher && !isParent && !isFamily && !isStudent;
+
+                var roleKey =
+                isFamily ? "family" :
+                isStudent ? "student" :
+                isParent ? "needcheck" :
+                isTeacher ? "teacher" :
+                "needcheck";
+
+                // ✅ 검색 키: 가족이면 팀명 + 구성원들까지 포함
+                var familyKey = "";
+                if (isFamily && r.FamilyMembers != null && r.FamilyMembers.Count > 0)
+                {
+                    familyKey = string.Join(" ", r.FamilyMembers.Select(m => $"{Safe(m.RoleLabel)} {Safe(m.FullName)} {Safe(m.UserName)}"));
+                }
+
+                var dataName = $"{Safe(r.FullName)} {Safe(r.UserName)} {Safe(r.DisplayRoleText)} {Safe(r.FamilyTeamName)} {Safe(familyKey)}".ToLowerInvariant();
+
+                <div class="card @(isFamily ? "isFamily" : "")" data-role="@roleKey" data-name="@dataName">
+                    <div class="cardHead">
+                        <img class="avatar" src="@photo" alt="photo"
+                             onerror="this.src='/images/icon/people/people_01.webp';" />
+                        <div class="who">
+                            <div class="nameRow">
+                                <span class="rank">@no</span>
+
+                                @if (isFamily)
+                                {
+                                    <div class="name">@(!string.IsNullOrWhiteSpace(r.FamilyTeamName) ? r.FamilyTeamName : (!string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName))</div>
+                                }
+                                else
+                                {
+                                    <div class="name">
+                                        @(!string.IsNullOrWhiteSpace(r.FullName) ? r.FullName : r.UserName)
+                                        <span class="badge">@r.UserName</span>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="meta">
+                                @if (isFamily)
+                                {
+                                    <span class="badge">가족</span>
+                                    <span class="badge">@($"구성원 {r.FamilyMembers?.Count ?? 0}명")</span>
+                                }
+                                else if (isStudent)
+                                {
+                                    <span class="badge">학생</span>
+                                    <span class="badge">@($"{r.ClassYear}학년 {r.ClassBan}반")</span>
+                                }
+                                else if (isParent)
+                                {
+                                    <span class="badge needcheck">확인필요</span>
+                                }
+                                else if (isTeacher)
+                                {
+                                    <span class="badge">교사</span>
+                                }
+                                else
+                                {
+                                    <span class="badge needcheck">확인필요</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cardBody">
+                        <div class="statRow">
+                            <div class="stat">
+                                <div class="k">현재 점수</div>
+                                <div class="v">@r.YearPoint</div>
+                            </div>
+                            <div class="stat">
+                                <div class="k">마지막 수행일</div>
+                                <div class="v" style="font-size:14px; font-weight:800;">@FmtDate(r.LastActionDate)</div>
+                            </div>
+                        </div>
+
+                        <div class="barWrap">
+                            <div class="barTop">
+                                <span>달성율</span>
+                                <span><b style="color:var(--txt)">@r.AchievePercent%</b></span>
+                            </div>
+                            <div class="bar">
+                                <i style="width:@r.AchievePercent%"></i>
+                            </div>
+                        </div>
+
+                        @* =========================================================
+                       ✅ 가족 구성원 표시 로직 (유동 조합 + "동생" 라벨 처리)
+                       - 학생(RoleCode=0): 첫 번째는 "학생", 두 번째부터는 "동생"
+                       - 엄마(RoleCode=1): "엄마"
+                       - 아빠(RoleCode=2): "아빠"
+                       - 기타: RoleLabel 있으면 사용, 없으면 "구성원"
+                       ========================================================= *@
+                        @if (isFamily && r.FamilyMembers != null && r.FamilyMembers.Count > 0)
+                        {
+                            // ✅ 학생(자녀) 목록 정렬: FullName -> UserName
+                            var kids = r.FamilyMembers
+                            .Where(x => x.RoleCode == 0)
+                            .OrderBy(x => Safe(x.FullName))
+                            .ThenBy(x => Safe(x.UserName))
+                            .ToList();
+
+                            // ✅ 부모/기타
+                            var momList = r.FamilyMembers.Where(x => x.RoleCode == 1).ToList();
+                            var dadList = r.FamilyMembers.Where(x => x.RoleCode == 2).ToList();
+                            var others = r.FamilyMembers.Where(x => x.RoleCode != 0 && x.RoleCode != 1 && x.RoleCode != 2).ToList();
+
+                            <div class="familyMembers" aria-label="family members">
+
+                                @* 1) 학생/동생들 *@
+                                @{
+                                    var idx = 0;
+                                }
+                                @foreach (var m in kids)
+                                {
+                                    var label = (idx == 0) ? "학생" : "동생";
+                                    var displayName = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+
+                                    <div class="familyMember">
+                                        <span class="familyRole">@label</span>
+                                        <span class="familyName">@displayName</span>
+                                        <span class="badge">@m.UserName</span>
+                                        <span class="familyPoint">@m.YearPoint 점</span>
+                                    </div>
+
+                                    idx++;
+                                }
+
+                                @* 2) 엄마들(복수도 방어) *@
+                                @foreach (var m in momList)
+                                {
+                                    var displayName = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+
+                                    <div class="familyMember">
+                                        <span class="familyRole">엄마</span>
+                                        <span class="familyName">@displayName</span>
+                                        <span class="badge">@m.UserName</span>
+                                        <span class="familyPoint">@m.YearPoint 점</span>
+                                    </div>
+                                }
+
+                                @* 3) 아빠들(복수도 방어) *@
+                                @foreach (var m in dadList)
+                                {
+                                    var displayName = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+
+                                    <div class="familyMember">
+                                        <span class="familyRole">아빠</span>
+                                        <span class="familyName">@displayName</span>
+                                        <span class="badge">@m.UserName</span>
+                                        <span class="familyPoint">@m.YearPoint 점</span>
+                                    </div>
+                                }
+
+                                @* 4) 기타 RoleCode *@
+                                @foreach (var m in others.OrderBy(x => x.RoleCode).ThenBy(x => Safe(x.FullName)).ThenBy(x => Safe(x.UserName)))
+                                {
+                                    var displayName = !string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName;
+                                    var label = !string.IsNullOrWhiteSpace(m.RoleLabel) ? m.RoleLabel : "구성원";
+
+                                    <div class="familyMember">
+                                        <span class="familyRole">@label</span>
+                                        <span class="familyName">@displayName</span>
+                                        <span class="badge">@m.UserName</span>
+                                        <span class="familyPoint">@m.YearPoint 점</span>
+                                    </div>
+                                }
+
+                                @* ✅ 가족멤버가 하나도 없으면 방어(이 케이스는 위 if 때문에 거의 없음) *@
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                no++;
+            }
+        </div>
+
+        @if (Model.Rows == null || Model.Rows.Count == 0)
+        {
+            <div class="empty">표시할 참여자가 없습니다.</div>
+        }
+
+        <div class="navbar" >
+            <a class="navBtn primary" href="/">
+                <span class="navIcon">🏠</span>
+                <span class="navText">
+                    <b>홈으로 가기</b>
+                    <span>메인 화면으로 이동</span>
+                </span>
+            </a>
+
+            <a class="navBtn good" href="/DailyMission2/Index">
+                <span class="navIcon">📖</span>
+                <span class="navText">
+                    <b>도전 성경으로 가기</b>
+                </span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const q = document.getElementById('q');
+            const segBtns = Array.from(document.querySelectorAll('.seg button'));
+            let role = 'all';
+
+            function apply() {
+                const term = (q.value || '').trim().toLowerCase();
+                const cards = Array.from(document.querySelectorAll('.card'));
+
+                cards.forEach(c => {
+                    const okRole = (role === 'all') || (c.dataset.role === role);
+                    const okTerm = !term || (c.dataset.name || '').includes(term);
+                    c.style.display = (okRole && okTerm) ? '' : 'none';
+                });
+            }
+
+            segBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    segBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    role = btn.dataset.role || 'all';
+                    apply();
+                });
+            });
+
+            q.addEventListener('input', apply);
+            apply();
+        })();
+    </script>
+
+</body>
+</html>

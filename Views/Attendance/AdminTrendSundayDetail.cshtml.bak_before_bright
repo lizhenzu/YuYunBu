@@ -1,0 +1,169 @@
+@model BulletinBoard.ViewModels.Attendance.AttendanceSundayClassDetailVM
+@using System.Globalization
+@using System.Linq
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 주일 반별 출석 — 한 주일의 반마다 출석 수 · 출석률
+    ViewData["AttTab"] = "more";
+
+    var classes = Model?.Classes ?? new List<BulletinBoard.ViewModels.Attendance.AttendanceSundayClassRowVM>();
+    var sunday = (Model?.SundayDate ?? DateHelper.GetKoreaToday()).Date;
+    if (sunday == DateTime.MinValue.Date && DateTime.TryParse(Context.Request.Query["sunday"], out var q)) sunday = q.Date;
+    var dateStr = sunday.ToString("yyyy-MM-dd");
+    var thisSunday = DateHelper.GetBaseSunday(DateHelper.GetKoreaToday());
+    bool atLatest = sunday >= thisSunday;
+    string Self(DateTime d) => $"/Attendance/AdminTrendSundayDetail?sunday={d:yyyy-MM-dd}";
+
+    int total = classes.Sum(c => c.TotalStudents);
+    int present = classes.Sum(c => c.PresentCount);
+    int rate = total == 0 ? 0 : (int)Math.Round(present * 100.0 / total);
+    string R(double r) => r.ToString(r == Math.Floor(r) ? "0" : "0.#", CultureInfo.InvariantCulture);
+    var best = classes.Where(c => c.TotalStudents > 0).OrderByDescending(c => c.Rate).FirstOrDefault();
+    var zero = classes.Count(c => c.TotalStudents > 0 && c.PresentCount == 0);
+    const double LowRate = 50;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>반별 출석 · @sunday.ToString("M월 d일")</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .sh { max-width: 900px; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .dn { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+        .dn a, .dn span.off { flex: none; width: 44px; height: 44px; display: grid; place-items: center; font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--headdim); }
+        .dn a:hover { color: var(--headk); }
+        .dn span.off { opacity: .25; }
+        .dn h1 { margin: 0; text-align: center; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 23px; }
+        .dn h1 small { display: block; font-family: "Gothic A1", sans-serif; font-size: 11px; letter-spacing: .18em; color: var(--headk); margin-top: 2px; }
+        .st { display: flex; gap: 22px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+        .st .lo b { color: #E08A72; }
+
+        .tools { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; }
+        .tools span { font-size: 12.5px; color: var(--dim); }
+        .seg { display: flex; border: 1px solid var(--rule); }
+        .seg button { font-family: inherit; font-size: 13px; padding: 8px 14px; background: var(--card); border: 0; color: var(--dim2); cursor: pointer; }
+        .seg button + button { border-left: 1px solid var(--rule); }
+        .seg button.on { background: var(--tx); color: var(--bg); font-weight: 600; }
+
+        .cl { padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        .clT { display: flex; align-items: baseline; gap: 8px; }
+        .clT b { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 17px; }
+        .clT small { font-size: 12px; color: var(--dim); }
+        .clT .p { margin-left: auto; font-family: "Inter", sans-serif; font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .cl.lo .clT .p { color: var(--danger); }
+        .bar { height: 5px; background: var(--line); margin-top: 8px; }
+        .bar i { display: block; height: 5px; background: var(--ok); }
+        .cl.lo .bar i { background: var(--danger); }
+        .clM { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12.5px; color: var(--dim2); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+        .clM .a { color: var(--ok); } .clM .x { color: var(--danger); }
+        .clM .go { margin-left: auto; display: flex; gap: 6px; }
+        .clM .go a { font-size: 13px; padding: 7px 11px; border: 1px solid var(--rule); background: var(--card); color: var(--tx); }
+        .clM .go a:hover { border-color: var(--acc); color: var(--acc); }
+        .clM .go a.pri { background: var(--tx); border-color: var(--tx); color: var(--bg); }
+        .clM .go a.pri:hover { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 24px; }
+        .links a { flex: 1; min-width: 140px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 13.5px; border: 1px solid var(--rule); background: var(--card); }
+        .links a:hover { border-color: var(--acc); color: var(--acc); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/AdminTrend3Weeks?date=@dateStr">전체 출석현황</a><span class="sep">›</span>반별</span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="dn">
+                <a href="@Self(sunday.AddDays(-7))" aria-label="지난 주일">‹</a>
+                <h1>@sunday.ToString("M월 d일") 주일<small>반별 출석</small></h1>
+                @if (atLatest) { <span class="off" aria-hidden="true">›</span> } else { <a href="@Self(sunday.AddDays(7))" aria-label="다음 주일">›</a> }
+            </div>
+            <div class="st">
+                <div>출석률<b>@(rate)%</b></div>
+                <div class="k">출석<b>@present</b></div>
+                <div>총원<b>@total</b></div>
+                <div>반<b>@classes.Count</b></div>
+                @if (zero > 0) { <div class="lo">미체크<b>@zero</b></div> }
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        @if (!classes.Any())
+        {
+            <div class="empty">표시할 데이터가 없습니다.</div>
+        }
+        else
+        {
+            <div class="tools">
+                <span>@(best != null ? $"가장 높은 반 · {best.ClassName} {R(best.Rate)}%" : "")</span>
+                <div class="seg" aria-label="정렬">
+                    <button type="button" data-s="class" class="on">반 순서</button>
+                    <button type="button" data-s="rate">출석률 순</button>
+                </div>
+            </div>
+
+            <section class="sec" style="margin-top:14px">
+                <div class="secH">
+                    <div><div class="secK">CLASSES</div><div class="secT">반별 출석</div></div>
+                    <span class="secN">@(LowRate)% 미만은 빨간 막대</span>
+                </div>
+                <div id="list">
+                    @{ int ord = 0; }
+                    @foreach (var c in classes)
+                    {
+                        ord++;
+                        bool lo = c.TotalStudents > 0 && c.Rate < LowRate;
+                        var w = Math.Min(100, Math.Max(0, c.Rate)).ToString("0.#", CultureInfo.InvariantCulture);
+                        <div class="cl @(lo ? "lo" : "")" data-ord="@ord" data-rate="@c.Rate.ToString(CultureInfo.InvariantCulture)">
+                            <div class="clT">
+                                <b>@c.ClassName</b>
+                                <small>@(string.IsNullOrWhiteSpace(c.TeacherName) ? "담임 미지정" : c.TeacherName)</small>
+                                <span class="p">@R(c.Rate)%</span>
+                            </div>
+                            <div class="bar"><i style="width:@(w)%"></i></div>
+                            <div class="clM">
+                                <span>총 @c.TotalStudents</span><span class="a">출석 @c.PresentCount</span><span class="x">결석 @c.AbsentCount</span>
+                                <span class="go">
+                                    <a href="/Attendance/SundayStudentsMobile?sunday=@dateStr#c-@c.ClassYear-@c.ClassBan">명단</a>
+                                    <a class="pri" href="/Attendance/Index?date=@dateStr#g-@c.ClassYear-@c.ClassBan">출석 고치기</a>
+                                </span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </section>
+
+            <div class="links">
+                <a href="/Attendance/SundayStudentsPC?sunday=@dateStr">명단 보기 (PC)</a>
+                <a href="/Attendance/SundayStudentsMobile?sunday=@dateStr">명단 보기 (모바일)</a>
+            </div>
+        }
+        <div class="ft"><span>출석률 = 출석 ÷ 총원(지금 반 편성 기준)</span><a href="/Attendance/Statistics">월별 통계 →</a></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    const list = document.getElementById('list');
+    if (!list) return;
+    document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+        document.querySelectorAll('.seg button').forEach(x => x.classList.toggle('on', x === b));
+        const by = b.dataset.s;
+        Array.from(list.children)
+            .sort((a, c) => by === 'rate' ? parseFloat(c.dataset.rate) - parseFloat(a.dataset.rate) : a.dataset.ord - c.dataset.ord)
+            .forEach(el => list.appendChild(el));
+    }));
+})();
+</script>
+</body>
+</html>

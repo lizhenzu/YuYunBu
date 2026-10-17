@@ -1,0 +1,714 @@
+﻿@model BulletinBoard.Models.BessingChildDatas
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@using System.Text.RegularExpressions
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var todayDate = DateHelper.GetTodayDateDayString();
+    string formattedModResultData = $"pray_{todayDate}.webp";
+    string formattedModResultDataOG = $"{@ViewBag.Domain}/images/pray/{formattedModResultData}";
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    string pageTitle = $"{ChurchName} {DepartmentName}";
+
+    var kNow = DateHelper.GetKoreaNow();
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    string dateStr = $"{kNow:yyyy년 M월 d일} {dayKor[(int)kNow.DayOfWeek]}요일";
+
+    // **○○(이)** 처럼 별표로 감싼 이름 자리를 강조 표시로 바꿔 준다.
+    // 그 밖의 본문은 HTML 로 해석되지 않도록 먼저 이스케이프한다.
+    Func<string, Microsoft.AspNetCore.Html.IHtmlContent> Mark = raw =>
+    {
+        var enc = System.Net.WebUtility.HtmlEncode(raw ?? string.Empty);
+        enc = Regex.Replace(enc, @"\*{2,3}(.+?)\*{2,3}", "<span class=\"nm\">$1</span>");
+        enc = enc.Replace("*", string.Empty);   // 짝이 맞지 않는 별표는 지운다
+        return new Microsoft.AspNetCore.Html.HtmlString(enc);
+    };
+
+    Func<string, string[]> Lines = raw =>
+        string.IsNullOrWhiteSpace(raw)
+            ? new string[0]
+            : raw.Replace("\r\n", "\n").Replace("\r", "\n").Trim()
+                 .Split('\n')
+                 .Where(l => !string.IsNullOrWhiteSpace(l))
+                 .ToArray();
+
+    var koLines = Lines(Model?.PrayText);
+    var enLines = Lines(Model?.PrayText_Eng);
+    var wordLines = Lines(Model?.HolyWord);
+}
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFCF5" />
+    <title>@pageTitle</title>
+
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@pageTitle 입니다." />
+    <meta property="og:image" content="@formattedModResultDataOG" />
+    <meta property="og:url" content="@ViewBag.FullURL" />
+    <meta property="og:type" content="website" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* 아침 햇살 파스텔 */
+            --cream: #FFFCF5;
+            --cream-2: #FFF6E7;
+            --card: #FFFFFF;
+            --ink: #3E362E;
+            --ink-2: #574C41;
+            --muted: #93867A;
+            --line: #F1E6D4;
+            --honey: #E8A13A;
+            --honey-dk: #C67F1C;
+            --blossom: #EE8FA4;
+            --sky: #77B3E2;
+            --leaf: #8CC98F;
+            --shadow-s: 0 1px 2px rgba(94,72,40,.06);
+            --shadow-m: 0 6px 20px rgba(94,72,40,.09);
+            --shadow-l: 0 14px 40px rgba(94,72,40,.12);
+            --f-ui: "Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+            --f-read: "Gowun Batang","Nanum Myeongjo","Apple SD Gothic Neo",serif;
+            --fs: 1;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--cream);
+            background-image: radial-gradient(760px 320px at 50% -120px, #FFF0D2 0%, rgba(255,240,210,0) 70%), radial-gradient(560px 260px at 8% 120px, #FDECF0 0%, rgba(253,236,240,0) 72%), radial-gradient(560px 260px at 96% 220px, #E7F2FB 0%, rgba(231,242,251,0) 72%);
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            color: var(--ink);
+            font-family: var(--f-ui);
+            line-height: 1.6;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* ── 상단 바 ───────────────────────── */
+        .nbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: rgba(255,252,245,.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .nbar-in {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 9px clamp(12px,4vw,20px);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nb-btn {
+            flex: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            height: 34px;
+            padding: 0 13px;
+            border-radius: 999px;
+            background: var(--card);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-s);
+            font-size: 13px;
+            color: var(--ink-2);
+        }
+
+            .nb-btn:hover {
+                border-color: var(--honey);
+                color: var(--honey-dk);
+            }
+
+        .nb-mid {
+            flex: 1 1 auto;
+            min-width: 0;
+            text-align: center;
+            font-size: 12.5px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 글자 크기 3단 */
+        .fsgrp {
+            flex: none;
+            display: flex;
+            gap: 0;
+            background: var(--cream-2);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 3px;
+        }
+
+            .fsgrp button {
+                width: 30px;
+                height: 28px;
+                border: 0;
+                background: transparent;
+                cursor: pointer;
+                border-radius: 999px;
+                color: var(--muted);
+                font-family: var(--f-ui);
+                line-height: 1;
+                display: grid;
+                place-items: center;
+                transition: .14s;
+            }
+
+                .fsgrp button:nth-child(1) {
+                    font-size: 11px;
+                }
+
+                .fsgrp button:nth-child(2) {
+                    font-size: 13px;
+                }
+
+                .fsgrp button:nth-child(3) {
+                    font-size: 16px;
+                }
+
+        .fsgrp button:nth-child(4) {
+            font-size: 19px;
+        }
+
+                .fsgrp button.on {
+                    background: var(--card);
+                    color: var(--honey-dk);
+                    box-shadow: var(--shadow-s);
+                }
+
+                .fsgrp button:hover {
+                    color: var(--honey-dk);
+                }
+
+        /* ── 레이아웃 ───────────────────────── */
+        .wrap {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0 clamp(14px,4vw,22px) 92px;
+        }
+
+        /* ── 히어로 ───────────────────────── */
+        .hero {
+            padding: 30px 0 22px;
+            text-align: center;
+        }
+
+        .sun {
+            width: 62px;
+            height: 62px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            font-size: 27px;
+            background: radial-gradient(circle at 50% 42%, #FFE6AE 0%, #FFD68F 62%, #FFC96E 100%);
+            box-shadow: 0 0 0 9px rgba(255,214,143,.24), 0 0 0 18px rgba(255,214,143,.12);
+        }
+
+        .chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .chip {
+            padding: 5px 11px;
+            border-radius: 999px;
+            font-size: 11.5px;
+            border: 1px solid var(--line);
+            background: var(--card);
+            color: var(--ink-2);
+            box-shadow: var(--shadow-s);
+        }
+
+        .chip-honey {
+            background: #FFF4DE;
+            border-color: #F7DFAE;
+            color: var(--honey-dk);
+        }
+
+        .hero-h1 {
+            margin: 0;
+            font-size: clamp(21px,5.2vw,30px);
+            line-height: 1.34;
+            letter-spacing: -.02em;
+            color: var(--ink);
+            word-break: keep-all;
+            text-wrap: balance;
+        }
+
+        .hero-sub {
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .hero-rule {
+            margin: 20px auto 0;
+            width: 58px;
+            height: 4px;
+            border-radius: 999px;
+            background: linear-gradient(90deg,var(--honey),var(--blossom));
+        }
+
+        /* ── 카드 ───────────────────────── */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 22px;
+            box-shadow: var(--shadow-m);
+            overflow: hidden;
+            margin-bottom: 18px;
+        }
+
+        .card-hd {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--line);
+            background: linear-gradient(180deg,#FFFAF0,#FFFFFF);
+        }
+
+        .card-ico {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: grid;
+            place-items: center;
+            font-size: 16px;
+            background: #FFF1D8;
+        }
+
+        .card-verse .card-ico {
+            background: #E9F3FC;
+        }
+
+        /* 말씀 카드 — 처음에는 접힘 */
+        .card-verse > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+        }
+
+            .card-verse > summary::-webkit-details-marker {
+                display: none;
+            }
+
+        .card-verse:not([open]) > summary {
+            border-bottom: 0;
+        }
+
+        .card-hint {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11.5px;
+            color: var(--muted);
+        }
+
+            .card-hint::after {
+                content: "▾";
+                transition: .18s;
+            }
+
+        .card-verse[open] .card-hint::after {
+            transform: rotate(180deg);
+        }
+
+        .card-verse[open] .card-hint {
+            font-size: 0;
+            gap: 0;
+        }
+
+            .card-verse[open] .card-hint::after {
+                font-size: 11.5px;
+            }
+
+        .card-tt {
+            font-size: 13.5px;
+            color: var(--ink-2);
+        }
+
+        .card-bd {
+            padding: 22px 20px 24px;
+        }
+
+        .pray-title {
+            margin: 0;
+            font-family: var(--f-ui);
+            font-size: clamp(19px,4.4vw,25px);
+            line-height: 1.4;
+            letter-spacing: -.02em;
+            color: var(--ink);
+            word-break: keep-all;
+            text-wrap: balance;
+        }
+
+        .title-rule {
+            margin: 15px 0 19px;
+            height: 1px;
+            background: repeating-linear-gradient(90deg,var(--line) 0 7px,transparent 7px 13px);
+        }
+
+        .prose p {
+            margin: 0 0 17px;
+            font-family: var(--f-read);
+            font-size: calc(17px * var(--fs));
+            line-height: 2.0;
+            color: var(--ink);
+            word-break: keep-all;
+        }
+
+            .prose p:last-child {
+                margin-bottom: 0;
+            }
+
+        /* 이름을 넣어 기도하는 자리 */
+        .nm {
+            color: var(--honey-dk);
+            font-weight: 700;
+            background: linear-gradient(180deg,transparent 62%,#FFE7B8 62%);
+            padding: 0 2px;
+            border-radius: 3px;
+        }
+
+        /* 성/경/말/씀 */
+        .verse p {
+            margin: 0 0 14px;
+            font-family: var(--f-read);
+            font-size: calc(15.5px * var(--fs));
+            line-height: 1.95;
+            color: var(--ink-2);
+            word-break: keep-all;
+        }
+
+            .verse p:last-child {
+                margin-bottom: 0;
+            }
+
+        .card-verse .card-bd {
+            background: #FBFDFF;
+        }
+
+        /* 영문 */
+        .en {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--card);
+            box-shadow: var(--shadow-s);
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+            .en > summary {
+                list-style: none;
+                cursor: pointer;
+                padding: 14px 18px;
+                font-size: 13px;
+                color: var(--ink-2);
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+                .en > summary::-webkit-details-marker {
+                    display: none;
+                }
+
+                .en > summary::after {
+                    content: "▾";
+                    margin-left: auto;
+                    color: var(--muted);
+                    transition: .18s;
+                }
+
+            .en[open] > summary::after {
+                transform: rotate(180deg);
+            }
+
+            .en .en-bd {
+                padding: 4px 18px 20px;
+            }
+
+                .en .en-bd p {
+                    margin: 0 0 13px;
+                    font-family: var(--f-read);
+                    font-size: calc(15px * var(--fs));
+                    line-height: 1.9;
+                    color: var(--ink-2);
+                }
+
+        .stamp {
+            text-align: right;
+            font-size: 11.5px;
+            color: var(--muted);
+            margin: -4px 2px 18px;
+        }
+
+        /* ── 버튼 ───────────────────────── */
+        .btn-row {
+            display: flex;
+            gap: 9px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 14px;
+        }
+
+        .btn {
+            appearance: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 44px;
+            padding: 0 20px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: var(--card);
+            color: var(--ink-2);
+            font-family: var(--f-ui);
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: var(--shadow-s);
+            transition: .16s;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: var(--shadow-m);
+                border-color: #E5D3B4;
+            }
+
+        .btn-honey {
+            min-width: 160px;
+            background: linear-gradient(135deg,var(--honey),#F0B75C);
+            border-color: transparent;
+            color: #4A3208;
+            font-weight: 700;
+        }
+
+        /* 기도홈 — 홈으로 옆에 나란히, 한 톤 낮춰서 */
+        .btn-honey-soft {
+            min-width: 160px;
+            background: #FFF4DE;
+            border-color: #F0D9AB;
+            color: var(--honey-dk);
+            font-weight: 700;
+        }
+
+        .empty {
+            padding: 52px 20px;
+            text-align: center;
+        }
+
+        .empty-ico {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        .empty-tt {
+            font-size: 16px;
+            color: var(--ink-2);
+        }
+
+        @@media (max-width:420px) {
+            .btn {
+                height: 42px;
+                padding: 0 16px;
+                font-size: 13.5px;
+            }
+
+            .btn-honey, .btn-honey-soft {
+                min-width: 138px;
+            }
+        }
+
+        @@media (prefers-reduced-motion:reduce) {
+            * {
+                transition: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="nbar">
+        <div class="nbar-in">
+            <a class="nb-btn" href="/">🏠 홈</a>
+            <div class="nb-mid">@dateStr</div>
+            <div class="fsgrp" role="group" aria-label="기도문 글자 크기">
+                <button type="button" id="pfsS" onclick="setPFs('s')" aria-label="작게">가</button>
+                <button type="button" id="pfsM" onclick="setPFs('m')" aria-label="보통">가</button>
+                <button type="button" id="pfsL" onclick="setPFs('l')" aria-label="크게">가</button>
+                <button type="button" id="pfsXL" onclick="setPFs('xl')" aria-label="아주 크게">가</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="wrap">
+
+        <section class="hero">
+            <div class="sun">🌤️</div>
+            <div class="chips">
+                <span class="chip chip-honey">🧸 자녀 축복</span>
+                @if (!string.IsNullOrWhiteSpace(ChurchName))
+                {
+                    <span class="chip">@ChurchName</span>
+                }
+                @if (!string.IsNullOrWhiteSpace(DepartmentName))
+                {
+                    <span class="chip">@DepartmentName</span>
+                }
+            </div>
+            <h1 class="hero-h1">자녀를 위한 축복 기도</h1>
+            <div class="hero-sub">아이의 마음에 믿음과 지혜가 자라나도록 함께 기도해요</div>
+            <div class="hero-rule"></div>
+        </section>
+
+        @if (koLines.Length == 0 && wordLines.Length == 0)
+        {
+            <div class="card">
+                <div class="empty">
+                    <div class="empty-ico">🌱</div>
+                    <div class="empty-tt">표시할 기도문이 없어요</div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <article class="card">
+                <div class="card-hd">
+                    <div class="card-ico">🙏</div>
+                    <span class="card-tt">오늘의 축복 기도</span>
+                </div>
+                <div class="card-bd">
+                    <h2 class="pray-title">@Model.PrayTitle</h2>
+                    <div class="title-rule"></div>
+                    <div class="prose">
+                        @foreach (var line in koLines)
+                        {
+                            <p>@Mark(line)</p>
+                        }
+                    </div>
+                </div>
+            </article>
+
+            @if (wordLines.Length > 0)
+            {
+                @* 처음에는 접힌 상태 — 제목을 눌러 펼친다 *@
+                <details class="card card-verse">
+                    <summary class="card-hd">
+                        <div class="card-ico">📖</div>
+                        <span class="card-tt">함께 읽는 말씀</span>
+                        <span class="card-hint">펼쳐 보기</span>
+                    </summary>
+                    <div class="card-bd verse">
+                        @foreach (var line in wordLines)
+                        {
+                            <p>@Mark(line)</p>
+                        }
+                    </div>
+                </details>
+            }
+
+            @if (enLines.Length > 0)
+            {
+                <details class="en">
+                    <summary>🌐 English Prayer</summary>
+                    <div class="en-bd">
+                        @foreach (var line in enLines)
+                        {
+                            <p>@Mark(line)</p>
+                        }
+                    </div>
+                </details>
+            }
+        }
+
+        @if (Model != null && Model.updateDT.HasValue)
+        {
+            <div class="stamp">수정일 @Model.updateDT.Value.ToString("yyyy-MM-dd")</div>
+        }
+
+        <div class="btn-row">
+            <button class="btn btn-honey" onclick="location.href='/'">🏠 홈으로</button>
+            <button class="btn btn-honey-soft" onclick="location.href='/PrayHome/Index'">🙏 기도홈</button>
+        </div>
+
+        @if (isSuperAdmin)
+        {
+            <div class="btn-row">
+                <button class="btn" onclick="location.href='/BessingChild/DetailList'">📂 목록</button>
+                <button class="btn" onclick="location.href='/BessingChild/ModifyView?Id=@Model.Id'">✏️ 수정</button>
+            </div>
+        }
+
+    </div>
+
+    <script>
+        /* 기도문 글자 크기 — 작게 / 보통 / 크게 (HealingAndRestorationPray 와 동일 동작) */
+        (function () {
+            var MAP = { s: 0.90, m: 1, l: 1.18, xl: 1.36 };
+            window.setPFs = function (k, silent) {
+                if (!MAP[k]) k = 'm';
+                document.documentElement.style.setProperty('--fs', MAP[k]);
+                ['S', 'M', 'L', 'XL'].forEach(function (x) {
+                    var b = document.getElementById('pfs' + x);
+                    if (b) b.classList.toggle('on', x.toLowerCase() === k);
+                });
+                if (!silent) { try { localStorage.setItem('bcFs', k); } catch (e) { } }
+            };
+            function boot() {
+                var saved = 'm';
+                try { saved = localStorage.getItem('bcFs') || 'm'; } catch (e) { }
+                setPFs(saved, true);
+            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+            else boot();
+        })();
+    </script>
+</body>
+</html>

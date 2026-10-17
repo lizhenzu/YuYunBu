@@ -1,0 +1,115 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+    string Notice_1_Collapse = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.Notice_1_Collapse.ToString()) as String;
+}
+<style>
+    .notice {
+        background-color: #fffbea;
+        border: 1px solid #f1e2a9;
+        border-radius: 20px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        padding: 25px;
+    
+        margin: 0 auto;
+    }
+
+    .notice-title {
+        font-size: 1.4rem;
+        font-weight: bold;
+        text-align: center;
+        color: #4a4a00;
+        margin-bottom: 20px;
+    }
+
+    .notice p {
+        font-size: 1rem;
+        line-height: 1.8;
+        margin: 8px 0;
+    }
+
+    .notice .emoji {
+        font-size: 1.2rem;
+        margin-right: 5px;
+    }
+
+    .notice-footer {
+        margin-top: 20px;
+        font-size: 0.95rem;
+        text-align: center;
+        color: #555;
+    }
+
+        .notice-footer strong {
+            color: #c0392b;
+        }
+</style>
+
+<style>
+    .feedback-button {
+        display: inline-block;
+        background-color: #f39c12;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: bold;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        transition: background-color 0.3s ease;
+    }
+
+        .feedback-button:hover {
+            background-color: #d68910;
+        }
+</style>
+ 
+<script>
+  
+    const data = {
+        UserId: "@UserId",
+        LangCD: "",
+        PagesForView: 0,
+        Notice_1_Collapse: "y"
+    }; 
+
+    const confirmMsg = ['이 알림을 그만 보실래요?'];
+
+</script>
+
+@if (@Notice_1_Collapse == "n")
+{ 
+    <div class="notice">
+        <div class="notice-title">📢 새롭게 바뀐 기능 사용 방법!</div>
+        <div class="notice-title" style="  font-size: 1.0rem; font-weight: normal;">(성경구절 끝에 아이콘 버튼 설명)</div>
+
+        <p><span class="emoji">📗</span>: <strong> @(
+            $"{@ConstatsCommon.ReadBibleAllTitleButton}"
+            )</strong>에 반영 되요.</p>
+        <p><span class="emoji">📖</span>: <strong> @(
+            $"{@ConstatsCommon.ReadBibleAllTitleButton}"
+            )</strong>에 반영 취소 되요.</p>
+        <p><span class="emoji">🔖</span>: <strong>@(
+            $"{@ConstatsCommon.BibleNote}"
+            )</strong>에 추가 되요.</p>
+        <p><span class="emoji">📚</span>: <strong>@(
+            $"{@ConstatsCommon.BibleNote}"
+            )</strong>에 이동할 수 있어요.</p>
+
+        <div class="notice-footer">
+            <p><strong>※※※ 이제는 길게 누르는 기능은 안 돼요. ※※※</strong></p>
+            <p><strong>※ 읽음표시(읽음😄) 대신 📖이 아이콘이 읽음완료 의미에요.</strong></p>
+            <p>문제 있으면 <strong>"개선사항접수"</strong>에 알려 주세요 ^^</p>
+
+            <div style="margin-top: 15px; text-align: center;">
+                <a onclick="sendToServerUpdateUserSettings(data, confirmMsg);" class="feedback-button">이 알림을 그만 보실래요?</a>
+            </div>
+
+        </div>
+    </div>
+} 

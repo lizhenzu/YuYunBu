@@ -1,0 +1,105 @@
+﻿@using BulletinBoard.Models
+
+@{
+    Layout = null;
+    var counts = (System.Collections.Generic.Dictionary<string, int>)ViewBag.Counts;
+    string Card(string cat, string emoji) => $@"
+    <a class=""cat-card"" href=""/Places/List?category={cat}"">
+      <div class=""emoji"">{emoji}</div>
+      <div class=""title"">{cat}</div>
+      <div class=""cnt"">{(counts.TryGetValue(cat, out var c) ? c : 0)} 개</div>
+    </a>";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>맛집·카페·레스토랑</title>
+    <style>
+        :root {
+            --bg: #0e101a;
+            --card: #14182b;
+            --text: #e7e9f1;
+            --muted: #9aa3b2;
+            --accent: #7ee0ff;
+            --border: rgba(255,255,255,.12)
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif
+        }
+
+        header {
+            padding: 26px 18px
+        }
+
+            header h1 {
+                margin: 0 0 6px;
+                font-size: 22px
+            }
+
+            header .hint {
+                color: var(--muted);
+                font-size: 13px
+            }
+
+        .grid {
+            padding: 16px;
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit,minmax(220px,1fr))
+        }
+
+        .cat-card {
+            display: block;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            text-decoration: none;
+            color: var(--text);
+            box-shadow: 0 10px 24px rgba(0,0,0,.35);
+            transition: .2s transform,.2s box-shadow,.2s border-color
+        }
+
+            .cat-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 16px 38px rgba(0,0,0,.45);
+                border-color: rgba(126,224,255,.35)
+            }
+
+        .emoji {
+            font-size: 28px
+        }
+
+        .title {
+            margin-top: 6px;
+            font-size: 18px
+        }
+
+        .cnt {
+            margin-top: 6px;
+            color: var(--muted)
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🍽️ 카테고리 선택</h1>
+        <div class="hint">원하는 분류를 누르면 목록으로 이동합니다.</div>
+    </header>
+    <main class="grid">
+        @Html.Raw(Card("맛집","🍜"))
+        @Html.Raw(Card("카페","☕"))
+        @Html.Raw(Card("레스토랑","🍷"))
+    </main>
+</body>
+</html>

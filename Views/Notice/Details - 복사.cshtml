@@ -1,0 +1,138 @@
+﻿@model BulletinBoard.ViewModels.Notice.Notice
+
+@{
+    Layout = null;
+    ViewData["Title"] = "공지 상세";
+
+    // ✅ List로 캐스팅하지 말고 IEnumerable로 받기 (List/Array/IEnumerable 모두 안전)
+    var attachments = ViewBag.Attachments as IEnumerable<NoticeAttachment>;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"] - BulletinBoard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #f5f7fb;
+        }
+
+        .badge-soft {
+            background: rgba(13,110,253,.1);
+            color: #0d6efd;
+            border: 1px solid rgba(13,110,253,.2);
+        }
+
+        .file-item {
+            font-size: .95rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container py-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <div class="text-muted mb-1" style="font-size:0.9rem;">
+                    공지사항 · @Model.CreatedAt.ToString("yyyy.MM.dd")
+                </div>
+
+                <h2 class="fw-bold mb-2">
+                    @if (Model.IsPinned)
+                    {
+                        <span class="badge bg-warning text-dark me-1">상단고정</span>
+                    }
+                    @if (Model.IsPopup)
+                    {
+                        <span class="badge badge-soft me-1">팝업공지</span>
+                    }
+                    @Model.Title
+                </h2>
+
+                <div class="text-muted">
+                    작성자: @(!string.IsNullOrEmpty(Model.AuthorName) ? Model.AuthorName : "관리자")
+                    · 조회수: @Model.ViewCount
+                </div>
+
+                @if (Model.IsPopup && Model.PopupUntil.HasValue)
+                {
+                    <div class="text-muted mt-1" style="font-size:.9rem;">
+                        📌 팝업 표시 기간: @Model.PopupUntil.Value.ToString("yyyy.MM.dd") 까지
+                    </div>
+                }
+            </div>
+
+            <!-- 버튼 묶음 -->
+            <div class="ms-3 text-end d-flex flex-column gap-1">
+                <a href="@Url.Action("Index", "Home")"
+                   class="btn btn-outline-secondary btn-sm">
+                    🏠 홈으로
+                </a>
+
+                <a href="@Url.Action("Index", "Notice")"
+                   class="btn btn-outline-secondary btn-sm">
+                    목록
+                </a>
+
+                <a href="@Url.Action("Edit", "Notice", new { id = Model.Id })"
+                   class="btn btn-outline-primary btn-sm">
+                    수정
+                </a>
+
+                <form asp-controller="Notice"
+                      asp-action="Delete"
+                      method="post"
+                      onsubmit="return confirm('이 공지를 삭제하시겠습니까?');"
+                      class="d-inline">
+                    <input name="id" type="hidden" value="@Model.Id" />
+                    <button type="submit" class="btn btn-danger btn-sm">삭제</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 본문 -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body" style="min-height:200px;">
+                @Html.Raw((Model.Content ?? string.Empty).Replace("\n", "<br />"))
+            </div>
+        </div>
+
+        <!-- 첨부파일 -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">📎 첨부파일</h6>
+
+                @* ✅ 임시 디버그 표시가 필요하면 주석 해제 *@
+                @* <div class="text-muted mb-2">첨부 전달 수: @(attachments?.Count() ?? -1)</div> *@
+
+                @if (attachments != null && attachments.Any())
+                {
+                    <ul class="list-group">
+                        @foreach (var att in attachments)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center file-item">
+                                <a href="@Url.Action("DownloadAttachment", "Notice", new { id = att.Id })"
+                                   class="text-decoration-none">
+                                    📄 @att.OriginalName
+                                </a>
+                                <span class="text-muted">
+                                    @(att.FileSize / 1024) KB
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="text-muted">첨부파일이 없습니다.</div>
+                }
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

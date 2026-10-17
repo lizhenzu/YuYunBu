@@ -1,0 +1,273 @@
+﻿@using System
+@using System.Globalization
+@using BulletinBoard.Helpers;
+@using BibleReadingThrough.Models
+@model BibleReadingThrough.Models.DashboardViewModel
+@*  ══════════════════════════════════════════════════════════════
+    성경 통독 대시보드 — Bone 스킨 (B안 상세 + 책별 진도 구약/신약 탭)
+    이전 화면은 Index_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    ViewData["Title"] = "대시보드"; ViewData["Page"] = "home";
+
+    var kNow  = DateHelper.GetKoreaNow();
+    var today = kNow.Date;
+    string[] _dow = { "일", "월", "화", "수", "목", "금", "토" };
+
+    // 통독률 — 장 기준 · 소수 1자리 (2026-10-04 홈 · 오늘의 말씀과 통일)
+    double pctD  = Model.ProgressPercent;
+    double otPctD = Model.OtTotal == 0 ? 0 : Math.Round((double)Model.OtRead / Model.OtTotal * 100, 1);
+    double ntPctD = Model.NtTotal == 0 ? 0 : Math.Round((double)Model.NtRead / Model.NtTotal * 100, 1);
+    string pct   = pctD.ToString("0.0", CultureInfo.InvariantCulture);
+    string otPct = otPctD.ToString("0.0", CultureInfo.InvariantCulture);
+    string ntPct = ntPctD.ToString("0.0", CultureInfo.InvariantCulture);
+
+    // 원형 진도 (반지름 40)
+    double circ = 2 * Math.PI * 40;
+    string dash = (circ * pctD / 100).ToString("0.0", CultureInfo.InvariantCulture) + " " + circ.ToString("0.0", CultureInfo.InvariantCulture);
+
+    string ChapUnit(string book) => book == "시편" ? "편" : "장";
+}
+
+<style>
+    .b2i { --pad: 18px; max-width: 880px; margin: 0 auto; padding: 4px var(--pad) 30px; color: var(--b2-tx); }
+    @@media (min-width: 769px) { .b2i { --pad: 32px; } }
+    .b2i a { text-decoration: none; color: inherit; }
+    .b2i .k { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--b2-acc); }
+    .b2i .lbl { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--b2-acc); margin: 28px 0 10px; }
+    .b2i .lbl a { font-size: 11px; letter-spacing: 0; font-weight: 400; color: var(--b2-dim); }
+    .b2i .lbl a:hover { color: var(--b2-acc); }
+
+    /* 나의 통독 */
+    .b2i .ring { display: flex; gap: 18px; align-items: center; margin-top: 12px; }
+    .b2i .ring svg { flex: none; }
+    .b2i .ring .t b { display: block; font-family: "Noto Serif KR", serif; font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }
+    .b2i .ring .t small { display: block; font-size: 12px; color: var(--b2-dim); margin-top: 4px; line-height: 1.6; }
+    .b2i .cells { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--b2-tx); border-bottom: 1px solid var(--b2-rule); margin-top: 16px; }
+    .b2i .cells div { padding: 11px 0; text-align: center; font-size: 11px; color: var(--b2-dim); }
+    .b2i .cells div + div { border-left: 1px solid var(--b2-rule); }
+    .b2i .cells b { display: block; font-family: "Inter", sans-serif; font-weight: 300; font-size: 24px; color: var(--b2-tx); font-variant-numeric: tabular-nums; }
+    .b2i .streak { margin-top: 10px; font-size: 12px; color: var(--b2-acc); text-align: center; }
+
+    /* 이어 읽기 */
+    .b2i .cta { display: flex; justify-content: space-between; align-items: center; background: var(--b2-head); color: var(--b2-headtx) !important; margin: 20px calc(var(--pad) * -1) 0; padding: 18px var(--pad); }
+    .b2i .cta:hover { background: #24262B; }
+    .b2i .cta .kk { font-size: 9.5px; letter-spacing: .2em; color: var(--b2-headk); font-weight: 600; }
+    .b2i .cta .t { font-family: "Noto Serif KR", serif; font-size: 19px; margin-top: 4px; }
+    .b2i .cta p { margin: 6px 0 0; font-family: "Noto Serif KR", serif; font-size: 13.5px; line-height: 1.7; color: #C9C6C0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .b2i .cta small { display: block; font-size: 11px; color: var(--b2-headdim); margin-top: 5px; }
+    .b2i .cta em { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 32px; color: var(--b2-headk); margin-left: 14px; flex: none; }
+
+    /* 다음에 읽을 곳 */
+    .b2i .next { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+    .b2i .next a { border: 1px solid var(--b2-rule); background: var(--b2-card); padding: 11px 10px; font-family: "Noto Serif KR", serif; font-size: 13.5px; display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; }
+    .b2i .next a:hover { border-color: var(--b2-acc); }
+    .b2i .next small { font-family: "Inter", sans-serif; font-size: 11px; color: var(--b2-acc); white-space: nowrap; }
+    .b2i .done-all { border: 1px solid var(--b2-rule); background: var(--b2-card); padding: 20px; text-align: center; font-family: "Noto Serif KR", serif; }
+
+    /* 오늘의 말씀 */
+    .b2i .vod { border-left: 2px solid var(--b2-acc); padding: 2px 0 2px 14px; }
+    .b2i .vod p { margin: 0; font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.9; word-break: keep-all; }
+    .b2i .vod small { display: block; font-size: 11px; letter-spacing: .08em; color: var(--b2-dim); margin-top: 6px; }
+
+    /* 통독 진도 */
+    .b2i .bar2 { display: flex; justify-content: space-between; font-size: 12.5px; margin-top: 10px; }
+    .b2i .bar2 b { font-weight: 400; color: var(--b2-dim); font-family: "Inter", sans-serif; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+    .b2i .pg { height: 4px; background: var(--b2-rule); margin-top: 6px; }
+    .b2i .pg i { display: block; height: 4px; background: var(--b2-acc); }
+    .b2i .pg.all i { background: var(--b2-tx); }
+
+    /* 캘린더 */
+    .b2i .dow, .b2i .hm { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .b2i .dow { font-size: 10px; color: var(--b2-dim); text-align: center; margin-bottom: 4px; }
+    .b2i .hm span { aspect-ratio: 1; max-height: 44px; background: var(--b2-line); font-family: "Inter", sans-serif; font-size: 10px; color: var(--b2-dim); display: grid; place-items: center; }
+    .b2i .hm .read-sm { background: #E8DCC6; color: #9A7B4F; }
+    .b2i .hm .read-md { background: #CDB48A; color: #fff; }
+    .b2i .hm .read-lg { background: #9A7B4F; color: #fff; }
+    .b2i .hm .td { outline: 1.5px solid var(--b2-tx); outline-offset: -1.5px; }
+    .b2i .hm .e { background: none; }
+    .b2i .legend { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 10px; color: var(--b2-dim); margin-top: 8px; }
+    .b2i .legend i { width: 12px; height: 12px; display: block; }
+
+    /* 책별 진도 */
+    .b2i .tabs { display: flex; margin-bottom: 10px; }
+    .b2i .tabs button { flex: 1; font-family: inherit; padding: 8px 0; font-size: 12px; border: 1px solid var(--b2-rule); background: var(--b2-card); color: var(--b2-tx); cursor: pointer; }
+    .b2i .tabs button + button { border-left: 0; }
+    .b2i .tabs button.on { background: var(--b2-tx); color: var(--b2-bg); border-color: var(--b2-tx); }
+    .b2i .books { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    @@media (min-width: 560px) { .b2i .books { grid-template-columns: repeat(6, 1fr); } }
+    @@media (min-width: 1000px) { .b2i .books { grid-template-columns: repeat(7, 1fr); } }
+    .b2i .books a { border: 1px solid var(--b2-rule); background: var(--b2-card); padding: 7px 6px 9px; font-size: 11.5px; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .b2i .books a:hover { border-color: var(--b2-acc); }
+    .b2i .books small { display: block; font-family: "Inter", sans-serif; font-size: 10px; color: var(--b2-dim); margin-top: 1px; }
+    .b2i .books i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--b2-acc); }
+    .b2i .books a.dn { background: var(--b2-mark); border-color: var(--b2-mark); }
+    .b2i .books a.dn small { color: var(--b2-acc); }
+
+    .b2i .g2 { display: grid; grid-template-columns: 1fr; gap: 0 32px; }
+    @@media (min-width: 900px) {
+        .b2i .g2 { grid-template-columns: 1fr 1fr; }
+        .b2i .g2 .cta { margin: 0; height: 100%; }
+        .b2i .g2.top .lbl:first-child, .b2i .g2 > div > .lbl:first-child { margin-top: 28px; }
+    }
+</style>
+
+<div class="b2i">
+
+    <div class="g2 top">
+        @* ── 나의 통독 ── *@
+        <section>
+            <div class="k" style="margin-top:14px">나의 성경 통독</div>
+            <div class="ring">
+                <svg width="92" height="92" viewBox="0 0 92 92" role="img" aria-label="전체 진도 @pct%">
+                    <circle cx="46" cy="46" r="40" fill="none" stroke="var(--b2-rule)" stroke-width="5" />
+                    <circle cx="46" cy="46" r="40" fill="none" stroke="var(--b2-acc)" stroke-width="5" stroke-dasharray="@dash" transform="rotate(-90 46 46)" />
+                    <text x="46" y="52" text-anchor="middle" font-family="Inter" font-weight="300" font-size="21" fill="currentColor">@(pct)%</text>
+                </svg>
+                <div class="t">
+                    <b>@Model.ReadChapters.ToString("N0") / @Model.TotalChapters.ToString("N0")장</b>
+                    <small>구약 @Model.OtRead / @(Model.OtTotal)장<br>신약 @Model.NtRead / @(Model.NtTotal)장</small>
+                </div>
+            </div>
+            <div class="cells">
+                <div><b>@Model.StreakDays</b>일 연속</div>
+                <div><b>@Model.TotalReadDays</b>일 읽음</div>
+                <div><b>@kNow.ToString("M/d")</b>@(_dow[(int)kNow.DayOfWeek])요일</div>
+            </div>
+            @if (Model.StreakDays > 0)
+            {
+                <div class="streak">@(Model.StreakDays)일째 이어 읽고 있어요 · 오늘도 이어 가요</div>
+            }
+        </section>
+
+        @* ── 이어 읽기 ── *@
+        <section>
+            @if (Model.LastReadVerse != null)
+            {
+                var lv = Model.LastReadVerse;
+                var lvUrl = $"/Bible2/Read?bookName={Uri.EscapeDataString(lv.BookName)}&jang={lv.Jang}#vc-{Uri.EscapeDataString(lv.BookName + lv.Jang + lv.Zul)}";
+                <a class="cta" href="@lvUrl">
+                    <div>
+                        <div class="kk">이어 읽기</div>
+                        <div class="t">@lv.BookName @(lv.Jang)@ChapUnit(lv.BookName)</div>
+                        <p>"@lv.VerseText"</p>
+                        <small>@(lv.Zul)절에서 멈춤 · @lv.ReadDate.ToString("M/d HH:mm")</small>
+                    </div>
+                    <em>→</em>
+                </a>
+            }
+            else if (Model.NextToRead.Any())
+            {
+                var f = Model.NextToRead.First();
+                <a class="cta" href="/Bible2/Read?bookName=@Uri.EscapeDataString(f.BookName)&jang=@f.ChapterNumber">
+                    <div>
+                        <div class="kk">읽기 시작</div>
+                        <div class="t">@f.BookName @(f.ChapterNumber)@ChapUnit(f.BookName)</div>
+                        <small>오늘 첫 장을 펼쳐 보세요</small>
+                    </div>
+                    <em>→</em>
+                </a>
+            }
+        </section>
+    </div>
+
+    <div class="g2">
+        <div>
+            @* ── 다음에 읽을 곳 ── *@
+            <div class="lbl">다음에 읽을 곳</div>
+            @if (Model.NextToRead.Any())
+            {
+                <div class="next">
+                    @foreach (var item in Model.NextToRead)
+                    {
+                        <a href="/Bible2/Read?bookName=@Uri.EscapeDataString(item.BookName)&jang=@item.ChapterNumber">
+                            @item.BookName<small>@(item.ChapterNumber)@ChapUnit(item.BookName)</small>
+                        </a>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="done-all">성경 전체 통독을 마쳤어요<br><small style="font-family:'Gothic A1',sans-serif;color:var(--b2-dim)">하나님의 말씀을 모두 읽으셨습니다</small></div>
+            }
+
+            @* ── 오늘의 말씀 ── *@
+            @if (!string.IsNullOrEmpty(Model.TodayVerseText))
+            {
+                <div class="lbl">오늘의 말씀</div>
+                <div class="vod">
+                    <p>@Model.TodayVerseText</p>
+                    <small>@Model.TodayVerseRef</small>
+                </div>
+            }
+
+            @* ── 통독 진도 ── *@
+            <div class="lbl">통독 진도</div>
+            <div class="bar2"><span>전체</span><b>@Model.ReadChapters / @Model.TotalChapters · @(pct)%</b></div>
+            <div class="pg all"><i style="width:@(pct)%"></i></div>
+            <div class="bar2"><span>구약</span><b>@Model.OtRead / @Model.OtTotal · @(otPct)%</b></div>
+            <div class="pg"><i style="width:@(otPct)%"></i></div>
+            <div class="bar2"><span>신약</span><b>@Model.NtRead / @Model.NtTotal · @(ntPct)%</b></div>
+            <div class="pg"><i style="width:@(ntPct)%"></i></div>
+        </div>
+
+        <div>
+            @* ── 최근 8주 ── *@
+            <div class="lbl">최근 8주<span style="font-size:12px;letter-spacing:0;font-weight:400;color:var(--b2-dim)">@kNow.ToString("M/d") 오늘</span></div>
+            <div class="dow">@foreach (var d in _dow) { <span>@d</span> }</div>
+            @if (Model.Heatmap.Any())
+            {
+                int startDow = (int)Model.Heatmap.First().Date.DayOfWeek;
+                <div class="hm">
+                    @for (int e = 0; e < startDow; e++) { <span class="e"></span> }
+                    @foreach (var day in Model.Heatmap)
+                    {
+                        <span class="@day.Level @(day.Date.Date == today ? "td" : "")" title="@day.Date.ToString("M/d") — @(day.ChaptersRead)장">@day.Date.Day</span>
+                    }
+                </div>
+            }
+            <div class="legend">적음<i style="background:var(--b2-line)"></i><i style="background:#E8DCC6"></i><i style="background:#CDB48A"></i><i style="background:#9A7B4F"></i>많음</div>
+        </div>
+    </div>
+
+    @* ── 책별 진도 ── *@
+    <div class="lbl">책별 진도<a id="bkListLink" href="/Bible2/List?testament=구약">구약 목록 →</a></div>
+    <div class="tabs" role="tablist">
+        <button type="button" class="on" data-t="ot" role="tab">구약 @Model.BookProgress.Count(x => x.Testament == "구약")권</button>
+        <button type="button" data-t="nt" role="tab">신약 @Model.BookProgress.Count(x => x.Testament == "신약")권</button>
+    </div>
+    @foreach (var grp in new[] { ("ot", "구약"), ("nt", "신약") })
+    {
+        <div class="books" data-grp="@grp.Item1" @(grp.Item1 == "nt" ? "hidden" : "")>
+            @foreach (var b in Model.BookProgress.Where(x => x.Testament == grp.Item2))
+            {
+                <a href="/Bible2/List?testament=@grp.Item2#book=@Uri.EscapeDataString(b.Name)" class="@(b.IsComplete ? "dn" : "")" title="@b.Name @b.ReadChapters/@b.TotalChapters">
+                    @b.Name<small>@b.ReadChapters/@b.TotalChapters</small>
+                    @if (b.ReadChapters > 0) { <i style="width:@b.Pct%"></i> }
+                </a>
+            }
+        </div>
+    }
+</div>
+
+<script>
+    (function () {
+        var KEY = 'b2BookTab';
+        var tabs = document.querySelectorAll('.b2i .tabs button');
+        var link = document.getElementById('bkListLink');
+        function show(t, save) {
+            tabs.forEach(function (b) { b.classList.toggle('on', b.dataset.t === t); });
+            document.querySelectorAll('.b2i .books').forEach(function (g) { g.hidden = g.dataset.grp !== t; });
+            if (link) {
+                var name = t === 'nt' ? '신약' : '구약';
+                link.href = '/Bible2/List?testament=' + encodeURIComponent(name);
+                link.textContent = name + ' 목록 →';
+            }
+            if (save) { try { localStorage.setItem(KEY, t); } catch (e) { } }
+        }
+        tabs.forEach(function (b) { b.addEventListener('click', function () { show(b.dataset.t, true); }); });
+        var saved = 'ot';
+        try { saved = localStorage.getItem(KEY) || 'ot'; } catch (e) { }
+        show(saved, false);
+    })();
+</script>

@@ -1,0 +1,118 @@
+﻿@using BulletinBoard.Models
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 + 아이 눈높이 (큰 글씨 · 큰 숫자)
+    // 아이 본인 화면 — 지금까지 모은 점수 + 올해 12달 막대
+    var backUrl = "/StudentPointDashboard4/Index"; // 학생 포인트 대시보드
+    var now = DateHelper.GetKoreaNow();
+    var myName = HttpContextAccessor.HttpContext?.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>내 감사 점수</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .hd .sh { padding-top: 16px; padding-bottom: 26px; }
+        .who { margin-top: 20px; font-size: 15px; color: var(--headdim); }
+        .who b { color: var(--headtx); font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 24px; margin-right: 4px; }
+        .tot { margin-top: 16px; font-size: 14px; color: var(--headdim); }
+        .tot b { display: block; margin-top: 4px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 76px; line-height: 1; color: var(--headk); font-variant-numeric: tabular-nums; }
+        .tot b small { font-size: 22px; color: var(--headdim); margin-left: 4px; }
+
+        .sec { margin-top: 26px; }
+        .sec h2 { margin: 0; font-family: "Noto Serif KR", serif; font-weight: 500; font-size: 20px; }
+        .sec p { margin: 4px 0 0; font-size: 14.5px; color: var(--dim2); }
+        .kb { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-top: 16px; }
+        .kb div { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 4px; height: 150px; }
+        .kb em { font-style: normal; font-family: "Inter", sans-serif; font-size: 12px; color: var(--dim2); text-align: center; min-height: 14px; }
+        .kb i { display: block; background: var(--acc); min-height: 3px; }
+        .kb i.o { background: var(--line); }
+        .kb span { font-size: 12px; color: var(--dim); text-align: center; padding-top: 3px; border-top: 2px solid transparent; }
+        .kb div.now i { background: var(--ok); }
+        .kb div.now em, .kb div.now span { color: var(--ok); font-weight: 600; }
+        .kb div.now span { border-top-color: var(--ok); }
+        .msg { margin-top: 22px; padding: 16px 18px; background: var(--mark); font-size: 16px; line-height: 1.65; }
+        .msg b { color: var(--ok); }
+        .back { margin-top: 18px; height: 52px; display: grid; place-items: center; border: 1px solid var(--rule); background: var(--card); font-size: 15px; }
+        .back:hover { border-color: var(--acc); color: var(--acc); }
+        .wait { color: var(--dim); }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span>말씀과 일기노트</span><a href="@backUrl">← 내 포인트로</a></div>
+            <div class="who"><b>@(string.IsNullOrWhiteSpace(myName) ? "나" : myName)</b>의 감사 점수</div>
+            <div class="tot">지금까지 모은 점수<b><span id="total">…</span><small>점</small></b></div>
+        </div>
+    </header>
+
+    <main class="sh">
+        <section class="sec">
+            <h2>@(now.Year)년 달마다 모은 점수</h2>
+            <p>초록 막대가 이번 달이에요.</p>
+            <div class="kb" id="bars">
+                @for (int m = 1; m <= 12; m++)
+                {
+                    <div class="@(m == now.Month ? "now" : "")"><em></em><i class="o"></i><span>@(m == 1 ? "1월" : m.ToString())</span></div>
+                }
+            </div>
+        </section>
+        <div class="msg" id="msg"><span class="wait">점수를 불러오고 있어요…</span></div>
+        <a class="back" href="@backUrl">← 내 포인트 화면으로</a>
+    </main>
+
+<script>
+(function () {
+    const YEAR = '@now.Year', MONTH = @now.Month;
+    const pad = m => String(m).padStart(2, '0');
+
+    fetch('/DevotionPoints/MyTotal', { credentials: 'include' })
+        .then(r => r.json())
+        .then(j => { document.getElementById('total').textContent = (j && j.ok) ? (j.totalPoints ?? 0) : '0'; })
+        .catch(() => { document.getElementById('total').textContent = '0'; });
+
+    fetch('/DevotionPoints/MyMonthlyData?months=24', { credentials: 'include' })
+        .then(r => r.json())
+        .then(j => draw((j && j.ok) ? (j.rows || []) : []))
+        .catch(() => draw([]));
+
+    function draw(rows) {
+        const by = {};
+        rows.forEach(r => { by[r.ym ?? r.Ym] = Number(r.points ?? r.Points) || 0; });
+        const pts = Array.from({ length: 12 }, (_, i) => by[`${YEAR}-${pad(i + 1)}`] || 0);
+        const max = Math.max(1, ...pts);
+        document.querySelectorAll('#bars > div').forEach((d, i) => {
+            const future = i + 1 > MONTH;
+            d.querySelector('em').textContent = future ? '' : pts[i];
+            const bar = d.querySelector('i');
+            bar.classList.toggle('o', future || pts[i] === 0);
+            bar.style.height = (future || pts[i] === 0) ? '3px' : Math.max(4, Math.round(pts[i] / max * 124)) + 'px';
+        });
+
+        const cur = pts[MONTH - 1];
+        const last = MONTH > 1 ? pts[MONTH - 2] : (by[`${Number(YEAR) - 1}-12`] || 0);
+        let text;
+        if (cur === 0) text = '이번 달은 아직 점수가 없어요.<br>말씀을 읽고 감사일기를 써 볼까요?';
+        else if (cur > last) text = `이번 달 <b>${cur}점</b>을 모았어요.<br>지난달보다 <b>${cur - last}점</b> 더 많아요!`;
+        else if (cur === last) text = `이번 달 <b>${cur}점</b>을 모았어요.<br>지난달만큼 잘하고 있어요!`;
+        else text = `이번 달 <b>${cur}점</b>을 모았어요.<br>조금만 더 하면 지난달(${last}점)만큼 돼요!`;
+        document.getElementById('msg').innerHTML = text;
+    }
+})();
+</script>
+</body>
+</html>

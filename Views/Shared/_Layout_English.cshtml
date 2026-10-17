@@ -1,0 +1,482 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <link rel="manifest" href="/manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ChurchName · @DepartmentName</title>
+
+    <!-- Google Fonts: Midnight Lexicon Theme -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <!-- Legacy stylesheets (기존 유지) -->
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/button.css" />
+    <link rel="stylesheet" href="~/css/card.css">
+    <link rel="stylesheet" href="~/css/InputForm.css">
+    <link rel="stylesheet" href="~/css/responsive.css">
+    <link rel="stylesheet" href="~/css/Table.css">
+    <link rel="stylesheet" href="~/css/radiobox.css">
+    <link rel="stylesheet" href="~/css/img_thumbnail.css">
+    <link rel="stylesheet" href="~/css/textFont.css">
+    <link rel="stylesheet" href="~/css/modalPopup.css">
+    <link rel="stylesheet" href="~/css/welcome2.css">
+    <link rel="stylesheet" href="~/css/construction.css">
+    <link rel="stylesheet" href="~/css/common.layer.css">
+    <link rel="stylesheet" href="~/css/textTextBackgroundColorAndColor.css">
+    <link rel="stylesheet" href="~/css/site.css" />
+
+    <style>
+        /* ═══════════════════════════════════════════
+           MIDNIGHT LEXICON — GLOBAL LAYOUT THEME
+        ═══════════════════════════════════════════ */
+
+        :root {
+            --bg:          #0a0a0f;
+            --surface:     #111118;
+            --card:        #16161f;
+            --border:      rgba(255,255,255,0.07);
+            --gold:        #c9a84c;
+            --gold-lt:     #f0d080;
+            --gold-dk:     #8a6a1e;
+            --text:        #e8e6e0;
+            --muted:       #7a7870;
+            --danger:      #c0392b;
+            --radius:      22px;
+            --nav-w:       260px;
+            --ham-size:    48px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            min-height: 100vh;
+            background: var(--bg);
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        /* ── ambient background glow ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 55% 45% at 15% 15%, rgba(201,168,76,.06) 0%, transparent 65%),
+                radial-gradient(ellipse 45% 55% at 85% 85%, rgba(59,130,246,.04) 0%, transparent 65%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── noise grain ─── */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            opacity: .45;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ════════════════════════════════════════
+           HAMBURGER BUTTON — fixed top-left
+        ════════════════════════════════════════ */
+        #ham-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1000;
+            width: var(--ham-size);
+            height: var(--ham-size);
+            border: 1px solid rgba(201,168,76,.30);
+            border-radius: 14px;
+            background: rgba(22,22,31,.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: background .25s, border-color .25s, box-shadow .25s;
+            outline: none;
+            padding: 0;
+        }
+        #ham-btn:hover {
+            background: rgba(201,168,76,.12);
+            border-color: rgba(201,168,76,.55);
+            box-shadow: 0 0 20px rgba(201,168,76,.15);
+        }
+
+        /* three bar lines */
+        #ham-btn .bar {
+            display: block;
+            width: 20px;
+            height: 1.5px;
+            background: var(--gold);
+            border-radius: 2px;
+            transition: transform .35s cubic-bezier(.22,1,.36,1), opacity .25s;
+            transform-origin: center;
+        }
+
+        /* animate to X when open */
+        #ham-btn.open .bar:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
+        #ham-btn.open .bar:nth-child(2) { opacity: 0; transform: scaleX(0); }
+        #ham-btn.open .bar:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
+
+        /* ════════════════════════════════════════
+           DROPDOWN MENU PANEL
+        ════════════════════════════════════════ */
+        #nav-panel {
+            position: fixed;
+            top: calc(16px + var(--ham-size) + 10px);   /* just below the button */
+            left: 16px;
+            z-index: 999;
+            width: var(--nav-w);
+            background: rgba(17,17,24,.96);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(201,168,76,.18);
+            border-radius: 18px;
+            padding: 0;
+            overflow: hidden;
+            /* closed state */
+            max-height: 0;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-8px) scale(0.98);
+            transform-origin: top left;
+            transition:
+                max-height .4s cubic-bezier(.22,1,.36,1),
+                opacity .3s ease,
+                transform .35s cubic-bezier(.22,1,.36,1);
+            box-shadow: 0 20px 50px rgba(0,0,0,.55), 0 0 40px rgba(201,168,76,.08);
+        }
+
+        #nav-panel.open {
+            max-height: 420px;
+            opacity: 1;
+            pointer-events: all;
+            transform: translateY(0) scale(1);
+        }
+
+        /* panel inner padding */
+        #nav-panel .panel-inner {
+            padding: 10px 8px 12px;
+        }
+
+        /* site identity inside panel */
+        .panel-identity {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 12px 10px;
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            margin-bottom: 8px;
+        }
+        .panel-identity .monogram {
+            width: 34px; height: 34px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--gold-dk), var(--gold));
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Playfair Display', serif;
+            font-size: 14px; font-weight: 700;
+            color: #0a0a0f;
+            flex-shrink: 0;
+        }
+        .panel-identity .site-name {
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .panel-identity .site-name strong {
+            display: block;
+            color: #fff;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        .panel-identity .site-name span {
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        /* nav links */
+        #nav-panel .nav-section-label {
+            font-family: 'DM Mono', monospace;
+            font-size: 8.5px;
+            letter-spacing: .22em;
+            text-transform: uppercase;
+            color: var(--gold);
+            opacity: .6;
+            padding: 6px 12px 4px;
+        }
+
+        #nav-panel a.nav-link-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            border-radius: 10px;
+            color: #b8b5ae;
+            text-decoration: none;
+            font-size: 13.5px;
+            font-weight: 400;
+            transition: background .2s, color .2s;
+            margin: 1px 0;
+        }
+        #nav-panel a.nav-link-item:hover {
+            background: rgba(201,168,76,.1);
+            color: var(--gold-lt);
+        }
+        #nav-panel a.nav-link-item .nav-icon {
+            width: 28px; height: 28px;
+            border-radius: 8px;
+            background: rgba(255,255,255,.05);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+            transition: background .2s;
+        }
+        #nav-panel a.nav-link-item:hover .nav-icon {
+            background: rgba(201,168,76,.15);
+        }
+
+        /* divider inside panel */
+        #nav-panel .panel-divider {
+            height: 1px;
+            background: rgba(255,255,255,.06);
+            margin: 8px 12px;
+        }
+
+        /* login partial wrapper */
+        #nav-panel .login-area {
+            padding: 8px 12px 4px;
+        }
+        #nav-panel .login-area a,
+        #nav-panel .login-area button,
+        #nav-panel .login-area form a {
+            color: var(--muted) !important;
+            font-size: 13px !important;
+        }
+
+        /* ════════════════════════════════════════
+           TOP BAR  (identity strip)
+        ════════════════════════════════════════ */
+        #top-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 64px;
+            z-index: 100;
+            background: rgba(10,10,15,.8);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid rgba(255,255,255,.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #top-bar .top-bar-title {
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .22em;
+            text-transform: uppercase;
+            color: var(--gold);
+            opacity: .7;
+        }
+        /* subtle gold line at bottom of topbar */
+        #top-bar::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; left: 50%; transform: translateX(-50%);
+            width: 80px; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        }
+
+        /* ════════════════════════════════════════
+           PAGE CONTENT
+        ════════════════════════════════════════ */
+        #page-body {
+            position: relative;
+            z-index: 1;
+            padding-top: 80px;      /* below top-bar */
+            min-height: 100vh;
+        }
+
+        /* overlay to close menu when clicking outside */
+        #nav-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 998;
+            background: transparent;
+        }
+        #nav-overlay.visible { display: block; }
+
+        /* ════════════════════════════════════════
+           FOOTER
+        ════════════════════════════════════════ */
+        #site-footer {
+            position: relative;
+            z-index: 1;
+            border-top: 1px solid rgba(255,255,255,.06);
+            padding: 20px 0;
+            text-align: center;
+        }
+        #site-footer .footer-inner {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            letter-spacing: .12em;
+            color: var(--muted);
+        }
+        #site-footer .footer-inner .sep {
+            width: 3px; height: 3px;
+            border-radius: 50%;
+            background: var(--gold);
+            opacity: .4;
+        }
+        #site-footer .footer-inner .yr {
+            color: var(--gold);
+            opacity: .6;
+        }
+
+        /* ════════════════════════════════════════
+           SCROLLBAR
+        ════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: rgba(201,168,76,.25); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,.45); }
+    </style>
+</head>
+
+<body>
+
+    <!-- ── Overlay (click-outside to close) ── -->
+    <div id="nav-overlay" onclick="closeMenu()"></div>
+
+    <!-- ── Fixed Hamburger Button ── -->
+    <button id="ham-btn" onclick="toggleMenu()" aria-label="메뉴 열기/닫기" aria-expanded="false" aria-controls="nav-panel">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+    </button>
+
+    <!-- ── Dropdown Nav Panel ── -->
+    <nav id="nav-panel" role="navigation" aria-label="주 메뉴">
+        <div class="panel-inner">
+
+            <!-- Site identity -->
+            <div class="panel-identity">
+                <div class="monogram">L</div>
+                <div class="site-name">
+                    <strong>@ChurchName</strong>
+                    <span>@DepartmentName</span>
+                </div>
+            </div>
+
+            <!-- Main links -->
+            <div class="nav-section-label">메뉴</div>
+
+            <a class="nav-link-item" href="/" onclick="closeMenu()">
+                <span class="nav-icon">⛪</span>
+                잠실새내 유년부
+            </a>
+            <a class="nav-link-item" asp-area="" asp-controller="DailyEnglish" asp-action="Index" onclick="closeMenu()">
+                <span class="nav-icon">🏠</span>
+                Home
+            </a>
+            <a class="nav-link-item" asp-area="" asp-controller="DailyEnglish" asp-action="AdminList" onclick="closeMenu()">
+                <span class="nav-icon">📋</span>
+                Admin List
+            </a>
+            <a class="nav-link-item" asp-area="" asp-controller="DailyEnglish" asp-action="Create" onclick="closeMenu()">
+                <span class="nav-icon">✏️</span>
+                Create
+            </a>
+            <a class="nav-link-item" asp-area="" asp-controller="DailyEnglish" asp-action="Video" onclick="closeMenu()">
+                <span class="nav-icon">📹</span>
+                Video
+            </a>
+
+        </div>
+    </nav>
+
+    <!-- ── Top Bar ── -->
+    <div id="top-bar" aria-hidden="true">
+        <span class="top-bar-title">@ChurchName · @DepartmentName</span>
+    </div>
+
+    <!-- ── Page Body ── -->
+    <div id="page-body">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- ── Footer ── -->
+    <footer id="site-footer">
+        <div class="footer-inner">
+            <span class="yr">© @DateHelper.GetKoreaNow().Year</span>
+            <span class="sep"></span>
+            <span>@ChurchName</span>
+            <span class="sep"></span>
+            <span>@DepartmentName</span>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        function toggleMenu() {
+            var btn = document.getElementById('ham-btn');
+            var panel = document.getElementById('nav-panel');
+            var overlay = document.getElementById('nav-overlay');
+            var isOpen = panel.classList.contains('open');
+            if (isOpen) {
+                closeMenu();
+            } else {
+                btn.classList.add('open');
+                panel.classList.add('open');
+                overlay.classList.add('visible');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        }
+
+        function closeMenu() {
+            var btn = document.getElementById('ham-btn');
+            var panel = document.getElementById('nav-panel');
+            var overlay = document.getElementById('nav-overlay');
+            btn.classList.remove('open');
+            panel.classList.remove('open');
+            overlay.classList.remove('visible');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+
+        /* close on Escape */
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') closeMenu();
+        });
+    </script>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

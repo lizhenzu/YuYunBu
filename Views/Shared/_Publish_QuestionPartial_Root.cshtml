@@ -1,0 +1,73 @@
+﻿@model BulletinBoard.Models.TodayCollectQuestion
+
+<style>
+
+    .local-card {
+    border: 2px solid #4CAF50; /* 3px 흰색 테두리 설정 */
+    padding: 6px;
+    margin: 5px;
+    text-align: left;
+    width: 100%; /* 너비를 부모 요소의 100%로 설정 */
+    background-color: white;
+    color: black;
+    font-size: 17px;
+    transition: all 0.3s ease;
+}
+
+</style>
+
+@if (!string.IsNullOrEmpty(@Model.QuestionTypeDataObjectsData.QuestionQ))
+{ 
+        <div class="local-card" >
+                <p>@Model.QuestionTypeDataObjectsData.QuestionQ</p>
+                <div asp-validation-summary="All" class="text-danger"></div>
+                @if (@Model.QuestionTypeDataObjectsData.QuestionType.ToLower() == "o")
+                {
+                    <input type="radio" name="AnswerQ" id="Question1" value="1">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question1</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question2" value="2">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question2</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question3" value="3">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question3</label>
+                    <br>
+                    <input type="radio" name="AnswerQ" id="Question4" value="4">
+                    <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ">@Model.QuestionTypeDataObjectsData.Question4</label>
+                    <br>
+                    <span asp-validation-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="text-danger"></span>
+                }
+                else
+                {
+                    @if (@Model.TodayCheckCompositeData.QuestionCount == 0)
+                    {
+                        <div class="form-group">
+                            <label asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ"></label>
+                            <input asp-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="form-control" autofocus />
+                            <span asp-validation-for="@Model.QuestionTypeDataObjectsData.AnswerQ" class="text-danger"></span>
+                        </div>
+                    }
+                }
+                <input type="hidden" id="CorrectAnswer" name="CorrectAnswer" value="@Model.QuestionTypeDataObjectsData.CorrectAnswer" />
+                <input type="hidden" id="Id"            name="Id"            value="@Model.QuestionTypeDataObjectsData.Id" />
+            </div>
+  
+        <div class="button-container-horizontal-transparent">
+            @if (@Model.TodayCheckCompositeData.QuestionCount == 0)
+            {
+            <div class="button-click-division" id="sendData" >제출</div>
+            }
+                <div class="button-click-division" onclick="redirectToPage('/DailyMission/TodayQuestion')">닫기</div>
+        </div>        
+ 
+}
+else
+{
+    @await Html.PartialAsync("_DisplayMessageBar" ,"오늘은 성경 퀴즈가 없습니다.")
+}
+
+<script>     
+    function redirectToPage(URL) {
+      window.location.href = URL;
+    }
+</script>

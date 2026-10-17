@@ -1,0 +1,711 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model IEnumerable<BulletinBoard.Models.UserInfo>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+@{
+
+
+    string BanMode = ViewData["BanMode"] as string;
+
+    string styleHeaderColor = "color: black;";
+    string styleHeaderBackGroundColor = "background-color: #ffffff; " + styleHeaderColor;
+
+    string styleFooterColor = "color: black;";
+    string styleFooterBackgroundColor = "background-color: #ffeb3b; " + styleFooterColor;
+
+
+    styleHeaderColor = "color: white;";
+    styleHeaderBackGroundColor = "background-color: #006633;" + styleHeaderColor;
+
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Person Information</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            /*  min-height: 100vh;*/
+            background-color: #f4f4f4;
+        }
+
+        .search-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px;
+            text-align: center;
+        }
+
+        .search-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 10px;
+        }
+
+            .search-bar input {
+                padding: 10px;
+                width: 60%;
+                max-width: 400px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                font-size: 16px;
+            }
+
+            .search-bar button {
+                padding: 10px 20px;
+                margin-left: 10px;
+                border: none;
+                background-color: #007BFF;
+                color: white;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+            }
+
+                .search-bar button:hover {
+                    background-color: #0056b3;
+                }
+
+        @@media (max-width: 600px) {
+            .search-bar {
+                flex-direction: column;
+            }
+
+                .search-bar input {
+                    width: 80%;
+                    margin-bottom: 10px;
+                }
+
+                .search-bar button {
+                    width: 80%;
+                }
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+            margin: 20px;
+        }
+
+
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            max-width: 400px;
+            width: 85%;
+            margin: 20px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .profile-picture {
+            display: block;
+            margin: 0 auto 10px auto;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .info {
+            text-align: center;
+        }
+
+            .info h2 {
+                margin: 10px 0;
+                font-size: 24px;
+            }
+
+            .info p {
+                margin: 5px 0;
+                color: #666;
+            }
+
+        .buttons {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+            .buttons button {
+                background-color: #007BFF;
+                color: white;
+                border: none;
+                padding: 10px 15px;
+                border-radius: 5px;
+                cursor: pointer;
+                margin-left: 10px;
+            }
+
+                .buttons button:hover {
+                    background-color: #0056b3;
+                }
+
+            .buttons .home {
+                background-color: #6c757d;
+            }
+
+                .buttons .home:hover {
+                    background-color: #5a6268;
+                }
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        body {
+            position: relative;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            z-index: 1000;
+            display: none;
+        }
+
+
+
+        /* Disable pointer events when loading */
+        .disable-input {
+            pointer-events: none;
+        }
+
+        @@media (max-width: 600px) {
+            .card {
+                max-width: 100%;
+                margin: 10px;
+            }
+        }
+    </style>
+
+    <style>
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.7); /* Dark background with opacity */
+            z-index: 1000;
+            display: none; /* Hidden by default */
+            pointer-events: none; /* Block all input outside the popup */
+        }
+
+        /* Popup window (stays on top of the overlay and allows interaction) */
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%; /* 80% of the screen width */
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1001;
+            display: none; /* Hidden by default */
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+            pointer-events: auto; /* Allow interaction inside the popup */
+        }
+
+            /* Popup content styling */
+            .popup h2 {
+                text-align: center;
+            }
+
+            .popup .popup-fields {
+                margin-bottom: 20px;
+            }
+
+            .popup label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+            }
+
+            .popup input {
+                width: 98%;
+                padding: 10px;
+                margin-bottom: 10px;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+            }
+
+            .popup .buttons {
+                text-align: center;
+            }
+
+                .popup .buttons button {
+                    padding: 10px 20px;
+                    margin: 10px;
+                    border: none;
+                    background-color: #007BFF;
+                    color: white;
+                    border-radius: 5px;
+                    cursor: pointer;
+                }
+
+                .popup .buttons .cancel-btn {
+                    background-color: #6c757d;
+                }
+
+    </style>
+
+    <style>
+
+        .home-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+            .home-btn:hover {
+                background-color: #218838;
+            }
+
+    </style>
+    <style>
+
+        /* Header style */
+        header {
+            width: 100%;
+            background-color: #006633;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+        }
+
+            header h1 {
+                font-size: 2.0em;
+                margin: 0;
+            }
+        /* Image style */
+        .main-img {
+            width: 98%;
+            margin: 10px auto;
+        }
+    </style>
+    <style>
+
+        .popup-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); /* 배경 어둡게 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999; /* 화면에서 최상단에 표시되도록 설정 */
+        }
+
+        .popup {
+            background-color: white;
+            text-align: center;
+            width: 90%;
+            color: black;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* 팝업에 약간의 그림자 추가 */
+        }
+        /* Footer style */
+        footer {
+            background-color: #006633;
+            color: white;
+            text-align: center;
+            padding: 20px 0;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+        }
+
+            footer .footer-links a {
+                color: white;
+                text-decoration: none;
+                margin: 0 15px;
+            }
+
+                footer .footer-links a:hover {
+                    text-decoration: underline;
+                }
+    </style>
+    <script src="/js/common2.js"></script>
+</head>
+
+@{
+    int maxLimit_Message_horizontal = 5;
+    var todayDate_Message_horizontal = DateHelper.GetTodayDateDayString(maxLimit_Message_horizontal);
+    string formattedFor_Message_horizontal = $"/images/home/Message/horizontal/Message_horizontal_{todayDate_Message_horizontal}.webp";
+}
+
+<body>
+
+    <div id="loadingOverlay" class="loading-overlay popup-background">
+        자료 가져오는중...
+    </div>
+    <header style="max-width: 800px; width: 100%; margin: 0px auto;">
+
+        @if (@BanMode == "IndexBan")
+        {
+            <h1>우리반 이야기 공간</h1>
+        }
+        else if (@BanMode == "IndexTeacher")
+        {
+            <h1>교사간 이야기 공간</h1>
+        }
+        else if (@BanMode == "IndexAdressOnly")
+        {
+            <h1>주소록</h1>
+        }
+        else
+        {
+            <h1>@ConstatsCommon.TalkWithFriends</h1>
+        }
+
+
+    </header>
+
+    <img src="@formattedFor_Message_horizontal" alt="Header Image" style="max-width: 800px; width: 100%; height: auto; margin: 0px auto;">
+
+    <div id="popup-overlay" class="popup-overlay"></div>
+    <div class="search-container">
+        @if (@BanMode == "IndexAdressOnly")
+        {
+            <h1>친구 찾기</h1>
+        }
+        else
+        {
+            <h1>메세지 보낼 친구 찾기</h1>
+        }
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="이름이나 이메일을 입력하세요">
+            @*      <button onclick="createCards()">검색</button>*@
+        </div>
+    </div>
+
+    <script>
+        // Function to filter cards based on search input
+        function filter1111Cards() {
+            var input = document.getElementById('searchInput').value.toLowerCase();
+            var cards = document.querySelectorAll('.card');
+
+            cards.forEach(function (card) {
+                var name = card.querySelector('h2').textContent.toLowerCase();
+                var email = card.querySelector('p:nth-of-type(2)').textContent.toLowerCase();
+
+                if (name.includes(input) || email.includes(input)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        function filterCards() {
+            var input = document.getElementById('searchInput').value.toLowerCase();
+            var cards = document.querySelectorAll('.card');
+
+            cards.forEach(function (card) {
+                var name = card.querySelector('h2').textContent.toLowerCase();
+                var email = card.querySelector('p:last-of-type').textContent.toLowerCase(); // 마지막 <p>가 이메일인 경우
+
+                if (name.includes(input) || email.includes(input)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+
+        // Attach the filtering function to the input event of the search bar
+        document.getElementById('searchInput').addEventListener('input', filterCards);
+
+    </script>
+
+    <div id="cardContainer" style="display: flex; flex-direction: column; align-items: center; margin-bottom:70px">
+    </div>
+
+    <div class="popup" id="SendMessagePopup">
+        <h2>메세지 남기기</h2>
+        <div class="popup-fields">
+            <p id="name-display"> 이름 : </p>
+            <p id="email-display"> 이메일 : </p>
+
+            <label for="messageText">메세지</label>
+            @*   <input type="text" id="messageText">*@
+
+            <textarea id="messageText" name="messageText" style="width: 95%; height: 170px; resize: none; border: 1px solid #ccc;"></textarea>
+            @*<label for="input2">메세지 2라인</label>
+            <input type="text" id="input2">
+
+            <label for="input3">메세지 3라인</label>
+            <input type="text" id="input3">*@
+
+            <input type="hidden" id="userNameActive" name="userNameActive">
+        </div>
+        <div class="buttons">
+            <button class="send-btn">보내기</button>
+            <button class="cancel-btn">취소</button>
+        </div>
+    </div>
+    <footer>
+        <div class="footer-links">
+            <a href="/">Home</a>
+            @if (@BanMode == "IndexBan")
+            {
+                <a href="/HumanResource/IndexBan">쪽지보내기</a>
+            }
+            else if (@BanMode == "IndexTeacher")
+            {
+                <a href="/HumanResource/IndexTeacher">쪽지보내기</a>
+            }
+            else if (@BanMode == "IndexAdressOnly")
+            {
+            }
+            else
+            {
+                <a href="/HumanResource/Index">쪽지보내기</a>
+            }
+
+            @if (@BanMode == "IndexAdressOnly")
+            {
+
+            }
+            else
+            {
+            <a href="/MessageCenter/ReadPopMessage?BanMode=@BanMode&PopMessageReadMehod=@PopMessageReadMehod.ReadISentAllMessage.ToString()">보낸 쪽지</a>
+            <a href="/MessageCenter/ReadPopMessage?BanMode=@BanMode&PopMessageReadMehod=@PopMessageReadMehod.ReadMyAllMessage.ToString()">받은 쪽지</a>
+            }
+        </div>
+    </footer>
+
+    <script>
+        $(document).ready(function () {
+            // Automatically call createCards when the page loads
+            showLoading();
+            createCards();
+
+        });
+
+        function showLoading() {
+            $('#loadingOverlay').show();
+            $('body').addClass('disable-input');
+        }
+
+        function hideLoading() {
+            $('#loadingOverlay').hide();
+            $('body').removeClass('disable-input');
+        }
+
+        $(document).on('click', '.home-btn', function () {
+            window.location.href = '/';  // 홈 페이지로 이동
+        });
+
+
+
+        function createCards() {
+            var cardContainer = document.getElementById('cardContainer');
+            cardContainer.innerHTML = '';  // Clear any existing cards
+            var card = document.createElement('div');
+            //card.className = 'loading-overlay';
+            //card.id = 'loadingOverlay';
+            //card.innerHTML = `<div id="loadingOverlay" class="loading-overlay">조회중입니다...</div>`;
+            //cardContainer.appendChild(card);
+
+
+            $.ajax({
+                url: '@Url.Action("GetDetails", "HumanResource")',
+                type: 'GET',
+                data: { ClassYear: @ViewData["ClassYear"], ClassBan: @ViewData["ClassBan"], BanMode : "@ViewData["BanMode"]" },
+                success: function (response) {
+                    var people = response;
+
+                    people.forEach(function (person) {
+
+                        //var profilePicture = person.ProfilePicturePath ? `data:image/png;base64,${person.profilePicture}` : '/images/profile/people/people_01.webp';
+                        var profilePicture = person.profilePicturePath;
+
+                        var card = document.createElement('div');
+                        card.className = 'card';
+
+                        // Use jQuery's .data() to set custom data attributes
+                        $(card).data('name', person.fullName);
+                        $(card).data('email', person.email);
+                        $(card).data('userName', person.userName);
+
+
+                        card.innerHTML = `
+                                                    <img src="${profilePicture}" alt="Profile Picture" class="profile-picture">
+
+                                                    <div class="info">
+                                                        <h2>${person.fullName}</h2>
+                                                        <p>ID: ${person.userName}</p>
+                                                                <p>생일: ${person.bMonth}월${person.bDay}일</p>
+                                                                 <p>Phone: ${person.phoneNumber}</p>
+                                                                ${person.classYear > 0 ? `<p>학년반: ${person.classYear}학년 ${person.classBan}반</p>` : ""}
+                                                        <p>Email: ${person.email}</p>
+                                                    </div>
+                                                    <div class="buttons">
+                                                      <button class="CreatePrayer" style="background-color: #dc3545;" >기도문작성</button>
+                                                      <button class="SendMessage">문자전송</button>
+                                                                      <button  style="background-color: #4CAF50;" onclick="ModifyHRPhoto('${person.userId}',${person.PersonId})">정보변경</button>
+
+                                                    </div>
+                                                `;
+                        cardContainer.appendChild(card);
+                    });
+                    hideLoading(); // Hide loading screen when data is loaded
+                },
+                error: function () {
+                    hideLoading(); // Hide loading screen even if there's an error
+                }
+            });
+        }
+
+    </script>
+    <script>
+
+        $(document).ready(function () {
+            // Show popup when SendMessage button is clicked
+            $(document).on('click', '.SendMessage', function () {
+                openPopup($(this).closest('.card'), 'message'); // Pass 'message' identifier
+
+            });
+
+            // New CreatePrayer click event
+            $(document).on('click', '.CreatePrayer', function () {
+                openPopup($(this).closest('.card'), 'prayer'); // Pass 'prayer' identifier
+            });
+
+
+            $('.send-btn').click(function () {
+                const messageType = $('#SendMessagePopup').data('messageType'); // Retrieve the stored message type
+                sendMessageData(messageType);
+                closePopup();
+
+
+            });
+
+
+            // Close the popup when the cancel button is clicked
+            $('.cancel-btn').click(function () {
+                closePopup();
+            });
+
+            // Function to open the popup with the correct name and email
+            function openPopup(card, messageType) {
+                var name = $(card).data('name');
+                var email = $(card).data('email');
+                var userName = $(card).data('userName');
+
+                $('#name-display').text("이름 : " + name);
+                $('#email-display').text("이메일 : " + email);
+                $('#userNameActive').val(userName);
+
+                // Set the popup title based on messageType
+                $('#SendMessagePopup h2').text(messageType === 'message' ? '쪽지 문자 남기기' : '기도 내용 작성 하기');
+
+
+                $('#SendMessagePopup').data('messageType', messageType); // Store the message type
+
+                $('.popup-overlay').fadeIn(300);
+                $('#SendMessagePopup').fadeIn(300);
+                $('body').addClass('disable-input');
+            }
+
+
+        });
+
+        function ModifyHRPhoto(UserId, PersonId) {
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId + "&PersonId=" + PersonId;
+        }
+
+        // Close popup function
+        function closePopup() {
+            $('.popup-overlay').fadeOut(300);  // Fade out the dark background overlay
+            $('#SendMessagePopup').fadeOut(300);      // Fade out the popup window
+            $('body').removeClass('disable-input');  // Re-enable input interactions behind the popup
+        }
+
+        async function sendMessageData(messageType) { 
+            var messageText = '쪽지 보낼까요?';
+            if (messageType == "prayer") {
+                messageText = '기도문 올릴까요?';
+            }
+
+            console.log("aaaa1");
+            let result = await confirmMessage(true, [messageText]);
+
+            console.log("aaaa2");
+
+            if (result === 'y') {
+                console.log("aaaa3");
+                $.ajax({
+                    url: '/MessageCenter/PushPopMessage',
+                    type: 'POST',
+                    data: {
+                        messageText: $('#messageText').val(),
+                        toWhom: $('#userNameActive').val(),
+                        messageType : messageType  // New flag to identify prayer requests
+                    },
+                    success: async function (response) {
+                        await confirmMessage(false, ['정상 처리 되었습니다.']);
+                    },
+                    error: function (xhr, status, error) {
+                        console.error('Error:', error);
+                    }
+                });
+            } else if (result === 'c') {
+                console.log('Message sending canceled.');
+            }
+        }
+
+ 
+
+    </script>
+</body>
+</html>

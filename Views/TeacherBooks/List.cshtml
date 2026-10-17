@@ -1,0 +1,72 @@
+@model IEnumerable<BulletinBoard.Models.TeacherBookVM>
+@{
+    Layout = null;
+    var lessons = Model.ToList();
+    var grouped = lessons.GroupBy(x => x.UnitNumber.HasValue ? $"{x.UnitNumber}단원 {x.UnitTitle}" : "특별 공과");
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>교사용 공과 목록</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{--teal:#3aaea0;--teal-dk:#2a8e82;--teal-lt:#e8f7f5;--teal-bg:#f0faf8;--border:#e5e7eb;--gray1:#1f2937;--gray2:#374151;--gray3:#6b7280;--gray5:#f3f4f6;--sans:'Noto Sans KR',sans-serif;--serif:'Noto Serif KR',serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);color:var(--gray1);background:#f9fafb;-webkit-font-smoothing:antialiased}
+.hdr{background:var(--teal);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(58,174,160,.35);position:sticky;top:0;z-index:10}
+.hdr-title{font-weight:700;font-size:16px;color:#fff}
+.hdr a{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:600}
+.wrap{max-width:900px;margin:0 auto;padding:28px 16px 60px}
+.unit-group{margin-bottom:36px}
+.unit-label{font-family:var(--serif);font-size:13px;font-weight:700;color:var(--teal-dk);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;padding:8px 14px;background:var(--teal-lt);border-left:4px solid var(--teal);border-radius:0 6px 6px 0}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.card{border-radius:10px;overflow:hidden;border:1px solid var(--border);background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.06);transition:transform .15s,box-shadow .15s;cursor:pointer}
+.card:hover{transform:translateY(-4px);box-shadow:0 8px 20px rgba(58,174,160,.2);border-color:var(--teal)}
+.card-band{background:linear-gradient(135deg,var(--teal-dk),var(--teal));padding:20px 16px 14px;color:#fff;min-height:90px;display:flex;flex-direction:column;justify-content:flex-end}
+.card-num{font-family:var(--serif);font-size:34px;font-weight:700;line-height:1;opacity:.85}
+.card-label{font-size:13px;font-weight:700;margin-top:2px}
+.card-body{padding:12px 14px}
+.card-title{font-size:12.5px;color:var(--gray2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-cta{margin-top:10px;display:inline-block;font-size:12px;font-weight:600;color:var(--teal-dk)}
+@@media(max-width:480px){.card-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header class="hdr">
+  <span class="hdr-title">📚 교사용 공과 목록 (2026 · 2학기)</span>
+  <a href="/">🏠 홈</a>
+</header>
+<div class="wrap">
+  @foreach (var grp in grouped)
+  {
+    <div class="unit-group">
+      <div class="unit-label">@grp.Key</div>
+      <div class="card-grid">
+        @foreach (var item in grp)
+        {
+          <a class="card" href="/viewTeacherBooks/@item.LessonKey">
+            <div class="card-band">
+              @if (item.LessonNumber.HasValue)
+              {
+                <div class="card-num">@item.LessonNumber</div>
+                <div class="card-label">과</div>
+              }
+              else
+              {
+                <div class="card-label" style="font-size:16px">@item.LessonLabel</div>
+              }
+            </div>
+            <div class="card-body">
+              <div class="card-title">@item.LessonTitle</div>
+              <div class="card-cta">공과 보기 →</div>
+            </div>
+          </a>
+        }
+      </div>
+    </div>
+  }
+</div>
+</body>
+</html>

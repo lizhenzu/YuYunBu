@@ -1,0 +1,327 @@
+﻿@model BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment Env
+
+@*  ══════════════════════════════════════════════════════════════
+    나의 도토리 순위 — Bone 스킨 (B안: TOP3 시상대 + 펼치는 목록 + 개인별 비율 막대)
+    이전 화면은 TotalRank_old.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    var year = Model?.Year ?? DateHelper.GetKoreaNow().Year;
+    var rows = Model?.Rows ?? new List<BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM>();
+    var me   = (ViewData["UserName"] as string ?? "").Trim();
+
+    string Safe(string? s) => (s ?? "").Trim();
+    string N(int v) => v.ToString("N0");
+
+    var today = DateHelper.GetKoreaNow().Date;
+    string FmtDate(DateTime? dt)
+    {
+        if (!dt.HasValue) return "기록 없음";
+        var d = dt.Value.Date;
+        if (d == today) return "오늘";
+        if (d == today.AddDays(-1)) return "어제";
+        return d.ToString("yyyy-MM-dd");
+    }
+
+    string Photo(string? userId)
+    {
+        var uid = Safe(userId);
+        if (!string.IsNullOrWhiteSpace(uid))
+        {
+            var phys = System.IO.Path.Combine(Env.WebRootPath, "images", "profile", $"{uid}.png");
+            if (System.IO.File.Exists(phys)) return $"/images/profile/{uid}.png";
+        }
+        return "/images/icon/people/people_01.webp";
+    }
+
+    string ClassLabel(BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM r)
+    {
+        if (r.ClassYear.HasValue && r.ClassBan.HasValue) return $"{r.ClassYear}학년 {r.ClassBan}반";
+        if (r.ClassYear.HasValue) return $"{r.ClassYear}학년";
+        return "";
+    }
+    string Name(BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM r)
+        => !string.IsNullOrWhiteSpace(r.FullName) ? r.FullName! : (r.UserName ?? "");
+
+    // 항목 — 도토리 보드와 같은 색
+    const string cB = "#9A7B4F", cM = "#C4A77C", cD = "#DCCBAE", cA = "#16181C", cE = "#6F8A7A";
+    var legend = new[] { (ConstatsCommon.MainKeyTitle, cB), ("미션북", cM), ("말씀&일기", cD), ("출석", cA), ("전도", cE) };
+
+    (string Label, int Val, string Color)[] Parts(BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM r) => new[]
+    {
+        (ConstatsCommon.MainKeyTitle, r.BiblePoint, cB),
+        ("미션북", r.MissionBookPoint, cM),
+        ("말씀&일기", r.DevotionPoint, cD),
+        ("출석", r.AttendancePoint, cA),
+        ("전도", r.EvangelismPoint, cE),
+    };
+
+    var top3 = rows.Take(3).ToList();
+}
+
+@* 개인별 비율 막대 *@
+@{
+    void Stack(BulletinBoard.ViewModels.Dashboard.StudentPointTotalRankRowVM r, string cls)
+    {
+        <span class="trSt @cls">
+            @foreach (var p in Parts(r).Where(x => x.Val > 0))
+            {
+                <i style="flex:@p.Val;background:@p.Color" title="@p.Label @p.Val"></i>
+            }
+        </span>
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>@ConstatsCommon.myDoToRi 순위 — @ConstatsCommon.MainKeyTitle</title>
+<link rel="stylesheet" href="/css/mission3/bone.css" asp-append-version="true">
+<style>
+    body { margin: 0; background: #F7F6F3; }
+
+    .qz .trPgm { padding: 2px 0 16px; border-bottom: 1px solid var(--rule); }
+    .qz .trK { font-size: 10px; font-weight: 600; letter-spacing: .26em; color: var(--acc); margin-bottom: 9px; }
+    .qz .trT { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 22px; line-height: 1.4; }
+    .qz .trS { font-size: 11.5px; color: var(--dim); margin-top: 6px; }
+    .qz .trLink {
+        display: flex; justify-content: space-between; align-items: center; margin-top: 14px;
+        padding: 11px 14px; border: 1px solid var(--acc); color: var(--acc); text-decoration: none;
+        font-size: 12.5px; font-weight: 600; letter-spacing: .04em;
+    }
+    .qz .trLink:hover { background: var(--mark); }
+    .qz .trLinkGo { font-size: 15px; }
+    .qz .trLeg { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; font-size: 10.5px; color: var(--dim2); }
+    .qz .trLeg em { display: inline-block; width: 8px; height: 8px; margin-right: 5px; }
+
+    .qz .trAv { border-radius: 50%; object-fit: cover; display: block; background: var(--mark); box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--acc); flex: 0 0 auto; }
+
+    /* 시상대 */
+    .qz .trPod { display: grid; grid-template-columns: 1fr 1.15fr 1fr; align-items: end; gap: 8px; padding-top: 22px; border-bottom: 1px solid var(--rule); }
+    .qz .trPc { text-align: center; padding: 0 4px 14px; min-width: 0; }
+    .qz .trPc.first { background: var(--mark); padding-top: 14px; }
+    .qz .trPc.me { outline: 1px solid var(--acc); outline-offset: -1px; }
+    .qz .trPc .trAv { margin: 8px auto 0; }
+    .qz .trPl { font-family: "Inter", sans-serif; font-size: 10px; letter-spacing: .2em; color: var(--dim); }
+    .qz .trPc.first .trPl { color: var(--acc); }
+    .qz .trPn { font-family: "Noto Serif KR", serif; font-size: 14px; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qz .trPr { font-size: 9.5px; color: var(--dim); margin-top: 2px; }
+    .qz .trPv { font-family: "Inter", sans-serif; font-weight: 200; font-size: 26px; color: var(--acc); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .qz .trPc.first .trPv { font-size: 32px; }
+
+    /* 비율 막대 */
+    .qz .trSt { display: flex; height: 6px; margin-top: 7px; background: var(--rule); }
+    .qz .trSt i { display: block; }
+    .qz .trSt.pod { margin: 8px 6px 0; }
+
+    /* 탭 · 도구 */
+    .qz .trSeg { display: flex; border-bottom: 1px solid var(--rule); }
+    .qz .trSeg button { flex: 1; text-align: center; padding: 12px 0; font-family: inherit; font-size: 12.5px; color: var(--dim); background: none; border: 0; cursor: pointer; }
+    .qz .trSeg button.on { color: var(--tx); box-shadow: inset 0 -2px 0 var(--acc); }
+    .qz .trTools { display: flex; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+    .qz .trTools input, .qz .trTools select {
+        font-family: inherit; font-size: 12px; color: var(--tx); background: transparent;
+        border: 1px solid var(--rule); border-radius: 1px; padding: 8px 10px; min-width: 0;
+    }
+    .qz .trTools input { flex: 1 1 auto; }
+    .qz .trTools input:focus, .qz .trTools select:focus { outline: 1px solid var(--acc); }
+
+    /* 목록 */
+    .qz .trRow { border-bottom: 1px solid var(--rule); }
+    .qz .trRow.me { background: var(--mark); }
+    .qz .trRow summary { display: flex; align-items: center; gap: 12px; padding: 13px 2px; list-style: none; cursor: pointer; }
+    .qz .trRow summary::-webkit-details-marker { display: none; }
+    .qz .trRk { font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px; width: 26px; text-align: center; color: var(--dim2); flex: 0 0 auto; }
+    .qz .trRk.t { color: var(--acc); font-weight: 400; }
+    .qz .trTx { flex: 1 1 auto; min-width: 0; }
+    .qz .trN { font-size: 13.5px; }
+    .qz .trN small { font-size: 10px; color: var(--dim); margin-left: 5px; }
+    .qz .trD { font-family: "Inter", sans-serif; font-size: 9.5px; color: var(--dim); margin-top: 5px; }
+    .qz .trV { font-family: "Inter", sans-serif; font-weight: 300; font-size: 18px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .qz .trV u { text-decoration: none; font-size: 10px; color: var(--dim); margin-left: 2px; }
+    .qz .trBtn { flex: 0 0 auto; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; border: 1px solid var(--rule); color: var(--dim2); padding: 6px 9px; white-space: nowrap; }
+    .qz .trBtn::after { content: "자세히"; }
+    .qz .trRow[open] .trBtn { border-color: var(--acc); color: var(--acc); }
+    .qz .trRow[open] .trBtn::after { content: "닫기"; }
+    .qz .trDet { margin: 0 2px 0 40px; padding: 4px 0 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px 18px; font-size: 11px; color: var(--dim2); }
+    .qz .trDet span { display: flex; align-items: center; }
+    .qz .trDet em { display: inline-block; width: 7px; height: 7px; margin-right: 6px; flex: 0 0 auto; }
+    .qz .trDet b { margin-left: auto; font-family: "Inter", sans-serif; font-weight: 400; color: var(--tx); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .qz .trDet b small { color: var(--dim); font-weight: 300; margin-left: 4px; }
+
+    .qz .trNone { padding: 26px 0; text-align: center; font-size: 12.5px; color: var(--dim); }
+
+    @@media (max-width: 400px) {
+        .qz .trPv { font-size: 21px; }
+        .qz .trPc.first .trPv { font-size: 26px; }
+        .qz .trDet { grid-template-columns: 1fr; }
+    }
+</style>
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><a class="qzHome" href="/StudentPointDashboard4/Index">@ConstatsCommon.myDoToRi 보드</a><span class="qzHomeSep">·</span><a class="qzHome" href="/DailyMission4/ParticipantPersons">@ConstatsCommon.MainKeyTitle 참여자</a>
+            </div>
+            <div class="qzDate">@year</div>
+        </div>
+        <div class="qzProg"><i style="width:100%"></i></div>
+
+        <div class="trPgm">
+            <div class="trK">@ConstatsCommon.MainKeyTitle</div>
+            <div class="trT">@ConstatsCommon.myDoToRi 순위</div>
+            <div class="trS">서로 응원하려고 보는 화면이에요 · <span id="trCount">@rows.Count</span>명 참여</div>            <div class="trLeg">
+                @foreach (var l in legend)
+                {
+                    <span><em style="background:@l.Item2"></em>@l.Item1</span>
+                }
+            </div>
+        </div>
+
+        @if (!rows.Any())
+        {
+            <div class="trNone">아직 표시할 순위가 없어요</div>
+        }
+        else
+        {
+            @* ── TOP3 시상대 (2위 · 1위 · 3위) ── *@
+            <div class="trPod" id="trPod">
+                @{
+                    int[] order = top3.Count == 1 ? new[] { 0 } : top3.Count == 2 ? new[] { 1, 0 } : new[] { 1, 0, 2 };
+                    string[] place = { "1ST", "2ND", "3RD" };
+                }
+                @if (top3.Count == 1) { <div></div> }
+                @foreach (var oi in order)
+                {
+                    var r = top3[oi];
+                    int size = oi == 0 ? 72 : 58;
+                    var cls = ClassLabel(r);
+                    bool isMe = !string.IsNullOrWhiteSpace(me) && string.Equals(r.UserName, me, StringComparison.OrdinalIgnoreCase);
+                    <div class="trPc @(oi == 0 ? "first" : "") @(isMe ? "me" : "")">
+                        <span class="trPl">@place[oi]</span>
+                        <img class="trAv" src="@Photo(r.UserId)" alt="@Name(r)" width="@size" height="@size" style="width:@(size)px;height:@(size)px"
+                             onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp'" />
+                        <div class="trPn">@Name(r)</div>
+                        <div class="trPr">@(isMe ? "본인" : Safe(r.RoleLabel))@(string.IsNullOrWhiteSpace(cls) ? "" : " · " + cls)</div>
+                        <div class="trPv">@N(r.TotalPoint)</div>
+                        @{ Stack(r, "pod"); }
+                    </div>
+                }
+            </div>
+
+            <div class="trSeg" id="trSeg">
+                <button type="button" class="on" data-role="all">전체</button>
+                <button type="button" data-role="학생">학생</button>
+                <button type="button" data-role="교사">교사</button>
+                <button type="button" data-role="기타">기타</button>
+            </div>
+
+            <div class="trTools">
+                <input id="trQ" type="search" placeholder="이름으로 찾기" autocomplete="off" />
+                <select id="trSort" aria-label="정렬">
+                    <option value="rank" selected>순위순</option>
+                    <option value="bible">@ConstatsCommon.MainKeyTitle 순</option>
+                    <option value="mission">미션북순</option>
+                    <option value="devotion">말씀&amp;일기순</option>
+                    <option value="attendance">출석순</option>
+                    <option value="evangelism">전도순</option>
+                </select>
+            </div>
+
+            <div id="trList">
+                @foreach (var r in rows)
+                {
+                    var cls  = ClassLabel(r);
+                    bool isMe = !string.IsNullOrWhiteSpace(me) && string.Equals(r.UserName, me, StringComparison.OrdinalIgnoreCase);
+                    int sum  = Math.Max(1, Parts(r).Sum(p => Math.Max(0, p.Val)));
+                    <details class="trRow @(isMe ? "me" : "")"
+                             data-top="@(r.Rank <= 3 ? "1" : "0")"
+                             data-role="@Safe(r.RoleLabel)"
+                             data-name="@($"{Safe(r.FullName)} {Safe(r.UserName)}".ToLowerInvariant())"
+                             data-rank="@r.Rank" data-bible="@r.BiblePoint" data-mission="@r.MissionBookPoint"
+                             data-devotion="@r.DevotionPoint" data-attendance="@r.AttendancePoint" data-evangelism="@r.EvangelismPoint">
+                        <summary>
+                            <span class="trRk @(r.Rank <= 3 ? "t" : "")">@r.Rank</span>
+                            <img class="trAv" src="@Photo(r.UserId)" alt="@Name(r)" style="width:36px;height:36px" loading="lazy"
+                                 onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp'" />
+                            <span class="trTx">
+                                <span class="trN" style="display:block">@Name(r)<small>@(isMe ? "본인" : Safe(r.RoleLabel))@(string.IsNullOrWhiteSpace(cls) ? "" : " · " + cls)</small></span>
+                                @{ Stack(r, ""); }
+                                <span class="trD" style="display:block">@FmtDate(r.LastActivityDate)</span>
+                            </span>
+                            <span class="trV">@N(r.TotalPoint)<u>점</u></span>
+                            <span class="trBtn"></span>
+                        </summary>
+                        <div class="trDet">
+                            @foreach (var p in Parts(r))
+                            {
+                                <span><em style="background:@p.Color"></em>@p.Label<b>@N(p.Val)<small>@((int)Math.Round(Math.Max(0, p.Val) * 100.0 / sum))%</small></b></span>
+                            }
+                        </div>
+                    </details>
+                }
+                <div class="trNone" id="trEmpty" hidden>찾는 사람이 없어요</div>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+(function () {
+    var list = document.getElementById('trList');
+    if (!list) return;
+    var q = document.getElementById('trQ'), sortSel = document.getElementById('trSort');
+    var seg = document.getElementById('trSeg'), pod = document.getElementById('trPod');
+    var countEl = document.getElementById('trCount'), empty = document.getElementById('trEmpty');
+    var role = 'all';
+    var rows = Array.prototype.slice.call(list.querySelectorAll('.trRow'));
+
+    function num(v) { var n = parseInt(v, 10); return isNaN(n) ? 0 : n; }
+
+    function apply() {
+        var key = sortSel.value, text = (q.value || '').trim().toLowerCase();
+        // 기본 상태(전체·검색 없음·순위순)면 1~3위는 시상대에 있으니 목록에서 뺀다.
+        var plain = role === 'all' && !text && key === 'rank';
+        if (pod) pod.hidden = !plain;
+
+        rows.sort(function (a, b) {
+            return key === 'rank' ? num(a.dataset.rank) - num(b.dataset.rank)
+                                  : num(b.dataset[key]) - num(a.dataset[key]);
+        });
+        var vis = 0, total = 0;
+        rows.forEach(function (el) {
+            list.insertBefore(el, empty);
+            var match = (role === 'all' || el.dataset.role === role) && (!text || (el.dataset.name || '').indexOf(text) >= 0);
+            if (match) total++;
+            var show = match && !(plain && el.dataset.top === '1');
+            el.hidden = !show;
+            if (show) vis++;
+        });
+        if (countEl) countEl.textContent = total;
+        if (empty) empty.hidden = total > 0;
+    }
+
+    seg.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+            b.classList.add('on'); role = b.dataset.role; apply();
+        });
+    });
+    q.addEventListener('input', apply);
+    sortSel.addEventListener('change', apply);
+    apply();
+})();
+</script>
+</body>
+</html>

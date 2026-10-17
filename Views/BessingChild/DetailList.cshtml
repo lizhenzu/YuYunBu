@@ -1,0 +1,201 @@
+@model IEnumerable<BulletinBoard.Models.BessingChildDatas>
+@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@*  ══════════════════════════════════════════════════════════════
+    자녀 축복 기도문 — 목록
+    · 2026-10-05 시안 확정 — 밝은 흰색 · 오늘 칸(달력) + 번호 줄 목록
+    · 누구나 : 줄을 눌러 읽는다 / 관리자 : 보기 · 수정 · 리셋 / 슈퍼 관리자 : 등록 · 삭제 · 조회수
+    · 기도문은 '날짜(Id)' 로 고른다. 오늘 날짜와 같은 Id 가 오늘의 기도문
+    · 이전 화면(아침 햇살 파스텔 · 카드 격자)은 DetailList.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+
+    var isSignedIn   = await AuthService.IsSignedIn(User);
+    var user         = isSignedIn ? await AuthService.GetSignedUser(User) : null;
+    var isSuperAdmin = user != null && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin      = isSuperAdmin || (user != null && await AuthService.IsInRole(user, nameof(Roles.Admin)));
+
+    var ChurchName     = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+
+    string pageTitle = $"{ChurchName} {DepartmentName}";
+
+    var kNow = DateHelper.GetKoreaNow();
+    int todayDay = kNow.Day;   // DAL: Id = day(오늘)
+
+    var items = Model?.ToList() ?? new List<BulletinBoard.Models.BessingChildDatas>();
+    int total = items.Count;
+    var todayItem = items.Find(x => x.Id == todayDay);
+
+    // 줄에 얹을 본문 미리보기 — 이름 자리를 감싼 별표(**○○**)를 걷어내고 한 줄로 편다
+    Func<string, int, string> excerpt = (raw, len) =>
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        var t = System.Text.RegularExpressions.Regex.Replace(raw, @"\*{2,3}", "");
+        t = System.Text.RegularExpressions.Regex.Replace(t, @"\s+", " ").Trim();
+        return t.Length > len ? t.Substring(0, len) + "…" : t;
+    };
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@pageTitle</title>
+
+    <meta property="og:title" content="자녀를 위한 축복 기도" />
+    <meta property="og:description" content="@pageTitle · 자녀 축복 기도문 @(total)편" />
+    <meta property="og:url" content="@ViewBag.FullURL" />
+    <meta property="og:type" content="website" />
+
+    <partial name="_BcStyle" />
+    <style>
+        /* 오늘 칸 — 기도홈과 같은 달력 칸 */
+        .today { display: flex; align-items: center; gap: 14px; margin-top: 16px; padding: 14px 16px; border-radius: 14px; background: var(--soft); transition: background .15s; }
+        .today:hover { background: var(--soft2); }
+        .cal { flex: none; width: 52px; border-radius: 10px; overflow: hidden; background: #fff; text-align: center; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
+        .cal small { display: block; padding: 3px 0; background: var(--acc); color: #fff; font-size: 10.5px; font-weight: 800; }
+        .cal b { display: block; padding: 2px 0 5px; font-size: 22px; font-weight: 300; line-height: 1.1; color: var(--tx); }
+        .today .tx { flex: 1; min-width: 0; }
+        .today .tx i { font-style: normal; font-size: 11.5px; font-weight: 800; color: var(--acc); }
+        .today .tx b { display: block; margin-top: 2px; font-size: 15.5px; font-weight: 800; color: var(--tx); line-height: 1.4; word-break: keep-all; }
+        .today .go { flex: none; font-size: 20px; font-weight: 300; color: var(--acc); }
+        .src { margin-top: 12px; font-size: 11.5px; line-height: 1.7; color: var(--dim); word-break: keep-all; }
+
+        /* 묶음 · 줄 */
+        .sec { display: flex; justify-content: space-between; align-items: baseline; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rule); }
+        .sec b { font-size: 16px; font-weight: 800; color: var(--tx); }
+        .sec span { font-size: 11.5px; font-weight: 600; color: var(--dim); }
+        .row { position: relative; display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--rule); }
+        .row:last-child { border-bottom: 0; }
+        .row .hit { position: absolute; inset: 0; z-index: 1; }        /* 줄 전체를 눌러 읽기 — 관리 버튼은 이 위로 */
+        .row .n { flex: none; width: 34px; font-size: 15px; font-weight: 800; color: var(--num); font-variant-numeric: tabular-nums; }
+        .row.on .n { color: var(--acc); }
+        .row .t { flex: 1; min-width: 0; }
+        .row .t b { display: block; font-size: 15px; font-weight: 800; color: var(--tx); word-break: keep-all; transition: color .15s; }
+        .row .t small { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row .tg { flex: none; font-size: 11px; font-weight: 800; color: var(--acc); background: var(--soft); border-radius: 999px; padding: 2px 8px; }
+        .row .g { flex: none; font-size: 18px; font-weight: 300; color: var(--num); }
+        .row:hover .t b, .row:hover .g { color: var(--acc); }
+        .row .ad { position: relative; z-index: 2; display: flex; gap: 4px; flex-wrap: wrap; margin-top: 7px; align-items: center; }
+        .row .ad em { font-style: normal; font-size: 11px; color: var(--dim); margin-right: 4px; font-variant-numeric: tabular-nums; }
+        .row .ad .nb { font-size: 11.5px; padding: 5px 10px; }
+        .row .ad .nb.del:hover { color: var(--del); background: var(--delbg); }
+        .ask { position: relative; z-index: 2; margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--delbg); font-size: 12px; color: var(--del); }
+        .ask .nb { font-size: 11.5px; padding: 5px 10px; background: #fff; }
+        .ask .nb.yes { background: var(--del); color: #fff; }
+        .addRow { margin-top: 12px; text-align: center; }
+    </style>
+</head>
+<body>
+<div class="pz">
+
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/PrayHome/Index">기도홈</a><span class="sep">›</span>자녀 축복 기도문</span>
+        @if (isSuperAdmin)
+        {
+            <a class="nb gold" href="/BessingChild/EnrollView">＋ 등록</a>
+        }
+        else if (!isSignedIn)
+        {
+            <a class="nb" href="/Identity/Account/Login">로그인</a>
+        }
+    </div>
+    <div class="prog"></div>
+
+    <div class="kk" style="margin-top:20px">PRAYER FOR CHILDREN</div>
+    <h1 class="h1">자녀를 위한 축복 기도문</h1>
+    <div class="sub">@(total > 0 ? $"모두 {total}편 · 그 달 날짜에 맞춰 하루 한 편" : "곧 준비될 예정이에요")</div>
+
+    @if (todayItem != null)
+    {
+        <a class="today" href="/BessingChild/DetailWords?Id=@todayItem.Id">
+            <span class="cal"><small>@(kNow.Month)월</small><b>@kNow.Day</b></span>
+            <span class="tx"><i>오늘의 축복 기도</i><b>@todayItem.PrayTitle</b></span>
+            <span class="go">›</span>
+        </a>
+    }
+    <div class="src">구유선 · 최귀영 「자녀의 인생을 형통케 하는 자녀 축복 기도문」을 구매하여 사용합니다.</div>
+
+    @if (total == 0)
+    {
+        <div class="none">아직 등록된 기도문이 없어요</div>
+        @if (isSuperAdmin)
+        {
+            <div class="addRow"><a class="nb pri" href="/BessingChild/EnrollView">＋ 첫 기도문 등록</a></div>
+        }
+    }
+    else
+    {
+        <div class="sec"><b>기도문 목록</b><span>@(total)편</span></div>
+
+        @foreach (var item in items)
+        {
+            bool isToday = item.Id == todayDay;
+            string href = $"/BessingChild/DetailWords?Id={item.Id}";
+
+            <div class="row@(isToday ? " on" : "")">
+                <a class="hit" href="@href" aria-label="@item.PrayTitle 기도문 읽기"></a>
+                @* 왼쪽 번호는 '그 달의 며칠에 읽는 기도문인지' *@
+                <span class="n">@(item.Id)일</span>
+                <span class="t">
+                    <b>@item.PrayTitle</b>
+                    <small>@excerpt(item.PrayText, 60)</small>
+                    @if (isAdmin)
+                    {
+                        <span class="ad">
+                            @if (isSuperAdmin)
+                            {
+                                <em>조회 @item.visited.ToString("N0")@(item.updateDT.HasValue ? $" · 수정 {item.updateDT.Value:MM-dd}" : "")</em>
+                            }
+                            <a class="nb" href="@href">보기</a>
+                            <a class="nb" href="/BessingChild/ModifyView?Id=@item.Id">수정</a>
+                            <a class="nb" href="/BessingChild/DecreasetHitWeeklyWordToRead?Id=@item.Id">리셋</a>
+                            @if (isSuperAdmin)
+                            {
+                                <button type="button" class="nb del" data-del="@item.Id">삭제</button>
+                            }
+                        </span>
+                        <span class="askBox"></span>
+                    }
+                </span>
+                @if (isToday)
+                {
+                    <span class="tg">오늘</span>
+                }
+                <span class="g">›</span>
+            </div>
+        }
+    }
+
+    <div class="act">
+        <a class="p" href="/">@ConstatsCommon.ToHome</a>
+        <a class="s" href="/PrayHome/Index">기도홈</a>
+    </div>
+
+</div>
+
+<script>
+    /* 삭제는 되돌릴 수 없으므로 줄 안에서 한 번 더 묻는다 */
+    document.addEventListener('click', function (e) {
+        var del = e.target.closest('[data-del]');
+        if (del) {
+            var box = del.closest('.t').querySelector('.askBox');
+            var id = del.getAttribute('data-del');
+            box.innerHTML = '<div class="ask">' + id + '일 기도문을 지울까요? 되돌릴 수 없어요.' +
+                '<a class="nb yes" href="/BessingChild/DeleteView?Id=' + encodeURIComponent(id) + '">삭제</a>' +
+                '<button type="button" class="nb" data-keep>그대로 두기</button></div>';
+            return;
+        }
+        if (e.target.closest('[data-keep]')) e.target.closest('.askBox').innerHTML = '';
+    });
+</script>
+
+</body>
+</html>

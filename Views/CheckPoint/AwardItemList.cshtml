@@ -1,0 +1,509 @@
+﻿@model IEnumerable<BulletinBoard.Models.AwardItem>
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http;
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@{
+    // ✅ 완전 독립 화면 (마스터/Layout 영향 X)
+    Layout = null;
+
+    var UserId = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString()) as string;
+
+    var optionLower = (ViewBag.option + "").ToLowerInvariant();
+    bool isChoiceMode = optionLower == ProductDisplayOpton.challengeMissionBible.ToString().ToLowerInvariant()
+                     || optionLower == ProductDisplayOpton.birth.ToString().ToLowerInvariant();
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
+
+    List<AwardBase> _AwardBase = ViewBag._AwardBase as List<AwardBase>;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>선물 목록</title>
+
+    <style>
+        /* =========================
+                   🎁 Birthday Gift Gallery (Standalone)
+                   - Layout=null 전용(완전 독립)
+                   - 기존 스타일시트 무시: 완전 독립
+                   - 기능(액션/조건) 그대로 유지
+                   ========================= */
+
+        :root {
+            --bg0: #0b1220;
+            --bg1: #0f1a2e;
+            --card: rgba(255,255,255,0.92);
+            --text0: #0b1220;
+            --text1: rgba(2,6,23,0.74);
+            --brandA: #38bdf8;
+            --brandB: #22c55e;
+            --brandC: #f59e0b;
+            --shadow: 0 18px 55px rgba(0,0,0,0.20);
+            --shadow2: 0 10px 26px rgba(0,0,0,0.14);
+            --r-xl: 26px;
+            --r-lg: 20px;
+            --r-md: 16px;
+            --max: 1180px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+            background: radial-gradient(1200px 800px at 18% 0%, rgba(56,189,248,0.18), transparent 60%), radial-gradient(1000px 700px at 82% 12%, rgba(34,197,94,0.14), transparent 55%), radial-gradient(900px 700px at 55% 92%, rgba(245,158,11,0.10), transparent 55%), linear-gradient(180deg, var(--bg0), var(--bg1));
+            color: #eaf1ff;
+            min-height: 100vh;
+        }
+
+        .wrap {
+            max-width: var(--max);
+            margin: 0 auto;
+            padding: 18px 14px 28px;
+        }
+
+        /* Hero */
+        .hero {
+            position: relative;
+            border-radius: var(--r-xl);
+            padding: 16px 16px 14px;
+            background: radial-gradient(circle at 12% 18%, rgba(56,189,248,0.22), transparent 55%), radial-gradient(circle at 92% 30%, rgba(34,197,94,0.18), transparent 55%), linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.05));
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            overflow: hidden;
+        }
+
+            .hero::before {
+                content: "";
+                position: absolute;
+                inset: -120px -160px auto auto;
+                width: 340px;
+                height: 340px;
+                border-radius: 999px;
+                background: radial-gradient(circle at 30% 30%, rgba(245,158,11,0.18), transparent 65%);
+                pointer-events: none;
+            }
+
+        .hero-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.16);
+            font-weight: 1000;
+            font-size: 0.86rem;
+            letter-spacing: .02em;
+            color: rgba(255,255,255,0.92);
+            white-space: nowrap;
+        }
+
+        .title {
+            margin: 10px 0 6px;
+            font-size: 1.55rem;
+            font-weight: 1100;
+            letter-spacing: .02em;
+        }
+
+        .sub {
+            margin: 0;
+            color: rgba(255,255,255,0.86);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            font-weight: 650;
+        }
+
+        .hint {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(0,0,0,0.18);
+            border: 1px solid rgba(255,255,255,0.14);
+            font-weight: 850;
+            font-size: 0.86rem;
+            color: rgba(255,255,255,0.90);
+            white-space: nowrap;
+        }
+
+        .partial-wrap {
+            margin-top: 14px;
+        }
+
+        /* Grid */
+        .grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+        }
+
+        /* Card */
+        .card {
+            position: relative;
+            border-radius: var(--r-xl);
+            background: var(--card);
+            color: var(--text0);
+            border: 1px solid rgba(2,6,23,0.10);
+            box-shadow: 0 18px 55px rgba(0,0,0,0.10);
+            overflow: hidden;
+            transition: transform .14s ease, box-shadow .14s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 28px 80px rgba(0,0,0,0.16);
+            }
+
+        .media {
+            padding: 12px 12px 0;
+            position: relative;
+        }
+
+        .imgbox {
+            border-radius: var(--r-xl);
+            overflow: hidden;
+            border: 1px solid rgba(2,6,23,0.10);
+            background: #f3f6fb;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.10);
+        }
+
+            .imgbox img {
+                width: 100%;
+                aspect-ratio: 1/1;
+                object-fit: cover;
+                display: block;
+            }
+
+        .float {
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            z-index: 2;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            font-weight: 950;
+            font-size: 0.82rem;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.18);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.10);
+            white-space: nowrap;
+        }
+
+        .chip-point {
+            background: rgba(34,197,94,0.18);
+            color: #064e3b;
+        }
+
+        .chip-id {
+            background: rgba(56,189,248,0.16);
+            color: #0b3b5a;
+        }
+
+        .body {
+            padding: 14px 14px 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .name {
+            font-size: 1.05rem;
+            font-weight: 1100;
+            letter-spacing: .01em;
+            color: #0b1220;
+            line-height: 1.25;
+        }
+
+        .desc {
+            margin: 0;
+            color: var(--text1);
+            font-weight: 750;
+            line-height: 1.5;
+            font-size: 0.92rem;
+            min-height: 2.8em;
+        }
+
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-top: 1px dashed rgba(2,6,23,0.14);
+            padding-top: 10px;
+        }
+
+        .price {
+            font-weight: 1100;
+            color: #0b1220;
+            background: rgba(2,6,23,0.04);
+            border: 1px solid rgba(2,6,23,0.08);
+            padding: 8px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 0;
+            border-radius: 16px;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-weight: 1100;
+            font-size: 0.92rem;
+            transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+            box-shadow: 0 12px 26px rgba(0,0,0,0.10);
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                opacity: .98;
+            }
+
+            .btn:active {
+                transform: translateY(0);
+                opacity: .95;
+            }
+
+        .btn-pick {
+            background: linear-gradient(135deg, rgba(245,158,11,0.92), rgba(251,191,36,0.88));
+            color: #3b1d00;
+        }
+
+        .btn-edit {
+            background: linear-gradient(135deg, rgba(59,130,246,0.92), rgba(56,189,248,0.80));
+            color: #081a2d;
+        }
+
+        .no-data {
+            margin-top: 16px;
+            border-radius: var(--r-xl);
+            padding: 18px 16px;
+            text-align: center;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.14);
+            box-shadow: var(--shadow2);
+            color: rgba(255,255,255,0.90);
+            font-weight: 900;
+        }
+
+        /* 하단 고정 바 (선택사항) */
+        .bottom-bar {
+            position: sticky;
+            bottom: 0;
+            margin-top: 16px;
+            padding: 10px 0 0;
+        }
+
+        .bottom-inner {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .navbtn {
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: rgba(255,255,255,0.92);
+            padding: 10px 12px;
+            border-radius: 16px;
+            font-weight: 1000;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+            .navbtn:hover {
+                background: rgba(255,255,255,0.14);
+            }
+
+        @@media (max-width: 420px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .actions {
+                justify-content: stretch;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .title {
+                font-size: 1.35rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <!-- ✅ 상단 안내 -->
+        <section class="hero">
+            <div class="hero-top">
+                <span class="badge">🎂 선물 목록</span>
+                <div class="hint">
+                    @if (isChoiceMode)
+                    {
+                        <span class="pill">🎁 고른 후에도 다시 선택 가능</span>
+                        <span class="pill">🔄 다시 선택하면 기존 선택 자동 삭제</span>
+                    }
+                    else
+                    {
+                        <span class="pill">👀 이 화면은 구경만 가능</span>
+                    }
+                </div>
+            </div>
+
+            <div class="title">원하는 선물을 골라보세요</div>
+
+            @if (isChoiceMode)
+            {
+                <p class="sub">
+                    아래 선물 중 하나를 선택할 수 있어요. 나중에 마음이 바뀌면 <b>다시 선택</b>할 수도 있어요.
+                </p>
+            }
+        </section>
+
+        <!-- ✅ (선택) 하단 네비 - 원하면 삭제 가능 -->
+        <div class="bottom-bar">
+            <div class="bottom-inner">
+                <a class="navbtn" href="/">🏠 홈으로</a>
+                <a class="navbtn" href="/Home/MissionMainBoard">📌 @ConstatsCommon.MainKeyTitle</a>
+            </div>
+        </div>
+
+        <!-- ✅ 목록 -->
+        @if (Model == null || !Model.Any())
+        {
+            <div class="no-data">📭 선물상품 정보가 데이터가 없습니다.</div>
+        }
+        else
+        {
+            <section class="grid" aria-label="선물 목록">
+                @foreach (var item in Model)
+                {
+                    // ✅ 필터링: Admin, Basic은 가격이 0 이하인 항목은 보이지 않음 (기존 유지)
+                    if (!isSuperAdmin && item.UnitPrice <= 0)
+                    {
+                        continue;
+                    }
+
+                    <article class="card">
+                        <div class="media">
+                            <div class="float">
+                                <span class="chip chip-point">✨ @item.PointRequirement</span>
+                                <span class="chip chip-id">#@item.ProductID</span>
+                            </div>
+
+                            <div class="imgbox">
+                                <img src="/images/AwardItem/@(@item.ProductID).jpg"
+                                     alt="상품 이미지"
+                                     loading="lazy"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                            </div>
+                        </div>
+
+                        <div class="body">
+                            <div class="name">@item.ProductName</div>
+                            <p class="desc">@item.ProductDescription</p>
+
+                            <div class="meta">
+                                @if (isSuperAdmin || isAdmin)
+                                {
+                                    <div class="price">💰 @item.UnitPrice.ToString("N0")원</div>
+                                }
+
+                                <div class="actions">
+                                    @if (isChoiceMode)
+                                    {
+                                        <button type="button"
+                                                class="btn btn-pick"
+                                                onclick="window.location.href='/CheckPoint/UpsertAwardItemPick?userId=@UserId&productId=@item.ProductID'">
+                                            🎁 선택하기
+                                        </button>
+                                    }
+
+                                    @if (isSuperAdmin)
+                                    {
+                                        <button type="button"
+                                                class="btn btn-edit"
+                                                onclick="window.location.href='/CheckPoint/UpdateAwardItem?ProductID=@item.ProductID'">
+                                            🛠️ 수정하기
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+
+        <!-- ✅ (선택) 하단 네비 - 원하면 삭제 가능 -->
+        <div class="bottom-bar">
+            <div class="bottom-inner">
+                <a class="navbtn" href="/">🏠 홈으로</a>
+                <a class="navbtn" href="/Home/MissionMainBoard">📌 @ConstatsCommon.MainKeyTitle</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,589 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums;
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract;
+@using Microsoft.Extensions.Configuration;
+@using System.Data;
+@using System.Data.SqlClient;
+@using System.Collections.Generic;
+@using System.Linq;
+
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@inject IConfiguration Configuration
+
+@model List<BulletinBoard.Models.AwardItem>
+@{
+    Layout = null;
+    var teamName  = ViewBag.TeamName  as string ?? "";
+    var topScorer = ViewBag.TopScorer as string ?? "";
+    var teamTotal = (int)(ViewBag.TeamTotal ?? 0);
+    var threshold = (int)(ViewBag.Threshold ?? 1000);
+}
+
+@{
+    var user = await AuthService.GetSignedUser(User);
+    var isSignedIn = await AuthService.IsSignedIn(User);
+    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
+    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    bool isStaff = (isAdmin || isSuperAdmin);
+}
+
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>가족 합산 선물 고르기 — @teamName</title>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #F0F5FF;
+  --surface:  #FFFFFF;
+  --ink:      #0F172A;
+  --muted:    #64748B;
+  --accent:   #2563EB;
+  --accent-l: #DBEAFE;
+  --accent-d: #1D4ED8;
+  --gold:     #F59E0B;
+  --gold-l:   #FEF3C7;
+  --green:    #10B981;
+  --line:     rgba(15,23,42,.08);
+  --shadow-sm: 0 2px 8px rgba(15,23,42,.06);
+  --shadow:    0 8px 24px rgba(15,23,42,.10);
+  --shadow-lg: 0 20px 48px rgba(15,23,42,.14);
+  --r-sm: 14px;
+  --r:    20px;
+  --r-lg: 28px;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100dvh;
+  line-height: 1.5;
+}
+
+/* ── Topbar ── */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-bottom: 1px solid var(--line);
+  padding: 0 clamp(16px,4vw,32px);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  padding: 6px 12px 6px 8px;
+  border-radius: 10px;
+  transition: background .15s;
+  flex-shrink: 0;
+}
+.topbar-back:hover { background: var(--accent-l); }
+.topbar-back svg { width: 16px; height: 16px; flex-shrink: 0; }
+.topbar-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topbar-step {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Page Wrap ── */
+.wrap {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: clamp(20px,4vw,40px) clamp(16px,4vw,32px) 80px;
+}
+
+/* ── Hero Info Banner ── */
+.hero {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border: 1.5px solid rgba(37,99,235,.18);
+  border-radius: var(--r-lg);
+  padding: clamp(20px,3vw,32px) clamp(20px,3vw,32px);
+  margin-bottom: clamp(24px,3vw,36px);
+  display: flex;
+  gap: clamp(16px,3vw,28px);
+  align-items: center;
+  flex-wrap: wrap;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  right: -40px; top: -40px;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(37,99,235,.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-icon {
+  width: clamp(52px,7vw,72px);
+  height: clamp(52px,7vw,72px);
+  border-radius: var(--r);
+  background: linear-gradient(135deg, #2563EB, #3B82F6);
+  display: grid;
+  place-items: center;
+  font-size: clamp(24px,4vw,32px);
+  flex-shrink: 0;
+  box-shadow: 0 8px 24px rgba(37,99,235,.30);
+}
+.hero-text { flex: 1; min-width: 0; }
+.hero-team {
+  font-size: clamp(18px,2.5vw,24px);
+  font-weight: 900;
+  color: #1E40AF;
+  letter-spacing: -.4px;
+  line-height: 1.25;
+}
+.hero-sub {
+  margin-top: 6px;
+  font-size: clamp(12px,1.6vw,14px);
+  color: #3B82F6;
+  font-weight: 700;
+  line-height: 1.55;
+}
+.hero-sub strong { color: #1D4ED8; }
+.hero-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.hbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.hbadge.blue  { background: rgba(37,99,235,.12); color: #1D4ED8; border: 1px solid rgba(37,99,235,.20); }
+.hbadge.gold  { background: rgba(245,158,11,.14); color: #92400E; border: 1px solid rgba(245,158,11,.25); }
+.hbadge.green { background: rgba(16,185,129,.12); color: #065F46; border: 1px solid rgba(16,185,129,.20); }
+
+/* ── Section Label ── */
+.section-label {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--muted);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* ── Gift Grid ── */
+.gift-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: clamp(12px,2vw,20px);
+}
+
+/* ── Gift Card ── */
+.gift-card {
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  cursor: pointer;
+}
+.gift-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+  border-color: rgba(37,99,235,.35);
+}
+.gift-card:active { transform: translateY(-2px); }
+
+.gift-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: #F1F5F9;
+}
+.gift-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .35s ease;
+}
+.gift-card:hover .gift-img-wrap img { transform: scale(1.04); }
+
+.gift-price-tag {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(15,23,42,.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 9px;
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gift-body {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.gift-name {
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.35;
+  word-break: keep-all;
+}
+.gift-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.gift-btn {
+  width: 100%;
+  padding: 11px;
+  background: linear-gradient(135deg, var(--accent), #3B82F6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37,99,235,.30);
+  transition: background .14s, box-shadow .14s, transform .1s;
+  font-family: inherit;
+}
+.gift-btn:hover {
+  background: linear-gradient(135deg, var(--accent-d), #2563EB);
+  box-shadow: 0 6px 20px rgba(37,99,235,.40);
+}
+.gift-btn:active { transform: scale(.97); }
+
+/* ── Confirm Modal ── */
+.modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15,23,42,.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(15,23,42,.22);
+  animation: modalIn .22s ease;
+}
+@@keyframes modalIn {
+  from { opacity: 0; transform: scale(.94) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+.modal-img {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+  background: #F1F5F9;
+}
+.modal-body {
+  padding: 24px 24px 20px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.modal-label {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.modal-gift-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -.3px;
+  line-height: 1.35;
+  margin-bottom: 10px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.modal-info {
+  background: var(--gold-l);
+  border: 1px solid rgba(245,158,11,.25);
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #78350F;
+  font-weight: 700;
+  line-height: 1.7;
+  margin-bottom: 18px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+.modal-info strong { color: #92400E; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-cancel {
+  flex: 1;
+  padding: 12px;
+  border: 1.5px solid var(--line);
+  background: #F8FAFC;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background .12s;
+}
+.modal-cancel:hover { background: #F1F5F9; }
+.modal-confirm {
+  flex: 2;
+  padding: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), #3B82F6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(37,99,235,.30);
+  transition: box-shadow .12s;
+}
+.modal-confirm:hover { box-shadow: 0 6px 20px rgba(37,99,235,.42); }
+#confirmForm { width: 100%; }
+#confirmForm .modal-confirm { width: 100%; }
+
+/* ── Empty ── */
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ── Count bar ── */
+.count-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.count-txt {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.count-txt b { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- ── 상단바 ── -->
+<header class="topbar">
+  <a class="topbar-back" href="/">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="10 3 5 8 10 13"/>
+    </svg>
+    홈으로
+  </a>
+  <span class="topbar-title">선물 고르기</span>
+  <span class="topbar-step">가족 합산 시상</span>
+</header>
+
+<div class="wrap">
+
+  <!-- ── 정보 배너 ── -->
+  <div class="hero">
+    <div class="hero-icon">🏠</div>
+    <div class="hero-text">
+      <div class="hero-team">@teamName</div>
+      <div class="hero-sub">
+        가족 DM2 합산 <strong>@(teamTotal.ToString("N0"))점</strong> 달성을 축하드립니다! 🎉<br />
+        선물은 <strong>가족 중 본인</strong>에게 지급됩니다.
+      </div>
+      <div class="hero-badges">
+        <span class="hbadge blue">🏠 가족 합산 시상</span>
+        <span class="hbadge gold">📖 DM2 @(teamTotal.ToString("N0"))점</span>
+        <span class="hbadge green">✅ 관리자 확인 후 지급</span>
+        @{
+            var priceItems = Model?.Where(x => x.UnitPrice > 0).ToList();
+            if (priceItems != null && priceItems.Any())
+            {
+                var minP = priceItems.Min(x => x.UnitPrice);
+                var maxP = priceItems.Max(x => x.UnitPrice);
+                <span class="hbadge blue">📦 @(Model!.Count)종</span>
+                @if (isStaff)
+                {
+                    <span class="hbadge green">💰 최저 @(minP.ToString("N0"))원</span>
+                    <span class="hbadge gold">💰 최고 @(maxP.ToString("N0"))원</span>
+                }
+            }
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 선물 목록 ── -->
+  <div class="count-bar">
+    <span class="section-label">선물 목록</span>
+    <span class="count-txt">총 <b>@(Model?.Count ?? 0)</b>종</span>
+  </div>
+
+  @if (Model == null || !Model.Any())
+  {
+    <div class="gift-grid">
+      <div class="empty">🎁 선택 가능한 선물이 없습니다.</div>
+    </div>
+  }
+  else
+  {
+    <div class="gift-grid">
+      @foreach (var item in Model)
+      {
+        <div class="gift-card"
+             data-pid="@item.ProductID"
+             data-name="@item.ProductName"
+             onclick="openModal(this)">
+          <div class="gift-img-wrap">
+            <img src="/images/AwardItem/@(item.ProductID).jpg"
+                 alt="@item.ProductName"
+                 loading="lazy"
+                 onerror="this.onerror=null;this.style.visibility='hidden';" />
+                            @if (isStaff)
+            {
+              <span class="gift-price-tag">@(item.UnitPrice.ToString("N0"))원</span>
+            }
+          </div>
+          <div class="gift-body">
+            <div class="gift-name">@item.ProductName</div>
+            @if (!string.IsNullOrWhiteSpace(item.ProductDescription))
+            {
+              <div class="gift-desc">@item.ProductDescription</div>
+            }
+            <button type="button" class="gift-btn">🎁 이 선물 선택</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+</div>
+
+<!-- ── 확인 모달 ── -->
+<div class="modal-bg" id="confirmModal" onclick="handleBgClick(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <img class="modal-img" id="modalImg" src="" alt="" />
+    <div class="modal-body">
+      <div class="modal-label">선물 선택 확인</div>
+      <div class="modal-gift-name" id="modalName"></div>
+      <div class="modal-info">
+        🏠 <strong>@teamName</strong> 가족의 선물로 신청됩니다.<br />
+        선물은 <strong>가족 중 본인</strong>에게 지급되며,<br />
+        관리자 확인 후 최종 처리됩니다.
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="modal-cancel" onclick="closeModal()">취소</button>
+        <form id="confirmForm" method="post" action="/StudentPointDashboard4/FamilyGiftSelectPost" style="flex:2;display:flex;">
+          @Html.AntiForgeryToken()
+          <input type="hidden" name="productId"         id="hidProductId" value="" />
+          <input type="hidden" name="teamName"          value="@teamName" />
+          <input type="hidden" name="topScorerUserName" value="@topScorer" />
+          <input type="hidden" name="teamTotal"         value="@teamTotal" />
+          <input type="hidden" name="threshold"         value="@threshold" />
+          <button type="submit" class="modal-confirm">🎁 선택 완료</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal(card) {
+  var pid  = card.dataset.pid;
+  var name = card.dataset.name;
+  document.getElementById('modalImg').src  = '/images/AwardItem/' + pid + '.jpg';
+  document.getElementById('modalImg').alt  = name;
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('hidProductId').value = pid;
+  document.getElementById('confirmModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('open');
+}
+function handleBgClick(e) {
+  if (e.target === document.getElementById('confirmModal')) closeModal();
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+</script>
+
+</body>
+</html>

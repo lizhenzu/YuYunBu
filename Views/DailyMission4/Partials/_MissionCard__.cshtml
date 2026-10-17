@@ -1,0 +1,305 @@
+@model dynamic
+@using System
+@using System.Reflection
+@using System.Net
+
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+
+    object G(object o, params string[] names)
+    {
+        if (o == null) return null;
+        var t = o.GetType();
+        foreach (var n in names)
+        {
+            var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            return p.GetValue(o);
+        }
+        return null;
+    }
+
+    string GS(object o, params string[] names) => S(G(o, names));
+    bool GB(object o, params string[] names) => B(G(o, names));
+
+    string CleanHref(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href)) return "";
+        href = WebUtility.HtmlDecode(href).Trim();
+        href = href.Trim().Trim('"').Trim('\'').Trim('\u201c').Trim('\u201d').Trim('\u2018').Trim('\u2019');
+        href = href.Trim().Trim('"').Trim('\'').Trim('\u201c').Trim('\u201d').Trim('\u2018').Trim('\u2019');
+        if (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("tel:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+            return href;
+        if (!href.StartsWith("/")) href = "/" + href;
+        return href;
+    }
+}
+
+@{
+    var o = (object)Model;
+
+    var emoji       = GS(o, "Emoji");
+    var title       = GS(o, "Title");
+    var pillClass   = GS(o, "PillClass");
+    var pillText    = GS(o, "PillText");
+    var sticker     = GS(o, "Sticker");
+    var desc        = GS(o, "Desc");
+    var btnClass    = GS(o, "BtnClass");
+    var btnIcon     = GS(o, "BtnIcon");
+    var btnText     = GS(o, "BtnText");
+    var hrefRaw     = GS(o, "Href");
+    var disabled    = GB(o, "Disabled");
+    var isDone      = GB(o, "IsDone");
+    var hasContent  = GB(o, "HasContent");
+    var dateText    = GS(o, "DateText");
+    var noContentMsg = GS(o, "NoContentMsg");
+    var lockReason  = GS(o, "LockReason");
+
+    bool showNoContent = (!hasContent && !string.IsNullOrWhiteSpace(noContentMsg));
+    bool showLocked    = (disabled && !isDone && !string.IsNullOrWhiteSpace(lockReason));
+    var href           = CleanHref(hrefRaw);
+    bool allowNavigate = !showNoContent;
+    var safeHref       = (allowNavigate && !string.IsNullOrWhiteSpace(href)) ? href : null;
+    bool cardClickable = (safeHref != null);
+    bool disableButton = (safeHref == null);
+    var ariaDisabled   = disableButton ? "true" : "false";
+    var tabIndex       = disableButton ? "-1" : "0";
+    var disabledLabel  = showNoContent ? "콘텐츠 없음" : "비활성화됨";
+    bool isViewBtn     = (!string.IsNullOrWhiteSpace(btnText) && btnText.Contains("(다시보기)"));
+
+    // 미션별 팔레트 — 부드럽고 고급스러운 배색 (보색 대비로 흰 글씨 선명하게)
+    // ① 말씀: 엘레강트 네이비   ② 퀴즈: 딥 포레스트 세이지
+    // ③ 기도: 머스카딘(와인로즈) ④ 암송: 딥 아메시스트
+    string topGrad = btnClass switch {
+        "word"   => "linear-gradient(150deg,#14243c 0%,#1b3a66 55%,#2356a0 100%)",
+        "quiz"   => "linear-gradient(150deg,#0c2e22 0%,#155c3e 55%,#1a7a52 100%)",
+        "pray"   => "linear-gradient(150deg,#3a0e28 0%,#60174a 55%,#832064 100%)",
+        "recite" => "linear-gradient(150deg,#1c0936 0%,#321256 55%,#4a2478 100%)",
+        _        => "linear-gradient(150deg,#1e3a5f 0%,#2563eb 100%)"
+    };
+    string btnColor = btnClass switch {
+        "word"   => "#1e4d9a",
+        "quiz"   => "#156645",
+        "pray"   => "#6b1c52",
+        "recite" => "#3e2070",
+        _        => "#3730a3"
+    };
+    string btnShadow = btnClass switch {
+        "word"   => "0 5px 18px rgba(30,77,154,.38)",
+        "quiz"   => "0 5px 18px rgba(21,102,69,.38)",
+        "pray"   => "0 5px 18px rgba(107,28,82,.38)",
+        "recite" => "0 5px 18px rgba(62,32,112,.38)",
+        _        => "0 5px 18px rgba(55,48,163,.38)"
+    };
+}
+
+<style>
+/* ── Quest Card ───────────────────────────────────────────── */
+.qcard {
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(15,23,42,.18), 0 2px 6px rgba(15,23,42,.10);
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1), box-shadow .2s ease;
+    cursor: default;
+    background: #fff;
+}
+.qcard.isLink { cursor: pointer; }
+.qcard:not(.is-done):hover {
+    transform: translateY(-4px) scale(1.015);
+    box-shadow: 0 18px 48px rgba(15,23,42,.22), 0 4px 10px rgba(15,23,42,.12);
+}
+.qcard.is-done { opacity: .88; }
+.qcard.is-done:hover { transform: none; box-shadow: 0 8px 32px rgba(15,23,42,.18); }
+
+/* 카드 클릭 오버레이 */
+.qcard-ov {
+    position: absolute; inset: 0;
+    border-radius: inherit; z-index: 1;
+    text-indent: -9999px; overflow: hidden;
+}
+
+/* 완료 배지 (우상단) */
+.qcard-done-badge {
+    position: absolute; top: 10px; right: 10px; z-index: 5;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #22c55e;
+    display: none; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 900; color: #fff;
+    box-shadow: 0 2px 10px rgba(34,197,94,.5);
+    border: 2.5px solid #fff;
+}
+.qcard.is-done .qcard-done-badge { display: flex; }
+
+/* ── 상단 컬러 영역 ── */
+.qcard-top {
+    padding: 22px 16px 18px;
+    text-align: center;
+    position: relative;
+    z-index: 2;
+}
+.qcard-emoji {
+    font-size: 52px;
+    line-height: 1;
+    display: block;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 3px 10px rgba(0,0,0,.45));
+}
+.qcard-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 8px;
+    /* 배경이 옅어져도 흰 글씨 선명하게 */
+    text-shadow: 0 1px 3px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.35);
+}
+.qcard-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 99px;
+    padding: 3px 10px;
+    /* 어두운 반투명 배경으로 흰 글씨 대비 확보 */
+    background: rgba(0,0,0,.25);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.30);
+    text-shadow: 0 1px 2px rgba(0,0,0,.40);
+}
+.qcard-pill.done  { background: rgba(0,0,0,.22); border-color: rgba(134,239,172,.60); }
+.qcard-pill.fail  { background: rgba(0,0,0,.22); border-color: rgba(252,165,165,.60); }
+
+/* ── 하단 흰 영역 ── */
+.qcard-body {
+    background: #fff;
+    padding: 14px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    position: relative;
+    z-index: 2;
+}
+.qcard-sticker {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.5;
+    padding: 9px 12px;
+    border-radius: 1px;
+    background: rgba(var(--qc-sticker-rgb, 99,102,241), 0.06);
+    border-left: 3px solid var(--qc-accent, #6366f1);
+    flex: 1;
+}
+.qcard.word   .qcard-sticker { background: #eef4ff; }
+.qcard.quiz   .qcard-sticker { background: #edfaf3; }
+.qcard.pray   .qcard-sticker { background: #fdf0f7; }
+.qcard.recite .qcard-sticker { background: #f3eeff; }
+
+/* ── 메시지(없음/잠금) ── */
+.qcard-msg {
+    font-size: 11.5px; font-weight: 700;
+    padding: 9px 12px; border-radius: 1px;
+    display: flex; gap: 7px; align-items: flex-start;
+    background: #fffbeb; border: 1px solid rgba(245,158,11,.28); color: #78350f;
+}
+.qcard-msg.locked { background: #f0fdf4; border-color: rgba(5,150,105,.22); color: #064e3b; }
+
+/* ── CTA 버튼 ── */
+.qcard-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 1px;
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+    white-space: nowrap;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.qcard-btn.q-active {
+    background: var(--qc-btn, #4f46e5);
+    color: #fff;
+    box-shadow: var(--qc-shadow, 0 6px 20px rgba(79,70,229,.4));
+}
+.qcard-btn.q-active:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 10px 28px rgba(15,23,42,.3);
+}
+.qcard-btn.q-view {
+    background: #f1f5f9; color: #475569;
+    border: 1.5px solid #cbd5e1;
+}
+.qcard-btn.q-view:hover { background: #e2e8f0; }
+.qcard-btn.q-off {
+    background: #f1f5f9; color: #9ca3af;
+    border: 1.5px solid #e5e7eb;
+    opacity: .6; cursor: not-allowed; pointer-events: none;
+}
+.qcard-btn .q-ico { font-size: 16px; }
+</style>
+
+<div class="qcard @btnClass @(isDone ? "is-done" : "") @(cardClickable ? "isLink" : "")"
+     style="--qc-accent:@btnColor; --qc-btn:@btnColor; --qc-shadow:@btnShadow;">
+
+    @if (cardClickable)
+    {
+        <a class="qcard-ov" href="@safeHref" aria-label="@title"></a>
+    }
+
+ 
+
+    <!-- 컬러 상단 -->
+    <div class="qcard-top" style="background:@topGrad;">
+        <span class="qcard-emoji">@emoji</span>
+        <div class="qcard-title">@title</div>
+        <div class="qcard-pill @(pillClass.Replace("pill","").Trim())">@pillText</div>
+    </div>
+
+    <!-- 흰 하단 -->
+    <div class="qcard-body">
+        <div class="qcard-sticker">@sticker</div>
+
+        @if (showNoContent)
+        {
+            <div class="qcard-msg">
+                <span>⚠️</span>
+                <span>(<b>@dateText</b>) @noContentMsg</span>
+            </div>
+        }
+        else if (showLocked)
+        {
+            <div class="qcard-msg locked">
+                <span>🔒</span>
+                <span>@lockReason</span>
+            </div>
+        }
+
+        <a class="qcard-btn @(disableButton ? "q-off" : isViewBtn ? "q-view" : "q-active")"
+           href="@(safeHref ?? "javascript:void(0)")"
+           role="button"
+           aria-disabled="@ariaDisabled"
+           tabindex="@tabIndex"
+           title="@(disableButton ? disabledLabel : btnText)"
+           onclick="event.stopPropagation();">
+            <span class="q-ico">@btnIcon</span>
+            <span>@btnText</span>
+        </a>
+    </div>
+</div>

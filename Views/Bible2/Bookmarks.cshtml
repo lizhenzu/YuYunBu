@@ -1,0 +1,116 @@
+@model List<BibleReadingThrough.Models.UserBookMarkListItem>
+@*  ══════════════════════════════════════════════════════════════
+    북마크 — Bone 스킨 (B안: 말씀 쪽지 카드)
+    · 정렬: 최근 저장순(저장 날짜) / 성경 순서(절 번호 VerseId) — 화면에서만 바꾼다.
+    이전 화면은 Bookmarks_before_bone.cshtml 에 보관.
+    ══════════════════════════════════════════════════════════════ *@
+@{ ViewData["Title"] = "북마크"; ViewData["Page"] = "bookmark"; }
+
+<style>
+    .b2b { --pad: 18px; max-width: 720px; margin: 0 auto; padding: 8px var(--pad) 40px; color: var(--b2-tx); }
+    @@media (min-width: 769px) { .b2b { --pad: 32px; } }
+    .b2b a { text-decoration: none; color: inherit; }
+    .b2b .k { font-size: 10px; font-weight: 600; letter-spacing: .22em; color: var(--b2-acc); }
+    .b2b .T { display: flex; justify-content: space-between; align-items: baseline; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 28px; margin: 6px 0 0; }
+    .b2b .T small { font-family: "Inter", sans-serif; font-size: 13px; color: var(--b2-acc); }
+
+    .b2b .sort { display: flex; gap: 6px; margin-top: 14px; }
+    .b2b .sort button { font-family: inherit; font-size: 12px; border: 1px solid var(--b2-rule); background: var(--b2-card); color: var(--b2-tx); padding: 6px 11px; cursor: pointer; }
+    .b2b .sort button.on { background: var(--b2-tx); color: var(--b2-bg); border-color: var(--b2-tx); }
+
+    .b2b .card { position: relative; background: var(--b2-card); margin-top: 12px; padding: 18px 16px 12px; box-shadow: 0 6px 16px -10px rgba(22,24,28,.28); transition: opacity .3s, transform .3s; }
+    .b2b .card .q { position: absolute; right: 14px; top: 4px; font-family: "Noto Serif KR", serif; font-size: 44px; line-height: 1; color: var(--b2-mark); pointer-events: none; }
+    .b2b .card p { position: relative; margin: 0; font-family: "Noto Serif KR", serif; font-size: 16px; line-height: 1.9; word-break: keep-all; }
+    .b2b .card .m { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--b2-line); margin-top: 12px; padding-top: 10px; }
+    .b2b .card .m b { font-weight: 600; font-size: 12.5px; color: var(--b2-acc); }
+    .b2b .card .m small { font-family: "Inter", sans-serif; font-size: 10.5px; color: var(--b2-dim); margin-left: 6px; }
+    .b2b .card .act { display: flex; align-items: center; gap: 14px; flex: none; }
+    .b2b .card .del { background: none; border: 0; padding: 4px 0; font-family: inherit; font-size: 12px; color: var(--b2-dim); cursor: pointer; }
+    .b2b .card .del:hover { color: #B4531F; }
+    .b2b .card .go { font-size: 12.5px; color: var(--b2-tx); }
+    .b2b .card .go:hover { color: var(--b2-acc); }
+
+    .b2b .empty { text-align: center; padding: 44px 0 20px; border-top: 1px solid var(--b2-tx); margin-top: 14px; }
+    .b2b .empty b { display: block; font-family: "Noto Serif KR", serif; font-weight: 400; font-size: 17px; }
+    .b2b .empty span { display: block; font-size: 12.5px; color: var(--b2-dim); margin-top: 6px; line-height: 1.7; }
+    .b2b .empty a { display: inline-block; margin-top: 16px; background: var(--b2-head); color: var(--b2-headtx); padding: 10px 18px; font-size: 12.5px; }
+</style>
+
+<div class="b2b">
+    <div class="k">마음에 담은 말씀</div>
+    <h1 class="T">북마크 @if (Model.Any()) { <small id="bmCount">@(Model.Count)개</small> }</h1>
+
+    @if (!Model.Any())
+    {
+        <div class="empty">
+            <b>아직 담은 말씀이 없어요</b>
+            <span>성경을 읽다가 절 끝 ★ 을 누르면<br>여기에 모아 둘게요</span>
+            <a href="/Bible2">성경 읽으러 가기</a>
+        </div>
+    }
+    else
+    {
+        <div class="sort" role="group" aria-label="정렬">
+            <button type="button" class="on" data-sort="recent">최근 저장순</button>
+            <button type="button" data-sort="bible">성경 순서</button>
+        </div>
+
+        <div id="bmList">
+            @foreach (var bm in Model)
+            {
+                <article class="card" id="bm-@bm.VerseId" data-vid="@bm.VerseId" data-dt="@bm.InsertDT.Ticks">
+                    <span class="q" aria-hidden="true">“</span>
+                    <p>@bm.VerseText</p>
+                    <div class="m">
+                        <div><b>@bm.BibleText @bm.Jang:@bm.Zul</b><small>@bm.InsertDT.ToString("yyyy.MM.dd")</small></div>
+                        <div class="act">
+                            <button type="button" class="del" onclick="delBm(@bm.VerseId)">삭제</button>
+                            <a class="go" href="/Bible2/Read?bookName=@Uri.EscapeDataString(bm.BibleText)&jang=@bm.Jang#vc-@bm.VerseId">읽기 →</a>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+function delBm(verseId) {
+    if (!confirm('북마크를 삭제할까요?')) return;
+    $.post('/Bible2/ToggleBookmark', { verseId }, () => {
+        const el = document.getElementById('bm-' + verseId);
+        if (!el) return;
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        setTimeout(() => {
+            el.remove();
+            const left = document.querySelectorAll('#bmList .card').length;
+            const c = document.getElementById('bmCount');
+            if (c) c.textContent = left + '개';
+            if (left === 0) location.reload();
+        }, 300);
+    });
+}
+
+(function () {
+    const list = document.getElementById('bmList');
+    if (!list) return;
+    const KEY = 'b2BmSort';
+    const btns = document.querySelectorAll('.b2b .sort button');
+    function apply(mode, save) {
+        const cards = Array.from(list.querySelectorAll('.card'));
+        cards.sort((a, b) => mode === 'bible'
+            ? (+a.dataset.vid) - (+b.dataset.vid)
+            : (+b.dataset.dt) - (+a.dataset.dt));
+        cards.forEach(c => list.appendChild(c));
+        btns.forEach(b => b.classList.toggle('on', b.dataset.sort === mode));
+        if (save) { try { localStorage.setItem(KEY, mode); } catch (e) { } }
+    }
+    btns.forEach(b => b.addEventListener('click', () => apply(b.dataset.sort, true)));
+    let saved = 'recent';
+    try { saved = localStorage.getItem(KEY) || 'recent'; } catch (e) { }
+    apply(saved, false);
+})();
+</script>
+}

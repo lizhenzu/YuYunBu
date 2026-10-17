@@ -1,0 +1,300 @@
+﻿@model BulletinBoard.Models.FamilyPhoto.FamilyPhotoGalleryVM
+@using BulletinBoard.Common
+@using BulletinBoard.Helpers
+@using BulletinBoard.Models.FamilyPhoto
+@using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig
+
+@*  ══════════════════════════════════════════════════════════════
+    갤러리 — 가족 카드(무작위) · 사진 위 ○/● 좋아요 · 누르면 크게 보기.
+    좋아요 수는 발표 전엔 안 보인다 (내가 누른 것만 ●).
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var now = DateHelper.GetKoreaNow();
+    string dateText = now.ToString("yyyy.MM.dd") + " " + now.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpperInvariant();
+    bool isStaff = ViewBag.IsStaff == true;
+    string DM(DateTime d) => $"{d.Month}.{d.Day}";
+    // 좋아요 ○ 는 투표 시작(LikeStart)부터 마감 없이 — 관리자는 그 전에도 보이고 누를 수 있다
+    bool showLike = now >= Cfg.LikeStart || isStaff;
+    string announceTx = $"{Cfg.AnnounceDay.Month}월 {Cfg.AnnounceDay.Day}일 주일";
+
+    // 하트 (2026-09-27 C안) — 빈 하트(.l 테두리) · 누르면 꽉 참(.f).  색은 currentColor
+    const string HeartD = "M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z";
+    var heart = Html.Raw($"<svg class=\"fpHeart\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path class=\"f\" d=\"{HeartD}\"/><path class=\"l\" d=\"{HeartD}\"/></svg>");
+    var burst = Html.Raw("<span class=\"burst\" aria-hidden=\"true\"><i style=\"--x:0;--y:-22px\"></i><i style=\"--x:16px;--y:-15px\"></i><i style=\"--x:21px;--y:2px\"></i><i style=\"--x:14px;--y:17px\"></i><i style=\"--x:-14px;--y:17px\"></i><i style=\"--x:-21px;--y:2px\"></i><i style=\"--x:-16px;--y:-15px\"></i></span>");
+    string phaseNote = Model.Phase switch
+    {
+        FamilyPhotoPhase.Before => $"{DM(Cfg.UploadStart)} 부터 사진을 올릴 수 있어요.",
+        FamilyPhotoPhase.Upload => $"사진은 언제든 올릴 수 있어요 · 좋아요 투표는 {DM(Cfg.LikeStart)} 부터",
+        FamilyPhotoPhase.Like   => Model.IsPublished ? "결과가 나왔어요."
+                                   : $"사진은 계속 올릴 수 있어요 · 좋아요 결과는 {DM(Cfg.AnnounceDay)} 주일에 공개돼요",
+        _ => Model.IsPublished ? "결과가 나왔어요." : $"좋아요 투표가 끝났어요 · {DM(Cfg.AnnounceDay)} 주일에 함께 봐요",
+    };
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>@Cfg.Title — @ConstatsCommon.MainKeyTitle</title>
+<partial name="_FamilyPhotoStyle" />
+</head>
+<body>
+
+<div class="qz">
+    <div class="qzBody">
+
+        <div class="qzBar">
+            <div>
+                <a class="qzHome" href="/">@ConstatsCommon.ToHome</a><span class="qzHomeSep">·</span><span class="qzStepNo"><em>가족 사진</em></span>
+            </div>
+            <div class="qzDate">@dateText</div>
+        </div>
+
+        <div class="brK">@Cfg.Kicker</div>
+        <div class="brH1"><b>🌕 추석맞이 · 가족 사진 콘테스트</b></div>
+        <div class="brSum" style="margin-top:6px;letter-spacing:.04em">기간 : @(Cfg.UploadStart.Month)월 @(Cfg.UploadStart.Day)일부터 @(Cfg.AnnounceDay.Month)월 @(Cfg.AnnounceDay.Day)일</div>
+        <div class="brSum">가족명만 적고 사진 @(Cfg.MaxPhotos)장까지 올려요. @(showLike ? "마음에 드는 사진에 ○ 를 눌러 주세요 — 사진마다 1번, 누구나. " : "")@phaseNote</div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.Toast))
+        {
+            <div class="msg">@Model.Toast</div>
+        }
+
+        <div class="tl">
+            <div class="@(Model.Phase == FamilyPhotoPhase.Upload ? "on" : "")"><u>UPLOAD</u><b>@DM(Cfg.UploadStart) –</b><i>사진 올리기 · 언제든</i></div>
+            <div class="@(Model.Phase == FamilyPhotoPhase.Like ? "on" : "")"><u>LIKE</u><b>@DM(Cfg.LikeStart) –</b><i>좋아요 투표 · 언제든</i></div>
+            <div class="@(Model.Phase == FamilyPhotoPhase.Closed ? "on" : "")"><u>TOGETHER</u><b>@DM(Cfg.AnnounceDay) @Cfg.AnnounceDay.ToString("ddd", System.Globalization.CultureInfo.InvariantCulture).ToUpper()</b><i>같이 사진 보기</i></div>
+        </div>
+
+        <div class="acts">
+            @if (Model.CanUpload)
+            {
+                <a class="btn" href="/FamilyPhoto/Enter">@(Model.HasMyEntry ? "우리 가족 사진 고치기 →" : "우리 가족 사진 올리기 →")</a>
+                @if (!Model.HasMyEntry) { <a class="btn line" href="/FamilyPhoto/Enter?fresh=true">이미 올렸어요 · 가족명으로 들어가기</a> }
+            }
+            @if (Model.IsPublished || isStaff)
+            {
+                <a class="btn acc" href="/FamilyPhoto/Result@(Model.IsPublished ? "" : "?preview=true")">@(Model.IsPublished ? "결과 보기 →" : "결과 미리보기 (관리자) →")</a>
+            }
+            @if (isStaff)
+            {
+                <a class="btn line" href="/FamilyPhoto/Judge">심사 평가 →</a>
+                <a class="btn line" href="/FamilyPhoto/Admin">관리 →</a>
+            }
+        </div>
+
+        <div class="sec"><span style="letter-spacing:.2em;font-weight:600">참여 가족</span><span>@(Model.EntryCount)가족 · @(Model.PhotoCount)장 · 무작위</span></div>
+
+        @if (Model.Entries.Count == 0)
+        {
+            <div class="empty">@(Model.Phase == FamilyPhotoPhase.Before ? "아직 시작 전이에요. 곧 만나요." : "아직 올라온 사진이 없어요. 첫 번째 가족이 되어 주세요.")</div>
+        }
+
+        @foreach (var e in Model.Entries)
+        {
+            <div class="fam" data-entry="@e.EntryId">
+                <div class="famH">
+                    <span class="famN">@e.FamilyName<i>@(e.Photos.Count) PHOTOS</i></span>
+                    <span class="famC">@e.CreatedAt.ToString("M.d")</span>
+                </div>
+                <div class="ph">
+                    @for (int i = 0; i < e.Photos.Count; i++)
+                    {
+                        var p = e.Photos[i];
+                        <div class="p @(i == 0 ? "wide" : "")"
+                             data-pid="@p.PhotoId" data-src="@p.FilePath" data-cap="@(p.Caption ?? "")" data-fam="@e.FamilyName" data-idx="@(i + 1)" data-n="@e.Photos.Count">
+                            <img src="@p.ThumbPath" alt="@(p.Caption ?? e.FamilyName)" loading="lazy" decoding="async" />
+                            @if (!string.IsNullOrWhiteSpace(p.Caption)) { <span class="cap">@p.Caption</span> }
+                            @if (showLike)
+                            {
+                                <button type="button" class="lk @(p.Liked ? "on" : "")" data-like="@p.PhotoId" title="@(p.Liked ? "좋아요 취소" : "좋아요")" aria-pressed="@(p.Liked ? "true" : "false")" @(Model.CanLike ? "" : "disabled")>@heart@burst</button>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="famF">
+                    <span>@if (showLike) { <span class="mine">@heart 내가 누른 사진 <em data-my="@e.EntryId">@e.MyLikes</em></span> } else { <text>좋아요 투표는 @DM(Cfg.LikeStart) 부터</text> }</span>
+                    <span>사진을 누르면 크게 봐요</span>
+                </div>
+            </div>
+        }
+
+        <div class="hint">
+            좋아요 투표는 @DM(Cfg.LikeStart) 부터 언제든, 한 사진에 한 번만 누를 수 있고 다시 누르면 취소돼요. 좋아요 수는 @DM(Cfg.AnnounceDay) 주일에 공개해요.
+        </div>
+
+        <div class="brFoot">
+            <span><a href="/FamilyPhoto/Enter">사진 올리기 →</a><a href="/">홈으로 →</a></span>
+        </div>
+
+    </div>
+</div>
+
+<form id="fpAf" style="display:none">@Html.AntiForgeryToken()</form>
+<div id="fpToast" class="fpToast" role="status" aria-live="polite"></div>
+
+@* ── 좋아요를 누르면 보여 주는 카드 — 결과는 발표일에 공개 (2026-09-27) ── *@
+<style>
+    .fpCheer { position: fixed; inset: 0; z-index: 9500;   /* 크게 보기(.fpMask 9000) 위에서도 보이게 */ display: none; align-items: center; justify-content: center; padding: 20px;
+               background: rgba(22,24,28,.55); backdrop-filter: blur(2px); }
+    .fpCheer.show { display: flex; }
+    .fpCheerBox { position: relative; overflow: hidden; width: 100%; max-width: 330px; text-align: center; border-radius: 22px; padding: 30px 22px 20px;
+                  background: linear-gradient(165deg, #fff7ed 0%, #ffedd5 60%, #fde68a 140%); border: 1.5px solid #fdba74;
+                  box-shadow: 0 18px 50px rgba(124,45,18,.28); animation: fpCheerIn .32s cubic-bezier(.2,.9,.3,1.3); }
+    .fpCheerBox .moon { position: absolute; right: -46px; top: -56px; width: 150px; height: 150px; border-radius: 50%;
+                        background: radial-gradient(circle at 35% 35%, #fff7cc, #fde68a 55%, #fbbf24); opacity: .6; pointer-events: none; }
+    .fpCheerBox > * { position: relative; }
+    .fpCheerHeart { width: 72px; height: 72px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                    font-size: 36px; background: #fff; box-shadow: 0 6px 18px rgba(240,80,110,.25); animation: fpCheerPop .6s .1s ease-out both; color: #F0506E; }
+    .fpCheerHeart .fpHeart { width: 38px; height: 38px; }
+    .fpCheerHeart .fpHeart .f { fill: currentColor; }
+    .fpCheerK { margin-top: 14px; font-size: 11px; font-weight: 800; letter-spacing: .12em; color: #c2410c; }
+    .fpCheerT { margin-top: 4px; font-size: 20px; font-weight: 900; color: #3b1d0b; line-height: 1.35; word-break: keep-all; }
+    .fpCheerT em { font-style: normal; color: #ea580c; }
+    .fpCheerDay { display: inline-block; margin-top: 14px; padding: 9px 16px; border-radius: 14px; background: #fff; border: 1px dashed #fb923c;
+                  font-size: 14px; font-weight: 800; color: #7c2d12; line-height: 1.5; }
+    .fpCheerDay b { color: #ea580c; font-weight: 900; }
+    .fpCheerS { margin-top: 12px; font-size: 12px; color: #9a3412; line-height: 1.6; word-break: keep-all; }
+    .fpCheerBtn { width: 100%; margin-top: 16px; padding: 13px; border: 0; border-radius: 999px; background: #f97316; color: #fff;
+                  font-family: inherit; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 12px rgba(249,115,22,.35); }
+    .fpCheerBtn:hover { background: #ea580c; }
+    @@keyframes fpCheerIn { from { transform: translateY(14px) scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+    @@keyframes fpCheerPop { 0% { transform: scale(.4); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+    @@media (prefers-reduced-motion: reduce) { .fpCheerBox, .fpCheerHeart { animation: none; } }
+</style>
+<div id="fpCheer" class="fpCheer" aria-hidden="true">
+    <div class="fpCheerBox" role="dialog" aria-modal="true" aria-labelledby="fpCheerT">
+        <div class="moon"></div>
+        <div class="fpCheerHeart">@heart</div>
+        <div class="fpCheerK">좋아요 투표소</div>
+        <div class="fpCheerT" id="fpCheerT"><em id="fpCheerFam"></em> 사진에<br />좋아요를 보냈어요!</div>
+        <div class="fpCheerDay">🌕 투표 결과는<br /><b>@announceTx</b>에 공개돼요</div>
+        <div class="fpCheerS">다른 가족 사진에도 응원을 보내 주세요.<br />다시 누르면 좋아요가 취소돼요.</div>
+        <button type="button" class="fpCheerBtn" id="fpCheerOk">확인</button>
+    </div>
+</div>
+
+<div id="fpMask" class="fpMask" aria-hidden="true">
+    <div class="fpBox" role="dialog" aria-modal="true">
+        <img id="fpImg" src="" alt="" />
+        <div class="t"><span id="fpFam" style="font-family:'Noto Serif KR',serif;font-size:15px;color:#16181C;margin:0"></span><span id="fpIdx"></span></div>
+        <div class="c" id="fpCap"></div>
+        <div class="a">
+            <button type="button" class="nav" id="fpPrev">←</button>
+            <button type="button" class="like" id="fpLike" @(showLike ? "" : "hidden")></button>
+            <button type="button" class="nav" id="fpNext">→</button>
+            <button type="button" class="nav" id="fpClose">닫기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var CAN_LIKE = @(Model.CanLike ? "true" : "false");
+        var token = document.querySelector('#fpAf input[name="__RequestVerificationToken"]');
+        var toastEl = document.getElementById('fpToast'); var _tt = null;
+        function toast(m) { toastEl.textContent = m; toastEl.classList.add('show'); clearTimeout(_tt); _tt = setTimeout(function () { toastEl.classList.remove('show'); }, 1500); }
+
+        function setLiked(pid, on) {
+            document.querySelectorAll('[data-like="' + pid + '"]').forEach(function (b) {
+                b.classList.toggle('on', on); b.title = on ? '좋아요 취소' : '좋아요';
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                // 켤 때만 작은 하트 방울이 톡 터진다
+                b.classList.remove('boom'); void b.offsetWidth; if (on) b.classList.add('boom');
+            });
+            // 가족 카드의 '내가 누른 사진' 수
+            var p = document.querySelector('.p[data-pid="' + pid + '"]');
+            var fam = p && p.closest('.fam');
+            if (fam) {
+                var n = fam.querySelectorAll('.lk.on').length;
+                var em = fam.querySelector('[data-my]'); if (em) em.textContent = n;
+            }
+            if (cur && cur.pid === pid) renderLikeBtn(on);
+        }
+
+        // 좋아요 카드
+        var cheerEl = document.getElementById('fpCheer');
+        function cheer(pid) {
+            var p = document.querySelector('.p[data-pid="' + pid + '"]');
+            document.getElementById('fpCheerFam').textContent = (p && p.getAttribute('data-fam')) || '가족';
+            cheerEl.classList.add('show'); cheerEl.setAttribute('aria-hidden', 'false');
+            document.getElementById('fpCheerOk').focus();
+        }
+        function cheerClose() { cheerEl.classList.remove('show'); cheerEl.setAttribute('aria-hidden', 'true'); }
+        document.getElementById('fpCheerOk').addEventListener('click', cheerClose);
+        cheerEl.addEventListener('click', function (e) { if (e.target === cheerEl) cheerClose(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && cheerEl.classList.contains('show')) cheerClose(); });
+
+        var busy = false;
+        function like(pid) {
+            if (!CAN_LIKE) { toast('지금은 좋아요를 누를 수 없어요.'); return; }
+            if (busy) return; busy = true;
+            var fd = new FormData(); fd.append('photoId', pid); if (token) fd.append('__RequestVerificationToken', token.value);
+            fetch('/FamilyPhoto/Like', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    if (j.ok) setLiked(pid, j.liked);
+                    // 좋아요를 켰으면 예쁜 카드(결과는 발표일 공개), 취소 · 실패는 짧은 알림
+                    if (j.ok && j.liked) cheer(pid); else toast(j.msg || '');
+                })
+                .catch(function () { toast('잠시 후 다시 눌러 주세요.'); })
+                .finally(function () { busy = false; });
+        }
+
+        // 좋아요 버튼 (카드 위)
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-like]');
+            if (b && !b.closest('.fpBox')) { e.stopPropagation(); like(parseInt(b.getAttribute('data-like'), 10)); }
+        });
+
+        // 크게 보기
+        var mask = document.getElementById('fpMask'), img = document.getElementById('fpImg');
+        var famEl = document.getElementById('fpFam'), idxEl = document.getElementById('fpIdx'), capEl = document.getElementById('fpCap');
+        var likeBtn = document.getElementById('fpLike');
+        var HEART = document.querySelector('.fpCheerHeart .fpHeart').outerHTML;   // 서버에서 그린 하트를 그대로 쓴다
+        var cur = null, list = [];
+        function renderLikeBtn(on) {
+            likeBtn.classList.toggle('on', on);
+            likeBtn.innerHTML = HEART + '<span>' + (on ? '좋아요 보냈어요 · 다시 누르면 취소' : '좋아요') + '</span>';
+            likeBtn.disabled = !CAN_LIKE;
+        }
+        function open(el) {
+            var fam = el.closest('.fam');
+            list = Array.prototype.slice.call(fam.querySelectorAll('.p[data-pid]'));
+            show(list.indexOf(el));
+        }
+        function show(i) {
+            if (i < 0 || i >= list.length) return;
+            var el = list[i];
+            cur = { pid: parseInt(el.getAttribute('data-pid'), 10), i: i };
+            img.src = el.getAttribute('data-src'); img.alt = el.getAttribute('data-cap') || '';
+            famEl.textContent = el.getAttribute('data-fam'); idxEl.textContent = (i + 1) + ' / ' + list.length;
+            capEl.textContent = el.getAttribute('data-cap') || '';
+            var lkEl = el.querySelector('.lk'); renderLikeBtn(!!lkEl && lkEl.classList.contains('on'));
+            document.getElementById('fpPrev').disabled = i === 0;
+            document.getElementById('fpNext').disabled = i === list.length - 1;
+            mask.classList.add('show'); mask.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
+        }
+        function close() { mask.classList.remove('show'); mask.setAttribute('aria-hidden', 'true'); img.src = ''; document.body.style.overflow = ''; cur = null; }
+        document.addEventListener('click', function (e) {
+            var p = e.target.closest('.p[data-pid]');
+            if (p && !e.target.closest('[data-like]')) open(p);
+        });
+        likeBtn.addEventListener('click', function () { if (cur) like(cur.pid); });
+        document.getElementById('fpPrev').addEventListener('click', function () { if (cur) show(cur.i - 1); });
+        document.getElementById('fpNext').addEventListener('click', function () { if (cur) show(cur.i + 1); });
+        document.getElementById('fpClose').addEventListener('click', close);
+        mask.addEventListener('click', function (e) { if (e.target === mask) close(); });
+        document.addEventListener('keydown', function (e) {
+            if (!mask.classList.contains('show')) return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft' && cur) show(cur.i - 1);
+            if (e.key === 'ArrowRight' && cur) show(cur.i + 1);
+        });
+    })();
+</script>
+</body>
+</html>

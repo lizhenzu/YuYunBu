@@ -1,0 +1,322 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@model List<BulletinBoard.Models.PrayFriend>
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Information Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .card-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        .profile-pic {
+            width: 170px;
+            height: 170px;
+            border-radius: 50%;
+            margin-bottom: 10px;
+            object-fit: cover;
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        h1, h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .formatted-text {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .buttons button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+
+    <style>
+        /* 기존 스타일 */
+
+        /* 팝업 스타일 */
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .popup {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            height: 500px; /* 높이를 두 배로 설정 */
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+            .popup h2 {
+                color: #333;
+                margin-bottom: 10px;
+            }
+
+            .popup textarea {
+                width: 100%;
+                height: calc(100% - 120px); /* 버튼 영역을 고려하여 textarea 높이 설정 */
+                margin-bottom: 15px;
+                resize: none;
+            }
+
+        .popup-buttons {
+            display: flex;
+            justify-content: space-around;
+        }
+
+            .popup-buttons button {
+                padding: 10px 10px; /* 버튼 크기 크게 설정 */
+                border: none;
+                border-radius: 8px;
+                font-size: 17px; /* 폰트 크기 크게 설정 */
+                cursor: pointer;
+                color: #fff;
+            }
+
+            .popup-buttons .save-button {
+                background-color: #4CAF50; /* 저장 버튼 색상 설정 */
+            }
+
+            .popup-buttons .cancel-button {
+                background-color: #f44336; /* 취소 버튼 색상 설정 */
+            }
+    </style>
+
+ 
+  
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <link rel="stylesheet" href="/css/ProcessBar.css">
+    <script src="/js/common2.js"></script>
+    <script src="/js/ProcessBar73.js"></script>
+
+ 
+</head>
+<body>
+  
+
+    <div class="popup-overlay" id="editPopup">
+        <div class="popup">
+            <h2>기도 내용 수정</h2>
+            <textarea id="editText"></textarea>
+            <div class="popup-buttons">
+                <button class="save-button" onclick="confirmSave()">저장</button>
+                <button class="cancel-button" onclick="closePopup()">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-box">처리중입니다</div>
+    </div>
+
+
+    <div class="card-container">
+        <div class="card">
+            <h1>중보기도/관심 공간</h1>
+        </div>
+        @foreach (var friend in Model)
+        {
+                <div class="card">
+                    <div>
+                        <img id="myImage-@friend.UserId" src="@friend.ProfilePicturePath" onclick="ManageUserInfo('@friend.UserId')" alt="Profile Picture" class="profile-pic">
+                    </div>
+                    <h5>(위 사진을 눌러서 개인 사진을 변경할 수 있어요~)</h5>
+                    <h2>@friend.sequenceNo)@friend.FullName</h2>
+                    <p>@friend.ClassYear 학년 @friend.ClassBan 반</p>
+
+                    <p class="formatted-text">@friend.PrayText</p>
+                    <p class="formatted-text">@friend.insertDT</p>
+
+                <div class="buttons">
+                    <button type="button" onclick="openEditPopup('@friend.PrayId', '@Html.Raw(System.Web.HttpUtility.JavaScriptStringEncode(@friend.PrayText))')">기도 내용 수정</button>
+                    <button type="button" style="background-color:#9e1a20;" onclick="confirmDelete('@friend.PrayId')">삭제</button>
+                </div>
+
+
+                    <div class="buttons">
+                    <button type="button" style="background-color:#00704A;" onclick="window.location.href='/';">Home</button>
+                    </div>
+                </div>
+        }
+    </div>
+  
+    <script>
+        let currentPrayId;
+
+        function openEditPopup(prayId, text) {
+            currentPrayId = prayId;
+            document.getElementById("editText").value = text;
+            document.getElementById("editPopup").style.display = "flex";
+        }
+
+        function closePopup() {
+            document.getElementById("editPopup").style.display = "none";
+        }
+
+        async function confirmSave() {
+            let result = await confirmMessage(true, ['저장할까요?']);
+
+            const text = document.getElementById("editText").value.trim();
+            const data = { PrayId: parseInt(currentPrayId), PrayText: text };
+
+            if (result === 'y') {
+
+                document.getElementById("editPopup").style.display = "none";
+                doProcess(data, 'UpdatePrayFriend');
+            }
+        }
+        
+        async function confirmDelete(PrayId) {
+            let result = await confirmMessage(true, ['삭제할까요?']);
+            if (result === 'y') {
+                deletePrayText(PrayId);
+            }
+        }
+
+
+        async function deletePrayText(PrayId) {
+            document.getElementById("editPopup").style.display = "none";
+            showLoading();
+
+            const text = document.getElementById("editText").value.trim();
+
+            const url = `${window.location.origin}/api/PrayFreind/DeletePrayFreind`; // 오타 수정
+ 
+
+            console.log("요청 URL:", url);
+            console.log("보내는 데이터:", { PrayId: PrayId, PrayText: "" });
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json; charset=utf-8'
+                    },
+                    body: JSON.stringify({ PrayId: parseInt(PrayId), PrayText: "" })
+                });
+                hideLoading();
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error("서버 응답 오류:", errorData);
+                    throw new Error(errorData.message || "서버 오류 발생");
+                }
+
+                const data = await response.json();
+                console.log("서버 응답:", data);
+                hideLoading();
+                if (data.message === "Success") {
+                    await confirmMessage(false, ['정상 처리 되었습니다.']);
+                    location.reload();
+                } else {
+                    alert(`오류 발생: ${data.message}`);
+                }
+            } catch (error) {
+                hideLoading();
+                console.error("네트워크 오류:", error);
+                alert(`네트워크 오류: ${error.message}`);
+            }
+        }
+         
+    </script>
+
+    <script>
+        function loadLatestImage(userId, imagePath) {
+            const imageElement = document.getElementById('myImage-' + userId);
+            const timestamp = new Date().getTime();
+            imageElement.src = `${imagePath}?${timestamp}`;
+        }
+
+        window.onload = function() {
+        @foreach (var friend in Model)
+        {
+            <text>loadLatestImage('@friend.UserId', '@friend.ProfilePicturePath');</text>
+        }
+        };
+
+        function ManageUserInfo(UserId) {
+            window.location.href = "/HumanResource/ManageUserInfo?UserId=" + UserId;
+        }
+    </script>
+
+    <script>
+        function showLoading() {
+            // Show the loading overlay and apply animations
+            document.getElementById('loadingOverlay').style.display = 'block';
+            document.body.style.pointerEvents = 'none'; // Disable all inputs
+        }
+
+        function hideLoading() {
+            // Hide the loading overlay and remove input blocking
+            document.getElementById('loadingOverlay').style.display = 'none';
+            document.body.style.pointerEvents = 'auto'; // Re-enable inputs
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,287 @@
+﻿@model BulletinBoard.ViewModels.Attendance.NewComerDetailVM
+@using System
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@{
+    ViewData["Title"] = "새친구 상세";
+    Layout = null;
+    string ToDateText(DateTime? dt) => dt.HasValue ? dt.Value.ToString("yyyy-MM-dd") : "-";
+    var item = Model?.Info;
+    var msg  = TempData["NewComerMsg"]?.ToString();
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <title>@(item?.ChildName ?? "새친구") 상세</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ── DailyMission4 밝은 흰색 버전 (2026-10-03 시안 확정) ── */
+        *, *::before, *::after { box-sizing: border-box; }
+        :root { --blue: #2F80ED; --soft: #EAF2FD; --ink: #111827; --tx: #374151; --dim: #9CA3AF; --dim2: #6B7280; --line: #EEF0F3; --grey: #F4F6F9;
+                --ok: #15803D; --okbg: #EAF7EF; --warn: #B4531F; --warnbg: #FBEFE7; --danger: #D9534F; }
+        body { margin: 0; background: #FFFFFF; color: var(--tx); font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+        a { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; }
+        button, input { font: inherit; }
+        .page { max-width: 760px; margin: 0 auto; padding: 0 16px 40px; }
+
+        .bar { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+        .bar a { font-weight: 700; color: var(--tx); }
+        .bar a:hover { color: var(--blue); }
+        .toast { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--okbg); font-size: 13px; color: var(--ok); }
+        .none { padding: 40px 0; text-align: center; color: var(--dim); }
+
+        /* 프로필 */
+        .k { margin-top: 20px; font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); }
+        .pf { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+        .pic { flex: none; width: 72px; height: 72px; border-radius: 50%; object-fit: cover; background: var(--grey); display: block; }
+        .nm { font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); word-break: keep-all; }
+        .sb { margin-top: 2px; font-size: 13px; color: var(--dim2); }
+        .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+        .c { font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 3px 11px; }
+        .c.ok { background: var(--okbg); color: var(--ok); }
+        .c.gr { background: var(--grey); color: var(--dim2); }
+        .c.sf { background: var(--warnbg); color: var(--warn); }
+        .c.ev { background: #FFF4DB; color: #8A6410; }
+        .evn { font-size: 12px; color: var(--dim2); }
+
+        .go { margin-top: 16px; }
+        .go button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border: 0; border-radius: 14px; background: var(--soft); text-align: left; cursor: pointer; }
+        .go button span { font-size: 15px; font-weight: 800; color: var(--ink); }
+        .go button em { font-style: normal; font-size: 20px; font-weight: 300; color: var(--blue); }
+
+        /* 섹션 */
+        .sh { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 16px; font-weight: 800; color: var(--ink); }
+        .sh small { font-size: 11.5px; font-weight: 700; color: var(--blue); background: var(--soft); border-radius: 999px; padding: 2px 9px; margin-left: 6px; vertical-align: 2px; }
+        .ed { border: 0; background: var(--grey); color: var(--dim2); font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+        .info { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; margin-top: 8px; }
+        .cell { padding: 12px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+        .cell span { display: block; font-size: 11.5px; color: var(--dim); }
+        .cell b { display: block; margin-top: 2px; font-size: 15px; font-weight: 700; color: var(--ink); word-break: keep-all; }
+        .cell b.bl { color: var(--blue); }
+
+        /* 출석 이력 */
+        .add { display: flex; gap: 8px; margin-top: 10px; }
+        .add input { flex: 1; min-width: 0; border: 0; background: var(--grey); border-radius: 12px; padding: 11px 13px; font-size: 14px; color: var(--ink); outline: 0; }
+        .add input:focus { background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .add button { border: 0; background: var(--blue); color: #fff; font-size: 13.5px; font-weight: 800; border-radius: 12px; padding: 0 15px; cursor: pointer; white-space: nowrap; }
+        .v { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+        .vo { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--soft); color: var(--blue); display: grid; place-items: center; font-size: 13px; font-weight: 800; }
+        .vi { flex: 1; min-width: 0; }
+        .vd { font-size: 15.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+        .vm { margin-top: 1px; font-size: 12px; color: var(--dim); }
+        .v form { margin: 0; }
+        .del { border: 0; background: none; color: var(--dim); font-size: 12.5px; text-decoration: underline; cursor: pointer; padding: 4px; }
+        .del:hover { color: var(--danger); }
+        .empty { padding: 26px 0; text-align: center; font-size: 13px; color: var(--dim); border-bottom: 1px solid var(--line); }
+
+        /* 수정 창 */
+        .modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: none; align-items: flex-end; justify-content: center; background: rgba(17,24,39,.45); }
+        .modal-backdrop.show { display: flex; }
+        .modal { width: min(560px, 100%); max-height: 92vh; overflow: auto; background: #fff; border-radius: 20px 20px 0 0; }
+        @@media (min-width: 640px) { .modal-backdrop { align-items: center; padding: 16px; } .modal { border-radius: 20px; } }
+        .modal-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 10px; background: #fff; }
+        .modal-title { font-size: 18px; font-weight: 800; color: var(--ink); }
+        .modal-close { width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--grey); color: var(--dim2); font-size: 18px; cursor: pointer; }
+        .modal-body { padding: 6px 18px 4px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+        .form-item-full { grid-column: 1 / -1; }
+        .form-label { display: block; font-size: 12px; color: var(--dim2); margin-bottom: 4px; }
+        .form-input { width: 100%; border: 0; background: var(--grey); border-radius: 12px; padding: 12px 13px; font-size: 15px; color: var(--ink); outline: 0; }
+        .form-input:focus { background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .radio-group { display: flex; gap: 8px; }
+        .radio-label { flex: 1; position: relative; }
+        .radio-label input { position: absolute; opacity: 0; }
+        .radio-chip { display: block; text-align: center; padding: 12px 6px; border-radius: 12px; background: var(--grey); color: var(--dim2); font-size: 14px; cursor: pointer; }
+        .radio-label input:checked + .radio-chip { background: var(--soft); color: var(--blue); font-weight: 800; box-shadow: inset 0 0 0 2px var(--blue); }
+        .modal-foot { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 14px 18px 16px; background: #fff; }
+        .modal-foot button { height: 48px; border: 0; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+        .modal-foot .cancel { width: 96px; background: var(--grey); color: var(--dim2); }
+        .modal-foot .save { flex: 1; background: var(--blue); color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="bar">
+            <a href="@Url.Action("NewComer","Attendance")">← 새친구 목록</a>
+            <a href="@Url.Action("Index","Home")">@ConstatsCommon.ToHome</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="toast">✓ @msg</div>
+        }
+
+        @if (item == null)
+        {
+            <div class="none">새친구 정보를 찾을 수 없습니다.</div>
+        }
+        else
+        {
+            <div class="k">NEW FRIEND</div>
+            <div class="pf">
+                <img class="pic" src="@(!string.IsNullOrWhiteSpace(item.PhotoPath) ? item.PhotoPath : "/images/icon/people/people_01.webp")"
+                     alt="@item.ChildName" onerror="this.onerror=null;this.src='/images/icon/people/people_01.webp';" />
+                <div>
+                    <div class="nm">@item.ChildName</div>
+                    <div class="sb">보호자 · @item.ParentName</div>
+                    <div class="sb">@item.Phone</div>
+                </div>
+            </div>
+            <div class="chips">
+                <span class="c @(item.NewComerStatus == "활성" ? "ok" : "gr")">@item.NewComerStatus</span>
+                @if (item.IsVoluntary)
+                {
+                    <span class="c sf">자진 출석</span>
+                }
+                else
+                {
+                    <span class="c ev">전도로 출석</span>
+                }
+                @if (!item.IsVoluntary && !string.IsNullOrWhiteSpace(item.EvangelistName))
+                {
+                    <span class="evn">전도자 · @item.EvangelistName</span>
+                }
+            </div>
+
+            <form class="go" method="post"
+                  action="@Url.Action("AddNewComerVisitToday","Attendance")"
+                  onsubmit="return confirm('오늘 출석을 추가할까요?');">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="newComerId" value="@item.Id" />
+                <button type="submit"><span>＋ 오늘 출석 추가</span><em>→</em></button>
+            </form>
+
+            <div class="sh"><span>기본 정보</span><button type="button" class="ed" onclick="openEditModal()">수정</button></div>
+            <div class="info">
+                <div class="cell"><span>생일</span><b>@item.BirthText</b></div>
+                <div class="cell"><span>학년 / 반</span><b>@item.ClassText</b></div>
+                <div class="cell"><span>학교</span><b>@(string.IsNullOrWhiteSpace(item.School) ? "—" : item.School)</b></div>
+                <div class="cell"><span>첫 출석일</span><b>@ToDateText(item.FirstVisitDate)</b></div>
+                <div class="cell"><span>방문 횟수</span><b class="bl">@(item.VisitCount)회</b></div>
+                <div class="cell"><span>마지막 출석일</span><b>@ToDateText(item.LastVisitDate)</b></div>
+            </div>
+
+            <div class="sh"><span>출석 이력<small>@(Model?.Visits?.Count ?? 0)건</small></span></div>
+            <form class="add" method="post" action="@Url.Action("AddNewComerVisitByDate","Attendance")">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="newComerId" value="@item.Id" />
+                <input type="date" name="visitDate" value="@DateHelper.GetKoreaToday().ToString("yyyy-MM-dd")" required aria-label="출석 날짜" />
+                <button type="submit">날짜 출석 추가</button>
+            </form>
+
+            @if (Model?.Visits == null || Model.Visits.Count == 0)
+            {
+                <div class="empty">아직 등록된 출석 이력이 없습니다.</div>
+            }
+            else
+            {
+                @foreach (var visit in Model.Visits)
+                {
+                    <div class="v">
+                        <span class="vo">@visit.VisitOrder</span>
+                        <div class="vi">
+                            <div class="vd">@ToDateText(visit.VisitDate)</div>
+                            <div class="vm">등록 @ToDateText(visit.InsertDT)</div>
+                        </div>
+                        <form method="post"
+                              action="@Url.Action("DeleteNewComerVisit","Attendance")"
+                              onsubmit="return confirm('이 출석 기록을 삭제할까요?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@visit.Id" />
+                            <input type="hidden" name="newComerId" value="@visit.NewComerId" />
+                            <button type="submit" class="del">삭제</button>
+                        </form>
+                    </div>
+                }
+            }
+
+            <!-- ══ 기본정보 수정 창 ══ -->
+            <div id="editModal" class="modal-backdrop" onclick="if(event.target.id==='editModal')closeEditModal()">
+                <div class="modal" role="dialog" aria-modal="true" aria-label="기본정보 수정">
+                    <div class="modal-head">
+                        <span class="modal-title">기본정보 수정</span>
+                        <button type="button" class="modal-close" onclick="closeEditModal()" aria-label="닫기">×</button>
+                    </div>
+                    <form method="post" action="@Url.Action("UpdateNewComerInfo","Attendance")">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Id" value="@item.Id" />
+                        <div class="modal-body">
+                            <div class="form-grid">
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">이름</label>
+                                    <input class="form-input" type="text" name="ChildName" value="@item.ChildName" placeholder="새친구 이름" maxlength="100" required />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">전화번호</label>
+                                    <input class="form-input" type="tel" name="Phone" value="@item.Phone" placeholder="010-0000-0000" maxlength="50" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">생년월 (1~12)</label>
+                                    <input class="form-input" type="number" name="BirthMonth" min="1" max="12" value="@item.BirthMonth" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">생년일 (1~31)</label>
+                                    <input class="form-input" type="number" name="BirthDay" min="1" max="31" value="@item.BirthDay" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">학년</label>
+                                    <input class="form-input" type="number" name="ClassYear" min="1" max="20" value="@item.ClassYear" />
+                                </div>
+                                <div class="form-item">
+                                    <label class="form-label">반</label>
+                                    <input class="form-input" type="number" name="ClassBan" min="1" max="20" value="@item.ClassBan" />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">학교</label>
+                                    <input class="form-input" type="text" name="School" value="@item.School" placeholder="학교명 (선택)" />
+                                </div>
+                                <div class="form-item form-item-full">
+                                    <label class="form-label">출석 유형</label>
+                                    <div class="radio-group">
+                                        <label class="radio-label">
+                                            <input type="radio" name="IsVoluntary" value="true" @(item.IsVoluntary ? "checked" : "") onchange="toggleModalEv(this)" />
+                                            <span class="radio-chip">자진 출석</span>
+                                        </label>
+                                        <label class="radio-label">
+                                            <input type="radio" name="IsVoluntary" value="false" @(!item.IsVoluntary ? "checked" : "") onchange="toggleModalEv(this)" />
+                                            <span class="radio-chip">전도로 출석</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-item form-item-full" id="modalEvField" style="@(!item.IsVoluntary ? "" : "display:none;")">
+                                    <label class="form-label">전도자 이름</label>
+                                    <input class="form-input" type="text" name="EvangelistName" value="@item.EvangelistName" placeholder="전도한 분의 이름" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-foot">
+                            <button type="button" class="cancel" onclick="closeEditModal()">취소</button>
+                            <button type="submit" class="save">저장</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+
+    <script>
+        function openEditModal() {
+            document.getElementById('editModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+        function toggleModalEv(radio) {
+            var f = document.getElementById('modalEvField');
+            if (f) f.style.display = radio.value === 'true' ? 'none' : '';
+        }
+    </script>
+</body>
+</html>

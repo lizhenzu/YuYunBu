@@ -1,0 +1,128 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.JuManNas
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 묵상 노트(상세) — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · 일반 사용자도 QT 홈에서 들어온다.  수정 · 이 달 영상 구간 버튼은 예전처럼 SuperAdmin 만
+    · 영상 구간(URL ~ URL5)은 번호 줄 → 누르면 화면 안 영상 창, 구간 끝에서 처음으로 돌아가 반복(예전 동작, body data-yt-loop)
+    · 본문 읽기(DailyMission/BibleSheet) 주소 · 돌아올 곳 정보는 예전 그대로.  아래 그림 아이콘 → 글자 버튼
+    · 이전 화면은 IndexByID.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    string dateLabel = $"{Model.ExposeDate.Year}년 {Model.ExposeDate.Month}월 {Model.ExposeDate.Day}일 {Model.WeekDayKor}요일";
+    string JanZulString = SharedComm.MakeBibleSerialJangZul(Model.BibleText, Model.FromJang, Model.FromZul, Model.ToJang, Model.ToZul);
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+
+    bool isSuper = await AuthService.IsSignedIn(User) && await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+
+    int Sec(int mm, int ss) => Math.Max(0, mm) * 60 + Math.Max(0, ss);
+    var segs = new List<(string Url, int S, int E, string Label, string Total)>();
+    void Add(string url, int smm, int sss, int emm, int ess, int tmm, int tss)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return;
+        int s = Sec(smm, sss), e = Sec(emm, ess);
+        if (e <= s) e = 0;
+        segs.Add((url, s, e, $"{smm}:{sss:D2} ~ {emm}:{ess:D2}", $"{tmm}:{tss:D2}"));
+    }
+    Add(Model.URL,  Model.YouTuBuStartMM,  Model.YouTuBuStartSS,  Model.YouTuBuEndMM,  Model.YouTuBuEndSS,  Model.TimeMM,  Model.TimeSS);
+    Add(Model.URL2, Model.YouTuBuStartMM2, Model.YouTuBuStartSS2, Model.YouTuBuEndMM2, Model.YouTuBuEndSS2, Model.TimeMM2, Model.TimeSS2);
+    Add(Model.URL3, Model.YouTuBuStartMM3, Model.YouTuBuStartSS3, Model.YouTuBuEndMM3, Model.YouTuBuEndSS3, Model.TimeMM3, Model.TimeSS3);
+    Add(Model.URL4, Model.YouTuBuStartMM4, Model.YouTuBuStartSS4, Model.YouTuBuEndMM4, Model.YouTuBuEndSS4, Model.TimeMM4, Model.TimeSS4);
+    Add(Model.URL5, Model.YouTuBuStartMM5, Model.YouTuBuStartSS5, Model.YouTuBuEndMM5, Model.YouTuBuEndSS5, Model.TimeMM5, Model.TimeSS5);
+
+    string refText = $"{Model.BibleText} {JanZulString}";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>묵상 노트</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body data-yt-loop="1">
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>묵상 노트</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">매일성경 묵상 노트 · @dateLabel</div>
+    <h1 class="qb-h1">@(string.IsNullOrWhiteSpace(Model.BibleSubject) ? refText : Model.BibleSubject)</h1>
+
+    <div class="jm-scr">
+        <span class="t"><i>오늘의 말씀</i><b>@refText</b></span>
+        <a class="jm-scr-go" href="/DailyMission/BibleSheet?ControllerSource=@ControllerSource&ActionSource=@ActionSource&Id=@Model.Id">본문 읽기 ›</a>
+    </div>
+
+    @if (segs.Count > 0)
+    {
+        <div class="qb-sec">영상<small>누르면 그 구간만 재생</small></div>
+        @for (int i = 0; i < segs.Count; i++)
+        {
+            var sg = segs[i];
+            <button type="button" class="jm-vrow"
+                    data-yt-url="@sg.Url" data-start="@sg.S" data-end="@sg.E"
+                    data-title="@(segs.Count > 1 ? $"{refText} · 구간 {i + 1}" : refText)">
+                <span class="n">@((i + 1).ToString("00"))</span>
+                <span class="t"><b>@sg.Label</b><small>전체 길이 @sg.Total</small></span>
+                <span class="play"><svg width="14" height="14" viewBox="0 0 24 24" fill="#fff"><path d="M7 4l13 8-13 8z" /></svg></span>
+            </button>
+        }
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.Synopsis))
+    {
+        <div class="qb-sec">줄거리</div>
+        <div class="jm-para">@Model.Synopsis</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.BibleSummary))
+    {
+        <div class="qb-sec">말씀 요약</div>
+        <div class="jm-para">@Model.BibleSummary</div>
+    }
+
+    <div class="jm-nav">
+        @if (isSuper)
+        {
+            <a class="jm-pill" href="/JuManNa/IndexGroupByYYYYMM">목록</a>
+        }
+        <a class="jm-pill" href="/">@ConstatsCommon.ToHome</a>
+        <a class="jm-pill" href="/Question">퀴즈</a>
+        <a class="jm-pill" href="/Home/MissionMainBoard">미션</a>
+    </div>
+
+    @if (isSuper)
+    {
+        <div class="jm-adm">
+            <em>S</em>
+            <a class="jm-pill s" href="/JuManNa/ModifyJuManNa?Id=@Model.Id">수정</a>
+            <a class="jm-pill s" href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@Model.ExposeDate.ToString("yyyy-MM")">이 달 영상 구간</a>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>묵상 노트</span>
+        <span><a href="#" onclick="history.back(); return false;">뒤로</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/jumanna-yt.js" asp-append-version="true"></script>
+</body>
+</html>

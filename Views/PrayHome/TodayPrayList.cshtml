@@ -1,0 +1,191 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model IEnumerable<BulletinBoard.Models.TodayPray>
+@{
+    Layout = null;
+
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="2025 여름성경캠프 준비 기도">
+    <meta property="og:description" content="매일매일 함께 기도해요">
+    <meta property="og:image" content="@ViewBag.FullURL/images/home/welcome/welcome_01.webp">
+    <meta property="og:url" content="@ViewBag.FullURL">
+    <meta property="og:type" content="website">
+
+    <style>
+        body {
+            background: #f0f4f8;
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        h3 {
+            text-align: center;
+            color: #2e7d32;
+            margin-bottom: 30px;
+        }
+
+        .card-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            padding: 24px;
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+            .card-header h2 {
+                margin: 5px 0;
+                color: #43a047;
+                font-size: 1.3em;
+            }
+
+            .card-header h3 {
+                margin: 5px 0;
+                color: #66bb6a;
+                font-size: 1em;
+            }
+
+        .card-body {
+            margin-top: 15px;
+            font-size: 1.05em;
+            line-height: 1.7;
+            color: #444;
+        }
+
+        .card-body1 {
+            margin-top: 15px;
+            font-size: 1.05em;
+            line-height: 1.7;
+            padding: 5px;
+            color: #006633;
+        }
+
+        .card-body p {
+            margin-bottom: 10px;
+        }
+
+        .card-footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        @@media (max-width: 600px) {
+            .card {
+                padding: 18px;
+            }
+
+            .card-header h2 {
+                font-size: 1.1em;
+            }
+        }
+    </style>
+
+    <style>
+        .preserve-text {
+            white-space: pre-wrap;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>2025년 여름성경캠프</h1>
+    <h3>준비 기도 목록</h3>
+    <div style="text-align: center; margin-bottom: 30px;">
+        <a href="/PrayHome/TodayPray" style="display: inline-block; background-color: #43a047; color: white; text-decoration: none; padding: 10px 20px; border-radius: 30px; font-size: 1em;">
+            🏠기도홈으로 가기
+        </a>
+    </div>
+    <div class="card-container">
+        <!-- 카드 1 -->
+        @{
+            var isSuperAdmin = await AuthService.IsSignedIn(User) &&
+            await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+        }
+
+        @foreach (var item in Model)
+        {
+            if (item.publishYN == "y" || isSuperAdmin)
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h4>기도일자 : @item.ExposeDate.ToString("yyyy년 MM월 dd일")</h4>
+                        <h2>주제 : @item.Subject</h2>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(item.BibleText))
+                    {
+                        <div class="card-body1">
+                            @item.BibleText <br />
+                            @item.BibleTextData
+                        </div>
+                    }
+
+                    <hr>
+
+                    <div class="card-body preserve-text">@item.PrayTEXTData<br /><br />
+                        예수님의 이름으로 기도드립니다. <br />아멘
+                    </div>
+
+                    @if (isSuperAdmin)
+                    {
+                        <div class="card-body" style="text-align: right;">
+                            수정일 : @item.updateDT
+                        </div>
+                        <br />
+                        <div style="text-align: right;">
+                            <a href="/PrayHome/ModifyPray?PrayID=@item.PrayID"
+                               style="background-color: #81c784; color: white; padding: 6px 12px; border-radius: 20px; text-decoration: none; font-size: 0.9em;">
+                                ✏ 수정
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+        }
+
+
+    </div>
+    <br />
+    <div style="text-align: center; margin-bottom: 30px;">
+        <a href="/PrayHome/TodayPray" style="display: inline-block; background-color: #43a047; color: white; text-decoration: none; padding: 10px 20px; border-radius: 30px; font-size: 1em;">
+            🏠기도홈으로 가기
+        </a>
+    </div>
+</body>
+</html>

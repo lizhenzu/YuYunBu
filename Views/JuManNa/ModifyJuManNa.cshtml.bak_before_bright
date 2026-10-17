@@ -1,0 +1,271 @@
+﻿@model BulletinBoard.Models.JuManNa
+@using BulletinBoard.Common;
+@using BulletinBoard.Services.Abstract
+@using BulletinBoard.Enums
+@inject IAuthService AuthService
+
+@{
+    Layout = null;
+    string JanZulString = SharedComm.MakeBibleSerialJangZul(@Model.BibleText, @Model.FromJang, @Model.FromZul, @Model.ToJang, @Model.ToZul);
+
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>말씀 정보 입력</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f4f7f9;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        header {
+            background-color: #4caf50;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 10px auto;
+            padding: 25px;
+        }
+
+        label {
+            font-weight: 600;
+        }
+
+        .form-row {
+            margin-bottom: 15px;
+        }
+
+        .btn-group {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .form-group {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        .form-row {
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            width: 100%;
+        }
+
+        @@media (max-width: 480px) {
+            .form-inline .form-control {
+                width: 100%;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>매일성경 수정</h1>
+        <h5>@Model.BibleText @JanZulString</h5>
+        <h5>@SharedComm.GetTodayToStringKor(Model.ExposeDate)</h5>
+    </header>
+    <form asp-action="ProcessModifyJuManNa" method="post" class="verse-form">
+        <div class="container">
+
+            <div class="form-group">
+                <label asp-for="BibleSubject"></label>
+                <input asp-for="BibleSubject" class="form-control" autofocus />
+                <span asp-validation-for="BibleSubject" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="BibleSummary"></label>
+                <textarea id="BibleSummary" name="BibleSummary" asp-for="BibleSummary" class="form-control" rows="5" autofocus></textarea>
+                <span asp-validation-for="BibleSummary" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Synopsis"></label>
+                <textarea id="Synopsis" name="Synopsis" asp-for="Synopsis" class="form-control" rows="5" autofocus></textarea>
+                <span asp-validation-for="Synopsis" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-group">
+                <label asp-for="BibleText"></label>
+                <input asp-for="BibleText" class="form-control" autofocus />
+                <span asp-validation-for="BibleText" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 장/절</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="FromJang" class="form-control" autofocus placeholder="시작 장" />
+                        <input type="number" asp-for="FromZul" class="form-control" autofocus placeholder="시작 절" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 장/절</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="ToJang" class="form-control" autofocus placeholder="종료 장" />
+                        <input type="number" asp-for="ToZul" class="form-control" autofocus placeholder="종료 절" />
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="form-group">
+                <label asp-for="URL"></label>
+                <input asp-for="URL" class="form-control" autofocus disabled />
+                <span asp-validation-for="URL" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 시간(1)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuStartMM" class="form-control" autofocus placeholder="시작 분" />
+                        <input type="number" asp-for="YouTuBuStartSS" class="form-control" autofocus placeholder="시작 초" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 시간(1)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuEndMM" class="form-control" autofocus placeholder="종료 분" />
+                        <input type="number" asp-for="YouTuBuEndSS" class="form-control" autofocus placeholder="종료 초" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 시간(2)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuStartMM2" class="form-control" autofocus placeholder="시작 분" />
+                        <input type="number" asp-for="YouTuBuStartSS2" class="form-control" autofocus placeholder="시작 초" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 시간(2)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuEndMM2" class="form-control" autofocus placeholder="종료 분" />
+                        <input type="number" asp-for="YouTuBuEndSS2" class="form-control" autofocus placeholder="종료 초" />
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 시간(3)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuStartMM3" class="form-control" autofocus placeholder="시작 분" />
+                        <input type="number" asp-for="YouTuBuStartSS3" class="form-control" autofocus placeholder="시작 초" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 시간(3)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuEndMM3" class="form-control" autofocus placeholder="종료 분" />
+                        <input type="number" asp-for="YouTuBuEndSS3" class="form-control" autofocus placeholder="종료 초" />
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 시간(4)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuStartMM4" class="form-control" autofocus placeholder="시작 분" />
+                        <input type="number" asp-for="YouTuBuStartSS4" class="form-control" autofocus placeholder="시작 초" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 시간(4)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuEndMM4" class="form-control" autofocus placeholder="종료 분" />
+                        <input type="number" asp-for="YouTuBuEndSS4" class="form-control" autofocus placeholder="종료 초" />
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="form-row row mt-3">
+                <div class="col">
+                    <label>시작 시간(5)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuStartMM5" class="form-control" autofocus placeholder="시작 분" />
+                        <input type="number" asp-for="YouTuBuStartSS5" class="form-control" autofocus placeholder="시작 초" />
+                    </div>
+                </div>
+                <div class="col">
+                    <label>종료 시간(4)</label>
+                    <div class="form-inline d-flex gap-2">
+                        <input type="number" asp-for="YouTuBuEndMM5" class="form-control" autofocus placeholder="종료 분" />
+                        <input type="number" asp-for="YouTuBuEndSS5" class="form-control" autofocus placeholder="종료 초" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <input type="Hidden" id="Id" name="Id" class="form-control" value="@Model.Id" />
+            </div>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-success" onclick="save()">저장</button>
+                <button class="btn btn-secondary" onclick="goYTHome()">유투브</button>
+            </div>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-success" onclick="save()">저장</button>
+                <button class="btn btn-secondary" onclick="goHome()">홈</button>
+            </div>
+        </div>
+    </form>
+    <script>
+        function save() {
+            const data = {
+                bible: document.getElementById('bible').value,
+                chapter: document.getElementById('chapter').value,
+                url: document.getElementById('url').value,
+                maxTime: {
+                    min: document.getElementById('maxMinutes').value,
+                    sec: document.getElementById('maxSeconds').value,
+                },
+                start: {
+                    min: document.getElementById('startMin').value,
+                    sec: document.getElementById('startSec').value
+                },
+                end: {
+                    min: document.getElementById('endMin').value,
+                    sec: document.getElementById('endSec').value
+                }
+            };
+            console.log("저장할 데이터:", data);
+            alert("데이터가 저장되었습니다 (콘솔 확인)");
+        }
+           function goYTHome() {
+            window.location.href = "/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@Model.ExposeDate.ToString("yyyy-MM")";
+        }
+        function goHome() {
+            window.location.href = "/";
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,188 @@
+﻿@model IEnumerable<BulletinBoard.Models.eBibleBase>
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>성경노트</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Gowun Dodum', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            padding: 10px 10px;
+            background: linear-gradient(to bottom, #f0f4f8, #ffffff);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2d3a4b;
+            font-size: 2rem;
+            margin-bottom: 40px;
+        }
+
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.3s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-8px);
+            }
+
+        .verse {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #34495e;
+            margin-bottom: 10px;
+        }
+
+        .text {
+            font-size: 0.95rem;
+            color: #555;
+            margin-bottom: 14px;
+            line-height: 1.6;
+        }
+
+        .explanation {
+            background-color: #f1f9f5;
+            color: #2e7d32;
+            padding: 12px 16px;
+            border-left: 6px solid #81c784;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        @@media (max-width: 600px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        .footer-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 40px;
+        }
+
+            .footer-buttons button {
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 1rem;
+                cursor: pointer;
+                transition: background-color 0.2s ease;
+            }
+
+                .footer-buttons button:hover {
+                    background-color: #388e3c;
+                }
+
+    </style>
+    <style>
+
+        .card-actions {
+            display: flex;
+            justify-content: center;
+            margin-top: auto;
+            gap: 10px;
+        }
+
+        .delete-button {
+            background-color: #e57373;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease;
+        }
+
+            .delete-button:hover {
+                background-color: #ef5350;
+            }
+
+        .move-button {
+            background-color: #64b5f6;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background-color 0.2s ease;
+        }
+
+            .move-button:hover {
+                background-color: #42a5f5;
+            }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/css/card7.css">
+    <link rel="stylesheet" href="/css/ButtonBase7.css">
+    <link rel="stylesheet" href="/css/ColorBase7.css">
+</head>
+<body>
+    <h1>나의 @($"{@ConstatsCommon.BibleNote}") 목록</h1>
+    <div class="card-container">
+        @foreach (var item in Model)
+        {
+            string queryString = $"/DailyMission/BibleSheetJangByJang?ControllerSource={ControllerSource}&ActionSource={ActionSource}";
+            queryString = queryString + $"&BibleText={@item.BibleText}&FromJang={@item.Jang}&FromZul=0&ToJang={@item.Jang}&ToZul=0";
+
+
+            <div class="card">
+                <div class="verse">@item.BibleText @item.Jang:@item.zul</div>
+                <div class="text">@item.BibleData</div>
+                <div class="card-actions">
+                    <button class="move-button" onclick="location.href='/bibleCenter/bibleBookMarkDetail?VerseId=@item.Id'">📖 말씀카드</button>
+                    <button class="move-button" onclick="location.href='@queryString'">📖 성경책</button>
+                    <button class="delete-button" onclick="window.location.href='/bibleCenter/DeleteBookMark?VerseId=@item.Id'">🗑 삭제</button>
+                </div>
+            </div>
+        }
+    </div>
+    <br />
+    @await Html.PartialAsync("_PublishNavigationButton_Home_Old_New_Board")
+</body>
+</html>
+
+

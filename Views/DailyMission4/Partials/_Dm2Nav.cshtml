@@ -1,0 +1,57 @@
+﻿@* _Dm2Nav.cshtml — Bone 스킨 미션 내비 (B안)
+
+   · 칸은 언제나 4개다. 현재 화면도 빼지 않는다.
+     (빼면 화면마다 칸 수가 달라져서 버튼 위치가 흔들린다)
+   · 현재 화면은 위쪽 브라스 선으로만 표시한다.
+   · 홈 · 미션홈은 각 화면 맨 위의 작은 글씨로 올렸다. 여기엔 두지 않는다.
+   · 이 파셜은 .qz 안쪽 맨 끝에 둔다. (좌우로 꽉 차게 나오도록)
+*@
+@model BulletinBoard.Models.DailyMission2.DailyMission2DashboardVM
+@using System.Globalization
+
+@{
+    var d = Model.SelectedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var page = (ViewBag.DM2Page ?? "").ToString().ToLowerInvariant();
+
+    var lang = (ViewBag.Lang ?? "ko").ToString().ToLowerInvariant();
+    if (lang != "ko" && lang != "en" && lang != "al") { lang = "ko"; }
+
+    string U(string baseUrl)
+    {
+        var join = baseUrl.Contains("?") ? "&" : "?";
+        return $"{baseUrl}{join}date={d}&lang={lang}";
+    }
+
+    var items = new[]
+    {
+        new { Key = "word",   Label = "말씀", Url = U("/DailyMission4/Word"),   Done = Model.DayStatus?.WordDone   ?? false },
+        new { Key = "quiz",   Label = "퀴즈", Url = U("/DailyMission4/Quiz"),   Done = Model.DayStatus?.QuizDone   ?? false },
+        new { Key = "pray",   Label = "기도", Url = U("/DailyMission4/Pray"),   Done = Model.DayStatus?.PrayDone   ?? false },
+        new { Key = "recite", Label = "암송", Url = U("/DailyMission4/Recite"), Done = Model.DayStatus?.ReciteDone ?? false }
+    };
+}
+
+<style>
+    /* 밝은 흰색 화면(말씀 .wd · 퀴즈 .qd)의 아래 탭 — 흰 바탕, 현재 화면은 파란 윗줄, 끝낸 미션은 초록 글자 (2026-10-03) */
+    .qz.wd .qzNav, .qz.qd .qzNav, .qz.pd .qzNav, .qz.rd .qzNav { background: #FFFFFF; border-top: 1px solid #E5E7EB; }
+    .qz.wd .qzNav a, .qz.qd .qzNav a, .qz.pd .qzNav a, .qz.rd .qzNav a { border-right: 0; padding: 11px 2px 13px; color: #9CA3AF; }
+    .qz.wd .qzNavL, .qz.qd .qzNavL, .qz.pd .qzNavL, .qz.rd .qzNavL { font-size: 15px; font-weight: 800; letter-spacing: 0; }
+    .qz.wd .qzNavS, .qz.qd .qzNavS, .qz.pd .qzNavS, .qz.rd .qzNavS { font-size: 11.5px; font-weight: 600; letter-spacing: 0; margin-top: 3px; color: #C4C9D2; }
+    .qz.wd .qzNavS.done, .qz.qd .qzNavS.done, .qz.pd .qzNavS.done, .qz.rd .qzNavS.done { color: #6FBF8B; }
+    .qz.wd .qzNav a.dn .qzNavL, .qz.qd .qzNav a.dn .qzNavL, .qz.pd .qzNav a.dn .qzNavL, .qz.rd .qzNav a.dn .qzNavL { color: #16A34A; }
+    .qz.wd .qzNav a.on .qzNavL, .qz.qd .qzNav a.on .qzNavL, .qz.pd .qzNav a.on .qzNavL, .qz.rd .qzNav a.on .qzNavL { color: #111827; }
+    .qz.wd .qzNav a.on .qzNavS:not(.done), .qz.qd .qzNav a.on .qzNavS:not(.done), .qz.pd .qzNav a.on .qzNavS:not(.done), .qz.rd .qzNav a.on .qzNavS:not(.done) { color: #2F80ED; }
+    .qz.wd .qzNav a.on::before, .qz.qd .qzNav a.on::before, .qz.pd .qzNav a.on::before, .qz.rd .qzNav a.on::before { background: #2F80ED; }
+</style>
+<nav class="qzNav">
+    @foreach (var it in items)
+    {
+        var isNow = (page == it.Key);
+        var state = it.Done ? "✓ 완료" : (isNow ? "진행중" : "아직");
+
+        <a class="@(isNow ? "on" : "") @(it.Done ? "dn" : "")" href="@it.Url">
+            <span class="qzNavL">@it.Label</span>
+            <span class="qzNavS @(it.Done ? "done" : "")">@state</span>
+        </a>
+    }
+</nav>

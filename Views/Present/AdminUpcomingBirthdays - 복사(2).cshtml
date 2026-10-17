@@ -1,0 +1,1054 @@
+@model BulletinBoard.Models.UpcomingBirthdayListVM
+@{
+    Layout = null;
+    ViewData["Title"] = "관리자 - 다가오는 생일자";
+
+    var filter = (Context?.Request?.Query["filter"].ToString() ?? "unsentonly").Trim().ToLowerInvariant();
+    bool showSentOnly   = filter == "sentonly";
+    bool showUnsentOnly = filter == "unsentonly";
+    var withinDays = Model.WithinDays;
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #07090f;
+            --surface:   #0d1117;
+            --surface2:  #131924;
+            --surface3:  #192033;
+            --border:    rgba(148,163,184,.09);
+            --border2:   rgba(148,163,184,.17);
+            --text:      #dde4f0;
+            --text2:     rgba(221,228,240,.62);
+            --text3:     rgba(221,228,240,.38);
+
+            --c-today:   #f43f5e;
+            --c-urgent:  #fb923c;
+            --c-soon:    #60a5fa;
+            --c-normal:  #34d399;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ─── LAYOUT ─── */
+        .page {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 16px 80px;
+        }
+
+        /* ─── HERO ─── */
+        .hero {
+            padding: 40px 0 28px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            gap: 18px 24px;
+            align-items: start;
+        }
+
+        .hero-left { grid-column: 1; grid-row: 1; }
+
+        .hero-eyebrow {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-bottom: 10px;
+        }
+
+        .hero-title {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(28px, 4vw, 40px);
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -.03em;
+            line-height: 1.08;
+        }
+
+        .hero-title .accent {
+            background: linear-gradient(135deg, #f43f5e 10%, #fb923c 90%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-sub {
+            margin-top: 12px;
+            font-size: 13px;
+            color: var(--text2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .hero-sub strong { color: var(--text); font-weight: 700; }
+
+        .hero-dot {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: var(--border2);
+            flex-shrink: 0;
+        }
+
+        .hero-stats {
+            grid-column: 2;
+            grid-row: 1;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .stat-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 18px;
+            text-align: center;
+            min-width: 70px;
+        }
+
+        .stat-num {
+            font-family: 'Syne', sans-serif;
+            font-size: 30px;
+            font-weight: 800;
+            color: #fff;
+            line-height: 1;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            margin-top: 5px;
+        }
+
+        .hero-actions {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* ─── BUTTONS ─── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 15px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            border: 1px solid var(--border2);
+            cursor: pointer;
+            transition: all .15s ease;
+            white-space: nowrap;
+            background: var(--surface2);
+            color: var(--text2);
+        }
+
+        .btn:hover {
+            background: var(--surface3);
+            border-color: rgba(148,163,184,.28);
+            color: var(--text);
+        }
+
+        /* ─── FILTER BAR ─── */
+        .filter-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 18px;
+            margin-bottom: 26px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .f-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: .12em;
+        }
+
+        .f-input {
+            width: 110px;
+            padding: 8px 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 9px;
+            color: var(--text);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+            transition: border-color .15s;
+        }
+
+        .f-input:focus { border-color: rgba(96,165,250,.5); }
+
+        .f-apply {
+            padding: 8px 16px;
+            background: var(--c-soon);
+            color: #06213d;
+            border: none;
+            border-radius: 9px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+
+        .f-apply:hover { opacity: .82; }
+
+        .f-sep {
+            width: 1px;
+            height: 22px;
+            background: var(--border2);
+            flex-shrink: 0;
+        }
+
+        .f-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 9px 18px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: none;
+            border: 1px solid var(--border2);
+            color: var(--text2);
+            background: var(--surface2);
+            box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 2px 6px rgba(0,0,0,.25);
+            transition: all .15s;
+            white-space: nowrap;
+            letter-spacing: -.01em;
+        }
+
+        .f-toggle:hover {
+            background: var(--surface3);
+            border-color: rgba(148,163,184,.28);
+            color: var(--text);
+            box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 4px 10px rgba(0,0,0,.32);
+            transform: translateY(-1px);
+        }
+
+        .f-toggle:active { transform: translateY(0); box-shadow: none; }
+
+        .f-toggle.on.sent {
+            background: linear-gradient(135deg, rgba(52,211,153,.22), rgba(5,150,105,.18));
+            border-color: rgba(52,211,153,.45);
+            color: #6ee7b7;
+            box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 4px 14px rgba(52,211,153,.18);
+        }
+
+        .f-toggle.on.unsent {
+            background: linear-gradient(135deg, rgba(251,146,60,.20), rgba(234,88,12,.16));
+            border-color: rgba(251,146,60,.45);
+            color: #fdba74;
+            box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 4px 14px rgba(251,146,60,.18);
+        }
+
+        /* ─── CARDS GRID ─── */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        @@media (min-width: 700px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        @@media (min-width: 1060px) {
+            .grid { grid-template-columns: 1fr 1fr 1fr; }
+        }
+
+        /* ─── CARD ─── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: var(--border2);
+            box-shadow: 0 20px 48px rgba(0,0,0,.45);
+        }
+
+        /* urgency accent bar */
+        .card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            border-radius: 99px 0 0 99px;
+        }
+
+        .card[data-u="today"]::before  { background: var(--c-today); }
+        .card[data-u="urgent"]::before { background: var(--c-urgent); }
+        .card[data-u="soon"]::before   { background: var(--c-soon); }
+        .card[data-u="normal"]::before { background: var(--c-normal); }
+
+        .card.dimmed { opacity: .68; }
+        .card.dimmed:hover { opacity: 1; }
+
+        /* ─── CARD HEAD ─── */
+        .c-head {
+            padding: 16px 16px 12px 20px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .user-row {
+            display: flex;
+            gap: 11px;
+            align-items: flex-start;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 11px;
+            object-fit: cover;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            flex-shrink: 0;
+        }
+
+        .u-info { min-width: 0; }
+
+        .u-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .u-name em {
+            font-style: normal;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text3);
+            margin-left: 4px;
+        }
+
+        .u-sub {
+            font-size: 12px;
+            color: var(--text3);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 2px;
+        }
+
+        .u-phone {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 3px;
+        }
+
+        /* ─── D-DAY BADGE ─── */
+        .dday {
+            flex-shrink: 0;
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            border: 1px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1px;
+        }
+
+        .card[data-u="today"]  .dday { background: rgba(244,63,94,.11);  border-color: rgba(244,63,94,.28); }
+        .card[data-u="urgent"] .dday { background: rgba(251,146,60,.11); border-color: rgba(251,146,60,.28); }
+        .card[data-u="soon"]   .dday { background: rgba(96,165,250,.10); border-color: rgba(96,165,250,.26); }
+        .card[data-u="normal"] .dday { background: rgba(52,211,153,.09); border-color: rgba(52,211,153,.22); }
+
+        .dday-n {
+            /* font-family: 'Syne', sans-serif; */
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .card[data-u="today"]  .dday-n { color: var(--c-today); }
+        .card[data-u="urgent"] .dday-n { color: var(--c-urgent); }
+        .card[data-u="soon"]   .dday-n { color: var(--c-soon); }
+        .card[data-u="normal"] .dday-n { color: var(--c-normal); }
+
+        .dday-l {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--text3);
+        }
+
+        /* ─── STATUS PILLS ─── */
+        .status-row {
+            padding: 0 16px 12px 20px;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 4px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid;
+        }
+
+        .pill-picked   { background: rgba(167,139,250,.11); border-color: rgba(167,139,250,.28); color: #c4b5fd; }
+        .pill-unpicked { background: rgba(251,146,60,.10);  border-color: rgba(251,146,60,.26);  color: #fdba74; }
+        .pill-sent     { background: rgba(52,211,153,.10);  border-color: rgba(52,211,153,.24);  color: #6ee7b7; }
+        .pill-unsent   { background: rgba(251,146,60,.10);  border-color: rgba(251,146,60,.26);  color: #fdba74; }
+        .pill-birth    { background: rgba(148,163,184,.07); border-color: rgba(148,163,184,.14); color: #fdba74; }
+
+        /* ─── GIFT BLOCK ─── */
+        .gift-block {
+            margin: 0 16px 0 20px;
+            padding: 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 62px 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+
+        .gift-img {
+            width: 62px;
+            height: 62px;
+            border-radius: 10px;
+            object-fit: cover;
+            background: var(--surface3);
+            border: 1px solid var(--border2);
+            cursor: zoom-in;
+            transition: transform .15s, opacity .15s;
+            display: block;
+        }
+
+        .gift-img:hover { transform: scale(1.05); opacity: .9; }
+
+        .gift-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.3;
+        }
+
+        .gift-name-empty { color: var(--text3); font-style: italic; }
+
+        .gift-gid {
+            font-size: 11px;
+            color: var(--text3);
+            margin-left: 4px;
+        }
+
+        .gift-desc {
+            margin-top: 5px;
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.45;
+        }
+
+        .copy-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+        }
+
+        .copy-btn {
+            flex-shrink: 0;
+            padding: 2px 6px;
+            background: rgba(148,163,184,.08);
+            border: 1px solid rgba(148,163,184,.14);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text3);
+            transition: all .12s;
+            margin-top: 1px;
+        }
+
+        .copy-btn:hover { background: rgba(148,163,184,.18); color: var(--text2); }
+
+        .copy-src {
+            position: absolute;
+            left: -9999px;
+            top: -9999px;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+        }
+
+        .gift-type {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: rgba(148,163,184,.07);
+            border: 1px solid rgba(148,163,184,.12);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text3);
+        }
+
+        /* ─── CARD FOOTER ─── */
+        .c-foot {
+            padding: 12px 16px 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .foot-date {
+            font-size: 12px;
+            color: var(--text3);
+            line-height: 1.5;
+        }
+
+        .foot-date strong { color: var(--text2); font-weight: 700; }
+
+        .btn-send {
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            white-space: nowrap;
+            transition: opacity .15s, transform .1s;
+        }
+
+        .btn-send:hover  { opacity: .84; transform: translateY(-1px); }
+        .btn-send:active { transform: translateY(0); }
+        .btn-send:disabled { opacity: .32; cursor: not-allowed; transform: none; }
+
+        .btn-do   { background: linear-gradient(135deg, #34d399, #059669); color: #fff; }
+        .btn-undo { background: linear-gradient(135deg, #f43f5e, #be123c); color: #fff; }
+
+        .foot-hint {
+            width: 100%;
+            font-size: 11px;
+            color: var(--text3);
+        }
+
+        /* ─── EMPTY STATE ─── */
+        .empty {
+            grid-column: 1 / -1;
+            padding: 60px 24px;
+            text-align: center;
+            color: var(--text3);
+            font-size: 14px;
+        }
+
+        /* ─── IMAGE MODAL ─── */
+        .modal-bg {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.72);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 9999;
+        }
+
+        .modal-bg.open { display: flex; }
+
+        .modal-box {
+            width: min(840px, 100%);
+            background: var(--surface);
+            border: 1px solid var(--border2);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .modal-close {
+            padding: 6px 12px;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 9px;
+            color: var(--text2);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .12s;
+        }
+
+        .modal-close:hover { background: var(--surface3); color: var(--text); }
+
+        .modal-body { padding: 14px; }
+
+        .modal-img {
+            width: 100%;
+            max-height: 75vh;
+            object-fit: contain;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            display: block;
+        }
+
+        body.modal-lock { overflow: hidden; }
+
+        /* ─── TOAST ─── */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 26px;
+            transform: translateX(-50%) translateY(14px);
+            background: var(--surface3);
+            border: 1px solid var(--border2);
+            color: var(--text);
+            padding: 10px 20px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s, transform .2s;
+            z-index: 99999;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ─── DIVIDER ─── */
+        .divider {
+            width: 1px;
+            height: 22px;
+            background: var(--border2);
+            flex-shrink: 0;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @@media (max-width: 540px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+            .hero-stats {
+                grid-column: 1;
+                grid-row: 2;
+            }
+            .hero-actions {
+                grid-row: 3;
+            }
+        }
+
+        /* focus ring */
+        *:focus-visible {
+            outline: 2px solid rgba(96,165,250,.45);
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="page">
+
+    <!-- ═══════════════ HERO ═══════════════ -->
+    <header class="hero">
+        <div class="hero-left">
+            <div class="hero-eyebrow">Admin · Birthday Management</div>
+            <h1 class="hero-title">🎂 <span class="accent">생일자</span> 관리</h1>
+            <div class="hero-sub">
+                <span><strong>@Model.WithinDays</strong>일 이내 생일자</span>
+                <div class="hero-dot"></div>
+                <span>선물 / 발송 현황</span>
+                @if (showSentOnly)
+                {
+                    <div class="hero-dot"></div>
+                    <span style="color:#6ee7b7; font-weight:700;">처리완료만 보는 중</span>
+                }
+                else if (showUnsentOnly)
+                {
+                    <div class="hero-dot"></div>
+                    <span style="color:#fdba74; font-weight:700;">미처리만 보는 중</span>
+                }
+            </div>
+        </div>
+
+        <div class="hero-stats">
+            <div class="stat-card">
+                <div class="stat-num">@Model.WithinDays</div>
+                <div class="stat-lbl">일 이내</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num">@Model.TotalCount</div>
+                <div class="stat-lbl">총 인원</div>
+            </div>
+        </div>
+
+        <div class="hero-actions">
+            <a href="/Present/AdminUpcomingBirthdays" class="btn">📋 전체 선택현황</a>
+            <a href="/" class="btn">🏠 홈으로</a>
+        </div>
+    </header>
+
+    <!-- ═══════════════ FILTER BAR ═══════════════ -->
+    <form class="filter-bar" method="get" action="/Present/AdminUpcomingBirthdays">
+        <span class="f-label">기간</span>
+        <input type="number" name="withinDays" value="@Model.WithinDays" min="0" max="365" class="f-input" />
+        <input type="hidden" name="filter" value="@filter" />
+        <button type="submit" class="f-apply">적용</button>
+
+        <div class="divider"></div>
+
+        <span class="f-label">보기</span>
+        <a class="f-toggle sent @(showSentOnly ? "on" : "")"
+           href="/Present/AdminUpcomingBirthdays?withinDays=@withinDays&filter=sentOnly">
+            ✅ 처리완료
+        </a>
+        <a class="f-toggle unsent @(showUnsentOnly ? "on" : "")"
+           href="/Present/AdminUpcomingBirthdays?withinDays=@withinDays&filter=unsentOnly">
+            🚚 미처리
+        </a>
+    </form>
+
+    <!-- ═══════════════ CARDS ═══════════════ -->
+    @if (Model.Rows == null || Model.Rows.Count == 0)
+    {
+        <div class="empty">표시할 데이터가 없습니다.</div>
+    }
+    else
+    {
+ 
+            int loopCount = 0;
+            var rows = showSentOnly   ? Model.Rows.Where(x =>  x.IsSent).ToList()
+                     : showUnsentOnly ? Model.Rows.Where(x => !x.IsSent).ToList()
+                     : Model.Rows;
+      
+
+        <div class="grid">
+            @if (rows.Count == 0)
+            {
+                <div class="empty">현재 필터 조건에서 표시할 데이터가 없습니다.</div>
+            }
+            else
+            {
+                @foreach (var r in rows)
+                {
+                    var u        = r.User;
+                    var fullName = u?.FullName ?? "(사용자 정보 없음)";
+                    var userName = u?.UserName ?? (u?.UserId ?? "");
+                    var classInfo = u != null ? $"{u.ClassYear}학년 {u.ClassBan}반" : "";
+                    var avatar   = !string.IsNullOrWhiteSpace(u?.ProfilePicturePath) ? u.ProfilePicturePath : "/images/common/no-image.jpg";
+
+                    int bm = (u?.bMonth ?? 0);
+                    int bd = (u?.bDay ?? 0);
+                    var birthText = (bm >= 1 && bm <= 12 && bd >= 1 && bd <= 31) ? $"{bm}/{bd}" : "-";
+
+                    string urgency =
+                        r.DDay <= 0 ? "today"  :
+                        r.DDay <= 3 ? "urgent" :
+                        r.DDay <= 7 ? "soon"   : "normal";
+
+                    loopCount++;
+
+                    var giftSrc = (r.ProductId.HasValue && r.ProductId.Value > 0)
+                        ? $"/images/AwardItem/{r.ProductId.Value}.jpg"
+                        : "/images/common/no-image.jpg";
+
+                    bool canSend      = r.PickId.HasValue;
+                    bool isSent       = r.IsSent;
+                    bool nextVal      = !isSent;
+                    string btnText    = isSent ? "↩ 전달 취소" : "✅ 전달완료";
+                    string btnClass   = isSent ? "btn-undo"   : "btn-do";
+
+                    <article class="card @(isSent ? "dimmed" : "")" data-u="@urgency">
+
+                        <!-- HEAD -->
+                        <div class="c-head">
+                            <div class="user-row">
+                                <img class="avatar"
+                                     src="@avatar"
+                                     alt="profile"
+                                     onerror="this.onerror=null;this.src='/images/common/no-image.jpg';" />
+                                <div class="u-info">
+                                    <div class="u-name">
+                                        @loopCount. @fullName
+                                        <em>(@u?.RoleNM)</em>
+                                    </div>
+                                    <div class="u-sub">
+                                        @userName@(!string.IsNullOrWhiteSpace(classInfo) ? $" · {classInfo}" : "")
+                                    </div>
+                                    <div class="u-phone">@u?.PhoneNumber</div>
+                                </div>
+                            </div>
+
+                            <div class="dday" title="D-@r.DDay">
+                                <span class="dday-n">@r.DDay</span>
+                                <span class="dday-l">D-Day</span>
+                            </div>
+                        </div>
+
+                        <!-- STATUS PILLS -->
+                        <div class="status-row">
+                            <span class="pill @(r.HasPickedGift ? "pill-picked" : "pill-unpicked")">
+                                @(r.HasPickedGift ? "🎁 선택완료" : "🎁 미선택")
+                            </span>
+                            <span class="pill @(isSent ? "pill-sent" : "pill-unsent")">
+                                @(isSent ? "🚚 전달완료" : "🚚 전달안함")
+                            </span>
+                            <span class="pill pill-birth">📅 생일 : @birthText</span>
+                        </div>
+
+                        <!-- GIFT BLOCK -->
+                        <div class="gift-block">
+                            <img class="gift-img js-zoom"
+                                 src="@giftSrc"
+                                 alt="gift"
+                                 data-title="@((r.ProductName ?? "선물 미선택") + (r.ProductId.HasValue ? $" (#{r.ProductId})" : ""))"
+                                 onerror="this.onerror=null;this.src='/images/common/no-image.jpg';this.dataset.nozoom='1';" />
+
+                            <div>
+                                @if (!r.HasPickedGift)
+                                {
+                                    <div class="gift-name gift-name-empty">아직 선물을 고르지 않았어요</div>
+                                    <div class="gift-desc" style="opacity:.6;">생일자가 로그인해서 선물을 선택하면 표시됩니다.</div>
+                                }
+                                else
+                                {
+                                    <div class="gift-name">
+                                        @r.ProductName
+                                        @if (r.ProductId.HasValue)
+                                        {
+                                            <span class="gift-gid">#@r.ProductId</span>
+                                        }
+                                    </div>
+
+                                    if (!string.IsNullOrWhiteSpace(r.ProductDescription))
+                                    {
+                                        <div class="gift-desc copy-row">
+                                            <span>@r.ProductDescription</span>
+                                            <textarea class="copy-src" aria-hidden="true" tabindex="-1">@r.ProductDescription</textarea>
+                                            <button type="button" class="copy-btn" onclick="copyText(this)" title="복사">📋</button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="gift-desc" style="opacity:.5;">(설명 없음)</div>
+                                    }
+
+                                    if (!string.IsNullOrWhiteSpace(r.SourceType))
+                                    {
+                                        <div class="gift-type">🏷 @r.SourceType</div>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- FOOTER -->
+                        <div class="c-foot">
+                            <div class="foot-date">
+                                @* <strong>@r.NextBirthdayDate.ToString("yyyy-MM-dd")</strong> *@
+                                @if (r.SentAt.HasValue)
+                                {
+                                    <br /><span>처리일자 : @r.SentAt.Value.ToString("MM-dd HH:mm")</span>
+                                }
+                            </div>
+
+                            <form method="post" action="/Present/AdminBirthPickSetSent" style="margin:0;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="pickId"          value="@(r.PickId ?? 0)" />
+                                <input type="hidden" name="sent"            value="@(nextVal ? "true" : "false")" />
+                                <input type="hidden" name="withinDays"      value="@withinDays" />
+                                <input type="hidden" name="filter"          value="@filter" />
+                                <input type="hidden" name="q"               value="" />
+                                <input type="hidden" name="includeInactive" value="false" />
+
+                                <button type="submit"
+                                        class="btn-send @btnClass"
+                                        @(!canSend ? "disabled" : "")>
+                                    @btnText
+                                </button>
+                            </form>
+
+                            @if (!canSend)
+                            {
+                                <div class="foot-hint">※ 선물 미선택자는 처리할 수 없습니다.</div>
+                            }
+                        </div>
+
+                    </article>
+                }
+            }
+        </div>
+    }
+
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<!-- Image Modal -->
+<div id="imgModal" class="modal-bg" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="imgModalTitle">
+        <div class="modal-head">
+            <div id="imgModalTitle" class="modal-title">이미지</div>
+            <button type="button" class="modal-close" id="imgModalClose">✕ 닫기</button>
+        </div>
+        <div class="modal-body">
+            <img id="imgModalImg" class="modal-img" src="" alt="확대 이미지" />
+        </div>
+    </div>
+</div>
+
+<script>
+    /* ─── Toast ─── */
+    let __tt = null;
+    function showToast(msg) {
+        const t = document.getElementById("toast");
+        if (!t) return;
+        t.textContent = msg || "복사되었습니다";
+        t.classList.add("show");
+        clearTimeout(__tt);
+        __tt = setTimeout(() => t.classList.remove("show"), 1400);
+    }
+
+    /* ─── Copy ─── */
+    async function copyText(btn) {
+        try {
+            const row  = btn.closest(".copy-row");
+            const ta   = row?.querySelector(".copy-src");
+            const text = ta?.value ?? "";
+            if (!text) return;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                ta.focus(); ta.select();
+                document.execCommand("copy");
+            }
+            const old = btn.textContent;
+            btn.textContent = "✔";
+            setTimeout(() => btn.textContent = old, 900);
+            showToast("복사되었습니다");
+        } catch (e) {
+            alert("복사에 실패했습니다.");
+        }
+    }
+
+    /* ─── Image Modal ─── */
+    (function () {
+        const modal     = document.getElementById('imgModal');
+        const modalImg  = document.getElementById('imgModalImg');
+        const modalTitle = document.getElementById('imgModalTitle');
+        const closeBtn  = document.getElementById('imgModalClose');
+
+        function open(src, title) {
+            modalImg.src = src;
+            modalTitle.textContent = title || '이미지';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('modal-lock');
+            closeBtn.focus();
+        }
+
+        function close() {
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('modal-lock');
+            modalImg.src = '';
+        }
+
+        document.addEventListener('click', function (e) {
+            const img = e.target.closest('.js-zoom');
+            if (!img || img.dataset?.nozoom === '1') return;
+            const src = img.getAttribute('src') || '';
+            if (!src || src.includes('/images/common/no-image.jpg')) return;
+            open(src, img.dataset?.title || img.getAttribute('alt') || '이미지');
+        });
+
+        closeBtn.addEventListener('click', close);
+        modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && modal.classList.contains('open')) close();
+        });
+    })();
+</script>
+
+</body>
+</html>

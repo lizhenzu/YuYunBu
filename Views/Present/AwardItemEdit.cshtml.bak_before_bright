@@ -1,0 +1,472 @@
+﻿@using BulletinBoard.Common
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers
+@using Microsoft.AspNetCore.Http
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@using BulletinBoard.Models.Presents
+@model AwardItemEditVM
+
+@{
+    Layout = "_Layout_Mission2_New";
+
+    var isCreate = Model.ProductID <= 0;
+    ViewData["Title"] = isCreate ? "상품 등록" : "상품 수정";
+
+    var imgUrl = Model.ProductID > 0
+        ? $"/images/AwardItem/{Model.ProductID}.jpg?v={DateHelper.GetKoreaNow().Ticks}"
+        : "/images/common/no-image.jpg";
+}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css" />
+
+<style>
+    .wrap {
+        max-width: 980px;
+        margin: 22px auto;
+        padding: 0 16px;
+    }
+
+    .card {
+        background: #fff;
+        border: 1px solid rgba(2,6,23,.08);
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(0,0,0,.06);
+        overflow: hidden;
+    }
+
+    .head {
+        padding: 16px 18px;
+        border-bottom: 1px solid rgba(2,6,23,.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .title {
+        font-weight: 900;
+        font-size: 18px;
+    }
+
+    .body {
+        padding: 18px;
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 16px;
+    }
+
+    @@media(max-width:900px) {
+        .body {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .thumb {
+        width: 100%;
+        aspect-ratio: 1/1;
+        border-radius: 14px;
+        border: 1px solid rgba(2,6,23,.10);
+        overflow: hidden;
+        background: #f6f7fb;
+    }
+
+        .thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+    .row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+    }
+
+    @@media(max-width:520px) {
+        .row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .lbl {
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .inp, textarea, select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid rgba(2,6,23,.14);
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    textarea {
+        min-height: 92px;
+        resize: vertical;
+    }
+
+    .btns {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+    }
+
+    .btn {
+        border: 0;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-weight: 900;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: #2563eb;
+        color: #fff;
+    }
+
+    .btn-ghost {
+        background: #f3f4f6;
+        color: #111827;
+    }
+
+    .hint {
+        color: #6b7280;
+        font-size: 13px;
+        margin-top: 6px;
+        line-height: 1.45;
+    }
+
+    .chk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .err {
+        color: #b91c1c;
+        font-weight: 800;
+        margin-top: 8px;
+    }
+
+    .fieldErr {
+        color: #b91c1c;
+        font-weight: 800;
+        font-size: 13px;
+        margin-top: 6px;
+    }
+
+    .modal-back {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 9999;
+    }
+
+    .modal {
+        background: #fff;
+        border-radius: 16px;
+        width: min(980px,100%);
+        overflow: hidden;
+    }
+
+    .modalHead {
+        padding: 12px 14px;
+        border-bottom: 1px solid rgba(2,6,23,.08);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modalBody {
+        padding: 14px;
+    }
+
+    .cropStage {
+        width: 100%;
+        max-height: 70vh;
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid rgba(2,6,23,.10);
+        background: #0b1220;
+    }
+
+        .cropStage img {
+            display: block;
+            max-width: 100%;
+        }
+
+    .warn {
+        background: #fff7ed;
+        border: 1px solid rgba(251,146,60,.35);
+        color: #7c2d12;
+        padding: 10px 12px;
+        border-radius: 12px;
+        font-weight: 900;
+    }
+</style>
+
+<div class="wrap">
+    <div class="card">
+        <div class="head">
+            <div class="title">@ViewData["Title"]</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <a class="btn btn-ghost" href="/">🏠 홈으로</a>
+                <a class="btn btn-ghost" href="/Present/AwardItemAdmin">↩ 목록으로</a>
+            </div>
+        </div>
+
+        <form id="mainForm"
+              method="post"
+              enctype="multipart/form-data"
+              action="@(isCreate ? Url.Action("AwardItemCreate","Present") : Url.Action("AwardItemEdit","Present"))">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="ProductID" />
+
+            <input type="hidden" id="CroppedBase64" name="CroppedBase64" value="" />
+            <input asp-for="ImageFile" type="file" style="display:none;" />
+
+            <div class="body">
+                <div>
+                    <div class="thumb">
+                        <img id="previewImg"
+                             src="@imgUrl"
+                             alt="미리보기"
+                             onerror="this.onerror=null; this.src='/images/common/no-image.jpg';" />
+                    </div>
+
+                    <div style="margin-top:12px;">
+                        <input id="fileInput" type="file" accept="image/*" class="inp" />
+
+                        <div class="hint">
+                            사진을 선택하면 정사각형(1:1)으로 영역을 지정해 Crop 후 저장됩니다.<br />
+                            저장 파일명은 <b>ProductID.jpg</b> 입니다.
+                        </div>
+
+                        @if (isCreate)
+                        {
+                            <div class="hint warn" style="margin-top:10px;">
+                                ⚠ 등록은 이미지가 필수입니다. (사진 선택 → Crop 적용 후 저장)
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <div class="row">
+                        <div class="lbl">상품명</div>
+                        <div>
+                            <input class="inp" asp-for="ProductName" />
+                            <span asp-validation-for="ProductName" class="fieldErr"></span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="lbl">상품설명</div>
+                        <div>
+                            <textarea asp-for="ProductDescription"></textarea>
+                            <span asp-validation-for="ProductDescription" class="fieldErr"></span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="lbl">가격</div>
+                        <div>
+                            <input class="inp" asp-for="UnitPrice" type="number" min="0" />
+                            <span asp-validation-for="UnitPrice" class="fieldErr"></span>
+                        </div>
+                    </div>
+
+                    <!-- ✅ SourceType: 카카오/쿠팡 드롭다운 -->
+                    <div class="row">
+                        <div class="lbl">SourceType</div>
+                        <div>
+                            <select class="inp" asp-for="SourceType">
+                                <option value="카카오">카카오</option>
+                                <option value="쿠팡">쿠팡</option>
+                            </select>
+                            <span asp-validation-for="SourceType" class="fieldErr"></span>
+                            <div class="hint">SourceType는 <b>카카오/쿠팡</b>만 선택할 수 있습니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="lbl">URL</div>
+                        <div>
+                            <input class="inp" asp-for="ExternalUrl" type="url" placeholder="https://www.coupang.com/..." />
+                            <span asp-validation-for="ExternalUrl" class="fieldErr"></span>
+                            <div class="hint">쿠팡 등 외부 링크 URL (선택 입력)</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="lbl">숨김</div>
+                        <label class="chk">
+                            <input asp-for="IsHidden" type="checkbox" />
+                            <span>일반 유저에게 숨김</span>
+                        </label>
+                    </div>
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="err">
+                            @foreach (var e in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                            {
+                                <div>@e.ErrorMessage</div>
+                            }
+                        </div>
+                    }
+
+                    <div class="btns">
+                        <button id="btnSubmit" type="submit" class="btn btn-primary">💾 저장</button>
+                        <a class="btn btn-ghost" href="/Present/AwardItemAdmin">취소</a>
+                    </div>
+
+                    <div class="hint" style="margin-top:10px;">
+                        ✅ 수정 화면에서는 이미지를 바꾸지 않아도 저장됩니다.<br />
+                        ✅ 이미지를 바꾸려면 새 사진 선택 → Crop 적용 후 저장하세요.
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="modal-back" id="cropModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modalHead">
+            <b>이미지 정사각 Crop</b>
+            <button type="button" class="btn btn-ghost" id="btnCloseCrop">닫기</button>
+        </div>
+        <div class="modalBody">
+            <div class="cropStage">
+                <img id="cropImg" alt="crop source" />
+            </div>
+
+            <div class="btns" style="margin-top:12px;">
+                <button type="button" class="btn btn-primary" id="btnApplyCrop">✅ Crop 적용</button>
+                <button type="button" class="btn btn-ghost" id="btnCancelCrop">취소</button>
+            </div>
+            <div class="hint">정사각형(1:1)로만 선택됩니다.</div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
+<script>
+    (function () {
+        let cropper = null;
+
+        const isCreate = @(isCreate.ToString().ToLower());
+        const fileInput = document.getElementById("fileInput");
+        const cropModal = document.getElementById("cropModal");
+        const cropImg = document.getElementById("cropImg");
+        const previewImg = document.getElementById("previewImg");
+        const croppedBase64 = document.getElementById("CroppedBase64");
+        const mainForm = document.getElementById("mainForm");
+
+        function openModal() {
+            cropModal.style.display = "flex";
+            cropModal.setAttribute("aria-hidden", "false");
+            document.body.style.overflow = "hidden";
+        }
+
+        function closeModal() {
+            cropModal.style.display = "none";
+            cropModal.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "";
+
+            if (cropper) { cropper.destroy(); cropper = null; }
+            cropImg.src = "";
+        }
+
+        function hasCroppedImage() {
+            return !!(croppedBase64.value && croppedBase64.value.length > 50);
+        }
+
+        mainForm.addEventListener("submit", (e) => {
+            if (isCreate && !hasCroppedImage()) {
+                e.preventDefault();
+                alert("등록은 이미지가 필수입니다. 사진 선택 후 Crop 적용을 해주세요.");
+                return false;
+            }
+        });
+
+        fileInput.addEventListener("change", (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (!f) return;
+
+            if (!f.type || f.type.indexOf("image/") !== 0) {
+                alert("이미지 파일만 선택해 주세요.");
+                fileInput.value = "";
+                return;
+            }
+
+            croppedBase64.value = "";
+
+            const url = URL.createObjectURL(f);
+            cropImg.src = url;
+
+            openModal();
+
+            cropImg.onload = () => {
+                if (cropper) cropper.destroy();
+                cropper = new Cropper(cropImg, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    dragMode: "move",
+                    autoCropArea: 1,
+                    background: false,
+                    movable: true,
+                    zoomable: true,
+                    rotatable: false,
+                    scalable: false,
+                });
+            };
+        });
+
+        document.getElementById("btnCloseCrop").addEventListener("click", closeModal);
+        document.getElementById("btnCancelCrop").addEventListener("click", closeModal);
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && cropModal.style.display === "flex") closeModal();
+        });
+
+        cropModal.addEventListener("click", (e) => {
+            if (e.target === cropModal) closeModal();
+        });
+
+        document.getElementById("btnApplyCrop").addEventListener("click", () => {
+            if (!cropper) return;
+
+            const canvas = cropper.getCroppedCanvas({
+                width: 800,
+                height: 800,
+                imageSmoothingQuality: "high"
+            });
+
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+            previewImg.src = dataUrl;
+            croppedBase64.value = dataUrl;
+
+            closeModal();
+        });
+    })();
+</script>

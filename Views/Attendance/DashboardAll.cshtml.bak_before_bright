@@ -1,0 +1,797 @@
+﻿@model BulletinBoard.ViewModels.Attendance.AttendanceAllClassesDashboardVM
+@{
+    Layout = null;
+    var dateStr = Model.Date.ToString("yyyy-MM-dd");
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>전체 반 출석 대시보드</title>
+
+    <style>
+        :root {
+            --bg: #f6fbf8;
+            --card: #fff;
+            --ink: #123029;
+            --muted: #5a6b66;
+            --line: #dfeee8;
+            --primary: #1F6F5B;
+            --shadow: 0 10px 30px rgba(18,48,41,.08);
+            --radius: 18px;
+            --danger: #c62828;
+            --dangerBg: rgba(198,40,40,.10);
+            --warn: #ef6c00;
+            --warnBg: rgba(239,108,0,.10);
+            --good: #1b8a5a;
+            --goodBg: rgba(27,138,90,.10);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",Arial,sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        .wrap {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 16px 14px 70px;
+        }
+
+        .topbar {
+            top: 0;
+            z-index: 20;
+            background: rgba(246,251,248,.92);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(223,238,232,.9);
+        }
+
+            .topbar .wrap {
+                padding-bottom: 12px;
+            }
+
+        .head {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            letter-spacing: -.3px;
+        }
+
+        .sub {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .ctl {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 10px 10px;
+            box-shadow: 0 6px 18px rgba(18,48,41,.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .ctl label {
+                font-size: 12px;
+                color: var(--muted);
+                white-space: nowrap;
+            }
+
+            .ctl input[type="date"], .ctl select {
+                border: 0;
+                outline: 0;
+                font-size: 14px;
+                background: transparent;
+                color: var(--ink);
+            }
+
+        .toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.75);
+            box-shadow: 0 6px 18px rgba(18,48,41,.05);
+            user-select: none;
+        }
+
+            .toggle .txt {
+                font-size: 13px;
+                color: var(--muted);
+                white-space: nowrap;
+            }
+
+        .switch {
+            width: 44px;
+            height: 26px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+            position: relative;
+            cursor: pointer;
+            flex: 0 0 auto;
+        }
+
+        .knob {
+            position: absolute;
+            top: 50%;
+            left: 3px;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary);
+            transition: left .15s ease, background .15s ease;
+        }
+
+        .toggle input {
+            display: none;
+        }
+
+            .toggle input:checked + .switch .knob {
+                left: 21px;
+                background: var(--danger);
+            }
+
+        .summary {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.75);
+            box-shadow: 0 6px 18px rgba(18,48,41,.05);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+            .pill strong {
+                color: var(--ink);
+            }
+
+        .search {
+            min-width: 240px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+
+            .search input {
+                width: 100%;
+                border: 0;
+                outline: 0;
+                font-size: 14px;
+                background: transparent;
+            }
+
+        .legend {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+            .legend .tag {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 7px 10px;
+                border-radius: 999px;
+                border: 1px solid var(--line);
+                background: #fff;
+            }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+            .dot.good {
+                background: var(--good);
+            }
+
+            .dot.warn {
+                background: var(--warn);
+            }
+
+            .dot.danger {
+                background: var(--danger);
+            }
+
+        .grid {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0,1fr));
+            gap: 10px;
+        }
+
+        @@media (max-width: 980px) {
+            .grid {
+                grid-template-columns: repeat(3, minmax(0,1fr));
+            }
+        }
+
+        @@media (max-width: 740px) {
+            .grid {
+                grid-template-columns: repeat(2, minmax(0,1fr));
+            }
+        }
+
+        @@media (max-width: 520px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 12px;
+            position: relative;
+            overflow: hidden;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 14px 40px rgba(18,48,41,.12);
+            }
+
+            .card:before {
+                content: "";
+                position: absolute;
+                inset: -2px -2px auto -2px;
+                height: 44px;
+                background: linear-gradient(90deg, rgba(31,111,91,.16), rgba(255,255,255,0));
+            }
+
+            /* ✅ NEW: 미체크 카드 시각 강조 */
+            .card.not-checked {
+                border-color: rgba(198,40,40,.38);
+                background: rgba(198,40,40,.045);
+            }
+
+                .card.not-checked:before {
+                    background: linear-gradient(90deg, rgba(198,40,40,.18), rgba(255,255,255,0));
+                }
+
+        .card-inner {
+            position: relative;
+        }
+
+        .topline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .title {
+            font-weight: 900;
+            letter-spacing: -.2px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--muted);
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+            .badge.danger {
+                border-color: rgba(198,40,40,.25);
+                background: var(--dangerBg);
+                color: var(--danger);
+                font-weight: 900;
+            }
+
+            .badge.warn {
+                border-color: rgba(239,108,0,.25);
+                background: var(--warnBg);
+                color: var(--warn);
+                font-weight: 900;
+            }
+
+            .badge.good {
+                border-color: rgba(27,138,90,.22);
+                background: var(--goodBg);
+                color: var(--good);
+                font-weight: 900;
+            }
+
+        .meta {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .rate {
+            margin-top: 10px;
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--primary);
+        }
+
+        .actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: #fff;
+            cursor: pointer;
+            font-weight: 800;
+            color: var(--ink);
+            text-decoration: none;
+            font-size: 12px;
+        }
+
+            .btn.primary {
+                background: var(--primary);
+                border-color: rgba(31,111,91,.35);
+                color: #fff;
+            }
+
+        .empty {
+            margin-top: 14px;
+            padding: 16px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            color: var(--muted);
+        }
+
+        .note {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        /* ✅ Q40-2(1차): 미체크 반 알림 */
+        .alert {
+            margin-top: 12px;
+            padding: 12px 12px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(198,40,40,.28);
+            background: rgba(198,40,40,.06);
+            box-shadow: 0 10px 30px rgba(18,48,41,.06);
+        }
+
+            .alert .row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .alert .left {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .alert .title {
+                font-weight: 1000;
+                color: var(--danger);
+            }
+
+            .alert .chips {
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+            }
+
+        .chip-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(198,40,40,.25);
+            background: #fff;
+            color: var(--danger);
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+            .chip-link:hover { filter: brightness(.98); }
+
+        .notchecked-section {
+            margin-top: 14px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+            .section-head h2 {
+                margin: 0;
+                font-size: 16px;
+                letter-spacing: -.2px;
+            }
+
+            .section-head .hint {
+                color: var(--muted);
+                font-size: 12px;
+            }
+
+        .notchecked-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        @@media (max-width: 740px) {
+            .notchecked-grid { grid-template-columns: 1fr; }
+        }
+
+        .nccard {
+            background: #fff;
+            border: 1px solid rgba(198,40,40,.22);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 12px;
+        }
+
+        .nccard .t {
+            font-weight: 1000;
+        }
+
+        .nccard .m {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 12px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <div class="wrap">
+            <div class="head">
+                <div>
+                    <h1>🏫 전체반 출석현황</h1>
+                    <p class="sub">@dateStr · 모든 반 출석률 카드</p>
+                </div>
+
+                <div class="controls">
+                    <div class="ctl" title="오늘 기준 '최근 주일'로 자동 계산됩니다">
+                        <label>기준</label>
+                        <div style="font-weight:900">@dateStr (주일)</div>
+                    </div>
+
+                    <div class="ctl" title="카드 정렬">
+                        <label>정렬</label>
+                        <select id="sortPick">
+                            <option value="notchecked_first">미체크 우선</option>
+                            <option value="rate_desc">출석률 높은 순</option>
+                            <option value="absent_desc">결석자 많은 순</option>
+                            <option value="total_desc">총원 많은 순</option>
+                            <option value="name_asc">반 이름(오름차순)</option>
+                        </select>
+                    </div>
+
+                    <label class="toggle" title="출석체크(출석 1명 이상)되지 않은 반만 표시">
+                        <span class="txt">미체크만</span>
+                        <input id="onlyNotChecked" type="checkbox" />
+                        <span class="switch"><span class="knob"></span></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="summary">
+                <span class="pill">반 <strong>@Model.TotalClasses</strong>개</span>
+                <span class="pill">총원 <strong>@Model.TotalStudents</strong>명</span>
+                <span class="pill">출석 <strong>@Model.TotalPresent</strong>명</span>
+                <span class="pill">전체 출석률 <strong>@Model.OverallRate %</strong></span>
+
+                @if (Model.MyClassYear.HasValue && Model.MyClassBan.HasValue)
+                {
+                    <a class="btn primary"
+                       href="/Attendance/Check?date=@dateStr&classYear=@Model.MyClassYear&classBan=@Model.MyClassBan">
+                        🧑‍🏫 내 반 출석체크로
+                    </a>
+                }
+
+                   <!-- ✅ 새로 추가 -->
+    <a class="btn"
+       href="/Attendance/AdminTrend3Weeks">
+        📈 최근 전체 출석현황(3주)
+    </a>
+
+    <a class="btn"
+       href="/">
+        🏠 홈으로
+    </a>
+     
+            </div>
+
+            <div class="legend">
+                <span class="tag"><span class="dot good"></span> 체크됨(출석 1명 이상)</span>
+                <span class="tag"><span class="dot danger"></span> 미체크(기록 0건)</span>
+            </div>
+
+            @* ✅ Q40-2(1차): 미체크 반 알림 (상단 배너) *@
+            @if (Model.NotCheckedCount > 0)
+            {
+                @* <div style="margin-top:12px;padding:12px 12px;border-radius:16px;border:1px solid rgba(198,40,40,.25);background:rgba(198,40,40,.07);box-shadow:0 10px 30px rgba(18,48,41,.06);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;">
+                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                        <div style="font-weight:900;color:#c62828;">⚠️ 오늘 출석 미체크 반: @Model.NotCheckedCount 개</div>
+                        <div style="color:var(--muted);font-size:12px;">(반 버튼을 누르면 바로 출석체크 화면으로 이동합니다)</div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        @foreach (var nc in Model.NotCheckedClasses)
+                        {
+                            <a class="btn" href="/Attendance/Check?classYear=@nc.ClassYear&classBan=@nc.ClassBan" title="담당: @nc.TeacherName">@nc.ClassName</a>
+                        }
+                    </div>
+                </div> *@
+            }
+
+     @*        <div class="note">
+                * 정렬/검색/토글은 화면에서 즉시 적용됩니다(서버 재조회 없음).
+            </div> *@
+        </div>
+    </div>
+
+    <div class="wrap">
+        @* ✅ Q40-2(1차): 미체크 반 카드 섹션 *@
+        @if (Model.NotCheckedCount > 0)
+        {
+@*             <section aria-label="미체크 반" style="margin-top:14px;">
+                <h2 style="margin:0 0 10px;font-size:15px;letter-spacing:-.2px;">⚠️ 오늘 출석 미체크 반</h2>
+                <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+                    @foreach (var nc in Model.NotCheckedClasses)
+                    {
+                        <article class="card not-checked" style="padding:12px;">
+                            <div class="topline">
+                                <div class="title">@nc.ClassName</div>
+                                <div class="badge danger">미체크</div>
+                            </div>
+                            <div class="meta">
+                                <span>담당 @nc.TeacherName</span>
+                                <span>출석 기록 0건</span>
+                            </div>
+                            <div class="actions">
+                                <a class="btn primary" href="/Attendance/Check?classYear=@nc.ClassYear&classBan=@nc.ClassBan">✅ 출석체크하러 가기</a>
+                            </div>
+                        </article>
+                    }
+                </div>
+                <div class="note">* 미체크 반은 “해당 주일에 출석 기록이 1건도 없는 반”입니다.</div>
+            </section> *@
+        }
+
+        @if (Model.Classes == null || Model.Classes.Count == 0)
+        {
+            <div class="empty">표시할 반이 없습니다. ClassInfo_2026 데이터를 확인해 주세요.</div>
+        }
+        else
+        {
+            <section class="grid" id="grid" aria-label="반 카드 목록">
+                @foreach (var c in Model.Classes)
+                {
+                    var isChecked = c.IsChecked;
+                    var checkedBadgeText = isChecked ? "체크됨" : "미체크";
+                    var checkedBadgeClass = isChecked ? "good" : "danger";
+                    var cardExtraClass = isChecked ? "" : "not-checked";
+
+                    <article class="card @cardExtraClass"
+                             data-name="@c.ClassName"
+                             data-rate="@(Convert.ToDouble(c.Rate))"
+                             data-absent="@c.AbsentCount"
+                             data-total="@c.TotalStudents"
+                             data-present="@c.PresentCount"
+                             data-checked="@(isChecked ? "1" : "0")">
+                        <div class="card-inner">
+                            <div class="topline">
+                                <div class="title">@c.ClassName</div>
+                                <div class="badge @checkedBadgeClass">@checkedBadgeText</div>
+                            </div>
+
+                            <div class="meta">
+                                <span>담당 @c.TeacherName</span>
+                                <span>총원 @c.TotalStudents</span>
+                                <span>출석 @c.PresentCount</span>
+                                <span>결석 @c.AbsentCount</span>
+                            </div>
+
+                            <div class="rate">@c.Rate %</div>
+
+                            <div class="actions">
+                                <a class="btn primary"
+                                   href="/Attendance/Check?date=@dateStr&classYear=@c.ClassYear&classBan=@c.ClassBan">✅ 출석체크</a>
+                                <a class="btn"
+                                   href="/Attendance/Dashboard?date=@dateStr&classYear=@c.ClassYear&classBan=@c.ClassBan">📊 반 대시보드</a>
+                            </div>
+                        </div>
+                    </article>
+                }
+            </section>
+        }
+    </div>
+
+    <script>
+        const datePick = document.getElementById('datePick');
+        const sortPick = document.getElementById('sortPick');
+        const q = document.getElementById('q');
+        const grid = document.getElementById('grid');
+        const onlyNotChecked = document.getElementById('onlyNotChecked');
+
+        datePick?.addEventListener('change', () => {
+            const d = datePick.value;
+            location.href = `/Attendance/DashboardAll?date=${encodeURIComponent(d)}`;
+        });
+
+        function normalizeText(s){ return (s || '').toString().toLowerCase().trim(); }
+
+        function getCards(){
+            if(!grid) return [];
+            return Array.from(grid.querySelectorAll('.card'));
+        }
+
+        function applySearch(){
+            const keyword = normalizeText(q?.value);
+            const cards = getCards();
+            cards.forEach(card => {
+                const name = normalizeText(card.dataset.name);
+                const ok = !keyword || name.includes(keyword);
+                card.dataset._searchOk = ok ? "1" : "0";
+            });
+        }
+
+        function applyFilterToggle(){
+            const cards = getCards();
+            const only = !!onlyNotChecked?.checked;
+
+            cards.forEach(card => {
+                const searchOk = (card.dataset._searchOk || "1") === "1";
+                const isChecked = (card.dataset.checked || "0") === "1";
+                const toggleOk = !only || !isChecked; // ✅ 미체크만
+                const show = searchOk && toggleOk;
+                card.style.display = show ? '' : 'none';
+            });
+        }
+
+        function applySort(){
+            if(!grid) return;
+
+            const cards = getCards();
+            const mode = sortPick?.value || 'notchecked_first';
+
+            const sorted = cards.sort((a,b) => {
+                const an = normalizeText(a.dataset.name);
+                const bn = normalizeText(b.dataset.name);
+
+                const ar = Number(a.dataset.rate || 0);
+                const br = Number(b.dataset.rate || 0);
+
+                const aa = Number(a.dataset.absent || 0);
+                const ba = Number(b.dataset.absent || 0);
+
+                const at = Number(a.dataset.total || 0);
+                const bt = Number(b.dataset.total || 0);
+
+                const ac = Number(a.dataset.checked || 0);
+                const bc = Number(b.dataset.checked || 0);
+
+                switch(mode){
+                    case 'notchecked_first':
+                        // ✅ 미체크(0) 우선
+                        if(ac !== bc) return ac - bc;
+                        // 그 다음 학년/반(이름 기반으로 정렬)
+                        return an.localeCompare(bn, 'ko');
+                    case 'rate_desc':
+                        if(br !== ar) return br - ar;
+                        if(bt !== at) return bt - at;
+                        return an.localeCompare(bn, 'ko');
+                    case 'absent_desc':
+                        if(ba !== aa) return ba - aa;
+                        if(ar !== br) return ar - br;
+                        return an.localeCompare(bn, 'ko');
+                    case 'total_desc':
+                        if(bt !== at) return bt - at;
+                        if(br !== ar) return br - ar;
+                        return an.localeCompare(bn, 'ko');
+                    case 'name_asc':
+                    default:
+                        return an.localeCompare(bn, 'ko');
+                }
+            });
+
+            const frag = document.createDocumentFragment();
+            sorted.forEach(c => frag.appendChild(c));
+            grid.appendChild(frag);
+        }
+
+        function applyAll(){
+            applySearch();
+            applyFilterToggle();
+            applySort();
+            applyFilterToggle();
+        }
+
+        q?.addEventListener('input', applyAll);
+        sortPick?.addEventListener('change', () => { applySort(); applyFilterToggle(); });
+        onlyNotChecked?.addEventListener('change', applyAll);
+
+        applyAll();
+    </script>
+</body>
+</html>

@@ -1,0 +1,553 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@model BulletinBoard.Services.Abstract.VBSParticipationSurveyAdminVM
+@{
+    Layout = null;
+    var viewMode = ((ViewBag.ViewMode as string) ?? "All").ToLowerInvariant();
+
+    DateTime[] days = Model.Days ?? new[] {
+    ConstatsCommon.VBSParticipationStartDate,
+    ConstatsCommon.VBSParticipationStartDate.AddDays(1),
+    ConstatsCommon.VBSParticipationStartDate.AddDays(2)
+    };
+    var hidePmDate = new DateTime(2026,3,1).Date;
+
+    string[] koDdd = { "일", "월", "화", "수", "목", "금", "토" };
+    string fmtDay(DateTime d) => $"{d.Month}/{d.Day} ({koDdd[(int)d.DayOfWeek]})";
+
+    bool? getSlot(VBSParticipationSurveyAdminRow r, DateTime d, string slot)
+        => r.Slots != null && r.Slots.TryGetValue((d.Date, slot), out var v) ? v : (bool?)null;
+
+    bool isExcluded(VBSParticipationSurveyAdminRow r)
+    {
+        var role   = (r.RoleCode ?? "").Trim().ToLowerInvariant();
+        var roleNm = (r.RoleNM   ?? "").Trim().ToLowerInvariant();
+        var name   = (r.FullName ?? "").Trim();
+        if (role   is "guest" or "admin" or "superadmin") return true;
+        if (roleNm is "guest" or "admin" or "superadmin") return true;
+        if (name == "관리자" || name == "구경하기") return true;
+        return false;
+    }
+
+    bool isStudent(VBSParticipationSurveyAdminRow r)
+        => (r.RoleCode ?? "").Trim().Equals("T1001", StringComparison.OrdinalIgnoreCase);
+
+    bool isResponded(VBSParticipationSurveyAdminRow r)
+    {
+        foreach (var d in days)
+        {
+            if (getSlot(r,d,"AM") != null) return true;
+            if (d.Date != hidePmDate && getSlot(r,d,"PM") != null) return true;
+        }
+        return false;
+    }
+
+    bool isFullAttend(VBSParticipationSurveyAdminRow r)
+    {
+        foreach (var d in days)
+        {
+            if (getSlot(r,d,"AM") != true) return false;
+            if (d.Date != hidePmDate && getSlot(r,d,"PM") != true) return false;
+        }
+        return true;
+    }
+
+    var allRows = (Model.Rows ?? new List<VBSParticipationSurveyAdminRow>())
+        .Where(r => r != null && !isExcluded(r)).ToList();
+
+    var studentRows = allRows.Where(r =>  isStudent(r)).ToList();
+    var staffRows   = allRows.Where(r => !isStudent(r)).ToList();
+
+    // view filter
+    var filteredRows = viewMode switch {
+        "student" => studentRows,
+        "teacher" => staffRows,
+        _         => allRows
+    };
+
+    int total       = filteredRows.Count;
+    int responded   = filteredRows.Count(r =>  isResponded(r));
+    int unresponded = total - responded;
+    int fullAttend  = filteredRows.Count(r =>  isFullAttend(r));
+    int partial     = filteredRows.Count(r => !isFullAttend(r) && isResponded(r));
+    int respondedPct = total <= 0 ? 0 : (int)Math.Round(responded * 100.0 / total);
+
+    int countAM(List<VBSParticipationSurveyAdminRow> rows, DateTime d)
+        => rows.Count(r => getSlot(r,d,"AM") == true);
+    int countPM(List<VBSParticipationSurveyAdminRow> rows, DateTime d)
+        => rows.Count(r => getSlot(r,d,"PM") == true);
+
+    var unrespondedList = filteredRows.Where(r => !isResponded(r))
+        .OrderBy(r => r.FullName).ToList();
+
+    string viewParam = viewMode switch { "student" => "Student", "teacher" => "Teacher", _ => "All" };
+
+    // Student-only stats
+    int stTotal    = studentRows.Count;
+    int stResp     = studentRows.Count(r => isResponded(r));
+    int stRespPct  = stTotal <= 0 ? 0 : (int)Math.Round(stResp * 100.0 / stTotal);
+    // Staff-only stats
+    int sfTotal    = staffRows.Count;
+    int sfResp     = staffRows.Count(r => isResponded(r));
+    int sfRespPct  = sfTotal <= 0 ? 0 : (int)Math.Round(sfResp * 100.0 / sfTotal);
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>성경학교 통계 대시보드</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --blue:  #2563eb; --blue2: #1d4ed8; --blue-lt: #eff6ff;
+            --grn:   #16a34a; --grn2:  #15803d; --grn-lt:  #f0fdf4;
+            --amber: #d97706; --amber-lt: #fffbeb;
+            --red:   #dc2626; --red-lt:   #fef2f2;
+            --ink:   #0f172a; --mut: #64748b;
+            --line:  rgba(15,23,42,.10); --line2: rgba(15,23,42,.06);
+            --card:  #ffffff;
+            --shadow: 0 8px 28px rgba(2,6,23,.09);
+            --shadow2: 0 16px 48px rgba(2,6,23,.13);
+        }
+        body {
+            min-height: 100vh;
+            background: linear-gradient(160deg,#dbeafe 0%,#dcfce7 40%,#f8fafc 100%);
+            font-family: system-ui,-apple-system,'Noto Sans KR',sans-serif;
+            color: var(--ink);
+        }
+        a { color: inherit; text-decoration: none; }
+        .wrap { max-width: 860px; margin: 0 auto; padding: 16px 14px 48px; }
+
+        /* ── 상단 바 ── */
+        .topbar { display:flex; align-items:center; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+        .back-btn {
+            display:flex; align-items:center; gap:5px;
+            padding:9px 16px; border-radius:50px;
+            background:rgba(255,255,255,.85); border:1px solid var(--line);
+            font-size:13px; font-weight:800; cursor:pointer; transition:transform .1s;
+        }
+        .back-btn:hover { transform:translateX(-2px); }
+        .topbar-title { font-size:16px; font-weight:950; flex:1; text-align:center; }
+        .topbar-right { display:flex; gap:8px; }
+        .topbar-btn {
+            padding:9px 16px; border-radius:50px;
+            background:rgba(255,255,255,.85); border:1px solid var(--line);
+            font-size:13px; font-weight:800; cursor:pointer; transition:all .1s;
+        }
+        .topbar-btn:hover { background:#fff; box-shadow:var(--shadow); }
+
+        /* ── 필터 탭 ── */
+        .tab-row { display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap; }
+        .tab-btn {
+            padding:9px 20px; border-radius:50px; border:1.5px solid var(--line);
+            background:rgba(255,255,255,.80); font-size:13px; font-weight:900;
+            cursor:pointer; transition:all .15s;
+        }
+        .tab-btn:hover { border-color:var(--blue); }
+        .tab-btn.active-all   { background:var(--blue);  color:#fff; border-color:var(--blue); }
+        .tab-btn.active-stu   { background:var(--blue);  color:#fff; border-color:var(--blue); }
+        .tab-btn.active-tea   { background:var(--grn);   color:#fff; border-color:var(--grn);  }
+
+        /* ── 갱신 표시 ── */
+        .refresh-bar {
+            display:flex; align-items:center; gap:8px; margin-bottom:18px;
+            padding:9px 14px; border-radius:12px;
+            background:rgba(255,255,255,.70); border:1px solid var(--line);
+            font-size:12px; font-weight:800; color:var(--mut);
+        }
+        .refresh-dot {
+            width:8px; height:8px; border-radius:50%;
+            background:var(--grn); animation:pulse 2s ease-in-out infinite;
+        }
+        @@keyframes pulse { 0%,100%{opacity:.4;transform:scale(.9)} 50%{opacity:1;transform:scale(1.2)} }
+
+        /* ── 요약 카드 그리드 ── */
+        .stat-grid {
+            display:grid; grid-template-columns:repeat(5,1fr); gap:12px;
+            margin-bottom:22px;
+        }
+        @@media (max-width:700px) { .stat-grid { grid-template-columns:repeat(3,1fr); } }
+        @@media (max-width:420px) { .stat-grid { grid-template-columns:repeat(2,1fr); } }
+
+        .stat-card {
+            background:var(--card); border-radius:18px; padding:16px 14px;
+            border:1.5px solid var(--line); box-shadow:var(--shadow);
+            text-align:center; transition:transform .12s;
+        }
+        .stat-card:hover { transform:translateY(-3px); box-shadow:var(--shadow2); }
+        .stat-icon  { font-size:22px; line-height:1; margin-bottom:8px; }
+        .stat-num   { font-size:26px; font-weight:950; line-height:1; }
+        .stat-label { font-size:11px; font-weight:800; color:var(--mut); margin-top:4px; }
+        .stat-card.c-blue  { border-color:rgba(37,99,235,.25); background:linear-gradient(160deg,#eff6ff,#fff); }
+        .stat-card.c-grn   { border-color:rgba(22,163,74,.25);  background:linear-gradient(160deg,#f0fdf4,#fff); }
+        .stat-card.c-amber { border-color:rgba(217,119,6,.25);  background:linear-gradient(160deg,#fffbeb,#fff); }
+        .stat-card.c-red   { border-color:rgba(220,38,38,.25);  background:linear-gradient(160deg,#fef2f2,#fff); }
+        .stat-num.blue  { color:var(--blue); }
+        .stat-num.grn   { color:var(--grn);  }
+        .stat-num.amber { color:var(--amber);}
+        .stat-num.red   { color:var(--red);  }
+
+        /* ── 응답률 프로그레스 ── */
+        .prog-section {
+            background:var(--card); border-radius:18px; padding:18px 20px;
+            border:1px solid var(--line); box-shadow:var(--shadow); margin-bottom:22px;
+        }
+        .prog-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .prog-title  { font-size:15px; font-weight:950; }
+        .prog-pct    { font-size:26px; font-weight:950; color:var(--blue); }
+        .prog-bar-wrap { height:14px; border-radius:999px; background:rgba(15,23,42,.08); overflow:hidden; margin-bottom:8px; }
+        .prog-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--blue),var(--grn)); transition:width .4s ease; }
+        .prog-sub { display:flex; justify-content:space-between; font-size:12px; font-weight:800; color:var(--mut); }
+
+        /* ── 구분 패널 (학생/교사) ── */
+        .split-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px; }
+        @@media (max-width:600px) { .split-grid { grid-template-columns:1fr; } }
+
+        .split-panel {
+            border-radius:18px; padding:16px;
+            border:1.5px solid var(--line); box-shadow:var(--shadow);
+        }
+        .split-panel.sp-blue { background:linear-gradient(160deg,#eff6ff,#fff); border-color:rgba(37,99,235,.22); }
+        .split-panel.sp-grn  { background:linear-gradient(160deg,#f0fdf4,#fff); border-color:rgba(22,163,74,.22);  }
+        .split-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+        .split-icon  { font-size:20px; }
+        .split-title { font-size:14px; font-weight:950; }
+        .split-nums  { display:flex; gap:10px; margin-bottom:10px; }
+        .sn-item     { flex:1; text-align:center; }
+        .sn-val      { font-size:20px; font-weight:950; line-height:1; }
+        .sn-lbl      { font-size:10px; font-weight:800; color:var(--mut); margin-top:3px; }
+        .sn-val.blue { color:var(--blue); }
+        .sn-val.grn  { color:var(--grn);  }
+        .sn-val.red  { color:var(--red);  }
+        .mini-bar-wrap { height:8px; border-radius:999px; background:rgba(15,23,42,.08); overflow:hidden; }
+        .mini-bar-fill { height:100%; border-radius:999px; transition:width .4s ease; }
+        .mb-blue { background:linear-gradient(90deg,var(--blue),#60a5fa); }
+        .mb-grn  { background:linear-gradient(90deg,var(--grn),#4ade80);  }
+
+        /* ── 날짜별 참석 현황 ── */
+        .day-section {
+            background:var(--card); border-radius:18px; padding:18px 20px;
+            border:1px solid var(--line); box-shadow:var(--shadow); margin-bottom:22px;
+        }
+        .section-title { font-size:15px; font-weight:950; margin-bottom:14px; }
+        .day-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+        @@media (max-width:500px) { .day-grid { grid-template-columns:1fr; } }
+
+        .day-card2 {
+            border-radius:14px; padding:14px;
+            border:1px solid var(--line); background:rgba(15,23,42,.02);
+        }
+        .day-date  { font-size:12.5px; font-weight:950; margin-bottom:10px; color:var(--mut); }
+        .day-slots { display:flex; flex-direction:column; gap:6px; }
+        .slot-row  { display:flex; align-items:center; justify-content:space-between; }
+        .slot-name { font-size:12px; font-weight:800; color:var(--mut); }
+        .slot-count { font-size:15px; font-weight:950; }
+        .slot-count.blue { color:var(--blue); }
+        .slot-bar-wrap { height:5px; border-radius:999px; background:rgba(15,23,42,.07); overflow:hidden; margin-top:3px; }
+        .slot-bar-fill { height:100%; border-radius:999px; background:var(--blue); transition:width .3s; }
+        .slot-no-pm { font-size:11px; color:var(--mut); font-weight:700; margin-top:4px; }
+
+        /* ── 미응답자 목록 ── */
+        .unresp-section {
+            background:var(--card); border-radius:18px; padding:18px 20px;
+            border:1.5px solid rgba(220,38,38,.18); box-shadow:var(--shadow);
+        }
+        .unresp-title { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+        .unresp-count-badge {
+            padding:3px 10px; border-radius:999px;
+            background:rgba(220,38,38,.10); color:var(--red);
+            font-size:12px; font-weight:950; border:1px solid rgba(220,38,38,.2);
+        }
+        .unresp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; }
+        .unresp-chip {
+            padding:8px 12px; border-radius:12px;
+            background:rgba(220,38,38,.06); border:1px solid rgba(220,38,38,.15);
+            font-size:13px; font-weight:900; color:#991b1b; text-align:center;
+        }
+        .unresp-empty {
+            padding:14px; border-radius:12px;
+            background:rgba(22,163,74,.08); border:1px solid rgba(22,163,74,.20);
+            font-size:14px; font-weight:900; color:var(--grn); text-align:center;
+        }
+        .unresp-role { font-size:10px; font-weight:700; color:var(--mut); margin-top:2px; }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+
+        <!-- 상단 바 -->
+        <div class="topbar">
+            <a class="back-btn" href="/VBSParticipationSurvey/Index">← 뒤로</a>
+            <div class="topbar-title">📊 성경학교 통계</div>
+            <div class="topbar-right">
+                <a class="topbar-btn" href="/VBSParticipationSurvey/Admin?view=All">⚙️ 직접 수정</a>
+                <a class="topbar-btn" href="/Home/Index">🏠 홈(메인)</a>
+                <a class="topbar-btn" href="/VBSParticipationSurvey/Index">🏠 홈(성경학교)</a>
+            </div>
+        </div>
+
+        <!-- 필터 탭 -->
+        <div class="tab-row">
+            <a class="tab-btn @(viewMode == "all" ? "active-all" : "")"
+               href="/VBSParticipationSurvey/Stats?view=All">전체</a>
+            <a class="tab-btn @(viewMode == "student" ? "active-stu" : "")"
+               href="/VBSParticipationSurvey/Stats?view=Student">🎒 학생</a>
+            <a class="tab-btn @(viewMode == "teacher" ? "active-tea" : "")"
+               href="/VBSParticipationSurvey/Stats?view=Teacher">👨‍🏫 교사/교역자</a>
+        </div>
+
+        <!-- 자동갱신 표시 -->
+        <div class="refresh-bar">
+            <div class="refresh-dot"></div>
+            <span>10초마다 자동 갱신 중 &nbsp;·&nbsp; 마지막 갱신: <b id="updatedAt">로드됨</b></span>
+        </div>
+
+        <!-- 요약 카드 -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-num" id="sTotal">@total</div>
+                <div class="stat-label">전체 인원</div>
+            </div>
+            <div class="stat-card c-blue">
+                <div class="stat-icon">✅</div>
+                <div class="stat-num blue" id="sResponded">@responded</div>
+                <div class="stat-label">응답 완료</div>
+            </div>
+            <div class="stat-card c-red">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-num red" id="sUnresponded">@unresponded</div>
+                <div class="stat-label">미응답</div>
+            </div>
+            <div class="stat-card c-grn">
+                <div class="stat-icon">🙌</div>
+                <div class="stat-num grn" id="sFullAttend">@fullAttend</div>
+                <div class="stat-label">전체 참여</div>
+            </div>
+            <div class="stat-card c-amber">
+                <div class="stat-icon">🔸</div>
+                <div class="stat-num amber" id="sPartial">@partial</div>
+                <div class="stat-label">부분 참여</div>
+            </div>
+        </div>
+
+        <!-- 응답률 프로그레스 -->
+        <div class="prog-section">
+            <div class="prog-header">
+                <div class="prog-title">📋 전체 응답률</div>
+                <div class="prog-pct"><span id="progPct">@respondedPct</span>%</div>
+            </div>
+            <div class="prog-bar-wrap">
+                <div class="prog-bar-fill" id="progBar" style="width:@respondedPct%"></div>
+            </div>
+            <div class="prog-sub">
+                <span>응답 <b id="progResp">@responded</b>명</span>
+                <span>미응답 <b id="progUnresp">@unresponded</b>명</span>
+                <span>전체 <b id="progTotal">@total</b>명</span>
+            </div>
+        </div>
+
+        <!-- 학생 / 교사 구분 패널 -->
+        @if (viewMode == "all")
+        {
+            <div class="split-grid">
+                <div class="split-panel sp-blue">
+                    <div class="split-head">
+                        <span class="split-icon">🎒</span>
+                        <span class="split-title">학생 참여자</span>
+                    </div>
+                    <div class="split-nums">
+                        <div class="sn-item">
+                            <div class="sn-val blue">@stTotal</div>
+                            <div class="sn-lbl">전체</div>
+                        </div>
+                        <div class="sn-item">
+                            <div class="sn-val blue">@stResp</div>
+                            <div class="sn-lbl">응답</div>
+                        </div>
+                        <div class="sn-item">
+                            <div class="sn-val red">@(stTotal - stResp)</div>
+                            <div class="sn-lbl">미응답</div>
+                        </div>
+                    </div>
+                    <div class="mini-bar-wrap">
+                        <div class="mini-bar-fill mb-blue" style="width:@stRespPct%"></div>
+                    </div>
+                    <div style="text-align:right;font-size:11px;font-weight:800;color:var(--mut);margin-top:4px;">
+                        응답률 @stRespPct%
+                    </div>
+                </div>
+
+                <div class="split-panel sp-grn">
+                    <div class="split-head">
+                        <span class="split-icon">👨‍🏫</span>
+                        <span class="split-title">교사 / 교역자</span>
+                    </div>
+                    <div class="split-nums">
+                        <div class="sn-item">
+                            <div class="sn-val grn">@sfTotal</div>
+                            <div class="sn-lbl">전체</div>
+                        </div>
+                        <div class="sn-item">
+                            <div class="sn-val grn">@sfResp</div>
+                            <div class="sn-lbl">응답</div>
+                        </div>
+                        <div class="sn-item">
+                            <div class="sn-val red">@(sfTotal - sfResp)</div>
+                            <div class="sn-lbl">미응답</div>
+                        </div>
+                    </div>
+                    <div class="mini-bar-wrap">
+                        <div class="mini-bar-fill mb-grn" style="width:@sfRespPct%"></div>
+                    </div>
+                    <div style="text-align:right;font-size:11px;font-weight:800;color:var(--mut);margin-top:4px;">
+                        응답률 @sfRespPct%
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- 날짜별 참석 현황 -->
+        <div class="day-section">
+            <div class="section-title">📅 날짜별 참석 인원</div>
+            <div class="day-grid">
+                @foreach (var d in days)
+                {
+                    int amCnt = countAM(filteredRows, d);
+                    int pmCnt = countPM(filteredRows, d);
+                    int amPct = total <= 0 ? 0 : (int)Math.Round(amCnt * 100.0 / total);
+                    int pmPct = total <= 0 ? 0 : (int)Math.Round(pmCnt * 100.0 / total);
+                    string dk  = d.ToString("yyyyMMdd");
+
+                    <div class="day-card2">
+                        <div class="day-date">📅 @fmtDay(d)</div>
+                        <div class="day-slots">
+                            <div>
+                                <div class="slot-row">
+                                    <span class="slot-name">☀️ 오전</span>
+                                    <span class="slot-count blue" id="am-@dk">@amCnt</span>
+                                </div>
+                                <div class="slot-bar-wrap">
+                                    <div class="slot-bar-fill" id="am-bar-@dk" style="width:@amPct%;background:var(--blue);"></div>
+                                </div>
+                            </div>
+                            @if (d.Date == hidePmDate)
+                            {
+                                <div class="slot-no-pm">* 3/1 오후는 집계 제외</div>
+                            }
+                            else
+                            {
+                                <div>
+                                    <div class="slot-row">
+                                        <span class="slot-name">🌙 오후</span>
+                                        <span class="slot-count blue" id="pm-@dk">@pmCnt</span>
+                                    </div>
+                                    <div class="slot-bar-wrap">
+                                        <div class="slot-bar-fill" id="pm-bar-@dk" style="width:@pmPct%;background:var(--grn);"></div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- 미응답자 목록 -->
+        <div class="unresp-section">
+            <div class="unresp-title">
+                <div class="section-title" style="margin:0;">⚠️ 미응답자 목록</div>
+                <div class="unresp-count-badge" id="unrespBadge">@unrespondedList.Count 명</div>
+            </div>
+
+            @if (unrespondedList.Count == 0)
+            {
+                <div class="unresp-empty">🎉 모든 분이 응답을 완료했습니다!</div>
+            }
+            else
+            {
+                <div class="unresp-grid" id="unrespGrid">
+                    @foreach (var r in unrespondedList)
+                    {
+                        var roleLabel = isStudent(r)
+                            ? (r.ClassYear.HasValue && r.ClassBan.HasValue ? $"{r.ClassYear}학년 {r.ClassBan}반" : "학생")
+                            : (string.IsNullOrWhiteSpace(r.RoleNM) ? "교사" : r.RoleNM);
+                        <div class="unresp-chip">
+                            <div>@r.FullName</div>
+                            <div class="unresp-role">@roleLabel</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+    </div>
+
+    <script>
+        const VIEW_PARAM = '@viewParam';
+        const TOTAL_INIT = @total;
+
+        function setText(id, v) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = (v ?? '').toString();
+        }
+
+        function setBar(id, pct) {
+            const el = document.getElementById(id);
+            if (el) el.style.width = (pct ?? 0) + '%';
+        }
+
+        async function refreshStats() {
+            try {
+                const url = `/VBSParticipationSurvey/AdminStats?view=${encodeURIComponent(VIEW_PARAM)}&t=${Date.now()}`;
+                const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+                const j = await r.json().catch(() => null);
+                if (!r.ok || !j || !j.ok) return;
+
+                const t = j.peopleTotal || 0;
+
+                setText('sTotal',      j.peopleTotal);
+                setText('sResponded',  j.respondedPeople);
+                setText('sUnresponded',j.unrespondedPeople);
+                setText('sFullAttend', j.fullAttendPeople);
+                setText('sPartial',    j.partialAttendPeople);
+
+                setText('progPct',   j.respondedPct);
+                setText('progResp',  j.respondedPeople);
+                setText('progUnresp',j.unrespondedPeople);
+                setText('progTotal', j.peopleTotal);
+                setBar('progBar', j.respondedPct);
+
+                setText('updatedAt', j.updatedAtText || '갱신됨');
+
+                // 날짜별
+                if (Array.isArray(j.dayCounts)) {
+                    j.dayCounts.forEach(dc => {
+                        const key = (dc.date || '').replaceAll('-', '');
+                        if (!key) return;
+                        const amPct = t > 0 ? Math.round((dc.am || 0) * 100 / t) : 0;
+                        const pmPct = t > 0 && dc.pm != null ? Math.round(dc.pm * 100 / t) : 0;
+                        setText(`am-${key}`, dc.am ?? 0);
+                        setBar(`am-bar-${key}`, amPct);
+                        if (dc.pm != null) {
+                            setText(`pm-${key}`, dc.pm);
+                            setBar(`pm-bar-${key}`, pmPct);
+                        }
+                    });
+                }
+            } catch (e) {
+                // 조용히 무시
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStats();
+            setInterval(refreshStats, 10000);
+        });
+    </script>
+</body>
+</html>

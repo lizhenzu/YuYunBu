@@ -1,0 +1,229 @@
+@using BulletinBoard.Common;
+@using System.Web
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@model BulletinBoard.Models.QuestionTypeDataObjects
+
+@*  ══════════════════════════════════════════════════════════════
+    퀴즈 만들기 (새로 · 퀴즈뱅크에서 수정해서) — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
+    · 폼 이름 · 검증 · 저장 주소(CreateQuestionProcess) · hidden 값 · "알려 드려요" 팝업(쿠키)은 예전 그대로
+    · 이전 화면은 CreateQuizByBank.cshtml.bak_before_bright
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+
+    TodayWordToReads todayWordToReads = ViewBag.TodayWordToReads as TodayWordToReads;
+    eBibles _eBibles = ViewBag._eBibles as eBibles;
+
+    // ⚠️ QuestionBackground 는 [Required] 다.
+    //    textarea 에 asp-for 를 붙이면 태그 헬퍼가 안쪽에 적어 둔 글자를 모델 값으로 갈아치운다.
+    //    모델 값이 비어 있으면 화면엔 빈 칸이 나오고, 등록을 눌러도 필수 검사에 걸려 저장되지 않는다.
+    //    그래서 기본값을 모델 쪽에 넣어 준다.
+    if (string.IsNullOrWhiteSpace(Model.QuestionBackground))
+    {
+        Model.QuestionBackground = "blank";
+    }
+
+    string qt = Model.QuestionType?.ToLower() ?? "";
+    string questionTypeLabel = qt switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
+    string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
+    var ed = Model.ExposeDate;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>퀴즈 만들기</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+
+<div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div>등록하는 중이에요<small>잠시만 기다려 주세요</small></div></div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/Index">퀴즈</a><span class="sep">›</span>문제 작성</span>
+        <span>QUIZ</span>
+    </div>
+
+    <div class="qb-k">WRITE · @questionTypeLabel · @ed.ToString("M월 d일") @(dayKor[(int)ed.DayOfWeek])요일</div>
+    <h1 class="qb-h1">문제 작성</h1>
+
+    @if (todayWordToReads != null)
+    {
+        <div class="qb-scr">
+            <i>오늘의 말씀</i>
+            <b>@todayWordToReads.BibleSubject</b>
+            <small>@todayWordToReads.BibleText @(todayWordToReads.FromJang)장 @(todayWordToReads.FromZul)절 ~ @(todayWordToReads.ToJang)장 @(todayWordToReads.ToZul)절</small>
+        </div>
+    }
+
+    <form asp-action="CreateQuestionProcess" method="post" onsubmit="return beforeSubmit(this);">
+        <div asp-validation-summary="ModelOnly"></div>
+
+        <div class="qb-f" style="display:none">
+            <label asp-for="@Model.QuestionBackground"></label>
+            <textarea class="qb-in" id="QuestionBackground" name="QuestionBackground" asp-for="QuestionBackground" rows="1"></textarea>
+            <span asp-validation-for="QuestionBackground" class="field-error"></span>
+        </div>
+
+        <div class="qb-f">
+            <label asp-for="@Model.QuestionQ">질문</label>
+            <textarea class="qb-in" id="QuestionQ" name="QuestionQ" asp-for="QuestionQ" rows="6" placeholder="질문을 입력하세요"></textarea>
+            <span asp-validation-for="QuestionQ" class="field-error"></span>
+        </div>
+
+        @if (qt == "o")
+        {
+            <div class="qb-f">
+                <label asp-for="@Model.Question1">보기 1</label>
+                <input type="text" class="qb-in" id="Question1" name="Question1" asp-for="Question1" placeholder="보기 1" />
+                <span asp-validation-for="Question1" class="field-error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question2">보기 2</label>
+                <input type="text" class="qb-in" id="Question2" name="Question2" asp-for="Question2" placeholder="보기 2" />
+                <span asp-validation-for="Question2" class="field-error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question3">보기 3</label>
+                <input type="text" class="qb-in" id="Question3" name="Question3" asp-for="Question3" placeholder="보기 3" />
+                <span asp-validation-for="Question3" class="field-error"></span>
+            </div>
+            <div class="qb-f">
+                <label asp-for="@Model.Question4">보기 4</label>
+                <input type="text" class="qb-in" id="Question4" name="Question4" asp-for="Question4" placeholder="보기 4" />
+                <span asp-validation-for="Question4" class="field-error"></span>
+            </div>
+            <div class="qb-f">
+                <span class="lbl">정답 선택</span>
+                <div class="qb-cho">
+                    <label><input type="radio" name="CorrectAnswer" value="1" id="ans1" asp-for="CorrectAnswer" /><span>1번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="2" id="ans2" asp-for="CorrectAnswer" /><span>2번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="3" id="ans3" asp-for="CorrectAnswer" /><span>3번</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="4" id="ans4" asp-for="CorrectAnswer" /><span>4번</span></label>
+                </div>
+                <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+            </div>
+        }
+        else if (qt == "a")
+        {
+            <div class="qb-f">
+                <span class="lbl">정답 선택</span>
+                <div class="qb-cho two">
+                    <label><input type="radio" name="CorrectAnswer" value="o" id="ansO" asp-for="CorrectAnswer" /><span>O</span></label>
+                    <label><input type="radio" name="CorrectAnswer" value="x" id="ansX" asp-for="CorrectAnswer" /><span>X</span></label>
+                </div>
+                <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+            </div>
+        }
+        else
+        {
+            <div class="qb-f">
+                <label asp-for="CorrectAnswer">정답</label>
+                <input type="text" class="qb-in" asp-for="CorrectAnswer" placeholder="정답을 입력하세요" />
+                <span asp-validation-for="CorrectAnswer" class="field-error"></span>
+            </div>
+        }
+
+        <div class="qb-f">
+            <label asp-for="@Model.AnswerGuide">힌트 · 해설</label>
+            <textarea class="qb-in" name="AnswerGuide" asp-for="AnswerGuide" rows="6" placeholder="힌트나 해설을 입력하세요"></textarea>
+            <span asp-validation-for="AnswerGuide" class="field-error"></span>
+        </div>
+
+        <button type="submit" class="qb-submit">퀴즈 등록</button>
+
+        <input type="hidden" name="QuestionType" value="@Model.QuestionType" />
+        <input type="hidden" name="ExposeDate" value="@Model.ExposeDate" />
+    </form>
+
+    <div class="qb-ft">
+        <span>퀴즈 출제</span>
+        <span><a href="/Question/Index">퀴즈 달력</a><a href="#" onclick="window.history.back(); return false;">뒤로</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<!-- 알려 드려요 (오늘 하루 · 7일간 안보기) -->
+<div class="qb-pop" id="popup-background">
+    <div class="box">
+        <h3>알려 드려요</h3>
+        <p>퀴즈뱅크에서 문제가 잘못 생성될 수 있어요.<br />잘못된 문제는 고민없이 바로 삭제해 주세요.</p>
+        <div class="bt">
+            <button type="button" onclick="handleCheckbox('hideToday', 1)">오늘 하루 안보기</button>
+            <button type="button" onclick="handleCheckbox('hide7Days', 7)">7일간 안보기</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+@await Html.PartialAsync("_ValidationScriptsPartial")
+<script src="/js/asyncProcesing.js"></script>
+<script src="/js/common2.js"></script>
+
+<script>
+    function createQuizById(id) {
+        location.href = "/Question/CreateQuizById?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    function createQuizByBank(id) {
+        location.href = "/Question/CreateQuizByBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+    }
+    async function deleteQuestion(id, QuestionQ) {
+        let result = await confirmMessage(true, ['퀴즈뱅크에서 아래 퀴즈를 삭제 할까요?', QuestionQ], null, '진행');
+        if (result === 'y') {
+            location.href = "/Question/DeleteQuestionBank?Id=" + id + "&WhenDate=@ViewBag.WhenDate";
+        }
+    }
+    function goBack() { window.history.back(); }
+    function redirectToPage(URL) { window.location.href = URL; }
+
+    // 검증이 통과했을 때만 대기 카드
+    function beforeSubmit(form) {
+        if (window.jQuery && jQuery.fn.valid && !jQuery(form).valid()) return false;
+        document.getElementById('loadingOverlay').classList.add('on');
+        return true;
+    }
+    window.addEventListener('pageshow', function () { document.getElementById('loadingOverlay').classList.remove('on'); });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const hideToday = getCookie('hideToday');
+        const hide7Days = getCookie('hide7Days');
+        if (!hideToday && !hide7Days) {
+            document.getElementById('popup-background').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+    });
+
+    function handleCheckbox(cookieName, days) {
+        setCookie(cookieName, 'true', days);
+        document.getElementById('popup-background').style.display = 'none';
+        document.body.style.overflow = 'auto';
+    }
+    function setCookie(name, value, days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = name + "=" + value + ";expires=" + date.toUTCString() + ";path=/";
+    }
+    function getCookie(name) {
+        const cname = name + "=";
+        const ca = decodeURIComponent(document.cookie).split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(cname) === 0) return c.substring(cname.length);
+        }
+        return "";
+    }
+</script>
+
+</body>
+</html>

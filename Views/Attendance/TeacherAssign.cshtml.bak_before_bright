@@ -1,0 +1,156 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@model BulletinBoard.ViewModels.Attendance.TeacherAssignVM
+@{
+    Layout = null; // ✅ 독립 페이지 — Bone 톤 (wwwroot/css/board-bone.css)
+    // 반 담당교사 배정 — 반당 1명 · TeacherCandidate_2026 에 있는 교사만 (저장 방식은 그대로: 반마다 폼 POST)
+    ViewData["AttTab"] = "more";
+    var msg = TempData["TeacherAssignMsg"] as string;
+
+    int classCount = Model.Classes.Count;
+    int assigned = Model.Classes.Count(c => c.AssignedTeacherPersonId.HasValue && c.AssignedTeacherPersonId.Value > 0);
+    int unassigned = classCount - assigned;
+    int students = Model.Classes.Sum(c => c.TotalStudents);
+
+    // 같은 이름 교사가 있으면 번호를 붙여 구분
+    var dupNames = Model.Teachers.GroupBy(t => t.FullName).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+    string TeacherLabel(BulletinBoard.ViewModels.Attendance.TeacherAssignVM.TeacherOption t)
+        => dupNames.Contains(t.FullName) ? $"{t.FullName} ({t.PersonId})" : t.FullName;
+
+    // 교사가 이미 맡은 반 (선택지에 "· 2학년 1반 담당" 표시)
+    var charge = Model.Classes.Where(c => c.AssignedTeacherPersonId.HasValue && c.AssignedTeacherPersonId.Value > 0)
+                              .GroupBy(c => c.AssignedTeacherPersonId!.Value)
+                              .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(c => c.ClassName)));
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>출석부 · 반 담당교사 배정</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500&family=Inter:wght@200;400;500;600&family=Gothic+A1:wght@400;600&display=swap" rel="stylesheet">
+    <link href="~/css/board-bone.css" rel="stylesheet" asp-append-version="true" />
+    <style>
+        :root { --ok: #2F6B4F; }
+        .hd .sh { padding-top: 16px; padding-bottom: 20px; }
+        .st { display: flex; gap: 22px; margin-top: 14px; }
+        .st div { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--headdim); }
+        .st b { display: block; margin-top: 2px; font-family: "Inter", sans-serif; font-weight: 200; font-size: 28px; letter-spacing: 0; color: var(--headtx); font-variant-numeric: tabular-nums; }
+        .st .k b { color: var(--headk); }
+        .st .lo b { color: #E08A72; }
+
+        .ok { margin-top: 16px; padding: 11px 14px; border-left: 2px solid var(--ok); background: var(--card); font-size: 14px; color: var(--ok); }
+        .ok.bad { border-color: var(--danger); color: var(--danger); }
+
+        .cl { padding: 14px 2px; border-bottom: 1px solid var(--line); }
+        .clTop { display: flex; align-items: baseline; gap: 10px; }
+        .clN { font-family: "Noto Serif KR", serif; font-size: 17px; }
+        .clC { font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .clT { margin-left: auto; font-size: 13px; color: var(--dim2); white-space: nowrap; }
+        .clT b { font-weight: 600; color: var(--tx); }
+        .clT.none { color: var(--danger); }
+        .cl.none { background: linear-gradient(90deg, rgba(163,64,42,.05), transparent 60%); }
+
+        .clAct { display: flex; gap: 6px; margin-top: 10px; }
+        .sel { flex: 1; min-width: 0; height: 48px; padding: 0 36px 0 12px; font-family: inherit; font-size: 15px; color: var(--tx); background: var(--card); border: 1px solid var(--rule); border-radius: 0; outline: none;
+               appearance: none; -webkit-appearance: none;
+               background-image: linear-gradient(45deg, transparent 50%, var(--dim) 50%), linear-gradient(135deg, var(--dim) 50%, transparent 50%);
+               background-position: calc(100% - 18px) 21px, calc(100% - 13px) 21px; background-size: 5px 5px; background-repeat: no-repeat; }
+        .sel:focus { border-color: var(--tx); }
+        .sel.changed { border-color: var(--acc); box-shadow: inset 3px 0 0 var(--acc); }
+        .clAct form { margin: 0; display: flex; }
+        .save { width: 92px; height: 48px; font-family: inherit; font-size: 15px; border: 1px solid var(--rule); background: var(--card); color: var(--dim); cursor: default; }
+        .save.on { background: var(--tx); border-color: var(--tx); color: var(--bg); cursor: pointer; }
+        .save.on:hover { background: var(--acc); border-color: var(--acc); color: #fff; }
+        .hint { margin-top: 6px; font-size: 12px; color: var(--acc); min-height: 0; }
+        .hint:empty { display: none; }
+    </style>
+</head>
+<body>
+    <header class="hd">
+        <div class="sh">
+            <div class="hdTop"><span><a href="/Attendance/Index">출석부</a><span class="sep">›</span><a href="/Attendance/More">더보기</a></span><a href="/">@ConstatsCommon.ToHome</a></div>
+            <div class="hdK">TEACHERS</div>
+            <h1 class="hdT">반 담당교사 배정</h1>
+            <div class="hdS">반마다 담임 한 분 · 교사 후보에 등록된 분만 고를 수 있어요.</div>
+            <div class="st">
+                <div>반<b>@classCount</b></div>
+                <div class="k">배정<b>@assigned</b></div>
+                <div class="lo">미지정<b>@unassigned</b></div>
+                <div>아이<b>@students</b></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="sh">
+        @if (!string.IsNullOrWhiteSpace(msg))
+        {
+            <div class="ok @(msg.Contains("실패") ? "bad" : "")">@msg</div>
+        }
+
+        <section class="sec">
+            <div class="secH">
+                <div><div class="secK">CLASSES</div><div class="secT">반별 담임</div></div>
+                <span class="secN">바꾸면 저장 버튼이 켜져요</span>
+            </div>
+
+            @foreach (var c in Model.Classes)
+            {
+                var formId = $"f-{c.ClassYear}-{c.ClassBan}";
+                bool has = c.AssignedTeacherPersonId.HasValue && c.AssignedTeacherPersonId.Value > 0;
+                int cur = has ? c.AssignedTeacherPersonId!.Value : 0;
+
+                <div class="cl @(has ? "" : "none")">
+                    <div class="clTop">
+                        <span class="clN">@c.ClassName</span>
+                        <span class="clC">@(c.TotalStudents)명</span>
+                        <span class="clT @(has ? "" : "none")">@if (has) {<text>담임 </text><b>@c.AssignedTeacherName</b>} else {<text>담임 미지정</text>}</span>
+                    </div>
+                    <div class="clAct">
+                        @* select 는 form 밖에 두고 form="id" 로 연결 (기존 방식 그대로) *@
+                        <select class="sel" name="TeacherPersonId" form="@formId" data-cur="@cur" aria-label="@c.ClassName 담임 고르기">
+                            <option value="0">미지정 (담임 해제)</option>
+                            @foreach (var t in Model.Teachers)
+                            {
+                                bool sel = cur == t.PersonId;
+                                string other = charge.TryGetValue(t.PersonId, out var cls) && !sel ? $" · {cls} 담당" : "";
+                                <option value="@t.PersonId" selected="@(sel)">@TeacherLabel(t)@other</option>
+                            }
+                        </select>
+                        <form id="@formId" method="post" action="/Attendance/TeacherAssign">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ClassYear" value="@c.ClassYear" />
+                            <input type="hidden" name="ClassBan" value="@c.ClassBan" />
+                            <button type="submit" class="save" disabled>저장</button>
+                        </form>
+                    </div>
+                    <div class="hint"></div>
+                </div>
+            }
+        </section>
+
+        <div class="ft"><span>한 교사가 두 반을 맡으면 선택지에 "○반 담당"이 함께 보여요.</span></div>
+    </main>
+
+    @await Html.PartialAsync("_AttTabs")
+
+<script>
+(function () {
+    // 담임을 바꾸면 그 반의 저장 버튼만 켜진다
+    document.querySelectorAll('.cl').forEach(row => {
+        const sel = row.querySelector('.sel'), btn = row.querySelector('.save'), hint = row.querySelector('.hint');
+        sel.addEventListener('change', () => {
+            const changed = sel.value !== sel.dataset.cur;
+            sel.classList.toggle('changed', changed);
+            btn.disabled = !changed;
+            btn.classList.toggle('on', changed);
+            const opt = sel.options[sel.selectedIndex];
+            hint.textContent = !changed ? '' : (sel.value === '0' ? '저장하면 담임이 해제돼요.' : (opt.text.includes('담당') ? '이 선생님은 다른 반도 맡고 있어요. 저장하면 이 반도 맡게 돼요.' : ''));
+        });
+        row.querySelector('form').addEventListener('submit', () => { btn.disabled = true; btn.textContent = '저장 중…'; });
+    });
+})();
+</script>
+</body>
+</html>

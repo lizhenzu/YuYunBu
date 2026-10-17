@@ -1,0 +1,480 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@using BulletinBoard.Models
+@model BulletinBoard.Models.ExerciseDocDetail
+
+@{
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+@using System.Linq
+@{
+    Layout = null;
+
+    // SEO
+    var pageTitle = (Model != null && Model.Seo != null && !string.IsNullOrWhiteSpace(Model.Seo.HtmlTitle))
+        ? Model.Seo.HtmlTitle
+        : (Model != null && !string.IsNullOrWhiteSpace(Model.TitleKo) ? Model.TitleKo : "운동 상세");
+    var pageDesc = (Model != null && Model.Seo != null && !string.IsNullOrWhiteSpace(Model.Seo.MetaDescription))
+        ? Model.Seo.MetaDescription
+        : (Model != null ? Model.Description : "");
+
+    // Header chips: 우선 DB 칩 사용, 없으면 Audience/Level/Keywords에서 생성
+    var chips = (Model != null && Model.Chips != null && Model.Chips.Count > 0)
+        ? Model.Chips.Select(c => c.ChipText).ToList()
+        : new System.Collections.Generic.List<string>();
+    if (chips.Count == 0 && Model != null)
+    {
+        if (!string.IsNullOrWhiteSpace(Model.LevelText)) chips.Add("운동 유형: " + Model.LevelText);
+        if (!string.IsNullOrWhiteSpace(Model.Audience)) chips.Add("대상: " + Model.Audience);
+        if (!string.IsNullOrWhiteSpace(Model.Keywords)) chips.Add("키워드: " + Model.Keywords);
+    }
+
+    // 섹션 바인딩
+    System.Func<string, BulletinBoard.Models.SectionDto> S = t =>
+        (Model != null && Model.Sections != null) ? Model.Sections.FirstOrDefault(x => x.SectionType == t) : null;
+
+    var secIntro = S("intro");
+    var secHowTo = S("howto");
+    var secPres = S("prescription");
+    var secEffect = S("effect");
+    var secVariation = S("variation");
+    var secCaution = S("caution");
+    var secProTips = S("pro_tips");
+    var secSummary = S("summary");
+
+    // 이미지
+    var defaultImg = "https://bit2001-001-site4.dtempurl.com/images/Health/TypeA/Glute_Bridge.png";
+    var heroImg = (Model != null && Model.Illustrations != null && Model.Illustrations.Count > 0)
+        ? Model.Illustrations.OrderBy(i => i.SortOrder).ThenBy(i => i.IllustrationId).First()
+        : null;
+
+    // 리스트 필터 도우미
+    System.Func<BulletinBoard.Models.SectionDto, string, System.Collections.Generic.List<BulletinBoard.Models.SectionListItemDto>> Items =
+        (sec, kind) =>
+        {
+            if (sec == null || sec.Items == null) return new System.Collections.Generic.List<BulletinBoard.Models.SectionListItemDto>();
+            return sec.Items.Where(i => i.ItemType == kind).OrderBy(i => i.SortOrder).ThenBy(i => i.ListItemId).ToList();
+        };
+
+    var howtoOl = Items(secHowTo, "ol");
+    var howtoPara = Items(secHowTo, "paragraph");
+    var effectUl = Items(secEffect, "ul");
+    var varUl = Items(secVariation, "ul");
+    var cautUl = Items(secCaution, "ul");
+
+    // 처방
+    var pres = (secPres != null) ? secPres.Prescription : null;
+    var presRows = (pres != null && pres.Rows != null)
+        ? pres.Rows.OrderBy(r => r.SortOrder).ThenBy(r => r.PrescriptionRowId).ToList()
+        : new System.Collections.Generic.List<BulletinBoard.Models.PrescriptionRowDto>();
+}
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+    <meta name="description" content="@pageDesc" />
+    <style>
+        :root {
+            --bg: #f4f9f5;
+            --bg-accent: #e8f5ec;
+            --ink: #0f172a;
+            --muted: #5b6b72;
+            --brand: #16a34a;
+            --brand-2: #65c77a;
+            --card: #ffffff;
+            --ring: #dbe7df;
+            --shadow: 0 4px 20px rgba(16, 185, 129, 0.08);
+            color-scheme: light;
+        }
+
+        @@media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0b1410;
+                --bg-accent: #0f1c14;
+                --ink: #e6f3ea;
+                --muted: #a3b2a8;
+                --brand: #22c55e;
+                --brand-2: #86efac;
+                --card: #0f1a13;
+                --ring: #1b2a20;
+                --shadow: 0 10px 30px rgba(0,0,0,0.35);
+                color-scheme: dark;
+            }
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: ui-sans-serif, system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", Roboto, Arial, "나눔고딕", "맑은 고딕", sans-serif;
+            line-height: 1.6
+        }
+
+        .wrap {
+            max-width: 1000px;
+            margin-inline: auto;
+            padding: 24px
+        }
+
+        header.site {
+            position: relative;
+            background: radial-gradient(1200px 400px at 20% -10%, var(--brand-2) 0%, transparent 60%), linear-gradient(180deg, var(--bg-accent), transparent 60%);
+            border-bottom: 1px solid var(--ring);
+            padding: 40px 24px 28px;
+            border-radius: 0 0 24px 24px;
+        }
+
+        .title {
+            display: grid;
+            gap: 12px;
+            align-items: end;
+            grid-template-columns: 1fr auto;
+            max-width: 1000px;
+            margin: auto;
+        }
+
+            .title h1 {
+                margin: 0;
+                font-size: clamp(22px, 3.5vw, 36px);
+            }
+
+            .title h3 {
+                margin: 0;
+                font-size: clamp(17px, 3.5vw, 22px);
+            }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .chip {
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--card);
+            border: 1px solid var(--ring);
+            color: var(--muted);
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 24px auto;
+        }
+
+        .grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(12, 1fr);
+        }
+
+        .col-12 {
+            grid-column: span 12;
+        }
+
+        .col-6 {
+            grid-column: span 6;
+        }
+
+        @@media (max-width: 900px) {
+            .col-6 {
+                grid-column: span 12;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--ring);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: var(--shadow);
+        }
+
+        .eyebrow {
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .note {
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .list-clean {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(22,163,74,.12);
+            color: #065f46;
+            border: 1px solid rgba(22,163,74,.25);
+        }
+
+        .footer {
+            margin-top: 28px;
+            padding: 22px;
+            text-align: center;
+            color: var(--muted);
+            border-top: 1px solid var(--ring);
+        }
+
+        .illus {
+            display: grid;
+            place-items: center;
+            margin-bottom: 16px;
+        }
+
+            .illus img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 12px;
+            }
+    </style>
+</head>
+<body>
+    <header class="site">
+        <div class="title">
+            <div>
+                <h3>@(string.IsNullOrWhiteSpace(Model.Subtitle) ? "무산소 운동 교육서" : Model.Subtitle)</h3>
+                <h1>@(string.IsNullOrWhiteSpace(Model.TitleKo) ? "운동 상세" : Model.TitleKo) @(string.IsNullOrWhiteSpace(Model.TitleEn) ? "" : ("(" + Model.TitleEn.Replace("_"," ").ToUpper() + ")"))</h1>
+                <div class="chips" aria-label="문서 정보">
+                    @if (chips.Count > 0)
+                    {
+                        foreach (var t in chips)
+                        {
+                            <span class="chip">@t</span>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="wrap">
+        <main class="grid" role="main">
+
+            <!-- 삽화 -->
+            <section class="card col-12 illus">
+                <img src="/images/Health/TypeA/@( !string.IsNullOrWhiteSpace(Model.Slug) ? Model.Slug : defaultImg ).png"
+                     alt="@( string.IsNullOrWhiteSpace(Model.TitleKo) ? "운동 일러스트" : Model.TitleKo + " 일러스트")">
+            </section>
+            <!-- 소개 -->
+            @if (secIntro != null)
+            {
+                <section class="card col-12">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secIntro.Eyebrow) ? secIntro.Eyebrow : "소개")</div>
+                    <h2>@(!string.IsNullOrWhiteSpace(secIntro.Title) ? secIntro.Title : (Model.TitleKo + "란 무엇인가?"))</h2>
+                    @if (!string.IsNullOrWhiteSpace(secIntro.Body))
+                    {
+                        <p>@secIntro.Body</p>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(Model.Description))
+                    {
+                        <p>@Model.Description</p>
+                    }
+                    else
+                    {
+                        <p>소개 정보가 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- 방법 -->
+            @if (secHowTo != null)
+            {
+                <section class="card col-6">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secHowTo.Eyebrow) ? secHowTo.Eyebrow : "How To")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secHowTo.Title) ? secHowTo.Title : "운동 방법")</h3>
+
+                    @if (howtoOl.Count > 0)
+                    {
+                        <ol class="list-clean">
+                            @foreach (var it in howtoOl)
+                            {
+                                <li>@it.Content</li>
+                            }
+                        </ol>
+                    }
+                    @foreach (var it in howtoPara)
+                    {
+                        <p class="note">@it.Content</p>
+                    }
+                </section>
+            }
+
+            <!-- 권장 처방 -->
+            @if (secPres != null)
+            {
+                <section class="card col-6">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secPres.Eyebrow) ? secPres.Eyebrow : "Prescription")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secPres.Title) ? secPres.Title : "권장 처방")</h3>
+
+                    @if (presRows.Count > 0)
+                    {
+                        <table style="width:100%; border-collapse:collapse; font-size:14px">
+                            <tbody>
+                                @foreach (var row in presRows)
+                                {
+                                    <tr>
+                                        <td style="padding:6px; border:1px solid var(--ring); width:25%"><strong>@row.LabelText</strong></td>
+                                        <td style="padding:6px; border:1px solid var(--ring)">@row.ValueText</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <p class="note">처방 정보가 없습니다.</p>
+                    }
+
+                    @if (pres != null && !string.IsNullOrWhiteSpace(pres.Note))
+                    {
+                        <p class="note">@pres.Note</p>
+                    }
+                </section>
+            }
+
+            <!-- 효과 -->
+            @if (secEffect != null)
+            {
+                <section class="card col-6">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secEffect.Eyebrow) ? secEffect.Eyebrow : "Effect")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secEffect.Title) ? secEffect.Title : "운동 효과")</h3>
+                    @if (effectUl.Count > 0)
+                    {
+                        <ul class="list-clean">
+                            @foreach (var it in effectUl)
+                            {
+                                <li>@it.Content</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="note">효과 정보가 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- 변형 -->
+            @if (secVariation != null)
+            {
+                <section class="card col-6">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secVariation.Eyebrow) ? secVariation.Eyebrow : "Variation")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secVariation.Title) ? secVariation.Title : "플랭크 변형 동작")</h3>
+                    @if (varUl.Count > 0)
+                    {
+                        <ul class="list-clean">
+                            @foreach (var it in varUl)
+                            {
+                                <li>@it.Content</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="note">변형 동작 정보가 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- 주의사항 -->
+            @if (secCaution != null)
+            {
+                <section class="card col-6">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secCaution.Eyebrow) ? secCaution.Eyebrow : "Caution")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secCaution.Title) ? secCaution.Title : "주의사항")</h3>
+                    @if (cautUl.Count > 0)
+                    {
+                        <ul class="list-clean">
+                            @foreach (var it in cautUl)
+                            {
+                                <li>@it.Content</li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="note">주의사항 정보가 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- 전문가 팁 -->
+            @if (secProTips != null)
+            {
+                <section class="card col-12">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secProTips.Eyebrow) ? secProTips.Eyebrow : "Pro Tips")</div>
+                    <h2>@(!string.IsNullOrWhiteSpace(secProTips.Title) ? secProTips.Title : "전문가의 조언")</h2>
+                    @if (!string.IsNullOrWhiteSpace(secProTips.Body))
+                    {
+                        <p>@secProTips.Body</p>
+                    }
+                    else
+                    {
+                        <p class="note">전문가 팁이 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- 정리 -->
+            @if (secSummary != null)
+            {
+                <section class="card col-12">
+                    <div class="eyebrow">@(!string.IsNullOrWhiteSpace(secSummary.Eyebrow) ? secSummary.Eyebrow : "Summary")</div>
+                    <h3>@(!string.IsNullOrWhiteSpace(secSummary.Title) ? secSummary.Title : "정리")</h3>
+                    @if (!string.IsNullOrWhiteSpace(secSummary.Body))
+                    {
+                        <p>@secSummary.Body</p>
+                    }
+                    else
+                    {
+                        <p class="note">요약 정보가 없습니다.</p>
+                    }
+                </section>
+            }
+
+            <!-- Navigation Buttons -->
+            <section class="card col-12" style="text-align:center">
+                <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                        <a href="/Fit" class="btn"
+                           style="padding:10px 16px; border-radius:12px; background:@("A"=="primary" ? "var(--brand-2)" : "var(--card)"); border:1px solid var(--ring); color:var(--ink); font-weight:600; text-decoration:none; box-shadow:var(--shadow)">
+                            목록으로
+                        </a>
+                        <a href="/" class="btn"
+                           style="padding:10px 16px; border-radius:12px; background:var(--brand-2); color:#053; font-weight:600; text-decoration:none; box-shadow:var(--shadow)">
+                            홈으로
+                        </a>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div>© @DateHelper.GetKoreaNow().Year @ChurchName · @DepartmentName</div>
+        </footer>
+    </div>
+</body>
+</html>
+     

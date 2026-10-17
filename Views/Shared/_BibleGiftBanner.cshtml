@@ -1,0 +1,53 @@
+﻿@* 도전! 성경통독 완독 선물 배너 — 완독한 본인에게만 보인다 (HomeController 에서 ViewBag.BibleGiftBanner 설정) *@
+@{
+    var bg = ViewBag.BibleGiftBanner as BibleReadingThrough.Models.BibleGift.BibleGiftBannerVM;
+}
+@if (bg != null)
+{
+    <style>
+        .bgBanner { position: relative; background: linear-gradient(180deg,#FFF8E1,#FFF3D0); border: 2px solid #F0D99B; border-radius: 18px; padding: 16px 16px 18px; box-shadow: 0 2px 10px rgba(180,140,40,.12); margin: 14px 0; }
+        .bgTop { display: flex; align-items: center; gap: 8px; }
+        .bgAvatar { width: 30px; height: 30px; border-radius: 50%; background: #C9AE82; display: flex; align-items: center; justify-content: center; font-size: 15px; border: 2px solid #fff; }
+        .bgWho { font-size: 13px; font-weight: 700; color: #7A5A16; }
+        .bgStamp { position: absolute; top: 12px; right: 14px; width: 56px; height: 56px; border-radius: 50%; background: #FFE9A8; border: 2px dashed #E0B94C; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; color: #8A6410; font-weight: 700; }
+        .bgStamp b { font-size: 14px; }
+        .bgStamp span { font-size: 9px; }
+        .bgKick { margin-top: 12px; font-size: 12px; color: #9A7B2F; font-weight: 600; }
+        .bgTitle { margin-top: 4px; font-family: "Noto Serif KR", serif; font-size: 19px; font-weight: 600; color: #5B4310; line-height: 1.4; word-break: keep-all; }
+        .bgSub { margin-top: 5px; font-size: 12.5px; color: #8A7433; word-break: keep-all; }
+        .bgBtn { display: block; margin-top: 13px; text-align: center; background: #6B3F14; color: #FFE9B8; font-weight: 700; font-size: 15px; padding: 13px; border-radius: 12px; text-decoration: none; }
+        .bgBtn:hover { color: #FFF3D0; }
+        .bgDone { display: block; margin-top: 13px; text-align: center; background: #FFF; color: #7A5A16; font-weight: 600; font-size: 14px; padding: 12px; border-radius: 12px; border: 1px solid #E8D39B; text-decoration: none; }
+    </style>
+
+    @* 아직 안 골랐으면 이 회차 고르기 화면으로 바로.  이미 골랐으면(바꾸기 · 취소) 통합 선물함으로. *@
+    var bgHref = (bg.IsPicked || bg.IsPurchased)
+        ? "/StudentPointDashboard4/MyGiftBox3"
+        : $"/StudentPointDashboard4/GiftSelect?type=bible&round={bg.RoundNo}";
+    <a class="bgBanner" style="display:block" href="@bgHref">
+        <span class="bgStamp"><b>@(bg.RoundNo)독</b><span>완독</span></span>
+        <span class="bgTop">
+            <span class="bgAvatar">📖</span>
+            <span class="bgWho">@bg.UserFullName · @(bg.RoundNo)독 완독</span>
+        </span>
+        <span class="bgKick">📚 성경통독 · 완독 선물</span>
+        <span class="bgTitle" style="display:block">@bg.Title</span>
+
+        @* 상태에 따라 단추 글이 바뀐다 : 선물 고르기 › → 선물 변경하기 › → 구매 완료 (전달 완료면 배너 자체가 사라진다) *@
+        @if (bg.IsPurchased)
+        {
+            <span class="bgSub" style="display:block">고른 선물: <b>@bg.ProductName</b> · 선생님이 구매했어요 · 이제 바꿀 수 없어요</span>
+            <span class="bgDone">구매 완료 · 곧 전해 드려요 ›</span>
+        }
+        else if (bg.IsPicked)
+        {
+            <span class="bgSub" style="display:block">고른 선물: <b>@bg.ProductName</b> · 구매 전까지 바꾸거나 취소할 수 있어요</span>
+            <span class="bgBtn">선물 변경하기 ›</span>
+        }
+        else
+        {
+            <span class="bgSub" style="display:block">@(bg.SubTitle ?? "선물을 골라 주세요")</span>
+            <span class="bgBtn">선물 고르기 ›</span>
+        }
+    </a>
+}

@@ -1,0 +1,294 @@
+@* ══════════════════════════════════════════════════
+   치유와 회복을 위한 기도문 — 공통 테마 (대자연 · 힐링 · 밝음)
+   각 뷰의 <head> 안에서 @@await Html.PartialAsync("_Nature") 로 사용
+══════════════════════════════════════════════════ *@
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;500;700;800;900&family=Gowun+Batang:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+    /* 대자연 팔레트 — 이른 아침 숲과 물 */
+    --sky:      #F4FAF7;   /* 페이지 바탕 (아주 옅은 민트) */
+    --card:     #FFFFFF;
+    --card-2:   #F7FBF9;
+    --ink:      #1F2E2A;
+    --ink2:     #48605A;
+    --muted:    #86988F;
+    --line:     #E2EDE7;
+    --line-2:   #D2E2DA;
+
+    --leaf:     #2E9E7A;   /* 강조색 — 새잎 초록 */
+    --leaf-dk:  #1E7A5C;
+    --leaf-sf:  #E6F5EF;
+    --leaf-mid: #B9E2D2;
+
+    --water:    #4A9BC4;   /* 보조 — 물빛 */
+    --water-sf: #E9F4F9;
+    --sun:      #E8A13C;   /* 보조 — 햇살 */
+    --sun-sf:   #FDF3E3;
+
+    --shadow-s: 0 1px 2px rgba(31,46,42,.05), 0 3px 12px rgba(31,46,42,.06);
+    --shadow-m: 0 3px 10px rgba(31,46,42,.08), 0 14px 36px rgba(31,46,42,.09);
+
+    --fs: 1;               /* 기도문 글자 배율 (JS) */
+    --f-ui:   "Gothic A1","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+    --f-read: "Gowun Batang","Nanum Myeongjo","Apple SD Gothic Neo",serif;
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+    margin:0; background:var(--sky); color:var(--ink);
+    font-family:var(--f-ui); line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
+}
+a{ color:inherit; text-decoration:none; }
+button{ font-family:inherit; }
+
+/* 하늘·물·햇살이 옅게 겹친 배경 */
+body::before{
+    content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+    background:
+      radial-gradient(900px 500px at 82% -10%, rgba(74,155,196,.10), transparent 62%),
+      radial-gradient(760px 460px at -8% 2%,  rgba(46,158,122,.11), transparent 60%),
+      radial-gradient(620px 380px at 50% 108%, rgba(232,161,60,.09), transparent 62%);
+}
+/* 아래쪽 완만한 언덕 실루엣 */
+body::after{
+    content:""; position:fixed; left:0; right:0; bottom:0; height:190px; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(120% 100% at 18% 100%, rgba(46,158,122,.11) 0 42%, transparent 43%),
+      radial-gradient(120% 100% at 76% 100%, rgba(74,155,196,.09) 0 40%, transparent 41%);
+}
+
+/* ── 상단바 ─────────────────────────── */
+.nbar{
+    position:sticky; top:0; z-index:60;
+    background:rgba(244,250,247,.92);
+    -webkit-backdrop-filter:saturate(180%) blur(14px);
+    backdrop-filter:saturate(180%) blur(14px);
+    border-bottom:1px solid var(--line);
+}
+.nbar-in{
+    max-width:860px; margin:0 auto;
+    padding:9px clamp(14px,4vw,22px);
+    display:flex; align-items:center; gap:10px;
+}
+.nb-btn{
+    flex:none; display:inline-flex; align-items:center; gap:6px;
+    height:36px; padding:0 14px; border-radius:999px;
+    background:var(--card); border:1px solid var(--line);
+    font-size:13px; font-weight:800; color:var(--ink2);
+    box-shadow:var(--shadow-s); transition:.16s; white-space:nowrap;
+}
+.nb-btn:hover{ border-color:var(--leaf); color:var(--leaf-dk); background:var(--leaf-sf); }
+.nb-mid{
+    flex:1; min-width:0; text-align:center;
+    font-size:12.5px; font-weight:800; color:var(--muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* 글자 크기 3단 */
+.fsgrp{ flex:none; display:flex; gap:0; background:var(--card-2); border:1px solid var(--line); border-radius:999px; padding:3px; }
+.fsgrp button{
+    width:30px; height:28px; border:0; background:transparent; cursor:pointer;
+    border-radius:999px; color:var(--muted); font-weight:900; line-height:1;
+    display:grid; place-items:center; transition:.14s;
+}
+.fsgrp button:nth-child(1){ font-size:11px; }
+.fsgrp button:nth-child(2){ font-size:13px; }
+.fsgrp button:nth-child(3){ font-size:16px; }
+.fsgrp button.on{ background:var(--card); color:var(--leaf-dk); box-shadow:var(--shadow-s); }
+.fsgrp button:hover{ color:var(--leaf-dk); }
+
+/* ── 레이아웃 ───────────────────────── */
+.wrap{ max-width:760px; margin:0 auto; padding:0 clamp(14px,4vw,22px) 96px; }
+
+/* ── 카드 ───────────────────────────── */
+.ncard{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:20px; box-shadow:var(--shadow-s);
+    overflow:hidden; margin-bottom:16px;
+}
+.ncard-hd{
+    display:flex; align-items:center; gap:10px;
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,var(--card-2),var(--card));
+}
+.ncard-ico{
+    flex:none; width:32px; height:32px; border-radius:11px;
+    display:grid; place-items:center; font-size:16px; background:var(--leaf-sf);
+}
+.ncard-tt{ font-size:14.5px; font-weight:900; letter-spacing:-.2px; }
+.ncard-sub{ margin-left:auto; font-size:11.5px; font-weight:700; color:var(--muted); white-space:nowrap; }
+.ncard-bd{ padding:18px; }
+
+/* ── 배지 / 칩 ──────────────────────── */
+.chip{
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:999px; padding:5px 14px;
+    font-size:12px; font-weight:800; white-space:nowrap;
+}
+.chip-leaf { background:var(--leaf-sf);  color:var(--leaf-dk); border:1px solid var(--leaf-mid); }
+.chip-water{ background:var(--water-sf); color:#276B90;        border:1px solid #C6E2EF; }
+.chip-sun  { background:var(--sun-sf);   color:#9A651C;        border:1px solid #F3DDB6; }
+.chip-gray { background:var(--card-2);   color:var(--muted);   border:1px solid var(--line); }
+
+/* ── 기도문 본문 ────────────────────── */
+.pray-title{
+    font-family:var(--f-ui); font-weight:900;
+    font-size:clamp(20px,4.6vw,27px); line-height:1.34; letter-spacing:-.03em;
+    color:var(--ink); text-wrap:balance; word-break:keep-all; margin:0;
+}
+/* 이름을 넣어 기도하는 자리 — **○○(이)** 가 이 모양으로 바뀐다 */
+.nm{
+    color:#B8791E; font-weight:700;
+    background:linear-gradient(180deg,transparent 62%,#FBE3B8 62%);
+    padding:0 2px; border-radius:3px;
+}
+
+.pray-body{
+    font-family:var(--f-read);
+    /* 줄 간격 — 2.0 → 1.75 → 1.55 로 좁혔습니다.
+       문단 사이 빈 줄도 이 값을 따르므로 전체가 함께 촘촘해집니다. */
+    font-size:calc(17px * var(--fs)); line-height:1.55;
+    color:var(--ink); word-break:keep-all; white-space:pre-line;
+    margin:0;
+}
+.verse-box{
+    margin-top:18px; padding:15px 17px;
+    background:var(--water-sf); border:1px solid #D8EBF4;
+    border-radius:14px;
+}
+.verse-ref{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:900; color:#276B90; margin-bottom:7px;
+}
+.verse-text{
+    font-family:var(--f-read);
+    font-size:calc(14.5px * var(--fs)); line-height:1.55;
+    color:#2C5C76; word-break:keep-all; margin:0;
+}
+
+/* ── 버튼 ───────────────────────────── */
+.btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:7px;
+    height:44px; padding:0 20px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card);
+    font-size:14px; font-weight:800; color:var(--ink2);
+    transition:.15s; white-space:nowrap; text-align:center;
+}
+.btn:hover{ background:var(--card-2); border-color:var(--line-2); }
+.btn:active{ transform:scale(.98); }
+.btn-leaf{
+    background:var(--leaf); border-color:var(--leaf); color:#fff;
+    box-shadow:0 3px 14px rgba(46,158,122,.30);
+}
+.btn-leaf:hover{ background:var(--leaf-dk); border-color:var(--leaf-dk); color:#fff; }
+.btn-danger{ background:#FDECEA; border-color:#F5C9C3; color:#A63A2C; }
+.btn-danger:hover{ background:#FBDEDA; border-color:#EFB3AB; }
+.btn-row{ display:flex; gap:9px; flex-wrap:wrap; }
+.btn-row .btn{ flex:1 1 auto; min-width:0; }
+
+/* ── 폼 ─────────────────────────────── */
+.field{ margin-bottom:15px; }
+.field-lb{ display:block; font-size:12px; font-weight:800; color:var(--ink2); margin-bottom:6px; }
+.field-in, .field-ta{
+    width:100%; border:1.5px solid var(--line); border-radius:12px;
+    padding:11px 14px; font-family:inherit; font-size:14px; color:var(--ink);
+    background:var(--card-2); outline:none; transition:.15s;
+}
+.field-ta{ font-family:var(--f-read); line-height:1.85; resize:vertical; min-height:190px; }
+.field-in:focus, .field-ta:focus{ border-color:var(--leaf); background:var(--card); box-shadow:0 0 0 3px var(--leaf-sf); }
+.field-hint{ font-size:11.5px; color:var(--muted); margin-top:5px; }
+.field-row{ display:flex; gap:12px; flex-wrap:wrap; }
+.field-row > *{ flex:1 1 160px; min-width:0; }
+
+/* ── 알림 ───────────────────────────── */
+.flash{
+    border-radius:14px; padding:12px 16px; margin-bottom:14px;
+    font-size:13.5px; font-weight:800;
+}
+.flash-ok { background:var(--leaf-sf); color:var(--leaf-dk); border:1px solid var(--leaf-mid); }
+.flash-err{ background:#FDECEA;       color:#A63A2C;        border:1px solid #F5C9C3; }
+
+/* ── 목록 ───────────────────────────── */
+.rowitem{
+    display:flex; align-items:center; gap:12px;
+    padding:13px 16px; border-bottom:1px solid var(--line);
+    transition:background .14s;
+}
+.rowitem:last-child{ border-bottom:0; }
+.rowitem:hover{ background:var(--card-2); }
+.rowitem.is-today{ background:var(--leaf-sf); }
+.row-no{
+    flex:none; width:34px; height:34px; border-radius:11px;
+    background:var(--card-2); border:1px solid var(--line);
+    display:grid; place-items:center;
+    font-size:12.5px; font-weight:900; color:var(--ink2);
+}
+.rowitem.is-today .row-no{ background:var(--leaf); border-color:var(--leaf); color:#fff; }
+.row-bd{ flex:1; min-width:0; }
+.row-tt{
+    font-size:13.5px; font-weight:800; color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.row-meta{ font-size:11px; color:var(--muted); margin-top:2px; }
+.row-act{ flex:none; display:flex; gap:6px; }
+.row-btn{
+    height:32px; padding:0 12px; border-radius:999px;
+    border:1px solid var(--line); background:var(--card);
+    font-size:12px; font-weight:800; color:var(--ink2);
+    display:inline-flex; align-items:center; transition:.14s;
+}
+.row-btn:hover{ background:var(--leaf-sf); border-color:var(--leaf-mid); color:var(--leaf-dk); }
+.row-btn.del:hover{ background:#FDECEA; border-color:#F5C9C3; color:#A63A2C; }
+
+/* ── 빈 상태 ────────────────────────── */
+.empty{ text-align:center; padding:52px 20px; }
+.empty-ico{ font-size:42px; margin-bottom:12px; }
+.empty-tt{ font-size:16px; font-weight:900; margin-bottom:6px; }
+.empty-sub{ font-size:13px; color:var(--muted); }
+
+@@media (max-width:520px){
+    .ncard-bd{ padding:16px 14px; }
+    .ncard-hd{ padding:13px 14px; }
+    .row-act .row-btn span{ display:none; }
+    .rowitem{ padding:12px 13px; }
+}
+@@media print{
+    .nbar,.btn-row,.row-act{ display:none !important; }
+    body{ background:#fff; }
+    body::before, body::after{ display:none; }
+    .ncard{ box-shadow:none; border-color:#DDD; }
+}
+@@media (prefers-reduced-motion:reduce){
+    *{ animation:none !important; transition:none !important; }
+}
+</style>
+
+<script>
+/* 기도문 글자 크기 — 작게 / 보통 / 크게 */
+(function(){
+    var MAP = { s:0.90, m:1, l:1.18 };
+    window.setPFs = function(k, silent){
+        if (!MAP[k]) k = 'm';
+        document.documentElement.style.setProperty('--fs', MAP[k]);
+        ['S','M','L'].forEach(function(x){
+            var b = document.getElementById('pfs'+x);
+            if (b) b.classList.toggle('on', x.toLowerCase() === k);
+        });
+        if (!silent) { try { localStorage.setItem('ppFs', k); } catch(e){} }
+    };
+    function boot(){
+        var saved = 'm';
+        try { saved = localStorage.getItem('ppFs') || 'm'; } catch(e){}
+        setPFs(saved, true);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+})();
+</script>

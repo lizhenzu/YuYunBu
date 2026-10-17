@@ -1,0 +1,32 @@
+@*
+    출석부 아래 탭 막대 — 오늘 · 새친구 · 돌봄 · 더보기
+    ViewData["AttTab"]    : "today" | "new" | "care" | "more"
+    ViewData["CareCount"] : 돌봄 탭 위 빨간 숫자 (없으면 표시 안 함)
+    돌봄(장기 결석)은 컨트롤러가 Admin/SuperAdmin 만 허용하므로 그때만 보인다.
+*@
+@{
+    var tab = ViewData["AttTab"] as string ?? "";
+    var care = ViewData["CareCount"] as int? ?? 0;
+    bool canCare = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+}
+<style>
+    .attTabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; background: var(--card); border-top: 1px solid var(--rule); padding-bottom: env(safe-area-inset-bottom); }
+    .attTabs nav { max-width: 760px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; height: 58px; }
+    .attTabs a { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--dim); }
+    .attTabs a i { font-style: normal; font-family: "Inter", sans-serif; font-weight: 200; font-size: 19px; line-height: 1; }
+    .attTabs a.on { color: var(--tx); font-weight: 600; }
+    .attTabs a.on::before { content: ""; position: absolute; top: -1px; left: 28%; right: 28%; height: 2px; background: var(--acc); }
+    .attTabs sup { position: absolute; top: 7px; left: calc(50% + 6px); min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger); color: #fff; font-size: 10px; display: grid; place-items: center; }
+    body { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
+</style>
+<div class="attTabs">
+    <nav aria-label="출석부 메뉴">
+        <a href="/Attendance/Index" class="@(tab == "today" ? "on" : "")"><i>✓</i>오늘</a>
+        <a href="/Attendance/NewComer" class="@(tab == "new" ? "on" : "")"><i>＋</i>새친구</a>
+        @if (canCare)
+        {
+            <a href="/Attendance/LongAbsent?absentDays=21" class="@(tab == "care" ? "on" : "")"><i>☎</i>돌봄 @if (care > 0) {<sup>@care</sup>}</a>
+        }
+        <a href="/Attendance/More" class="@(tab == "more" ? "on" : "")"><i>⋯</i>더보기</a>
+    </nav>
+</div>

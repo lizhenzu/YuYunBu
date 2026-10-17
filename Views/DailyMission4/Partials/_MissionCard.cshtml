@@ -1,0 +1,294 @@
+@model dynamic
+@using System
+@using System.Reflection
+@using System.Net
+
+@functions {
+    string S(object v) => v == null ? "" : v.ToString();
+    bool B(object v) { try { return v != null && Convert.ToBoolean(v); } catch { return false; } }
+
+    object G(object o, params string[] names)
+    {
+        if (o == null) return null;
+        var t = o.GetType();
+        foreach (var n in names)
+        {
+            var p = t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            if (p == null) continue;
+            return p.GetValue(o);
+        }
+        return null;
+    }
+
+    string GS(object o, params string[] names) => S(G(o, names));
+    bool GB(object o, params string[] names) => B(G(o, names));
+
+    string CleanHref(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href)) return "";
+        href = WebUtility.HtmlDecode(href).Trim();
+        href = href.Trim().Trim('"').Trim('\'').Trim('“').Trim('”').Trim('‘').Trim('’');
+        href = href.Trim().Trim('"').Trim('\'').Trim('“').Trim('”').Trim('‘').Trim('’');
+        if (href.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("tel:", StringComparison.OrdinalIgnoreCase) ||
+            href.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+            return href;
+        if (!href.StartsWith("/")) href = "/" + href;
+        return href;
+    }
+}
+
+@{
+    var o = (object)Model;
+
+    var emoji        = GS(o, "Emoji");
+    var title        = GS(o, "Title");
+    var pillClass    = GS(o, "PillClass");
+    var pillText     = GS(o, "PillText");
+    var btnClass     = GS(o, "BtnClass");
+    var btnIcon      = GS(o, "BtnIcon");
+    var btnText      = GS(o, "BtnText");
+    var hrefRaw      = GS(o, "Href");
+    var disabled     = GB(o, "Disabled");
+    var isDone       = GB(o, "IsDone");
+    var hasContent   = GB(o, "HasContent");
+    var dateText     = GS(o, "DateText");
+    var noContentMsg = GS(o, "NoContentMsg");
+    var lockReason   = GS(o, "LockReason");
+
+    bool showNoContent = (!hasContent && !string.IsNullOrWhiteSpace(noContentMsg));
+    bool showLocked    = (disabled && !isDone && !string.IsNullOrWhiteSpace(lockReason));
+    var href           = CleanHref(hrefRaw);
+    bool allowNavigate = !showNoContent;
+    var safeHref       = (allowNavigate && !string.IsNullOrWhiteSpace(href)) ? href : null;
+    bool cardClickable = (safeHref != null);
+    bool disableButton = (safeHref == null);
+    var ariaDisabled   = disableButton ? "true" : "false";
+    var tabIndex       = disableButton ? "-1" : "0";
+    var disabledLabel  = showNoContent ? "콘텐츠 없음" : "비활성화됨";
+    bool isViewBtn     = (!string.IsNullOrWhiteSpace(btnText) && btnText.Contains("(다시보기)"));
+
+    // 미션별 파스텔 컬러 (단색, 그라디언트 없음)
+    string cardBg = btnClass switch {
+        "word"   => "#f3f0ff",
+        "quiz"   => "#fff6ee",
+        "pray"   => "#fff0f4",
+        "recite" => "#fffbee",
+        _        => "#f0f4ff"
+    };
+    string cardBorder = btnClass switch {
+        "word"   => "#ddd6fe",
+        "quiz"   => "#fed7aa",
+        "pray"   => "#fecdd3",
+        "recite" => "#fde68a",
+        _        => "#c7d2fe"
+    };
+    string iconRingBg = btnClass switch {
+        "word"   => "#ede9fe",
+        "quiz"   => "#ffedd5",
+        "pray"   => "#ffe4e6",
+        "recite" => "#fef9c3",
+        _        => "#e0e7ff"
+    };
+    string iconColor = btnClass switch {
+        "word"   => "#7c5cfc",
+        "quiz"   => "#f97316",
+        "pray"   => "#f43f5e",
+        "recite" => "#f59e0b",
+        _        => "#6366f1"
+    };
+    string btnSolid = btnClass switch {
+        "word"   => "#9b73f8",
+        "quiz"   => "#f97316",
+        "pray"   => "#f43f5e",
+        "recite" => "#f59e0b",
+        _        => "#6366f1"
+    };
+    string btnGrad    = btnSolid;   // 단색 사용
+    string neonColor  = iconColor;
+    string neonGlow   = "transparent";
+    string iconShadow = "none";
+    string pillDoneColor  = "rgba(34,197,94,.15)";
+    string pillDoneBorder = "#16a34a";
+}
+
+<style>
+/* ── Flat Pastel Mission Card (이미지 동일) ──────── */
+.qcard {
+    border-radius: 16px;
+    background: var(--qc-card-bg);
+    border: 1px solid var(--qc-card-border);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px 16px 14px;
+    gap: 0;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    box-shadow: 0 1px 6px rgba(0,0,0,.05);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.qcard.isLink { cursor: pointer; }
+.qcard.isLink:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.09); }
+.qcard::before { display: none; }
+.qcard.is-done { opacity: 1; }
+
+/* 클릭 오버레이 */
+.qcard-ov {
+    position: absolute; inset: 0;
+    border-radius: inherit; z-index: 1;
+    text-indent: -9999px; overflow: hidden;
+}
+
+/* 상단: 아이콘 + 텍스트 행 */
+.qcard-top {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 14px; position: relative; z-index: 2;
+}
+
+/* 이모지 링 (작게, 좌측) */
+.qcard-icon-ring {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: var(--qc-icon-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+}
+
+/* 텍스트 영역 */
+.qcard-text { flex: 1; min-width: 0; }
+
+/* 제목 */
+.qcard-title {
+    font-size: 14px; font-weight: 800;
+    color: #1e293b;
+    letter-spacing: -.2px; line-height: 1.3;
+    margin-bottom: 3px;
+}
+
+/* 설명 (서브타이틀) */
+.qcard-desc {
+    font-size: 12px; font-weight: 500; color: #94a3b8;
+    line-height: 1.35;
+}
+
+/* 상태 pill — 숨김 (버튼에 통합) */
+.qcard-pill { display: none; }
+
+/* 없음/잠금 메시지 */
+.qcard-msg {
+    font-size: 11px; font-weight: 700;
+    padding: 7px 10px; border-radius: 8px; margin-bottom: 10px;
+    display: flex; gap: 6px; align-items: flex-start;
+    background: rgba(0,0,0,.04); border: 1px solid rgba(0,0,0,.07);
+    color: #64748b; position: relative; z-index: 2;
+}
+
+/* CTA 버튼 */
+.qcard-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 11px 14px;
+    border-radius: 10px; border: none;
+    font-size: 14px; font-weight: 800;
+    cursor: pointer; text-decoration: none;
+    transition: filter .15s ease;
+    white-space: nowrap; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    position: relative; z-index: 2; color: #fff;
+}
+.qcard-btn.q-active  { background: var(--qc-btn-grad); }
+.qcard-btn.q-active:hover { filter: brightness(1.07); }
+.qcard-btn.q-view {
+    background: rgba(0,0,0,.07); color: #64748b;
+    border: 1px solid rgba(0,0,0,.10);
+}
+.qcard-btn.q-off {
+    background: rgba(0,0,0,.05); color: #94a3b8;
+    border: 1px solid rgba(0,0,0,.07);
+    opacity: .55; cursor: not-allowed; pointer-events: none;
+}
+.qcard-btn .q-ico { font-size: 15px; }
+/* 말씀 제목/구절 영역 */
+.qcard-word-info {
+    width: 100%; padding: 10px 12px; margin-bottom: 10px;
+    background: rgba(255,255,255,.60); border-radius: 10px;
+    border: 1px solid rgba(0,0,0,.06);
+    position: relative; z-index: 2;
+}
+.qcard-word-title {
+    font-size: 14px; font-weight: 800; color: #1e293b;
+    line-height: 1.3; margin-bottom: 4px;
+    letter-spacing: -.2px;
+}
+.qcard-word-ref {
+    font-size: 12px; font-weight: 600; color: #64748b;
+}
+</style>
+
+<div class="qcard @btnClass @(isDone ? "is-done" : "") @(cardClickable ? "isLink" : "")"
+     style="--qc-neon:@neonColor; --qc-glow:@neonGlow; --qc-btn-grad:@btnGrad; --qc-icon-bg:@iconRingBg; --qc-icon-shadow:@iconShadow; --qc-card-bg:@cardBg; --qc-card-border:@cardBorder;">
+
+    @if (cardClickable)
+    {
+        <a class="qcard-ov" href="@safeHref" aria-label="@title"></a>
+    }
+
+    <!-- 상단: 아이콘 + 제목/설명 -->
+    <div class="qcard-top">
+        <div class="qcard-icon-ring">@emoji</div>
+        <div class="qcard-text">
+            <div class="qcard-title">@title</div>
+            @{ var descText = GS(o, "Desc"); }
+            @if (!string.IsNullOrWhiteSpace(descText))
+            {
+                <div class="qcard-desc">@descText</div>
+            }
+        </div>
+    </div>
+    @{
+        var subTitle = GS(o, "SubTitle");
+        var subRef   = GS(o, "SubRef");
+    }
+    @if (!string.IsNullOrWhiteSpace(subTitle) || !string.IsNullOrWhiteSpace(subRef))
+    {
+        <div class="qcard-word-info">
+            @if (!string.IsNullOrWhiteSpace(subTitle))
+            {
+                <div class="qcard-word-title">@subTitle</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(subRef))
+            {
+                <div class="qcard-word-ref">@subRef</div>
+            }
+        </div>
+    }
+
+    <!-- 없음/잠금 안내 -->
+    @if (showNoContent)
+    {
+        <div class="qcard-msg">
+            <span>⚠️</span>
+            <span>@noContentMsg</span>
+        </div>
+    }
+    else if (showLocked)
+    {
+        <div class="qcard-msg">
+            <span>🔒</span>
+            <span>@lockReason</span>
+        </div>
+    }
+
+    <!-- 버튼 -->
+    <a class="qcard-btn @(disableButton ? "q-off" : isViewBtn ? "q-view" : "q-active")"
+       href="@(safeHref ?? "javascript:void(0)")"
+       role="button"
+       aria-disabled="@ariaDisabled"
+       tabindex="@tabIndex"
+       title="@(disableButton ? disabledLabel : btnText)"
+       onclick="event.stopPropagation();">
+        <span>@btnText</span>
+    </a>
+</div>

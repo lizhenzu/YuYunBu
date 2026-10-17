@@ -1,0 +1,29 @@
+﻿@using BulletinBoard.Common;
+@using System.Web
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+ 
+
+@model string
+
+<div class="buttons2">
+    <div class="button home" onclick="location.href='/'">Home</div>
+    <div class="button quizCalendar" onclick="location.href='/Question/Index'">퀴즈달력</div>
+    <div class="button quizHome" onclick="location.href='/Question/QuestionDetailList?KindData=@Model'">퀴즈홈</div>
+    <div class="button back" onclick="history.back()">이전</div>
+</div>
+
+@if (await AuthService.IsSignedIn(User) &&
+(
+await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+)
+{
+    <div class="buttons2">
+        <div class="button quizHome" onclick="location.href='/Admin/Index'">관리자메뉴</div> 
+    </div>
+
+}

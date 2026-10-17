@@ -1,0 +1,1080 @@
+﻿@model IEnumerable<BulletinBoard.Models.JuManNas>
+@using BulletinBoard.Common;
+
+@{
+    Layout = null; // ✅ 독립 페이지
+    string keyWordTitle = "묵상";
+
+    // ✅ 유튜브 ID 추출 (item.URL이 videoId만 오든, 전체 URL이 오든 처리)
+    string ExtractYouTubeId(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "";
+
+        var s = input.Trim();
+
+        // 이미 videoId만 있는 경우
+        if (!s.Contains("/") && !s.Contains("?") && !s.Contains("&") && s.Length >= 8)
+            return s;
+
+        // watch?v=
+        var idx = s.IndexOf("v=", StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
+        {
+            var start = idx + 2;
+            var end = s.IndexOf("&", start, StringComparison.OrdinalIgnoreCase);
+            return (end >= 0) ? s.Substring(start, end - start) : s.Substring(start);
+        }
+
+        // youtu.be/
+        var shortIdx = s.IndexOf("youtu.be/", StringComparison.OrdinalIgnoreCase);
+        if (shortIdx >= 0)
+        {
+            var start = shortIdx + "youtu.be/".Length;
+            var end = s.IndexOf("?", start, StringComparison.OrdinalIgnoreCase);
+            var id = (end >= 0) ? s.Substring(start, end - start) : s.Substring(start);
+            return id.Trim('/').Trim();
+        }
+
+        // /embed/
+        var embIdx = s.IndexOf("/embed/", StringComparison.OrdinalIgnoreCase);
+        if (embIdx >= 0)
+        {
+            var start = embIdx + "/embed/".Length;
+            var end = s.IndexOf("?", start, StringComparison.OrdinalIgnoreCase);
+            return (end >= 0) ? s.Substring(start, end - start) : s.Substring(start);
+        }
+
+        return s;
+    }
+
+    int ToSeconds(int mm, int ss) => (mm < 0 ? 0 : mm) * 60 + (ss < 0 ? 0 : ss);
+
+    // ✅ 한 카드에 유튜브 구간이 여러 개일 수 있다 (URL ~ URL5).
+    //    주소가 들어 있는 것만 순서대로 모은다.
+    List<(string VId, int StartSec, int EndSec, string Label, string OriginUrl)>
+        CollectSegments(BulletinBoard.Models.JuManNas it)
+    {
+        var raw = new (string Url, int SMM, int SSS, int EMM, int ESS)[]
+        {
+            (it.URL,  it.YouTuBuStartMM,  it.YouTuBuStartSS,  it.YouTuBuEndMM,  it.YouTuBuEndSS),
+            (it.URL2, it.YouTuBuStartMM2, it.YouTuBuStartSS2, it.YouTuBuEndMM2, it.YouTuBuEndSS2),
+            (it.URL3, it.YouTuBuStartMM3, it.YouTuBuStartSS3, it.YouTuBuEndMM3, it.YouTuBuEndSS3),
+            (it.URL4, it.YouTuBuStartMM4, it.YouTuBuStartSS4, it.YouTuBuEndMM4, it.YouTuBuEndSS4),
+            (it.URL5, it.YouTuBuStartMM5, it.YouTuBuStartSS5, it.YouTuBuEndMM5, it.YouTuBuEndSS5),
+        };
+
+        var list = new List<(string, int, int, string, string)>();
+        foreach (var r in raw)
+        {
+            var vid = ExtractYouTubeId(r.Url);
+            if (string.IsNullOrWhiteSpace(vid)) continue;
+
+            int s = ToSeconds(r.SMM, r.SSS);
+            int e = ToSeconds(r.EMM, r.ESS);
+            if (e <= s) e = 0;   // end가 이상하면 "끝까지"
+
+            string label = $"{r.SMM}:{r.SSS:D2} ~ {r.EMM}:{r.ESS:D2}";
+            list.Add((vid, s, e, label, $"https://www.youtube.com/watch?v={vid}"));
+        }
+        return list;
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@keyWordTitle 목록</title>
+
+    <style>
+        :root {
+            --bg0: #f6f9ff;
+            --bg1: #eef5ff;
+            --card: #ffffff;
+            --line: rgba(15,23,42,.10);
+            --txt: rgba(15,23,42,.92);
+            --muted: rgba(15,23,42,.60);
+            --muted2: rgba(15,23,42,.45);
+            --brand: #2563eb;
+            --brand2: #60a5fa;
+            --ok: #16a34a;
+            --warn: #f59e0b;
+            --danger: #ef4444;
+            --shadow: 0 12px 30px rgba(2,6,23,.08);
+            --shadow2: 0 8px 18px rgba(2,6,23,.06);
+            --radius: 18px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+            color: var(--txt);
+            background: radial-gradient(1200px 600px at 20% -10%, rgba(96,165,250,.25), transparent 60%), radial-gradient(900px 500px at 110% 10%, rgba(34,197,94,.18), transparent 60%), linear-gradient(180deg, var(--bg0), var(--bg1));
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 18px 14px 28px;
+        }
+
+        /* Top toolbar */
+        .toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(246,249,255,.78);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 10px;
+            box-shadow: var(--shadow2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .brandMark {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 140px;
+        }
+
+        .logo {
+            width: 38px;
+            height: 38px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--brand), var(--brand2));
+            box-shadow: 0 10px 18px rgba(37,99,235,.18);
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-weight: 900;
+        }
+
+        .brandText {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.1;
+        }
+
+            .brandText .title {
+                font-weight: 900;
+                letter-spacing: -.3px;
+            }
+
+            .brandText .sub {
+                font-size: 12px;
+                color: var(--muted);
+            }
+
+        .toolBtns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: #fff;
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-weight: 800;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease;
+            box-shadow: 0 6px 12px rgba(2,6,23,.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 12px 18px rgba(2,6,23,.07);
+                border-color: rgba(37,99,235,.25);
+            }
+
+            .btn.primary {
+                border-color: rgba(37,99,235,.35);
+                background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(96,165,250,.10));
+            }
+
+            .btn .dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: var(--brand);
+                box-shadow: 0 0 0 4px rgba(37,99,235,.10);
+            }
+
+            .btn.secondary .dot {
+                background: var(--ok);
+                box-shadow: 0 0 0 4px rgba(34,197,94,.12);
+            }
+
+        /* Hero */
+        .hero {
+            margin-top: 14px;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: radial-gradient(1200px 500px at 20% 0%, rgba(96,165,250,.35), transparent 55%), radial-gradient(1000px 500px at 100% 0%, rgba(34,197,94,.22), transparent 55%), linear-gradient(135deg, rgba(255,255,255,.88), rgba(255,255,255,.70));
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-columns: 1.2fr .8fr;
+        }
+
+        .heroLeft {
+            padding: 22px 22px 18px;
+        }
+
+        .heroKicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(37,99,235,.18);
+            background: rgba(255,255,255,.65);
+            font-weight: 900;
+            font-size: 13px;
+            color: rgba(37,99,235,.95);
+        }
+
+            .heroKicker .pill {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                background: linear-gradient(135deg, var(--brand), var(--brand2));
+            }
+
+        .heroTitle {
+            margin: 12px 0 6px;
+            font-size: 28px;
+            letter-spacing: -.6px;
+        }
+
+        .heroDesc {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+            max-width: 56ch;
+        }
+
+        .heroRight {
+            min-height: 170px;
+            padding: 18px;
+            display: flex;
+        }
+
+        .heroImage {
+            width: 100%;
+            border-radius: 16px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 14px 26px rgba(2,6,23,.10);
+        }
+
+            .heroImage img {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                display: block;
+            }
+
+        /* List */
+        .listHeader {
+            margin-top: 18px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+            .listHeader h2 {
+                margin: 0;
+                font-size: 18px;
+                letter-spacing: -.3px;
+            }
+
+            .listHeader .hint {
+                margin: 0;
+                font-size: 13px;
+                color: var(--muted);
+            }
+
+        .grid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            background: rgba(255,255,255,.85);
+            border-radius: 18px;
+            box-shadow: var(--shadow2);
+            padding: 14px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-1px);
+                box-shadow: var(--shadow);
+                border-color: rgba(37,99,235,.20);
+            }
+
+        .rowTop {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .dateBadge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 14px;
+            background: rgba(239,246,255,.85);
+            border: 1px solid rgba(37,99,235,.15);
+            font-weight: 900;
+        }
+
+            .dateBadge .cal {
+                width: 28px;
+                height: 28px;
+                border-radius: 12px;
+                display: grid;
+                place-items: center;
+                background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(96,165,250,.95));
+                color: #fff;
+                box-shadow: 0 10px 16px rgba(37,99,235,.18);
+                font-size: 14px;
+            }
+
+            .dateBadge .small {
+                display: flex;
+                flex-direction: column;
+                line-height: 1.15;
+            }
+
+                .dateBadge .small .d {
+                    font-size: 13px;
+                }
+
+                .dateBadge .small .w {
+                    font-size: 12px;
+                    color: rgba(15,23,42,.70);
+                    font-weight: 800;
+                }
+
+        .meta {
+            text-align: right;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .mainLine {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .bible {
+            font-weight: 900;
+            letter-spacing: -.2px;
+        }
+
+        .range {
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .timeTag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.9);
+            font-weight: 900;
+            font-size: 12px;
+        }
+
+        /* 구간이 여러 개일 때 시간 태그를 나란히 놓는다 */
+        .timeTags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .timeTag .segNo {
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            font-size: 10px;
+            background: rgba(245,158,11,.18);
+            color: #92400e;
+            margin-right: -2px;
+        }
+
+        .chip.noVideo {
+            opacity: .55;
+            cursor: default;
+        }
+
+            .chip.noVideo:hover {
+                transform: none;
+                box-shadow: none;
+                border-color: rgba(15,23,42,.10);
+            }
+
+            .timeTag .tDot {
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: var(--warn);
+                box-shadow: 0 0 0 4px rgba(245,158,11,.14);
+            }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .chip {
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.9);
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-weight: 900;
+            font-size: 13px;
+            cursor: pointer;
+            transition: transform .08s ease, box-shadow .18s ease, border-color .18s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .chip:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 10px 16px rgba(2,6,23,.07);
+                border-color: rgba(37,99,235,.25);
+            }
+
+            .chip.blue {
+                background: rgba(37,99,235,.08);
+                border-color: rgba(37,99,235,.18);
+            }
+
+            .chip.green {
+                background: rgba(34,197,94,.10);
+                border-color: rgba(34,197,94,.18);
+            }
+
+            .chip.gray {
+                background: rgba(148,163,184,.14);
+                border-color: rgba(148,163,184,.22);
+            }
+
+            .chip .ic {
+                width: 22px;
+                height: 22px;
+                border-radius: 10px;
+                display: grid;
+                place-items: center;
+                font-size: 12px;
+                background: rgba(15,23,42,.06);
+            }
+
+        .footerBar {
+            margin-top: 14px;
+            display: flex;
+            justify-content: center;
+        }
+
+        @@media (max-width: 820px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+
+            .heroRight {
+                min-height: 200px;
+            }
+        }
+
+        @@media (max-width: 520px) {
+            .brandText .sub {
+                display: none;
+            }
+
+            .toolbar {
+                border-radius: 14px;
+            }
+
+            .btn {
+                padding: 9px 10px;
+            }
+
+            .heroTitle {
+                font-size: 24px;
+            }
+
+            .meta {
+                display: none;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+        }
+
+        /* ==========================
+                   ✅ YouTube Modal (NEW)
+                   ========================== */
+        .ytModalBackdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2,6,23,.55);
+            backdrop-filter: blur(6px);
+            display: none;
+            z-index: 9999;
+            padding: 18px 14px;
+        }
+
+        .ytModal {
+            max-width: 980px;
+            margin: 0 auto;
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(255,255,255,.45);
+            border-radius: 20px;
+            box-shadow: 0 24px 60px rgba(2,6,23,.25);
+            overflow: hidden;
+        }
+
+        .ytModalHeader {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(15,23,42,.10);
+            background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(96,165,250,.10));
+        }
+
+        .ytTitle {
+            font-weight: 900;
+            letter-spacing: -.3px;
+            line-height: 1.2;
+        }
+
+        .ytSub {
+            font-size: 12px;
+            color: rgba(15,23,42,.65);
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        .ytHeaderLeft {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .ytClose {
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(255,255,255,.85);
+            padding: 8px 10px;
+            border-radius: 12px;
+            font-weight: 900;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 16px rgba(2,6,23,.10);
+        }
+
+            .ytClose:hover {
+                border-color: rgba(37,99,235,.25);
+            }
+
+        .ytBody {
+            padding: 12px;
+            background: rgba(255,255,255,.92);
+        }
+
+        .ytPlayerWrap {
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(15,23,42,.12);
+            background: #000;
+            aspect-ratio: 16 / 9;
+        }
+
+        #ytPlayer, #ytPlayer iframe {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .ytFooter {
+            padding: 10px 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .ytStatus {
+            font-size: 13px;
+            font-weight: 800;
+            color: rgba(15,23,42,.70);
+        }
+
+        .ytBtns {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .miniBtn {
+            border: 1px solid rgba(15,23,42,.12);
+            background: rgba(255,255,255,.92);
+            padding: 8px 10px;
+            border-radius: 999px;
+            font-weight: 900;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .miniBtn:hover {
+                border-color: rgba(37,99,235,.25);
+                box-shadow: 0 12px 18px rgba(2,6,23,.08);
+                transform: translateY(-1px);
+            }
+
+        .noScroll {
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <div class="toolbar">
+            <div class="brandMark">
+                <div class="logo">M</div>
+                <div class="brandText">
+                    <div class="title">@keyWordTitle</div>
+                    <div class="sub">밝은 테마 · 카드형 목록</div>
+                </div>
+            </div>
+
+            <div class="toolBtns">
+                <button class="btn primary" type="button" onclick="goUrl('/')">
+                    <span class="dot"></span> 홈으로
+                </button>
+                <button class="btn secondary" type="button" onclick="goUrl('/JuManNa/IndexGroupByYYYYMM')">
+                    <span class="dot"></span> 목록으로
+                </button>
+            </div>
+        </div>
+
+        <section class="hero" aria-label="header">
+            <div class="heroLeft">
+                <div class="heroKicker"><span class="pill"></span> 이번 주 @keyWordTitle</div>
+                <h1 class="heroTitle">말씀을 함께 보고, 함께 나누는 시간</h1>
+                <p class="heroDesc">
+                    날짜/본문/영상 구간을 한눈에 보고, 필요할 때 바로 <b>보기</b> 또는 <b>수정</b>으로 이동할 수 있어요.
+                </p>
+            </div>
+            <div class="heroRight">
+                <div class="heroImage">
+                    <img src="/images/admin/admin002.webp" alt="묵상 이미지" />
+                </div>
+            </div>
+        </section>
+
+        <div class="listHeader">
+            <div>
+                <h2>@keyWordTitle 목록</h2>
+                <p class="hint">‘유튜브(구간)’을 누르면 이 화면에서 바로 재생됩니다.</p>
+            </div>
+        </div>
+
+        <div class="grid">
+            @foreach (var item in Model ?? Enumerable.Empty<BulletinBoard.Models.JuManNas>())
+            {
+                string janZul = SharedComm.MakeBibleSerialJangZul(item.BibleText, item.FromJang, item.FromZul, item.ToJang, item.ToZul);
+
+                var segs = CollectSegments(item);
+                bool multiSeg = segs.Count > 1;
+                // 구간이 여럿이어도 영상이 하나뿐이면 원본 링크는 한 개만 둔다
+                bool multiVideo = segs.Select(s => s.VId).Distinct().Count() > 1;
+
+                string title = $"{item.BibleText} ({janZul})";
+                <article class="card">
+                    <div class="rowTop">
+                        <div class="dateBadge">
+                            <div class="cal">📅</div>
+                            <div class="small">
+                                <div class="d">@item.ExposeDate.ToString("yyyy-MM-dd")</div>
+                                <div class="w">@item.WeekDayKor 요일</div>
+                            </div>
+                        </div>
+
+                        <div class="meta">
+                            <div>본문 · 시간</div>
+                            <div style="color: rgba(37,99,235,.90); font-weight:900;">@keyWordTitle</div>
+                        </div>
+                    </div>
+
+                    <div class="mainLine">
+                        <div class="bible">@item.BibleText <span class="range">(@janZul)</span></div>
+
+                        @* ✅ 구간이 여러 개면 시간 태그도 개수만큼 보여 준다 *@
+                        <div class="timeTags">
+                            @for (int i = 0; i < segs.Count; i++)
+                            {
+                                <div class="timeTag" title="영상 구간">
+                                    <span class="tDot"></span>
+                                    @if (multiSeg)
+                                    {
+                                        <span class="segNo">@(i + 1)</span>
+                                    }
+                                    @segs[i].Label
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="actions">
+                        <!-- ✅ 컨트롤러 호출 X / 페이지 이동 X : 화면에서 바로 모달 재생 -->
+                        @for (int i = 0; i < segs.Count; i++)
+                        {
+                            var sg = segs[i];
+                            var segTitle = multiSeg ? $"{title} · 구간 {i + 1}" : title;
+                            <button class="chip gray" type="button"
+                                    onclick="openYouTubeSegment('@sg.VId', @sg.StartSec, @sg.EndSec, '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(segTitle))', '@sg.OriginUrl')">
+                                <span class="ic">▶</span> @(multiSeg ? $"유튜브(구간 {i + 1})" : "유튜브(구간)")
+                            </button>
+                        }
+
+                        @if (segs.Count == 0)
+                        {
+                            <span class="chip gray noVideo"><span class="ic">▶</span> 영상 없음</span>
+                        }
+                        else if (multiVideo)
+                        {
+                            @for (int i = 0; i < segs.Count; i++)
+                            {
+                                <a class="chip gray" href="@segs[i].OriginUrl" target="_blank" rel="noopener">
+                                    <span class="ic">↗</span> 원본 @(i + 1)
+                                </a>
+                            }
+                        }
+                        else
+                        {
+                            <a class="chip gray" href="@segs[0].OriginUrl" target="_blank" rel="noopener">
+                                <span class="ic">↗</span> 원본
+                            </a>
+                        }
+
+                        <button class="chip blue" type="button" onclick="goUrl('/JuManNa/IndexByID/@item.Id')">
+                            <span class="ic">👀</span> 보기
+                        </button>
+
+                        <button class="chip green" type="button" onclick="goUrl('/JuManNa/ModifyJuManNa?Id=@item.Id')">
+                            <span class="ic">✍</span> 수정
+                        </button>
+                    </div>
+                </article>
+            }
+        </div>
+
+        <div class="footerBar">
+            <div class="toolBtns">
+                <button class="btn primary" type="button" onclick="goUrl('/')">
+                    <span class="dot"></span> 홈으로
+                </button>
+                <button class="btn secondary" type="button" onclick="goUrl('/JuManNa/IndexGroupByYYYYMM')">
+                    <span class="dot"></span> 목록으로
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================
+         ✅ YouTube Modal Markup
+         ========================== -->
+    <div id="ytBackdrop" class="ytModalBackdrop" aria-hidden="true">
+        <div class="ytModal" role="dialog" aria-modal="true" aria-label="YouTube 구간 재생">
+            <div class="ytModalHeader">
+                <div class="ytHeaderLeft">
+                    <div id="ytModalTitle" class="ytTitle">YouTube 구간 재생</div>
+                    <div id="ytModalSub" class="ytSub"></div>
+                </div>
+                <button class="ytClose" type="button" onclick="closeYouTubeModal()">
+                    ✕ 닫기
+                </button>
+            </div>
+
+            <div class="ytBody">
+                <div class="ytPlayerWrap">
+                    <div id="ytPlayer"></div>
+                </div>
+            </div>
+
+            <div class="ytFooter">
+                <div id="ytStatus" class="ytStatus">준비 중...</div>
+                <div class="ytBtns">
+                    <button class="miniBtn" type="button" onclick="restartSegment()">↻ 구간 다시보기</button>
+                    <a id="ytOriginLink" class="miniBtn" href="#" target="_blank" rel="noopener">↗ 원본 유튜브</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function goUrl(url) { window.location.href = url; }
+
+        // ==========================
+        // ✅ YouTube Segment Modal
+        // ==========================
+        let ytApiLoaded = false;
+        let ytPlayer = null;
+        let ytTick = null;
+
+        let currentVideoId = "";
+        let currentStart = 0;
+        let currentEnd = 0;
+
+        function setYtStatus(msg) {
+            const el = document.getElementById("ytStatus");
+            if (el) el.textContent = msg;
+        }
+
+        function ensureYouTubeApi() {
+            return new Promise((resolve) => {
+                if (window.YT && window.YT.Player) {
+                    ytApiLoaded = true;
+                    resolve();
+                    return;
+                }
+                if (ytApiLoaded) { // 로딩 중
+                    const timer = setInterval(() => {
+                        if (window.YT && window.YT.Player) {
+                            clearInterval(timer);
+                            resolve();
+                        }
+                    }, 50);
+                    return;
+                }
+                ytApiLoaded = true;
+                const tag = document.createElement("script");
+                tag.src = "https://www.youtube.com/iframe_api";
+                document.head.appendChild(tag);
+
+                window.onYouTubeIframeAPIReady = function () {
+                    resolve();
+                };
+            });
+        }
+
+        function openYouTubeSegment(videoId, startSec, endSec, title, originUrl) {
+            if (!videoId) {
+                alert("유튜브 영상 정보가 없습니다.");
+                return;
+            }
+
+            currentVideoId = videoId;
+            currentStart = Math.max(0, Number(startSec || 0));
+            currentEnd = Math.max(0, Number(endSec || 0));
+
+            // UI
+            document.getElementById("ytModalTitle").textContent = title || "YouTube 구간 재생";
+            document.getElementById("ytModalSub").textContent =
+                `구간: ${fmtTime(currentStart)} ~ ${currentEnd > 0 ? fmtTime(currentEnd) : "끝까지"}`;
+
+            const link = document.getElementById("ytOriginLink");
+            if (link) link.href = originUrl || ("https://www.youtube.com/watch?v=" + videoId);
+
+            // show modal
+            const backdrop = document.getElementById("ytBackdrop");
+            backdrop.style.display = "block";
+            backdrop.setAttribute("aria-hidden", "false");
+            document.body.classList.add("noScroll");
+
+            setYtStatus("불러오는 중...");
+
+            // API 로드 후 플레이어 생성
+            ensureYouTubeApi().then(() => {
+                createOrLoadPlayer();
+            });
+        }
+
+        function createOrLoadPlayer() {
+            // 기존 플레이어가 있으면 loadVideoById로 교체
+            if (ytPlayer && typeof ytPlayer.loadVideoById === "function") {
+                stopTick();
+                ytPlayer.loadVideoById({
+                    videoId: currentVideoId,
+                    startSeconds: currentStart
+                });
+                setYtStatus("재생 중...");
+                startTick();
+                return;
+            }
+
+            // 새 플레이어 생성
+            stopTick();
+            document.getElementById("ytPlayer").innerHTML = ""; // 혹시 잔재 제거
+
+            ytPlayer = new YT.Player("ytPlayer", {
+                videoId: currentVideoId,
+                playerVars: {
+                    autoplay: 1,
+                    start: currentStart,
+                    controls: 1,
+                    rel: 0,
+                    modestbranding: 1
+                },
+                events: {
+                    onReady: function () {
+                        try {
+                            ytPlayer.seekTo(currentStart, true);
+                            ytPlayer.playVideo();
+                            setYtStatus("재생 중...");
+                            startTick();
+                        } catch (e) {
+                            setYtStatus("재생 준비 중 오류");
+                        }
+                    },
+                    onStateChange: function (ev) {
+                        if (!window.YT) return;
+                        if (ev.data === YT.PlayerState.PLAYING) {
+                            setYtStatus("재생 중...");
+                            startTick();
+                        } else if (ev.data === YT.PlayerState.PAUSED) {
+                            setYtStatus("일시정지");
+                        } else if (ev.data === YT.PlayerState.ENDED) {
+                            setYtStatus("종료");
+                            stopTick();
+                        }
+                    }
+                }
+            });
+        }
+
+        function startTick() {
+            stopTick();
+            // end가 0이면 끝까지 재생
+            if (!(currentEnd > 0)) return;
+
+            ytTick = setInterval(() => {
+                if (!ytPlayer || typeof ytPlayer.getCurrentTime !== "function") return;
+                const t = ytPlayer.getCurrentTime();
+                if (t >= currentEnd) {
+                    ytPlayer.pauseVideo();
+                    setYtStatus("구간 재생 완료");
+                    stopTick();
+                }
+            }, 250);
+        }
+
+        function stopTick() {
+            if (ytTick) {
+                clearInterval(ytTick);
+                ytTick = null;
+            }
+        }
+
+        function restartSegment() {
+            if (!ytPlayer) return;
+            try {
+                ytPlayer.seekTo(currentStart, true);
+                ytPlayer.playVideo();
+                setYtStatus("재생 중...");
+                startTick();
+            } catch (e) { }
+        }
+
+        function closeYouTubeModal() {
+            const backdrop = document.getElementById("ytBackdrop");
+            backdrop.style.display = "none";
+            backdrop.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("noScroll");
+
+            // 닫을 때 정지 + tick 중지
+            stopTick();
+            if (ytPlayer && typeof ytPlayer.stopVideo === "function") {
+                try { ytPlayer.stopVideo(); } catch (e) { }
+            }
+            // 플레이어를 destroy까지 하면 다시 열 때 생성이 느릴 수 있어 stopVideo만 유지
+            setYtStatus("닫힘");
+        }
+
+        // backdrop 클릭으로 닫기 (모달 내부 클릭은 제외)
+        document.getElementById("ytBackdrop").addEventListener("click", function (e) {
+            if (e.target === this) closeYouTubeModal();
+        });
+
+        // ESC로 닫기
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") {
+                const backdrop = document.getElementById("ytBackdrop");
+                if (backdrop && backdrop.style.display === "block") closeYouTubeModal();
+            }
+        });
+
+        function fmtTime(sec) {
+            sec = Math.max(0, Math.floor(sec || 0));
+            const m = Math.floor(sec / 60);
+            const s = sec % 60;
+            return `${m}:${String(s).padStart(2, "0")}`;
+        }
+    </script>
+</body>
+</html>

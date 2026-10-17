@@ -1,0 +1,336 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        .containe1r {
+            text-align: center;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            max-width: 800px;
+            margin: 0 auto; /* 가운데 정렬을 위한 코드 */
+        }
+
+        .container {
+            text-align: center;
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            max-width: 800px;
+            margin: 0 auto;
+            padding-bottom: 50px; /* 추가: 하단 여유 공간 확보 */
+        }
+
+        .navbar {
+            display: flex;
+            justify-content: space-around;
+            background-color: #fff;
+            padding: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: fixed;
+            width: 100%;
+            bottom: 0;
+        }
+
+            .navbar a {
+                text-align: center;
+                color: #555;
+                text-decoration: none;
+                font-size: 14px;
+            }
+
+        .profile {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+            .profile img {
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                margin-right: 15px;
+            }
+
+        .profile-info {
+            flex-grow: 1;
+        }
+
+            .profile-info h2 {
+                margin: 0;
+                font-size: 18px;
+            }
+
+            .profile-info p {
+                margin: 5px 0;
+                color: #888;
+            }
+
+        .subscribe-btn {
+            background-color: #cc0000;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .mission {
+            display: flex;
+            align-items: center;
+            /* margin: 10px;*/
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .video-thumbnail {
+            position: relative;
+            /* margin: 20px;*/
+            border: 3.5px solid #ffffff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+            .video-thumbnail img {
+                max-width: calc(100% - 6px);
+                border-radius: 5px;
+            }
+
+            .video-thumbnail .title {
+                position: absolute;
+                bottom: 10px;
+                left: 10px;
+                color: #fff;
+                font-size: 18px;
+                font-weight: bold;
+            }
+
+            .video-thumbnail .views {
+                position: absolute;
+                bottom: 10px;
+                right: 10px;
+                color: #fff;
+                font-size: 14px;
+            }
+
+        .uploads {
+            /* padding: 20px;*/
+        }
+
+            .uploads h3 {
+                margin: 0 0 10px 0;
+                font-size: 18px;
+            }
+
+            .uploads .video {
+                display: flex;
+                margin-bottom: 15px;
+            }
+
+                .uploads .video img {
+                    width: 120px;
+                    /*          border-radius: 10px;*/
+                    margin-right: 15px;
+                }
+
+            .uploads .video-info {
+                flex-grow: 1;
+            }
+
+                .uploads .video-info h4 {
+                    margin: 0;
+                    font-size: 16px;
+                }
+
+                .uploads .video-info p {
+                    margin: 5px 0;
+                    color: #888;
+                }
+    </style>
+    <style>
+
+        .video-info a {
+            color: #CC0000;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+            .video-info a:hover {
+                color: #e57373;
+            }
+
+    </style>
+
+    <style>
+        .blink {
+            animation: blinker 5s linear infinite;
+        }
+
+        @@keyframes blinker {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .small-font {
+            font-size: 0.8em; /* 원하는 크기로 조정 */
+        }
+
+    </style>
+
+</head>
+
+@{
+    int maxLimitAIHorizontal = 6;
+    int maxLimitAIVertical = 8;
+
+    var todayDateAIHorizontal = DateHelper.GetTodayDateDayString(maxLimitAIHorizontal);
+    var todayDateAIVertical = DateHelper.GetTodayDateDayString(maxLimitAIVertical);
+
+    // 문자열을 생성합니다.
+    string formattedForAIHorizontal = $"/images/home/AI/Horizontal/AI_Horizontal_{todayDateAIHorizontal}.webp";
+    string formattedForAIVertical = $"/images/home/AI/Vertical/AI_vertical_{todayDateAIVertical}.webp";
+
+}
+<body>
+    <div class="container">
+        <div class="profile">
+            <img src="/images/ICON/AI/AI_icon_00.webp" alt="Profile Picture">
+            <div class="profile-info">
+                <h1>인공지능(AI)</h1>
+                <h4>여기는 AI와 대화하는 공간입니다.</h4>
+            </div>
+        </div>
+        <div class="video-thumbnail">
+            <img src="@formattedForAIHorizontal" alt="Profile Picture">
+            <div class="title">IMAGINE</div>
+            <div class="views">... views</div>
+        </div>
+        <div class="uploads">
+  
+            <div class="video mission">
+
+                <div class="video-info">
+                    <div>
+                    @*    <div style="text-align:left;">
+                            <ul style="margin:0px;padding:20px;">
+                                <li>
+                                    제 소개 합니다.
+                                    <ul style="margin:0px;padding:5px;">
+                                        <li>저는 책, 기사, 웹사이트 등의 다양한 글을 읽고 학습했는데, 그 학습 범위에는 과학, 수학, 역사, 문학 등 여러 분야의 지식이 포함되어 있어요.</li>
+                                        <li>2023년까지의 지식을 바탕으로 질문에 답할 수 있지만, 그 이후의 최신 정보나 특정 이벤트에 대해선 대답하지 못할 수도 있어요. 즉, 학습 범위는 주로 공개된 데이터로 한정되어 있고, 실시간으로 새로운 정보를 배우지는 않아요.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>*@
+                        <div style="text-align:left;">
+                            <ul style="margin:0px;padding:20px;">
+                                <li>
+                                    알려 드려요
+                                    <ul style="margin:0px;padding:5px;">
+                                        <li>저는 AI라서 오류가 있을수도 있어요.</li>
+                                        <li>저는 무료버전이라 응답이 느려요.ㅠㅠ</li>
+                                        <li style=" color: #ff867f; ">응답이 1분~3분도 걸릴수도 있어요.</li>
+                                        <li>응답이 올때까지 조금만 기다려 주세요~</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div style="text-align:left">
+                            <ul style="margin:0px;padding:20px;">
+                                <li>
+                                    질문 예제
+                                    <ul style="margin:0px;padding:5px;">
+                                        <li>너는 누구니?</li>
+                                        <li>예수님은 누구인가요?</li>
+                                        <li>사과를 영어로 무엇이라고하나요?</li>
+                                        <li>나는 늦잠을 자서, 학교에 지각했다를 영작해주세요</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+
+
+                    </div>
+
+                </div>
+            </div>
+            <div class="video mission">
+                <div class="video-info">
+                    <div>
+                        <h4>
+                            <a href="/AIExperience/ChatWithAI?meth=simple" target="_blank">AI에게 질문하러가기 <<< 클릭 <br /> <span class="small-font blink1">(간단한 답변듣기, 응답시간이 짧아요.)</span> </a>
+                        </h4>
+                    </div>
+                </div>
+            </div>
+            <div class="video mission">
+                <div class="video-info">
+                    <div>
+                        <h4>
+                            <a href="/AIExperience/ChatWithAI?meth=complex" target="_blank">AI에게 질문하러가기 <<< 클릭 <br /> <span class="small-font blink1">(자세한 답변듣기, 응답시간이 길어요.)</span> </a>
+                        </h4>
+                    </div>
+                </div>
+            </div>
+        
+        
+        </div>
+    </div>
+    <div class="navbar">
+        <a href="/">Home</a>
+        <a href="/Home/MissionMainBoard">@ConstatsCommon.MainKeyTitle</a>
+
+        @if (await AuthService.IsSignedIn(User) &&
+        (
+        await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin)))
+        )
+        {
+            <a href="/AIExperience/AIAskHistory">질문 이력</a>
+        } 
+    </div>
+
+    <script>
+        function playVideo(videoId) {
+            window.open(`https://www.youtube.com/watch?v=${videoId}`, '_blank');
+        }
+    </script>
+
+
+</body>
+</html>

@@ -1,0 +1,868 @@
+﻿@using BulletinBoard.ViewModels
+@model IEnumerable<BandPost>
+
+@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+@{
+    Layout = null;
+
+    var UserFullName = HttpContextAccessor.HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString()) as string;
+
+    bool hasMore = ViewBag.HasMore is bool b && b;
+    int nextPage = ViewBag.NextPage is int n ? n : 0;
+
+    // ✅ 컨트롤러(Index)에서 넘긴 값 받기 (없으면 기본값)
+    string boardTableName = ViewBag.BoardTableName as string ?? "BandPosts";
+    string boardName = ViewBag.BoardName as string ?? "게시판";
+}
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@boardName</title>
+
+    <style>
+        /* ============================================================
+           BandBoard v2 (Bright / Premium / Fully Responsive)
+           - No Bootstrap required (theme independent)
+           - Mobile-first, accessible, smooth, fast
+           ============================================================ */
+
+        :root{
+            --bg0:#f6f8ff;
+            --bg1:#ffffff;
+            --ink:#0f172a;
+            --muted:#64748b;
+            --line:rgba(15,23,42,.10);
+            --shadow:0 18px 50px rgba(15,23,42,.10);
+            --shadow2:0 10px 28px rgba(15,23,42,.08);
+            --r-xl:24px;
+            --r-lg:18px;
+            --r-md:14px;
+
+            --pri:#2563eb;
+            --pri2:#1d4ed8;
+            --mint:#22c55e;
+            --warn:#f59e0b;
+            --danger:#ef4444;
+
+            --chip:#eaf2ff;
+            --chipInk:#1e40af;
+
+            --focus:rgba(37,99,235,.35);
+        }
+
+        *{ box-sizing:border-box; }
+        html,body{ height:100%; }
+        body{
+            margin:0;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Arial, sans-serif;
+            color:var(--ink);
+            background:
+              radial-gradient(900px 500px at 15% -10%, rgba(37,99,235,.14), transparent 55%),
+              radial-gradient(900px 520px at 110% 10%, rgba(34,197,94,.10), transparent 60%),
+              radial-gradient(900px 520px at 40% 120%, rgba(245,158,11,.09), transparent 60%),
+              linear-gradient(180deg, var(--bg0), #f2f7ff 55%, #eef2ff);
+        }
+
+        a{ color:inherit; text-decoration:none; }
+        .sr-only{
+            position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+            overflow:hidden; clip:rect(0,0,0,0); border:0;
+        }
+
+        /* Layout */
+        .wrap{
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 18px 14px 90px;
+        }
+        @@media (min-width: 720px){
+            .wrap{ padding: 28px 18px 110px; }
+        }
+
+        /* Top bar */
+        .topbar{
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            padding: 10px 0;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            background: linear-gradient(180deg, rgba(246,248,255,.88), rgba(246,248,255,.60));
+            border-bottom: 1px solid rgba(15,23,42,.06);
+        }
+        .topbarInner{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap: 12px;
+        }
+        .titleBlock{
+            display:flex;
+            flex-direction:column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .titleRow{
+            display:flex;
+            align-items:center;
+            gap: 10px;
+            min-width:0;
+        }
+        .badgeBoard{
+            display:inline-flex;
+            align-items:center;
+            gap: 8px;
+            padding: 7px 10px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.8);
+            border: 1px solid rgba(15,23,42,.08);
+            box-shadow: 0 10px 24px rgba(15,23,42,.06);
+            white-space:nowrap;
+        }
+        .badgeDot{
+            width:10px; height:10px; border-radius:50%;
+            background: radial-gradient(circle at 30% 30%, #93c5fd, var(--pri));
+            box-shadow: 0 0 0 4px rgba(37,99,235,.12);
+        }
+        h1{
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: -0.03em;
+            white-space: nowrap;
+            overflow:hidden;
+            text-overflow: ellipsis;
+        }
+        .subtitle{
+            font-size: 12.5px;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow:hidden;
+            text-overflow: ellipsis;
+        }
+
+        .topActions{
+            display:flex;
+            align-items:center;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+
+        .btn{
+            appearance:none;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.82);
+            color: var(--ink);
+            border-radius: 999px;
+            padding: 10px 12px;
+            font-weight: 700;
+            font-size: 13px;
+            display:inline-flex;
+            align-items:center;
+            gap: 8px;
+            box-shadow: 0 10px 24px rgba(15,23,42,.06);
+            cursor:pointer;
+            transition: transform .15s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+            user-select:none;
+        }
+        .btn:hover{
+            transform: translateY(-1px);
+            box-shadow: 0 14px 32px rgba(15,23,42,.10);
+            border-color: rgba(37,99,235,.25);
+        }
+        .btn:active{ transform: translateY(0px) scale(.99); }
+        .btn:focus-visible{
+            outline: none;
+            box-shadow: 0 0 0 5px var(--focus), 0 18px 40px rgba(15,23,42,.12);
+        }
+
+        .btnPri{
+            border: none;
+            background: linear-gradient(135deg, var(--pri), #4f46e5);
+            color: #fff;
+        }
+        .btnPri:hover{
+            background: linear-gradient(135deg, var(--pri2), #4338ca);
+            border-color: transparent;
+        }
+
+        /* Cards */
+        .grid{
+            display:grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            margin-top: 14px;
+        }
+        @@media (min-width: 900px){
+            .grid{
+                grid-template-columns: 420px 1fr;
+                align-items: start;
+            }
+        }
+
+        .card{
+            background: rgba(255,255,255,.86);
+            border: 1px solid rgba(15,23,42,.08);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow2);
+            overflow: hidden;
+        }
+        .cardInner{ padding: 14px; }
+        @@media (min-width: 720px){
+            .cardInner{ padding: 16px; }
+        }
+
+        .cardHead{
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .cardTitle{
+            font-size: 14px;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            display:flex;
+            align-items:center;
+            gap: 8px;
+        }
+        .cardHint{
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* Compose */
+        .field{
+            display:flex;
+            flex-direction:column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .label{
+            font-size: 12.5px;
+            font-weight: 800;
+            color: rgba(15,23,42,.80);
+            display:flex;
+            align-items:center;
+            gap: 8px;
+        }
+        .control, .textarea{
+            width:100%;
+            border-radius: 16px;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.95);
+            padding: 12px 12px;
+            font-size: 14px;
+            outline: none;
+            transition: box-shadow .15s ease, border-color .15s ease;
+        }
+        .textarea{
+            min-height: 140px;
+            resize: vertical;
+            line-height: 1.55;
+        }
+        .control:focus, .textarea:focus{
+            border-color: rgba(37,99,235,.35);
+            box-shadow: 0 0 0 5px var(--focus);
+        }
+
+        .row2{
+            display:grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        @@media (min-width: 520px){
+            .row2{ grid-template-columns: 1fr 1fr; }
+        }
+
+        .fileBox{
+            border: 1px dashed rgba(15,23,42,.20);
+            background: rgba(37,99,235,.04);
+            border-radius: 18px;
+            padding: 12px;
+        }
+        .fileTop{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .fileMeta{
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .fileInput{
+            width:100%;
+            margin-top: 10px;
+        }
+        .fileInput input[type=file]{
+            width:100%;
+            border-radius: 14px;
+            border: 1px solid rgba(15,23,42,.10);
+            padding: 10px;
+            background: rgba(255,255,255,.95);
+        }
+
+        .previewWrap{
+            margin-top: 10px;
+            display:none;
+        }
+        .previewImg{
+            width:100%;
+            max-height: 320px;
+            object-fit: cover;
+            border-radius: 18px;
+            border: 1px solid rgba(15,23,42,.08);
+            box-shadow: 0 18px 40px rgba(15,23,42,.10);
+        }
+
+        .composeActions{
+            display:flex;
+            justify-content:flex-end;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        /* Error */
+        .alert{
+            margin-top: 12px;
+            padding: 12px 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(245,158,11,.30);
+            background: rgba(245,158,11,.10);
+            color: #7c2d12;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        /* Posts area */
+        .postStack{
+            display:flex;
+            flex-direction:column;
+            gap: 14px;
+        }
+
+        .post-card{
+            background: rgba(255,255,255,.90);
+            border: 1px solid rgba(15,23,42,.08);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        /* If _PostCard uses Bootstrap-like markup, gently normalize */
+        .post-card .card-body{ padding: 14px; }
+
+        @@media (min-width: 720px) {
+            .post-card .card-body{ padding: 16px; }
+        }
+
+        .post-image{
+            width: 100%;
+            border-radius: 18px;
+            border: 1px solid rgba(15,23,42,.08);
+            box-shadow: 0 18px 36px rgba(15,23,42,.10);
+            max-height: 520px;
+            object-fit: cover;
+        }
+
+        .chip-writer{
+            display:inline-flex;
+            align-items:center;
+            gap: 6px;
+            font-size: 12.5px;
+            font-weight: 900;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #eaf2ff;
+            color: #1e40af;
+            border: 1px solid rgba(30,64,175,.12);
+        }
+        .chip-time{
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .btn-like{
+            border-radius: 999px;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-weight: 900;
+            border: 1px solid rgba(15,23,42,.10);
+            background: rgba(255,255,255,.92);
+            cursor:pointer;
+            display:inline-flex;
+            align-items:center;
+            gap: 8px;
+            transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+        }
+        .btn-like:hover{
+            transform: translateY(-1px);
+            border-color: rgba(239,68,68,.28);
+            box-shadow: 0 14px 30px rgba(15,23,42,.10);
+        }
+        .btn-like:active{ transform: translateY(0) scale(.99); }
+
+        .comment-box{
+            background: rgba(15,23,42,.035);
+            border: 1px solid rgba(15,23,42,.07);
+            border-radius: 16px;
+            padding: 10px 10px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .comment-writer{
+            font-weight: 900;
+            margin-right: 6px;
+        }
+        .comment-time{
+            display:inline-block;
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .comment-form{
+            display:flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .comment-form input[type=text]{
+            flex: 1 1 160px;
+            min-width: 160px;
+        }
+        .comment-form input[name=content]{
+            flex: 2 1 220px;
+            min-width: 220px;
+        }
+        .comment-form button{
+            flex: 0 0 auto;
+        }
+
+        /* Infinite loader */
+        .loader{
+            text-align:center;
+            color: var(--muted);
+            font-weight: 800;
+            padding: 14px 0 0;
+        }
+        .loader .pill{
+            display:inline-flex;
+            align-items:center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(15,23,42,.08);
+            background: rgba(255,255,255,.80);
+            box-shadow: 0 10px 24px rgba(15,23,42,.06);
+        }
+        .spin{
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            border: 2px solid rgba(37,99,235,.25);
+            border-top-color: rgba(37,99,235,.95);
+            animation: s 1s linear infinite;
+        }
+        @@keyframes s{ to{ transform: rotate(360deg); } }
+
+        /* Floating Home */
+        .fabHome{
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 30;
+            width: 54px;
+            height: 54px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, var(--pri), #4f46e5);
+            color: #fff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size: 22px;
+            box-shadow: 0 18px 40px rgba(37,99,235,.28);
+            border: 1px solid rgba(255,255,255,.55);
+            transition: transform .15s ease, box-shadow .15s ease;
+        }
+        .fabHome:hover{
+            transform: translateY(-2px);
+            box-shadow: 0 24px 52px rgba(37,99,235,.34);
+        }
+        .fabHome:active{ transform: translateY(0) scale(.99); }
+
+        @@media (prefers-reduced-motion: reduce){
+            *{ animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar">
+        <div class="wrap">
+            <div class="topbarInner">
+                <div class="titleBlock">
+                    <div class="titleRow">
+                        <span class="badgeBoard" aria-hidden="true">
+                            <span class="badgeDot"></span>
+                            <strong style="font-size:13px;">BOARD</strong>
+                        </span>
+                        <h1>📒 @boardName</h1>
+                    </div>
+                    <div class="subtitle">사진과 글을 올리고, 좋아요/댓글로 함께 나눠요.</div>
+                </div>
+
+                <div class="topActions">
+                    <a class="btn" href="/" aria-label="홈으로 이동">🏠 홈</a>
+                    <button class="btn btnPri" type="button" id="scrollToWriteBtn" aria-label="글쓰기 영역으로 이동">
+                        ✍️ 글쓰기
+                    </button>
+                </div>
+            </div>
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert" role="alert">
+                    ⚠️ @TempData["Error"]
+                </div>
+            }
+        </div>
+    </div>
+
+    <main class="wrap">
+        <div class="grid">
+
+            <!-- Compose -->
+            <section class="card" id="writeArea" aria-label="글쓰기">
+                <div class="cardInner">
+                    <div class="cardHead">
+                        <div>
+                            <div class="cardTitle">✍️ 새 글 작성</div>
+                            <div class="cardHint">텍스트는 선택이에요. 사진만 올려도 괜찮아요.</div>
+                        </div>
+                    </div>
+
+                    <form asp-action="Create"
+                          asp-controller="BandBoard"
+                          method="post"
+                          enctype="multipart/form-data">
+                        @Html.AntiForgeryToken()
+
+                        <input type="hidden" name="boardTableName" value="@boardTableName" />
+                        <input type="hidden" name="boardName" value="@boardName" />
+
+                        <div class="field">
+                            <label class="label" for="content">📝 내용</label>
+                            <textarea id="content" name="content" class="textarea" rows="7"
+                                      placeholder="오늘 있었던 일을 적어 보세요 🙂"></textarea>
+                        </div>
+
+                        <div class="row2">
+                            <div class="field">
+                                <label class="label" for="writerName">👤 작성자</label>
+
+                                @if (!string.IsNullOrWhiteSpace(UserFullName))
+                                {
+                                    <input id="writerName" type="text"
+                                           name="writerName"
+                                           class="control"
+                                           value="@UserFullName"
+                                           readonly
+                                           style="background: rgba(15,23,42,.06); font-weight:900;" />
+                                }
+                                else
+                                {
+                                    <input id="writerName" type="text"
+                                           name="writerName"
+                                           class="control"
+                                           placeholder="작성자 이름 (선택)" />
+                                }
+                            </div>
+
+                            <div class="field">
+                                <div class="label">📌 팁</div>
+                                <div class="control" style="background: rgba(34,197,94,.06); border-color: rgba(34,197,94,.18); color: rgba(15,23,42,.86); font-weight:800;">
+                                    사진은 여러 장 첨부 가능해요. (미리보기는 첫 장만 보여줘요)
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <div class="fileBox">
+                                <div class="fileTop">
+                                    <div>
+                                        <div class="label" style="margin:0;">📷 사진 첨부</div>
+                                        <div class="fileMeta">이미지 파일(JPG/PNG 등) · 여러 장 선택 가능</div>
+                                    </div>
+                                    <span class="badgeBoard" style="padding:6px 10px;">
+                                        <span class="badgeDot" style="background: radial-gradient(circle at 30% 30%, #86efac, #22c55e); box-shadow:0 0 0 4px rgba(34,197,94,.10);"></span>
+                                        <span style="font-size:12px; font-weight:900;">UPLOAD</span>
+                                    </span>
+                                </div>
+
+                                <div class="fileInput">
+                                    <input type="file" name="imageFiles" id="imageFiles" accept="image/*" multiple />
+                                </div>
+
+                                <div class="previewWrap" id="previewWrap" aria-live="polite">
+                                    <img id="imagePreview" class="previewImg" alt="이미지 미리보기" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="composeActions">
+                            <button type="submit" class="btn btnPri" aria-label="게시글 올리기">
+                                🚀 올리기
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Posts -->
+            <section class="postStack" aria-label="게시글 목록">
+                <div id="postList">
+                    @* ================================
+                       ✅ (기존 _PostListPartial 내용 인라인)
+                       ================================ *@
+                    @foreach (var post in Model ?? Enumerable.Empty<BandPost>())
+                    {
+                        @await Html.PartialAsync("_PostCard", post)
+                    }
+
+                    @if (ViewBag.NextPage != null)
+                    {
+                        <input type="hidden" id="nextPageHidden" value="@ViewBag.NextPage" />
+                    }
+                    @if (ViewBag.HasMore != null)
+                    {
+                        <input type="hidden" id="hasMoreHidden" value="@(ViewBag.HasMore ? "true" : "false")" />
+                    }
+                </div>
+
+                <div id="infiniteArea" class="loader" aria-live="polite">
+                    @if (hasMore)
+                    {
+                        <span class="pill"><span class="spin" aria-hidden="true"></span> 더 불러오는 중...</span>
+                    }
+                    else
+                    {
+                        <span class="pill">✅ 더 이상 글이 없습니다.</span>
+                    }
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <a class="fabHome" href="/" aria-label="홈으로 이동">🏠</a>
+
+    <script>
+        // ===== Scroll to compose =====
+        (function () {
+            const btn = document.getElementById('scrollToWriteBtn');
+            const area = document.getElementById('writeArea');
+            if (!btn || !area) return;
+
+            btn.addEventListener('click', function () {
+                area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const content = document.getElementById('content');
+                if (content) setTimeout(() => content.focus(), 250);
+            });
+        })();
+
+        // ===== Image preview (first image only) =====
+        (function () {
+            const fileInput = document.getElementById('imageFiles');
+            const preview = document.getElementById('imagePreview');
+            const wrap = document.getElementById('previewWrap');
+
+            if (!fileInput || !preview || !wrap) return;
+
+            fileInput.addEventListener('change', function () {
+                const file = this.files && this.files.length ? this.files[0] : null;
+                if (!file) {
+                    wrap.style.display = 'none';
+                    preview.src = '';
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    preview.src = e.target.result;
+                    wrap.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            });
+        })();
+
+        // ===== Global vars from server =====
+        const boardTableName = '@boardTableName';
+        const boardName = '@boardName';
+
+        // ===== Like (event delegation) =====
+        document.addEventListener('click', function (e) {
+            const likeBtn = e.target.closest('.btn-like');
+            if (!likeBtn) return;
+
+            const postId = likeBtn.getAttribute('data-post-id');
+            const url = '@Url.Action("Like", "BandBoard")'
+                + '?boardTableName=' + encodeURIComponent(boardTableName);
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body: 'id=' + encodeURIComponent(postId)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const span = likeBtn.querySelector('.like-count');
+                    if (span) span.textContent = data.likeCount;
+                })
+                .catch(err => console.error(err));
+        });
+
+        // ===== Add comment (event delegation) =====
+        document.addEventListener('submit', function (e) {
+            if (!e.target.classList.contains('comment-form')) return;
+
+            e.preventDefault();
+            const form = e.target;
+            const postId = form.getAttribute('data-post-id');
+
+            const writerInput = form.querySelector('input[name="writerName"]');
+            const contentInput = form.querySelector('input[name="content"]');
+
+            const writerName = writerInput ? (writerInput.value || '') : '';
+            const content = contentInput ? (contentInput.value || '') : '';
+
+            if (!content.trim()) {
+                alert('댓글 내용을 입력해 주세요.');
+                return;
+            }
+
+            const url = '@Url.Action("AddComment", "BandBoard")'
+                + '?boardTableName=' + encodeURIComponent(boardTableName);
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                body:
+                    'postId=' + encodeURIComponent(postId) +
+                    '&writerName=' + encodeURIComponent(writerName) +
+                    '&content=' + encodeURIComponent(content)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    const list = form.closest('.post-card')?.querySelector('.comment-list');
+                    if (list) {
+                        const div = document.createElement('div');
+                        div.className = 'comment-box';
+                        div.innerHTML =
+                            '<span class="comment-writer">' + escapeHtml(data.writerName) + '</span>' +
+                            '<span>' + escapeHtml(data.content) + '</span><br />' +
+                            '<span class="comment-time">' + escapeHtml(data.createdAt) + '</span>';
+                        list.appendChild(div);
+                    }
+                    if (contentInput) contentInput.value = '';
+                })
+                .catch(err => console.error(err));
+        });
+
+        // ===== Infinite scroll =====
+        let nextPage = @nextPage;
+        let isLoading = false;
+        let hasMore = @hasMore.ToString().ToLower() == "true";
+
+        function onScroll() {
+            if (!hasMore || isLoading) return;
+
+            const scrollBottom = window.innerHeight + window.scrollY;
+            const documentHeight = document.body.offsetHeight;
+
+            if (scrollBottom + 220 >= documentHeight) {
+                loadMore();
+            }
+        }
+
+        function loadMore() {
+            if (nextPage <= 0) return;
+            isLoading = true;
+
+            const infiniteArea = document.getElementById('infiniteArea');
+            if (infiniteArea) {
+                infiniteArea.innerHTML = '<span class="pill"><span class="spin" aria-hidden="true"></span> 더 불러오는 중...</span>';
+            }
+
+            const url = '@Url.Action("LoadMore", "BandBoard")'
+                + '?boardTableName=' + encodeURIComponent(boardTableName)
+                + '&boardName=' + encodeURIComponent(boardName)
+                + '&page=' + encodeURIComponent(nextPage);
+
+            fetch(url)
+                .then(res => res.text())
+                .then(html => {
+                    if (!html.trim()) {
+                        hasMore = false;
+                        if (infiniteArea) infiniteArea.innerHTML = '<span class="pill">✅ 더 이상 글이 없습니다.</span>';
+                        return;
+                    }
+
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+
+                    const postList = document.getElementById('postList');
+                    while (temp.firstChild) {
+                        postList.appendChild(temp.firstChild);
+                    }
+
+                    const hiddenNext = document.getElementById('nextPageHidden');
+                    const hiddenMore = document.getElementById('hasMoreHidden');
+                    if (hiddenNext && hiddenMore) {
+                        nextPage = parseInt(hiddenNext.value);
+                        hasMore = hiddenMore.value === 'true';
+                        hiddenNext.remove();
+                        hiddenMore.remove();
+                    }
+
+                    if (!hasMore) {
+                        if (infiniteArea) infiniteArea.innerHTML = '<span class="pill">✅ 더 이상 글이 없습니다.</span>';
+                    } else {
+                        if (infiniteArea) infiniteArea.innerHTML = '<span class="pill"><span class="spin" aria-hidden="true"></span> 스크롤하면 더 불러와요</span>';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    if (infiniteArea) infiniteArea.innerHTML = '<span class="pill">⚠️ 불러오기 실패. 다시 시도해 주세요.</span>';
+                })
+                .finally(() => {
+                    isLoading = false;
+                });
+        }
+
+        window.addEventListener('scroll', onScroll);
+
+        // ===== Safety: escape HTML for injected strings in comments =====
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+﻿@model BibleReadingThrough.Models.BibleGift.BibleGiftSelectVM
+@{
+    Layout = null;
+    var ok  = TempData["GiftOk"]  as string;
+    var err = TempData["GiftErr"] as string;
+
+    // 금액·한도는 ADMIN / SUPERADMIN 에게만 보인다
+    var isAdmin = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+
+    // 한도를 넘는 선물은 고를 수 없으니 관리자에게만 보인다
+    var items = isAdmin ? Model.Items : Model.Items.Where(i => !i.OverLimit).ToList();
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>@(Model.RoundNo)독 완독 선물</title>
+@await Html.PartialAsync("_GiftTheme")
+<style>
+.gGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
+.gCard{background:var(--card);border:1px solid var(--line);padding:11px;display:flex;flex-direction:column;gap:7px;width:100%;text-align:left;font-family:inherit;cursor:pointer}
+.gCard.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.gCard.off{opacity:.45;cursor:not-allowed}
+.gCard.ro{cursor:default}
+.gCard.ro .gThumb{cursor:zoom-in}
+.gThumb{position:relative;aspect-ratio:1/1;background:#F1EFEA;display:flex;align-items:center;justify-content:center;font-size:30px;overflow:hidden}
+.gThumb img{width:100%;height:100%;object-fit:cover}
+.gZoom{position:absolute;right:6px;bottom:6px;font-style:normal;font-size:10px;letter-spacing:.06em;background:rgba(22,24,28,.72);color:#F7F6F3;padding:3px 7px}
+/* 선물 크게 보기 */
+#gLight{display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.78);align-items:center;justify-content:center;padding:18px}
+#gLight.on{display:flex}
+.gLightBox{background:var(--card);max-width:460px;width:100%;padding:10px}
+.gLightBox img{width:100%;height:auto;display:block}
+.gLightName{font-family:"Noto Serif KR",serif;font-size:15px;padding:12px 4px 4px;text-align:center}
+.gLightDesc{font-size:12.5px;line-height:1.75;color:var(--dim2);padding:6px 6px 2px;text-align:center;word-break:keep-all}
+.gLightClose{width:100%;font-family:inherit;font-size:13px;padding:11px;background:var(--head);color:var(--headtx);border:0;cursor:pointer;margin-top:8px}
+.gName{font-family:"Noto Serif KR",serif;font-size:13.5px;line-height:1.45;color:var(--tx)}
+.gPrice{font-family:"Inter",sans-serif;font-size:11.5px;color:var(--dim)}
+.gDesc{font-size:11.5px;line-height:1.65;color:var(--dim2);word-break:keep-all;white-space:normal;
+       display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* 고르기 표시 — 버튼처럼 보이게 */
+.gTag{display:block;margin-top:auto;text-align:center;font-size:12px;font-weight:700;letter-spacing:.02em;
+      padding:9px 8px;border:1px solid var(--tx);color:var(--tx);background:var(--bg)}
+.gCard.on .gTag{background:var(--acc);border-color:var(--acc);color:#fff}
+.gCard.off .gTag{border-color:var(--rule);color:var(--dim);background:none;font-weight:400}
+.gCard.ro .gTag{display:none}
+.pickbar{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;background:var(--head);color:var(--headtx);padding:13px 14px;margin-top:18px}
+.pickbar .t{flex:1;font-size:13.5px;min-width:0}
+.pickbar .t b{color:var(--headk)}
+.pickbar button{font-family:inherit;font-size:13px;padding:9px 16px;border:0;cursor:pointer;white-space:nowrap}
+.bGho{background:none;color:var(--headdim);border:1px solid #3A3C40}
+.doneBox{background:var(--card);border:1px solid var(--line);padding:16px;margin-top:16px;display:flex;gap:13px;align-items:center}
+.doneBox .em{font-size:30px}
+img.em{width:56px;height:56px;border-radius:12px;object-fit:cover;background:#F1EFEA;border:1px solid var(--line);flex:none}
+.doneBox .n{flex:1;min-width:0}
+.doneBox .n b{font-family:"Noto Serif KR",serif;font-size:15px;display:block;font-weight:500}
+.doneBox .n span{font-size:12px;color:var(--dim2)}
+.cancelBtn{width:100%;font-family:inherit;font-size:13.5px;padding:12px;margin-top:8px;background:var(--card);border:1px solid #E7D2C4;color:var(--red);cursor:pointer;font-weight:600}
+.cancelBtn:hover{background:#F7EDE6}
+.lockbox{margin-top:14px;background:#F2EDE6;border:1px dashed var(--acc);padding:13px;font-size:13px;color:var(--dim2);line-height:1.8}
+.lockbox b{color:var(--red)}
+
+/* ── 태블릿 ── */
+@@media (max-width: 760px) {
+    .gGrid{grid-template-columns:repeat(2,1fr);gap:10px}
+}
+
+/* ── 휴대폰 : 가로로 눕힌 한 줄 카드 (사진 왼쪽 · 글 오른쪽) ── */
+@@media (max-width: 560px) {
+    .gGrid{grid-template-columns:1fr;gap:9px;margin-top:14px}
+    .gCard{display:grid;grid-template-columns:96px 1fr;grid-template-areas:"thumb name" "thumb desc" "thumb tag";
+           column-gap:12px;row-gap:5px;align-items:start;padding:10px}
+    .gThumb{grid-area:thumb;width:96px;height:96px;aspect-ratio:auto}
+    .gName{grid-area:name;font-size:15px;font-weight:600;line-height:1.4}
+    .gDesc{grid-area:desc;font-size:12.5px;-webkit-line-clamp:2}
+    .gPrice{display:none}                      /* 금액은 머리글에만 (관리자) */
+    .gTag{grid-area:tag;margin-top:6px;padding:11px 8px;font-size:13px}
+    .gZoom{font-size:9.5px;padding:2px 6px;right:4px;bottom:4px}
+
+    .pickbar{flex-wrap:wrap;gap:8px;padding:11px 12px}
+    .pickbar .t{flex:1 0 100%;font-size:13px}
+    .pickbar button{flex:1;padding:12px 10px;font-size:13.5px}
+    .doneBox{padding:13px;gap:10px}
+    .doneBox .em{font-size:26px}
+    img.em{width:48px;height:48px}
+    .gLightBox{padding:8px}
+    .cancelBtn{padding:13px}
+}
+
+/* 관리자에게만 보이는 금액은 휴대폰에서도 보이게 (카드 이름 아래 한 줄) */
+@@media (max-width: 560px) {
+    .gCard.hasPrice{grid-template-areas:"thumb name" "thumb price" "thumb desc" "thumb tag"}
+    .gCard.hasPrice .gPrice{display:block;grid-area:price;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="gwrap">
+
+    <header class="ghd">
+        <div class="ghdNav">
+            <a href="/Bible2/Welcome">성경통독</a>
+            <a href="/Home/Index">홈</a>
+        </div>
+        <div class="ghdK">@(BulletinBoard.Common.ConstatsCommon.ReadBibleAllTitleButton) 완독 선물</div>
+        <h1 class="ghdT">@(Model.RoundNo)독 완독 선물<span>@Model.UserFullName</span></h1>
+        <div class="ghdMeta">
+            <span>
+                @if (!Model.IsReadOnly)
+                {
+                    <text>완독일 @Model.CompletedAt.ToString("yyyy-MM-dd") · </text>
+                }
+                고를 수 있는 선물 <b>@(items.Count(i => !i.OverLimit))</b>가지
+            </span>
+            @if (isAdmin)
+            {
+                <span>
+                    @if (Model.MinUnitPrice > 0 && Model.MaxUnitPrice > 0)
+                    {
+                        <text>가격 @Model.MinUnitPrice.ToString("N0") ~ @Model.MaxUnitPrice.ToString("N0")원</text>
+                    }
+                    else if (Model.MaxUnitPrice > 0)
+                    {
+                        <text>선물 한도 @Model.MaxUnitPrice.ToString("N0")원</text>
+                    }
+                </span>
+            }
+        </div>
+    </header>
+
+    <div class="gbody">
+
+        @if (!string.IsNullOrEmpty(ok))  { <div class="gflash">@ok</div> }
+        @if (!string.IsNullOrEmpty(err)) { <div class="gflash err">@err</div> }
+
+        @if (Model.IsReadOnly)
+        {
+            @* ── 구경 전용 : 로그인 없이(또는 대상자가 아닌 사람이) 목록만 본다 ── *@
+            <div class="gnotice">
+                성경통독을 마치면 받는 <b>선물 목록</b>이에요. 구경만 하는 화면이라 여기서는 고를 수 없어요.<br>
+                통독을 마친 친구는 <b>로그인하면</b> 홈에서 "선물 고르기"가 보여요.
+            </div>
+
+            <div class="gGrid">
+                @foreach (var it in items)
+                {
+                    <div class="gCard @(it.OverLimit ? "off" : "") ro @(isAdmin ? "hasPrice" : "")">
+                        <span class="gThumb" data-zoom="@it.ImageUrl" data-zoomname="@it.ProductName" data-zoomdesc="@it.Description">
+                            <img src="@it.ImageUrl" alt="" onerror="this.style.display='none';this.parentNode.textContent='🎁';">
+                            <em class="gZoom">크게</em>
+                        </span>
+                        <span class="gName">@it.ProductName</span>
+                        @if (!string.IsNullOrWhiteSpace(it.Description))
+                        {
+                            <span class="gDesc">@it.Description</span>
+                        }
+                        @if (isAdmin)
+                        {
+                            <span class="gPrice">@(it.UnitPrice.ToString("N0"))원@(it.OverLimit ? " · 한도 초과" : "")</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            @if (items.Count == 0)
+            {
+                <div class="gempty">아직 등록된 선물이 없어요.</div>
+            }
+        }
+        else if (Model.Locked)
+        {
+            <div class="doneBox">
+                <img class="em" src="@(Model.Items.FirstOrDefault(i => i.ProductID == Model.PickedProductId)?.ImageUrl)" alt="" onerror="this.onerror=null;this.src='/images/icon/gift_default.png';this.style.opacity='.55';" />
+                <div class="n">
+                    <b>@Model.PickedProductName</b>
+                    <span>@(Model.RoundNo)독 완독 선물 · @(Model.IsDelivered ? "선물을 전해 드렸어요" : "선물을 준비하고 있어요")</span>
+                </div>
+                <span class="gpill buy">@(Model.IsDelivered ? "전달 완료" : "준비 중")</span>
+            </div>
+            <div class="lockbox">
+                @if (Model.IsDelivered)
+                {
+                    <text>선물을 이미 전해 드렸어요. 맛있게(재미있게) 잘 쓰세요 🎁</text>
+                }
+                else
+                {
+                    <text>선생님이 <b>선물을 사고 있어서</b> 이제는 바꾸거나 취소할 수 없어요.<br>조금만 기다려 주세요. 곧 전해 드릴게요.</text>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="gnotice">
+                마음에 드는 선물 하나를 골라 주세요. <b>고른 뒤에도 바꿀 수 있어요.</b>
+                다만 선생님이 <b>선물을 사기 시작하면 바꿀 수 없어요.</b>
+            </div>
+
+            @if (Model.PickedProductId != null)
+            {
+                <div class="doneBox">
+                    <img class="em" src="@(Model.Items.FirstOrDefault(i => i.ProductID == Model.PickedProductId)?.ImageUrl)" alt="" onerror="this.onerror=null;this.src='/images/icon/gift_default.png';this.style.opacity='.55';" />
+                    <div class="n">
+                        <b>@Model.PickedProductName</b>
+                        <span>@Model.SelectedAt?.ToString("yyyy-MM-dd HH:mm") 고름</span>
+                    </div>
+                    <span class="gpill draft">선택 완료</span>
+                </div>
+
+                @* 선택 취소 — 고른 선물 바로 아래 *@
+                <form method="post" asp-action="Cancel" onsubmit="return confirm('고른 선물을 취소할까요?');">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="round" value="@Model.RoundNo" />
+                    <button type="submit" class="cancelBtn">선택 취소하기</button>
+                </form>
+            }
+
+            <form method="post" asp-action="Pick" id="pickForm">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="round" value="@Model.RoundNo" />
+                <input type="hidden" name="productId" id="productId" value="@(Model.PickedProductId ?? 0)" />
+
+                <div class="gGrid">
+                    @foreach (var it in items)
+                    {
+                        <button type="button"
+                                class="gCard @(it.IsPicked ? "on" : "") @(it.OverLimit ? "off" : "") @(isAdmin ? "hasPrice" : "")"
+                                data-id="@it.ProductID"
+                                data-name="@it.ProductName"
+                                @(it.OverLimit ? "disabled" : "")>
+                            <span class="gThumb" data-zoom="@it.ImageUrl" data-zoomname="@it.ProductName" data-zoomdesc="@it.Description">
+                                <img src="@it.ImageUrl" alt="" onerror="this.style.display='none';this.parentNode.textContent='🎁';">
+                                <em class="gZoom">크게</em>
+                            </span>
+                            <span class="gName">@it.ProductName</span>
+                            @if (!string.IsNullOrWhiteSpace(it.Description))
+                            {
+                                <span class="gDesc">@it.Description</span>
+                            }
+                            @if (isAdmin)
+                            {
+                                <span class="gPrice">@(it.UnitPrice.ToString("N0"))원</span>
+                            }
+                            <span class="gTag">@(it.OverLimit ? "고를 수 없어요" : it.IsPicked ? "고른 선물" : "고르기")</span>
+                        </button>
+                    }
+                </div>
+
+                @if (items.Count == 0)
+                {
+                    <div class="gempty">아직 고를 수 있는 선물이 없어요. 선생님께 말씀해 주세요.</div>
+                }
+
+                <div class="pickbar">
+                    <div class="t">고른 선물 · <b id="pickName">@(Model.PickedProductName ?? "아직 안 골랐어요")</b></div>
+                    @if (Model.PickedProductId != null)
+                    {
+                        <button type="submit" class="bGho" formaction="/BibleGift/Cancel"
+                                onclick="return confirm('고른 선물을 취소할까요?');">선택 취소</button>
+                    }
+                    <button type="submit" class="bPri" id="submitBtn" style="background:var(--gold);color:#16181C;font-weight:700;">이걸로 할래요</button>
+                </div>
+            </form>
+
+        }
+
+        <div id="gLight" onclick="gLightClose(event)">
+            <div class="gLightBox" onclick="event.stopPropagation()">
+                <img id="gLightImg" src="" alt="">
+                <div class="gLightName" id="gLightName"></div>
+                <div class="gLightDesc" id="gLightDesc"></div>
+                <button type="button" class="gLightClose" onclick="gLightClose(event)">닫기</button>
+            </div>
+        </div>
+
+        <div class="gfoot">
+            <a href="/Bible2/Welcome">성경통독</a>
+            <a href="/Home/Index">홈</a>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── 선물 크게 보기 ── */
+function gLightClose(e) { if (e) e.stopPropagation(); document.getElementById('gLight').classList.remove('on'); }
+(function () {
+    document.querySelectorAll('.gThumb[data-zoom]').forEach(function (th) {
+        th.addEventListener('click', function (e) {
+            e.preventDefault(); e.stopPropagation();       // 카드 선택과 겹치지 않게
+            var box = document.getElementById('gLight');
+            var img = document.getElementById('gLightImg');
+            img.src = th.getAttribute('data-zoom');
+            img.onerror = function () { img.style.display = 'none'; };
+            img.style.display = '';
+            document.getElementById('gLightName').textContent = th.getAttribute('data-zoomname') || '';
+            document.getElementById('gLightDesc').textContent = th.getAttribute('data-zoomdesc') || '';
+            box.classList.add('on');
+        });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') gLightClose(); });
+})();
+
+(function () {
+    var hidden = document.getElementById('productId');
+    var label  = document.getElementById('pickName');
+    if (!hidden) return;
+    document.querySelectorAll('.gCard').forEach(function (b) {
+        if (b.disabled) return;
+        b.addEventListener('click', function () {
+            document.querySelectorAll('.gCard').forEach(function (x) {
+                x.classList.remove('on');
+                var t = x.querySelector('.gTag');
+                if (t && t.textContent !== '고를 수 없어요') t.textContent = '고르기';
+            });
+            b.classList.add('on');
+            var t = b.querySelector('.gTag');
+            if (t) t.textContent = '고른 선물';
+            hidden.value = b.getAttribute('data-id');
+            if (label) label.textContent = b.getAttribute('data-name');
+        });
+    });
+    document.getElementById('pickForm').addEventListener('submit', function (e) {
+        if (!hidden.value || hidden.value === '0') { e.preventDefault(); alert('선물을 하나 골라 주세요.'); }
+    });
+})();
+</script>
+@await Html.PartialAsync("_GiftWaitCard")
+</body>
+</html>

@@ -1,0 +1,458 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+
+
+@{
+    Layout = null;
+
+    var ChurchName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.ChurchName.ToString());
+    var DepartmentName = HttpContextAccessor.HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString());
+}
+
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ChurchName · @DepartmentName</title>
+    <style>
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background-color: #efefef;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            height: 100%;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            border-radius: 0;
+            box-shadow: none;
+            position: relative;
+        }
+
+        .chat-header {
+            background-color: #f7f7f7;
+            padding: 10px;
+            text-align: center;
+            font-weight: bold;
+            border-bottom: 1px solid #cccccc;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 10px;
+            overflow-y: auto;
+            margin-bottom: 60px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+        }
+
+            .message .user {
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+
+            .message.sent {
+                text-align: right;
+            }
+
+                .message.sent .bubble {
+                    background-color: #9eea6a;
+                    color: white;
+                    display: inline-block;
+                    padding: 10px;
+                    border-radius: 10px;
+                    border-bottom-right-radius: 0;
+                }
+
+            .message.received .bubble {
+                background-color: #ffffff;
+                border: 1px solid #cccccc;
+                display: inline-block;
+                padding: 10px;
+                border-radius: 10px;
+                border-bottom-left-radius: 0;
+            }
+
+        .chat-input {
+            border-top: 1px solid #cccccc;
+            padding: 10px;
+            display: flex;
+            align-items: center;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background-color: white;
+            z-index: 1000;
+        }
+
+            .chat-input input {
+                flex-grow: 1;
+                padding: 10px;
+                border: 1px solid #cccccc;
+                border-radius: 20px;
+                outline: none;
+            }
+
+            .chat-input button {
+                background-color: #007aff;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 20px;
+                margin-left: 10px;
+                cursor: pointer;
+            }
+
+        #loadingMessageOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #loadingMessage {
+            font-size: 24px;
+            color: white;
+        }
+    </style>
+    <style>
+
+        .close-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: #ff5c5c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            z-index: 1000;
+        }
+    </style>
+    <style>
+        /* 추가한 부분 */
+        #blurOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+
+        .alert-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 81%; /* 가로 크기를 화면의 81%로 설정 */
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: none;
+            z-index: 1000;
+            text-align: center; /* 내용 가운데 정렬 */
+        }
+
+            .alert-box button {
+                margin-top: 10px;
+                background-color: #007aff;
+                color: white;
+                margin-left:5px;
+                margin-right: 5px;
+                padding: 10px 10px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                display: inline-block; /* 버튼이 인라인 블록으로 설정 */
+            }
+
+    </style>
+      <script src="/js/common2.js"></script>
+</head>
+<body>
+    <button class="close-btn" onclick="window.location.href='/AIExperience/Index'">닫기</button>
+
+        <!-- 흐리게 하는 오버레이 추가 -->
+    <div id="blurOverlay"></div>
+
+    <div class="chat-container">
+        @if (ViewBag.Meth == "simple")
+        {
+            <div class="chat-header">인공지능과 대화(간단한 답변 모드)</div>
+        }
+        else
+        {
+            <div class="chat-header">인공지능과 대화(자세한 답변 모드)</div>
+        }
+        <div class="chat-messages" id="chat-messages"></div>
+        <div id="loadingMessageOverlay">
+            <div id="loadingMessage">AI 답변을 기다리는 중...(0초 경과)</div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="chat-input" placeholder="AI 프롬프트(질문)를 입력하세요...">
+            <button onclick="processResponse()">전송</button>
+        </div>
+    </div>
+
+
+    <script>
+        let elapsedSeconds = 0;
+        let totalElapsedSeconds = 0;
+        let interval;
+        let firstTimeout;
+        let secondTimeout;
+        let thirdTimeout;  // for third retry
+
+        async function sendGetRequest(inputData, attempt = 1) {
+            const baseUrl = "https://www.vision2080.co.kr/api/values/chat";
+            const params = new URLSearchParams({ WhatAsk: inputData, UserName: "@Html.Raw(@ViewData[HttpContextSessionCategory.UserFullName.ToString()])" });
+            const url = `${baseUrl}?${params.toString()}`;
+
+            console.log("url", url)
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder('utf-8');
+                let done = false;
+                let accumulatedData = ''; // Reset the accumulated data
+
+                while (!done) {
+                    const { value, done: streamDone } = await reader.read();
+                    done = streamDone;
+                    accumulatedData += decoder.decode(value, { stream: false });
+                }
+
+                processStreamedData(accumulatedData, totalElapsedSeconds); // Show total elapsed time, not just retry time
+            } catch (error) {
+                console.error('Error:', error);
+            } finally {
+                clearTimeout(firstTimeout);
+                clearTimeout(secondTimeout);
+                clearTimeout(thirdTimeout); // Clear third timeout as well
+                stopLoading();
+                enableInput();
+            }
+        }
+
+        function processStreamedData(result, totalTime) {
+            const lines = result.split('\n');
+            const parsedMessages = [];
+
+            lines.forEach(line => {
+                if (line.trim() !== '') {
+                    try {
+                        const parsedData = JSON.parse(line);
+                        parsedMessages.push(parsedData.message.content);
+                    } catch (error) {
+                        console.error('Error parsing line:', error);
+                    }
+                }
+            });
+
+            // Show the full message at once, including the total time taken
+            addMessage('received', `${parsedMessages.join(' ')} (총 ${totalTime}초 소요됨)`);
+        }
+
+        function addMessage(type, text) {
+            const messageContainer = document.createElement('div');
+            messageContainer.classList.add('message', type);
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('bubble');
+            messageBubble.innerText = text;
+
+            const time = new Date();
+            //            const timestamp = `${time.getHours()}:${time.getMinutes()}`;
+
+            const hours = String(time.getHours()).padStart(2, '0');
+            const minutes = String(time.getMinutes()).padStart(2, '0');
+            const seconds = String(time.getSeconds()).padStart(2, '0');
+            const timestamp = `${hours}:${minutes}:${seconds}`;
+
+            messageContainer.appendChild(messageBubble);
+            messageContainer.appendChild(document.createElement('div')).innerText = timestamp; // Display timestamp
+
+            document.getElementById('chat-messages').appendChild(messageContainer);
+
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function processResponse() {
+            let inputData = document.getElementById('chat-input').value;
+             // 입력값이 비어 있으면 경고 메시지 띄우기
+            if (inputData === '') { 
+
+                let result = await confirmMessage(false, ['AI 프롬프트(질문)를 입력하세요.']); // 취소 버튼 표시
+                if (result === 'y') {
+                    //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                    // 여기에 다음 작업을 넣습니다
+                } else if (result === 'c') {
+                    //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                    // 작업 취소 로직
+                }
+
+                return; // 입력이 없으면 진행 중단
+            }
+
+            try {
+
+                let result = await confirmMessage(true, ['공개된 초거대 인공지능(AI) 모델을 사용중 입니다.', '무료 버전이라 응답이 느려요.', '응답시간이 1~3분 소요될수도 있어요.'], null, '진행'); // 취소 버튼 표시
+                if (result === 'y') {
+                    //  alert('확인 버튼을 눌렀습니다. 다음 작업을 진행합니다.');
+                    // 여기에 다음 작업을 넣습니다
+                } else if (result === 'c') {
+                    //  alert('취소 버튼을 눌렀습니다. 작업을 취소합니다.');
+                    // 작업 취소 로직
+                    return;
+                }             
+
+
+            } catch (error) {
+                // "취소" 버튼을 누르면 여기서 멈춤
+                return;
+            }
+
+
+            document.getElementById('chat-input').value = '';
+
+            // Reset the total elapsed time to 0 for a new question
+            totalElapsedSeconds = 0;
+
+            addMessage('sent', inputData);
+
+            startLoading();  // Start loading once and keep it
+            disableInput();
+           
+            if ("@ViewBag.Meth" == "simple") {
+                inputData = `Llama3,다음 질문에 대해 한글로 짧고 간단하게 답변해 주세요: "${inputData}?"`;
+            }
+            else
+            {
+                inputData = `Llama3,다음 질문에 대해 한글로 답변해 주세요: "${inputData}?"`;
+            }
+            await sendGetRequest(inputData);
+        }
+      
+
+        // 경고 메시지 박스 닫기
+        function closeAlert() {
+            document.getElementById('blurOverlay').style.display = 'none';  // 화면 흐리게 제거
+            document.getElementById('alert-box').style.display = 'none';    // 경고 메시지 박스 숨기기
+        }
+
+                // 경고 메시지 박스 띄우기
+        //function showMessageAlert() {
+        //    document.getElementById('blurOverlay').style.display = 'block'; // 화면 흐리게
+        //    document.getElementById('alert-message-box').style.display = 'block';   // 경고 메시지 박스 보이기
+        //}
+
+        function showMessageAlert() {
+            return new Promise((resolve, reject) => {
+                document.getElementById('blurOverlay').style.display = 'block'; // 화면 흐리게
+                document.getElementById('alert-message-box').style.display = 'block';   // 경고 메시지 박스 보이기
+
+                // 확인 버튼 클릭 이벤트
+                document.querySelector("#alert-message-box .confirm-button").onclick = function () {
+                    closeMessageAlert();
+                    resolve(); // 확인 버튼을 누르면 Promise를 해결하여 다음으로 진행
+                };
+
+                // 취소 버튼 클릭 이벤트
+                document.querySelector("#alert-message-box .cancel-button").onclick = function () {
+                    closeMessageAlert();
+                    reject(); // 취소 버튼을 누르면 Promise를 거부하여 진행을 멈춤
+                };
+            });
+        }
+        // 경고 메시지 박스 닫기
+        function closeMessageAlert() {
+            document.getElementById('blurOverlay').style.display = 'none';  // 화면 흐리게 제거
+            document.getElementById('alert-message-box').style.display = 'none';    // 경고 메시지 박스 숨기기
+        }
+        function resetElapsedSeconds() {
+            totalElapsedSeconds += elapsedSeconds;  // Add current retry seconds to total
+            elapsedSeconds = 0;  // Reset the elapsed seconds to 0
+        }
+
+        function startLoading() {
+            document.getElementById('loadingMessage').innerText = 'AI 답변을 기다리는 중...(0초 경과)';
+            elapsedSeconds = 0;
+            document.getElementById('loadingMessageOverlay').style.display = 'flex';
+            interval = setInterval(() => {
+                elapsedSeconds++;
+                totalElapsedSeconds++;
+
+                // 분과 초 계산
+                let minutes = Math.floor(totalElapsedSeconds / 60); // 총 초를 60으로 나눠서 분을 구함
+                let seconds = totalElapsedSeconds % 60; // 남은 초를 구함
+
+                if(minutes > 0)
+                {
+                    document.getElementById('loadingMessage').innerText = `AI 답변을 기다리는 중...(${minutes}분${seconds}초 경과)`;
+                }
+                else
+                {
+                    document.getElementById('loadingMessage').innerText = `AI 답변을 기다리는 중...(${seconds}초 경과)`;
+                }
+
+            }, 1000);  // Update every second with the total elapsed time
+        }
+
+        function stopLoading() {
+            clearInterval(interval);
+            document.getElementById('loadingMessageOverlay').style.display = 'none';
+        }
+
+        function disableInput() {
+            document.getElementById('chat-input').disabled = true;
+            document.querySelector('.chat-input button').disabled = true;
+        }
+
+        function enableInput() {
+            document.getElementById('chat-input').disabled = false;
+            document.querySelector('.chat-input button').disabled = false;
+        }
+    </script>
+
+</body>
+</html>

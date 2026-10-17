@@ -1,0 +1,41 @@
+﻿@using BulletinBoard.Common;
+@using BulletinBoard.Enums
+@using BulletinBoard.Helpers;
+@using Microsoft.AspNetCore.Http;
+@using BulletinBoard.Services.Abstract
+@inject IAuthService AuthService
+@inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
+@model BulletinBoard.Models.eBibles
+
+@{
+    string ActionSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ActionSource.ToString()) as String;
+    string ControllerSource = HttpContextAccessor.HttpContext.Session.GetString(MVCInfomation.ControllerSource.ToString()) as String;
+
+}
+
+@if (!string.Equals(ViewBag.DisableLangTransBtton as string, "y", StringComparison.OrdinalIgnoreCase))
+{
+    @await Html.PartialAsync("_PublishSwicthLang")
+}
+
+@if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+{
+    @await Html.PartialAsync("_PublishNavigationButton_8")
+}
+
+@if (@ControllerSource == "RhapsodyOfReality" && @ActionSource == "DetailWords")
+{
+    <div class="bible-title" style="text-align:center;color : #006633;font-size: 22px; padding-top :20px; font-weight:bold;">@Model.JanZulString</div>
+}
+else
+{
+    @await Html.PartialAsync("_PublisheBible_Title", Model)
+}
+  
+
+@await Html.PartialAsync("_PublisheBible_OneByOne", Model)
+
+@if (await AuthService.IsSignedIn(User) && (await AuthService.IsInRole(await AuthService.GetSignedUser(User), nameof(Roles.SuperAdmin))))
+{
+    @await Html.PartialAsync("_PublishNavigationButton_8")
+}
