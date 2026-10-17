@@ -1,0 +1,113 @@
+@model BulletinBoard.Models.JuManNaSegMonth
+@using BulletinBoard.Common;
+
+@*  ══════════════════════════════════════════════════════════════
+    매일성경 말씀 정리 — 영상 구간 편집 — 2026-10-18 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
+    · 한 달 전체.  하루가 여러 장에 걸치면 장마다 한 줄(구간 1 ~ 5 = FromJang 부터 차례로)
+    · ▶ 를 누르면 영상 창 → [시작 시점 설정] · [종료 시점 설정] 을 누르는 즉시 SaveSegment 로 저장(화면 그대로)
+    · 값 0 = 기본값(시작 → 영상 처음, 종료 → 영상 끝).  점선으로 보인다
+    · 동작은 wwwroot/js/jumanna-segedit.js
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    DateTime first = DateTime.ParseExact(Model.YYYYMM + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+    string monthLabel = $"{first.Year}년 {first.Month}월";
+    string prevYm = first.AddMonths(-1).ToString("yyyy-MM");
+    string nextYm = first.AddMonths(1).ToString("yyyy-MM");
+    string[] week = { "일", "월", "화", "수", "목", "금", "토" };
+    string F(int sec) => $"{sec / 60}:{sec % 60:D2}";
+    int crossDays = Model.Days.Count(d => d.Segs.Count > 1);
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>영상 구간 편집</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
+    <style>body { margin: 0; background: #FFFFFF; }</style>
+</head>
+<body>
+<div id="segTok" hidden>@Html.AntiForgeryToken()</div>
+
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><span class="sep">›</span>구간 편집</span>
+        <span>WORD</span>
+    </div>
+
+    <div class="qb-k">@monthLabel · @(Model.Days.Count)일@(crossDays > 0 ? $" · 장 걸침 {crossDays}일" : "")</div>
+    <h1 class="qb-h1">영상 구간 편집</h1>
+    <div class="qb-sub">▶ 를 누르고 시작 · 종료 시점을 누르면 바로 저장돼요.  <span class="jm-sv def">0:00</span> 점선은 기본값(영상 처음 · 끝)이에요.</div>
+
+    <div class="jm-chips">
+        <a href="/JuManNa/SegmentEditor?YYYYMM=@prevYm">← @(first.AddMonths(-1).Month)월</a>
+        <a href="/JuManNa/SegmentEditor?YYYYMM=@nextYm">@(first.AddMonths(1).Month)월 →</a>
+        <a href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@Model.YYYYMM">영상 구간 보기</a>
+    </div>
+
+    @if (Model.Days.Count == 0)
+    {
+        <div class="qb-empty">이 달에 등록된 말씀이 없어요</div>
+    }
+
+    @foreach (var d in Model.Days)
+    {
+        bool sun = d.ExposeDate.DayOfWeek == DayOfWeek.Sunday;
+        bool cross = d.Segs.Count > 1;
+        string refText = $"{d.BibleText} {SharedComm.MakeBibleSerialJangZul(d.BibleText, d.FromJang, d.FromZul, d.ToJang, d.ToZul)}";
+
+        <div class="jm-day">
+            <span class="jm-dt @(sun ? "sun" : "")"><small>@(d.ExposeDate.Month)월</small><b>@d.ExposeDate.Day</b><i>@week[(int)d.ExposeDate.DayOfWeek]</i></span>
+            <div class="c">
+                <div class="ref">
+                    @refText
+                    @if (cross)
+                    {
+                        <span class="jm-xch">장 걸침 · 영상 @(d.Segs.Count)개</span>
+                    }
+                </div>
+
+                @foreach (var s in d.Segs)
+                {
+                    bool firstSeg = s.Slot == 1, lastSeg = s.Slot == d.Segs.Count;
+                    string hint = !cross ? $"{d.FromZul}~{d.ToZul}절"
+                                : firstSeg ? $"{d.FromZul}절부터 · 시작점 지정"
+                                : lastSeg ? $"{d.ToZul}절까지 · 종료점 지정"
+                                : "장 전체";
+                    bool hasVideo = !string.IsNullOrWhiteSpace(s.Url);
+
+                    <div class="jm-segrow" data-id="@d.Id" data-slot="@s.Slot" data-yt="@s.Url" data-len="@s.LenSec"
+                         data-s="@s.StartSec" data-e="@s.EndSec" data-title="@(d.ExposeDate.Month)월 @(d.ExposeDate.Day)일 · @d.BibleText @(s.Jang)장">
+                        @if (hasVideo)
+                        {
+                            <button type="button" class="jm-segplay" aria-label="@(s.Jang)장 영상 열기"><svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M7 4l13 8-13 8z" /></svg></button>
+                        }
+                        else
+                        {
+                            <span class="jm-segplay off" title="이 장 영상 주소가 없어요">–</span>
+                        }
+                        <span class="jm-segtag">구간 @s.Slot · @(s.Jang)장</span>
+                        <span class="jm-sv @(s.StartSec > 0 ? "" : "def")" data-v="s">@F(s.StartSec)</span>
+                        <i class="jm-segto">~</i>
+                        <span class="jm-sv @(s.EndSec > 0 ? "" : "def")" data-v="e">@F(s.EndSec > 0 ? s.EndSec : s.LenSec)</span>
+                        <small class="jm-seghint">@(hasVideo ? $"영상 {F(s.LenSec)} · {hint}" : "영상 없음")</small>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="qb-ft">
+        <span>영상 구간 편집</span>
+        <span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script src="/js/jumanna-segedit.js" asp-append-version="true"></script>
+</body>
+</html>
