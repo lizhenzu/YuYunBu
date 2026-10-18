@@ -14,7 +14,9 @@ namespace BulletinBoard.Services.Prayer365
         /// <summary>제목만 (홈 배너용 — 가벼운 조회).  없으면 null</summary>
         Task<string?> GetTitleAsync(string md);
         /// <summary>조회 수 +1 하고 새 값을 돌려준다 (기도문이 없으면 0)</summary>
-        Task<int> AddViewAsync(string md);
+        Task<int> AddViewAsync(string md, DateTime viewDate);
+        /// <summary>오늘(KST) 조회 수 · 누적 조회 수(모든 기도문 합계) (2026-10-19)</summary>
+        Task<(int today, int total)> GetViewStatsAsync(DateTime viewDate);
         /// <summary>
         /// "오늘 기도 했어요" — 로그인한 사람은 개인별 기록(Prayer365PrayLog)에 하루 한 줄 넣고 합계 +1.
         /// 이미 기록이 있으면 added=false.  count = 새 합계
@@ -24,6 +26,8 @@ namespace BulletinBoard.Services.Prayer365
         Task<List<DateTime>> GetPrayDatesAsync(string userName);
         /// <summary>모든 참여자의 (아이디, 기도한 날, 그날 마지막 누른 시각) — 관리자 집계용</summary>
         Task<List<(string user, DateTime day, DateTime at)>> GetAllPrayDaysAsync();
+        /// <summary>참여자 아이디 → 이름(성+이름, AspNetUsers) — 참여자 화면용 (2026-10-19)</summary>
+        Task<Dictionary<string, string>> GetParticipantNamesAsync();
         /// <summary>이 사람이 그날(KST) 이 기도문으로 기도했는지</summary>
         Task<bool> HasPrayedAsync(string md, string userName, DateTime prayDate);
         Task<int> GetPrayCountAsync(string md);
@@ -83,7 +87,13 @@ CREATE TABLE dbo.Prayer365PrayLog (
     CONSTRAINT UQ_Prayer365PrayLog UNIQUE (UserName, PrayDate, MonthDay)
 );
 CREATE INDEX IX_Prayer365PrayLog_Day ON dbo.Prayer365PrayLog (PrayDate, MonthDay);
-END";
+END
+-- 2026-10-19 : 날짜(KST)별 조회 수 — ""오늘의 조회수"" (누적은 Prayer365.ViewCount 합계)
+IF OBJECT_ID(N'dbo.Prayer365ViewDay', N'U') IS NULL
+CREATE TABLE dbo.Prayer365ViewDay (
+    ViewDate  DATE NOT NULL CONSTRAINT PK_Prayer365ViewDay PRIMARY KEY,
+    ViewCount INT  NOT NULL CONSTRAINT DF_Prayer365ViewDay_Cnt DEFAULT(0)
+);";
 
         public async Task EnsureTableAsync()
         {
@@ -198,6 +208,23 @@ SELECT @added, ISNULL((SELECT PrayCount FROM dbo.Prayer365 WHERE MonthDay=@Md), 
             return list;
         }
 
+        public async Task<Dictionary<string, string>> GetParticipantNamesAsync()
+        {
+            await EnsureTableAsync();
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            await using var con = Conn();
+            await con.OpenAsync();
+            // 기도 기록이 있는 아이디만 — 이름 = 성 + 이름 (AspNetUsers)
+            await using var cmd = new SqlCommand(@"
+SELECT u.UserName, LTRIM(RTRIM(ISNULL(u.LastName,'') + ISNULL(u.FirstName,'')))
+FROM dbo.AspNetUsers u WITH (NOLOCK)
+WHERE u.UserName IN (SELECT DISTINCT UserName FROM dbo.Prayer365PrayLog WITH (NOLOCK));", con);
+            await using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+                if (!r.IsDBNull(0) && !r.IsDBNull(1)) map[r.GetString(0)] = r.GetString(1);
+            return map;
+        }
+
         public async Task<bool> HasPrayedAsync(string md, string userName, DateTime prayDate)
         {
             await EnsureTableAsync();
@@ -223,16 +250,42 @@ SELECT @added, ISNULL((SELECT PrayCount FROM dbo.Prayer365 WHERE MonthDay=@Md), 
             return v == null || v == DBNull.Value ? 0 : (int)v;
         }
 
-        public async Task<int> AddViewAsync(string md)
+        public async Task<int> AddViewAsync(string md, DateTime viewDate)
         {
             await EnsureTableAsync();
             await using var con = Conn();
             await con.OpenAsync();
-            await using var cmd = new SqlCommand(
-                "UPDATE dbo.Prayer365 SET ViewCount = ViewCount + 1 OUTPUT inserted.ViewCount WHERE MonthDay=@Md;", con);
+            // 기도문 조회 수 +1, 기도문이 있으면 그날(KST) 조회 수도 +1
+            await using var cmd = new SqlCommand(@"
+SET XACT_ABORT ON;
+DECLARE @v TABLE (Cnt INT);
+BEGIN TRAN;
+UPDATE dbo.Prayer365 SET ViewCount = ViewCount + 1 OUTPUT inserted.ViewCount INTO @v WHERE MonthDay=@Md;
+IF EXISTS (SELECT 1 FROM @v)
+BEGIN
+    UPDATE dbo.Prayer365ViewDay WITH (UPDLOCK, HOLDLOCK) SET ViewCount = ViewCount + 1 WHERE ViewDate=@Day;
+    IF @@ROWCOUNT = 0 INSERT INTO dbo.Prayer365ViewDay (ViewDate, ViewCount) VALUES (@Day, 1);
+END
+COMMIT;
+SELECT ISNULL((SELECT TOP 1 Cnt FROM @v), 0);", con);
             cmd.Parameters.Add("@Md", SqlDbType.Char, 4).Value = md;
+            cmd.Parameters.Add("@Day", SqlDbType.Date).Value = viewDate.Date;
             var v = await cmd.ExecuteScalarAsync();
             return v == null || v == DBNull.Value ? 0 : (int)v;
+        }
+
+        public async Task<(int today, int total)> GetViewStatsAsync(DateTime viewDate)
+        {
+            await EnsureTableAsync();
+            await using var con = Conn();
+            await con.OpenAsync();
+            await using var cmd = new SqlCommand(@"
+SELECT ISNULL((SELECT ViewCount FROM dbo.Prayer365ViewDay WITH (NOLOCK) WHERE ViewDate=@Day), 0),
+       ISNULL((SELECT SUM(CAST(ViewCount AS BIGINT)) FROM dbo.Prayer365 WITH (NOLOCK)), 0);", con);
+            cmd.Parameters.Add("@Day", SqlDbType.Date).Value = viewDate.Date;
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync()) return (0, 0);
+            return (r.GetInt32(0), (int)Math.Min(int.MaxValue, r.GetInt64(1)));
         }
 
         public async Task<string?> GetTitleAsync(string md)

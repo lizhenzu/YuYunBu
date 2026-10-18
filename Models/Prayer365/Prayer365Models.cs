@@ -112,6 +112,9 @@ namespace BulletinBoard.Models.Prayer365
         public Prayer365PrayStats? Stats   { get; set; }
         /// <summary>관리자 참여자 요약(참여자 · 오늘 기도) — SuperAdmin 역할 · Basic 아이디에게만, 화면 맨 아래 (2026-10-18 홈에서 옮김)</summary>
         public Prayer365ParticipantsVM? Participants { get; set; }
+        /// <summary>오늘(KST) 조회 수 · 누적 조회 수(모든 기도문 합계) — 관리자가 연 것은 세지 않는다.  -1 = 못 읽음 (2026-10-19)</summary>
+        public int TodayViews { get; set; } = -1;
+        public int TotalViews { get; set; } = -1;
         /// <summary>링크에 붙일 꼬리 — 일반 보기면 "&amp;view=user"</summary>
         public string ViewQs => UserView ? "&view=user" : "";
         public string Prev => Prayer365Config.Step(MonthDay, -1);
@@ -214,6 +217,8 @@ namespace BulletinBoard.Models.Prayer365
     public class Prayer365Participant
     {
         public string   UserName   { get; set; } = "";
+        /// <summary>이름 (성+이름, AspNetUsers) — 참여자 화면에서만 채운다 (2026-10-19)</summary>
+        public string?  FullName   { get; set; }
         public int      PrayedDays { get; set; }
         public int      Streak     { get; set; }
         public int      RatePct    { get; set; } = -1;

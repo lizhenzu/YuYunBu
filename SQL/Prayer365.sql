@@ -42,3 +42,14 @@ CREATE TABLE dbo.Prayer365PrayLog (
 );
 CREATE INDEX IX_Prayer365PrayLog_Day ON dbo.Prayer365PrayLog (PrayDate, MonthDay);
 END
+
+-- ════════════════════════════════════════════════════════════════
+--  2026-10-19 : 날짜(KST)별 조회 수 — 화면의 "오늘 조회"
+--   · 누적 조회 = Prayer365.ViewCount 합계 (모든 기도문)
+--   · 관리자(Basic · SuperAdmin 아이디)가 연 것은 세지 않는다 (ViewCount 와 같음)
+-- ════════════════════════════════════════════════════════════════
+IF OBJECT_ID(N'dbo.Prayer365ViewDay', N'U') IS NULL
+CREATE TABLE dbo.Prayer365ViewDay (
+    ViewDate  DATE NOT NULL CONSTRAINT PK_Prayer365ViewDay PRIMARY KEY,   -- 본 날 (KST)
+    ViewCount INT  NOT NULL CONSTRAINT DF_Prayer365ViewDay_Cnt DEFAULT(0)
+);

@@ -81,8 +81,15 @@ public class Prayer365Controller : Controller
         bool noCount = IsStaff;
         if (vm.Item != null && !(IsStaff && !userView) && !noCount)
         {
-            try { vm.Item.ViewCount = await _svc.AddViewAsync(md!); }
+            try { vm.Item.ViewCount = await _svc.AddViewAsync(md!, today); }
             catch { /* 조회 수 실패로 기도문을 막지 않는다 */ }
+        }
+
+        // 오늘의 조회 수 · 누적 조회 수 — 일반 보기 화면 머리 아래 (2026-10-19)
+        if (vm.Item != null)
+        {
+            try { (vm.TodayViews, vm.TotalViews) = await _svc.GetViewStatsAsync(today); }
+            catch { vm.TodayViews = vm.TotalViews = -1; }
         }
         return View(vm);
     }
@@ -133,7 +140,16 @@ public class Prayer365Controller : Controller
     {
         if (!IsStaff && !PrayManagerHelper.CanSeePrayParticipants(User)) return RedirectToAction(nameof(Index));
         var rows = await _svc.GetAllPrayDaysAsync();
-        return View(Prayer365ParticipantsVM.Build(rows, DateHelper.GetKoreaToday(), sort ?? "recent"));
+        var vm = Prayer365ParticipantsVM.Build(rows, DateHelper.GetKoreaToday(), sort ?? "recent");
+        // 아이디 옆에 이름 (2026-10-19) — 이름을 못 읽어도 목록은 그대로
+        try
+        {
+            var names = await _svc.GetParticipantNamesAsync();
+            foreach (var p in vm.Items)
+                if (names.TryGetValue(p.UserName, out var n) && !string.IsNullOrWhiteSpace(n)) p.FullName = n;
+        }
+        catch { }
+        return View(vm);
     }
 
     // ── 관리 : 365일 달력판 ─────────────────────────────────
