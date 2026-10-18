@@ -217,7 +217,7 @@ namespace BulletinBoard.Models.Prayer365
     public class Prayer365Participant
     {
         public string   UserName   { get; set; } = "";
-        /// <summary>이름 (성+이름, AspNetUsers) — 참여자 화면에서만 채운다 (2026-10-19)</summary>
+        /// <summary>이름 (view_UserCompositeInfo_2026.FullName) — 참여자 화면에서만 채운다 (2026-10-19)</summary>
         public string?  FullName   { get; set; }
         public int      PrayedDays { get; set; }
         public int      Streak     { get; set; }
