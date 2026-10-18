@@ -38,6 +38,7 @@
         .li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--rule); }
         .av { width: 36px; height: 36px; border-radius: 50%; background: var(--soft); color: var(--acc); display: grid; place-items: center; font-size: 13px; font-weight: 800; text-transform: uppercase; }
         .li .n { font-size: 14px; font-weight: 800; color: var(--tx); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .li .n .uid { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--dim2); }
         .li .n small { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--dim); }
         .li .m { margin-top: 1px; font-size: 11.5px; color: var(--dim2); }
         .li .w { text-align: right; font-size: 12.5px; font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -80,9 +81,10 @@
     @foreach (var p in Model.Items)
     {
         <div class="li">
-            <div class="av">@(p.UserName.Length > 0 ? p.UserName.Substring(0, 1) : "?")</div>
+            @{ string avTx = !string.IsNullOrEmpty(p.FullName) ? p.FullName : p.UserName; }
+            <div class="av">@(avTx.Length > 0 ? avTx.Substring(0, 1) : "?")</div>
             <div>
-                <div class="n">@p.UserName<small>기도한 날 @(p.PrayedDays)일</small></div>
+                <div class="n">@if (!string.IsNullOrEmpty(p.FullName)) {<text>@p.FullName</text><span class="uid">@p.UserName</span>} else {<text>@p.UserName</text>}<small>기도한 날 @(p.PrayedDays)일</small></div>
                 <div class="m">연속 @(p.Streak)일 · 기도율 @(p.RatePct >= 0 ? p.RatePct + "%" : "–")</div>
             </div>
             <div class="w @(p.DaysAgo == 0 ? "today" : p.DaysAgo > 3 ? "old" : "")">@When(p)<small>@Ago(p)</small></div>
