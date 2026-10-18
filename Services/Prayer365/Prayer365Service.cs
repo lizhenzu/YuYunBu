@@ -26,7 +26,7 @@ namespace BulletinBoard.Services.Prayer365
         Task<List<DateTime>> GetPrayDatesAsync(string userName);
         /// <summary>모든 참여자의 (아이디, 기도한 날, 그날 마지막 누른 시각) — 관리자 집계용</summary>
         Task<List<(string user, DateTime day, DateTime at)>> GetAllPrayDaysAsync();
-        /// <summary>참여자 아이디 → 이름(성+이름, AspNetUsers) — 참여자 화면용 (2026-10-19)</summary>
+        /// <summary>참여자 아이디 → 이름(view_UserCompositeInfo_2026.FullName) — 참여자 화면용 (2026-10-19)</summary>
         Task<Dictionary<string, string>> GetParticipantNamesAsync();
         /// <summary>이 사람이 그날(KST) 이 기도문으로 기도했는지</summary>
         Task<bool> HasPrayedAsync(string md, string userName, DateTime prayDate);
@@ -214,11 +214,13 @@ SELECT @added, ISNULL((SELECT PrayCount FROM dbo.Prayer365 WHERE MonthDay=@Md), 
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             await using var con = Conn();
             await con.OpenAsync();
-            // 기도 기록이 있는 아이디만 — 이름 = 성 + 이름 (AspNetUsers)
+            // 기도 기록이 있는 아이디만 — 이름은 view_UserCompositeInfo_2026.FullName
+            // (AspNetUsers 에는 성·이름 칸이 없고 FullName 은 비어 있다 — 2026-10-19 확인)
             await using var cmd = new SqlCommand(@"
-SELECT u.UserName, LTRIM(RTRIM(ISNULL(u.LastName,'') + ISNULL(u.FirstName,'')))
-FROM dbo.AspNetUsers u WITH (NOLOCK)
-WHERE u.UserName IN (SELECT DISTINCT UserName FROM dbo.Prayer365PrayLog WITH (NOLOCK));", con);
+SELECT L.UserName, LTRIM(RTRIM(v.FullName))
+FROM (SELECT DISTINCT UserName FROM dbo.Prayer365PrayLog WITH (NOLOCK)) L
+CROSS APPLY (SELECT TOP 1 x.FullName FROM dbo.view_UserCompositeInfo_2026 x WITH (NOLOCK)
+             WHERE x.UserName = L.UserName AND NULLIF(LTRIM(RTRIM(x.FullName)), '') IS NOT NULL) v;", con);
             await using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
                 if (!r.IsDBNull(0) && !r.IsDBNull(1)) map[r.GetString(0)] = r.GetString(1);
