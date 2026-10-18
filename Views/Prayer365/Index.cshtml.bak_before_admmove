@@ -1,0 +1,386 @@
+﻿@model BulletinBoard.Models.Prayer365.Prayer365PageVM
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+@using Cfg = BulletinBoard.Models.Prayer365.Prayer365Config
+
+@*  ══════════════════════════════════════════════════════════════
+    오늘의 기도 — 자녀를 위한 365일 축복 기도문 (누구나)
+    · 오늘(KST) 날짜의 기도문.  ?md=0303 으로 다른 날.  ← 어제 · 오늘 · 내일 →, 날짜 고르기, 글자 크기, 본문 복사
+    · 본문은 줄바꿈으로 문단.  짧고 쉼표로 끝나는 줄("사랑의 하나님,")은 호칭 — 금빛 문단 머리
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var it = Model.Item;
+    string label = Cfg.Label(Model.MonthDay);
+    int idx = Cfg.DayIndex(Model.MonthDay);
+    var inv = System.Globalization.CultureInfo.InvariantCulture;
+    // 머리 원 안의 날짜(10.3)와 요일 — 2/29 는 평년이면 요일을 비운다
+    int mo = int.Parse(Model.MonthDay.Substring(0, 2)), dy = int.Parse(Model.MonthDay.Substring(2, 2));
+    string ringDay = $"{mo}.{dy}";
+    string wdText = "";
+    if (dy <= DateTime.DaysInMonth(Model.Today.Year, mo))
+    {
+        string[] wk = { "일", "월", "화", "수", "목", "금", "토" };
+        wdText = wk[(int)new DateTime(Model.Today.Year, mo, dy).DayOfWeek] + "요일";
+    }
+
+    // 본문 → 문단 · 호칭 · 마지막 "아멘."
+    var paras = new List<(bool call, string text)>();
+    bool amen = false;
+    if (it != null)
+    {
+        var body = it.Body.Replace("\r\n", "\n").Trim();
+        if (body.EndsWith("아멘.") || body.EndsWith("아멘"))
+        {
+            amen = true;
+            body = body[..body.LastIndexOf("아멘")].TrimEnd();
+        }
+        foreach (var raw in body.Split('\n'))
+        {
+            var line = raw.Trim();
+            if (line.Length == 0) continue;
+            bool call = line.EndsWith(",") && line.Length <= 30;
+            paras.Add((call, line));
+        }
+    }
+}
+
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>@label 축복 기도 — @Cfg.BookTitle</title>
+    <partial name="_Prayer365Style" />
+    <style>
+        /* 머리 — 원 진행 + 제목 (B안) */
+        .phd { display: flex; gap: 14px; align-items: center; margin-top: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--rule); }
+        .ring { flex: none; width: 72px; height: 72px; border-radius: 50%; background: conic-gradient(var(--acc) var(--pct), var(--soft) 0); display: grid; place-items: center; }
+        .ring > div { width: 60px; height: 60px; border-radius: 50%; background: #fff; display: grid; place-content: center; text-align: center; line-height: 1.15; }
+        .ring b { font-size: 19px; font-weight: 800; color: var(--tx); }
+        .ring small { display: block; font-size: 10px; color: var(--dim2); }
+        .phdTx { flex: 1; min-width: 0; }
+        .ttl { margin: 4px 0 0; font-size: 19px; font-weight: 800; line-height: 1.4; letter-spacing: -.01em; color: var(--tx); word-break: keep-all; text-wrap: balance; }
+        .phdS { margin-top: 3px; font-size: 12px; color: var(--dim); }
+        .bar .fz button { padding: 5px 9px; }
+        .vs { margin-top: 18px; padding-left: 12px; border-left: 3px solid #D6E4FA; font-size: 13.5px; line-height: 1.85; color: var(--dim2); word-break: keep-all; }
+        .vs cite { display: block; margin-top: 4px; font-style: normal; font-size: 12px; font-weight: 800; color: var(--acc); }
+        .body { margin-top: 18px; font-size: calc(var(--fsb, 16.5px) + var(--fsd, 0px)); line-height: 1.95; color: #2A2F3A; word-break: keep-all; }
+        .body p { margin: 0 0 4px; }
+        .body p.call { margin-top: 14px; padding-left: 10px; border-left: 3px solid var(--acc); line-height: 1.5; font-weight: 800; color: var(--tx); }
+        .body p.call + p { margin-top: 8px; }
+        .body p.call:first-child { margin-top: 0; }
+        .amen { margin-top: 10px; text-align: right; font-weight: 800; color: var(--tx); font-size: calc(var(--fsb, 16.5px) + var(--fsd, 0px)); }
+        .none { margin-top: 24px; text-align: center; padding: 28px 20px; border-radius: 14px; background: var(--mark); color: var(--dim2); font-size: 14px; line-height: 1.8; }
+        .lock { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--warn); }
+        .tools { display: grid; gap: 8px; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--rule); }
+        .src { margin-top: 18px; font-size: 11.5px; color: var(--dim); text-align: center; line-height: 1.7; word-break: keep-all; }
+        .admGo { margin-top: 14px; text-align: center; }
+        .bar > span:first-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bar .fz { flex: none; }
+        .src b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; color: var(--dim2); }
+        .src span { display: block; }
+        .vcnt { display: inline-flex; align-items: baseline; gap: 4px; margin-top: 12px; padding: 6px 12px; border-radius: 999px; background: var(--mark); font-size: 12px; color: var(--dim2); }
+        .vcnt b { font-size: 14px; font-weight: 800; color: var(--acc); }
+        .vcnt span { margin-left: 6px; font-size: 11px; color: var(--dim); }
+        /* 오늘 기도 했어요 (모든 사용자) */
+        .pLike { margin-top: 22px; text-align: center; }
+        /* 버튼 폭 = 아래 통계 카드 폭 (둘 다 본문 폭 100%) */
+        .pLike button { display: flex; justify-content: center; width: 100%; box-sizing: border-box; align-items: center; gap: 10px; border: 1.5px solid var(--acc); border-radius: 999px; background: #fff; color: var(--acc);
+                        padding: 11px 22px; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+                        -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+        .pLike button * { cursor: pointer; -webkit-user-select: none; user-select: none; }
+        .pLike button u { text-decoration: none; font-weight: 500; color: var(--tx); font-variant-numeric: tabular-nums; }
+        .pLike button.on { background: var(--acc); color: #fff; }
+        .pLike button.on u { color: #fff; }
+        .pLike button[disabled] { opacity: .6; }
+        .pLikeMsg { min-height: 16px; margin-top: 6px; font-size: 12px; color: var(--acc); }
+        .pTogether { margin-top: 2px; font-size: 12px; color: var(--dim2); }
+        .pTogether b { font-weight: 800; color: var(--acc); }
+        .pTogether[hidden] { display: none; }
+
+        /* 나의 기도 기록 */
+        .ps { margin-top: 18px; padding: 16px 18px; box-sizing: border-box; width: 100%; border: 1px solid var(--rule); border-radius: 14px; background: #fff; }
+        .psT { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: var(--tx); }
+        .psT.sm { margin-top: 4px; }
+        .psT small { font-size: 11px; font-weight: 400; color: var(--dim); }
+        .psBig { display: flex; align-items: baseline; gap: 6px; }
+        .psBig b { font-size: 32px; font-weight: 800; line-height: 1; color: var(--acc); }
+        .psBig span { font-size: 13px; color: var(--dim2); }
+        .psBar { height: 8px; margin: 10px 0 4px; border-radius: 999px; background: var(--mark); overflow: hidden; }
+        .psBar i { display: block; height: 100%; min-width: 2px; border-radius: 999px; background: var(--acc); }
+        .psSub { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); }
+        .psTiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+        .psTiles .t { padding: 10px 6px; border-radius: 10px; background: var(--mark); text-align: center; }
+        .psTiles .t b { display: block; font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--tx); }
+        .psTiles .t.hl b { color: var(--acc); }
+        .psTiles .t span { display: block; margin-top: 2px; font-size: 11px; color: var(--dim2); }
+        .psCal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+        .psCal .h { font-size: 10px; text-align: center; color: var(--dim); }
+        .psCal .d { aspect-ratio: 1; display: grid; place-items: center; border-radius: 8px; font-size: 11px; background: var(--mark); color: var(--dim); }
+        .psCal .d.on { background: var(--acc); color: #fff; }
+        .psCal .d.miss { background: var(--warnbg); color: var(--warn); }
+        .psCal .d.fut { background: transparent; border: 1px dashed var(--rule); }
+        .psCal .d.today { box-shadow: 0 0 0 2px #9DC1F5; }
+        .psLg { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--dim2); }
+        .psLg i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 3px; vertical-align: -1px; }
+        .psHr { border: 0; border-top: 1px solid var(--rule); margin: 16px 0; }
+        .psMo { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; font-size: 12px; }
+        .psMo .b { height: 6px; border-radius: 999px; background: var(--mark); overflow: hidden; }
+        .psMo .b i { display: block; height: 100%; background: var(--acc); }
+        .psMo em { font-style: normal; color: var(--dim2); font-variant-numeric: tabular-nums; }
+        .psNote { margin-top: 12px; font-size: 11px; line-height: 1.6; color: var(--dim); }
+        .dpk { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; }
+        /* 글자 크기 — 가− 100% 가+ (가운데를 누르면 100%) */
+        .fz { display: inline-flex; align-items: stretch; border: 1px solid #E1E6EE; border-radius: 8px; overflow: hidden; background: #fff; }
+        .fz button { border: 0; background: none; font: inherit; font-size: 12.5px; font-weight: 500; color: #374151; padding: 6px 10px; cursor: pointer; }
+        .fz button:hover:not(:disabled) { color: var(--acc); }
+        .fz button:disabled { color: #D1D5DB; cursor: default; }
+        .fz #pPct { min-width: 50px; border-left: 1px solid #E1E6EE; border-right: 1px solid #E1E6EE; font-size: 11.5px; font-weight: 400; color: var(--dim); font-variant-numeric: tabular-nums; }
+        .ptoast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 10px); opacity: 0; pointer-events: none; background: var(--tx); color: #fff;
+                  padding: 9px 15px; border-radius: 12px; font-size: 12.5px; transition: opacity .18s, transform .18s; z-index: 50; }
+        .ptoast.on { opacity: 1; transform: translate(-50%, 0); }
+        @@media (max-width: 560px) {
+            .body, .amen { --fsb: 15.5px; }   /* 휴대폰 기본 크기 — 가−/가+ 는 --fsd(차이값)로 더한다 */
+        }
+    </style>
+</head>
+<body>
+<div class="pz">
+    <div class="bar">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>@if (Model.IsAdminUser) {<a href="/Prayer365?md=@Model.MonthDay" title="관리자 보기로">매일 축복 기도</a>} else {<span>매일 축복 기도</span>}</span>
+        <span class="fz" role="group" aria-label="글자 크기"><button type="button" data-fs="-1" aria-label="글자 작게">가−</button><button type="button" id="pPct" title="100%로 되돌리기" aria-label="글자 크기 100%로 되돌리기">100%</button><button type="button" data-fs="1" aria-label="글자 크게">가+</button></span>
+    </div>
+    <div class="prog"><i style="width:@((idx * 100.0 / Cfg.TotalDays).ToString("0.#", inv))%"></i></div>
+
+
+    @if (Model.IsClosed)
+    {
+        @* 허락 전 — 관리자만 (Prayer365Config.StaffOnly) *@
+        <div class="none">매일 축복 기도는 준비 중이에요.<br />곧 함께 나눌게요.</div>
+        <div class="src"><a href="/">@ConstatsCommon.ToHome</a></div>
+    }
+    else
+    {
+    @* 머리 — 원 진행(한 해 중 오늘 위치) + 제목 · B안 (2026-10-03 확정) *@
+    <div class="phd">
+        <div class="ring" style="--pct:@((idx * 100.0 / Cfg.TotalDays).ToString("0.#", inv))%"><div><b>@ringDay</b><small>@(idx)일째</small></div></div>
+        <div class="phdTx">
+            <div class="kk">PRAYER 365</div>
+            <h1 class="ttl">@(it?.Title ?? label + " 기도문")</h1>
+            <div class="phdS"><span class="date">@label</span>@(wdText != "" ? " · " + wdText : "") · 자녀를 위한 축복 기도</div>
+        </div>
+    </div>
+    @if (Model.IsStaff && Cfg.StaffOnly)
+    {
+        <div class="lock">지금은 로그인한 회원만 볼 수 있어요 (전체 공개 전)</div>
+    }
+    @if (Model.IsStaff && it != null)
+    {
+        @* 관리자 보기에서만 — 이 날 기도문을 연 횟수 (관리자 보기로 연 것은 세지 않는다) *@
+        <div class="vcnt"><b>@it.ViewCount.ToString("N0")</b>회 조회<span>관리자 보기 · SuperAdmin · Basic 은 세지 않아요</span></div>
+    }
+
+    @if (it != null)
+    {
+        @if (!string.IsNullOrWhiteSpace(it.VerseText) || !string.IsNullOrWhiteSpace(it.VerseRef))
+        {
+            <div class="vs">@if (!string.IsNullOrWhiteSpace(it.VerseText)) {<text>“@it.VerseText”</text>}@if (!string.IsNullOrWhiteSpace(it.VerseRef)) {<cite>@it.VerseRef</cite>}</div>
+        }
+        <div class="body" id="pBody">
+            @foreach (var p in paras)
+            {
+                <p class="@(p.call ? "call" : "")">@p.text</p>
+            }
+        </div>
+        @if (amen) { <div class="amen">아멘.</div> }
+
+        @* 오늘 기도 했어요 — 이 기도문을 보는 모든 사용자에게 (2026-10-17) *@
+        <div class="pLike">
+            @* 로그인한 사람은 개인별 기록(Prayer365PrayLog)으로 오늘 눌렀는지 서버가 알려 준다 — 다른 기기에서도 같게 *@
+            <button type="button" id="pPrayBtn" data-md="@Model.MonthDay" data-day="@Model.Today.ToString("yyyyMMdd")"
+                    data-signed="@(Model.SignedIn ? "1" : "0")" data-prayed="@(Model.PrayedToday ? "1" : "0")"
+                    aria-pressed="false" aria-label="오늘 이 기도문으로 기도했어요">
+                오늘 기도 했어요
+            </button>
+            <div class="pLikeMsg" id="pPrayMsg" aria-live="polite"></div>
+            @* 버튼 숫자는 모든 사람의 합계라 내 것처럼 보였다 (2026-10-17 버그) — 버튼에서 빼고 따로 "함께 기도한 사람" 으로 *@
+            <div class="pTogether" id="pTogether" @(it.PrayCount > 0 ? "" : "hidden")>이 기도문으로 <b id="pPrayCount">@it.PrayCount.ToString("N0")</b>명이 함께 기도했어요</div>
+        </div>
+
+        @* 나의 기도 기록 — 로그인한 사람의 Prayer365PrayLog 로 계산 (2026-10-17 시안 2판) *@
+        @if (Model.Stats is { } ps)
+        {
+            string[] wkh = { "일", "월", "화", "수", "목", "금", "토" };
+            <section class="ps" aria-label="나의 기도 기록">
+                <div class="psT">나의 기도 기록</div>
+
+                <div class="psBig"><b>@ps.PrayedDays</b><span>일째 기도했어요 · @(ps.TotalDays)일 중</span></div>
+                <div class="psBar"><i style="width:@(ps.ProgressPct.ToString("0.#", inv))%"></i></div>
+                <div class="psSub"><span>@(ps.ProgressPct.ToString("0.#", inv))%</span><span>남은 @(ps.RemainDays)일</span></div>
+
+                <div class="psTiles">
+                    <div class="t hl"><b>@(ps.Streak)일</b><span>연속 기도</span></div>
+                    <div class="t"><b>@(ps.Longest)일</b><span>최장 연속</span></div>
+                    <div class="t"><b>@(ps.RatePct >= 0 ? ps.RatePct + "%" : "–")</b><span>기도율</span></div>
+                </div>
+
+                <div class="psT sm">@(ps.MonthNo)월 달력<small>기도한 날 @(ps.MonthPrayed.Count)일</small></div>
+                <div class="psCal">
+                    @foreach (var w in wkh) { <div class="h">@w</div> }
+                    @for (int i = 0; i < ps.MonthStartDow; i++) { <div></div> }
+                    @for (int d = 1; d <= ps.MonthDays; d++)
+                    {
+                        bool onDay = ps.MonthPrayed.Contains(d);
+                        bool fut = d > ps.Today;
+                        // 처음 기도하기 전 날은 "건너뛴 날"이 아니다
+                        bool before = ps.FirstDate.HasValue && new DateTime(ps.MonthYear, ps.MonthNo, d) < ps.FirstDate.Value;
+                        string cls = onDay ? "on" : fut ? "fut" : (before || !ps.FirstDate.HasValue) ? "" : "miss";
+                        <div class="d @cls @(d == ps.Today ? "today" : "")">@d</div>
+                    }
+                </div>
+                <div class="psLg">
+                    <span><i style="background:var(--acc)"></i>기도한 날</span>
+                    <span><i style="background:var(--warnbg)"></i>건너뛴 날</span>
+                    <span><i style="background:var(--mark)"></i>앞으로</span>
+                </div>
+
+                @if (ps.Months.Count > 0)
+                {
+                    <hr class="psHr" />
+                    <div class="psT sm">월별 기도율<small>기도한 날 ÷ 지난 날</small></div>
+                    <div class="psMo">
+                        @foreach (var mr in ps.Months)
+                        {
+                            <span>@(mr.Month)월</span><div class="b"><i style="width:@(mr.Pct)%"></i></div><em>@mr.Prayed / @(mr.Elapsed)일</em>
+                        }
+                    </div>
+                }
+                <div class="psNote">기도율은 처음 기도한 날부터 오늘까지 지난 날 중 기도한 날의 비율이에요. 오늘 아직 안 눌렀어도 어제까지로 계산해요.</div>
+            </section>
+        }
+    }
+    else
+    {
+        <div class="none">
+            @label 기도문을 준비하고 있어요.<br />다른 날의 기도문을 먼저 읽어 보세요.
+            @if (Model.IsStaff) { <div style="margin-top:12px"><a class="nb gold" href="/Prayer365/Edit?md=@Model.MonthDay">이 날 기도문 넣기 →</a></div> }
+        </div>
+    }
+
+    @* 일반 보기(?view=user)는 오늘 기도문만 — 날짜 이동 · 날짜 고르기 · 본문 복사를 모두 숨긴다 (2026-10-03, 복사 2026-10-17) *@
+    @if (!Model.UserView)
+    {
+    <div class="tools">
+        <div class="grp">
+            <a class="nb" href="/Prayer365?md=@(Model.Prev)">← @Cfg.Label(Model.Prev)</a>
+            <a class="nb @(Model.IsToday ? "pri" : "")" href="/Prayer365">오늘</a>
+            <a class="nb" href="/Prayer365?md=@(Model.Next)">@Cfg.Label(Model.Next) →</a>
+        </div>
+        <div class="grp">
+            <label class="nb" style="position:relative">날짜 고르기<input type="date" class="dpk" id="pDate" /></label>
+            @if (it != null) { <button class="nb gold" type="button" id="pCopy">본문 복사</button> }
+        </div>
+    </div>
+    }
+
+    <div class="src">
+        <b>한 해의 @(idx)번째 날</b>
+        <span>출처 · @Cfg.Author 지음</span>
+        <span>「@Cfg.BookTitle」 · @Cfg.Publisher</span>
+    </div>
+    @if (Model.IsStaff)
+    {
+        @* 관리 — 관리자 보기에서만, 맨 아래 (2026-10-04 머리 줄에서 옮김 · 휴대폰에서 머리 줄이 한 줄에 들어가게) *@
+        <div class="admGo"><a class="nb" href="/Prayer365/Admin">365일 기도문 관리 →</a></div>
+    }
+    }
+</div>
+<div class="ptoast" id="pToast" role="status" aria-live="polite"></div>
+
+<script>
+    (function () {
+        var root = document.documentElement, KEY = 'p365fs';
+        function toast(m) { var t = document.getElementById('pToast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1600); }
+
+        // 글자 크기 (이 기기에만 기억)
+        var fs = 0; try { fs = parseInt(localStorage.getItem(KEY) || '0', 10) || 0; } catch (e) { }
+        // 휴대폰은 .body 에 기본 크기가 따로 있어서, 크기 자체가 아니라 차이값(--fsd)만 넘긴다
+        function applyFs() {
+            if (fs) root.style.setProperty('--fsd', (fs * 1.5) + 'px'); else root.style.removeProperty('--fsd');
+            var pct = document.getElementById('pPct'); if (pct) pct.textContent = Math.round((16 + fs * 1.5) / 16 * 100) + '%';
+            document.querySelectorAll('[data-fs]').forEach(function (b) { b.disabled = parseInt(b.getAttribute('data-fs'), 10) < 0 ? fs <= -2 : fs >= 4; });
+        }
+        applyFs();
+        // 가운데 비율을 누르면 100% 로
+        var pctBtn = document.getElementById('pPct');
+        if (pctBtn) pctBtn.addEventListener('click', function () { fs = 0; applyFs(); try { localStorage.setItem(KEY, '0'); } catch (e) { } });
+        document.querySelectorAll('[data-fs]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                fs = Math.max(-2, Math.min(4, fs + parseInt(b.getAttribute('data-fs'), 10)));
+                applyFs(); try { localStorage.setItem(KEY, String(fs)); } catch (e) { }
+            });
+        });
+
+        // 날짜 고르기 — 연도는 무시하고 월일로 간다
+        var dp = document.getElementById('pDate');   // 일반 보기에는 없다
+        if (dp) {
+            dp.closest('label').addEventListener('click', function () { if (dp.showPicker) { try { dp.showPicker(); } catch (e) { } } });
+            dp.addEventListener('change', function () { if (dp.value) location.href = '/Prayer365?md=' + dp.value.slice(5, 7) + dp.value.slice(8, 10); });
+        }
+
+        // 오늘 기도 했어요 — 한 기도문에 하루 한 번
+        var pb = document.getElementById('pPrayBtn');
+        if (pb) {
+            var pMsg = document.getElementById('pPrayMsg');
+            var pKey = 'p365Prayed:' + pb.getAttribute('data-md') + ':' + pb.getAttribute('data-day');
+            var say = function (t) { if (pMsg) pMsg.textContent = t || ''; };
+            var done = function (t) { pb.classList.add('on'); pb.setAttribute('aria-pressed', 'true'); pb.disabled = false; say(t); };
+            if (pb.getAttribute('data-signed') === '1') {
+                if (pb.getAttribute('data-prayed') === '1') done('오늘 기도하셨어요');
+            } else {
+                try { if (localStorage.getItem(pKey) === '1') done('오늘 기도하셨어요'); } catch (e) { }
+            }
+            pb.addEventListener('click', function () {
+                if (pb.classList.contains('on') || pb.disabled) return;
+                pb.disabled = true; say('');
+                fetch('/Prayer365/Pray', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: 'md=' + encodeURIComponent(pb.getAttribute('data-md')),
+                    credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (!d || !d.ok) { pb.disabled = false; say((d && d.msg) ? d.msg : '잠시 후 다시 눌러 주세요.'); return; }
+                    document.getElementById('pPrayCount').textContent = Number(d.count).toLocaleString('ko-KR');
+                    document.getElementById('pTogether').hidden = !(d.count > 0);
+                    try { localStorage.setItem(pKey, '1'); } catch (e) { }
+                    done(d.already ? '오늘 이미 기도하셨어요' : '오늘도 기도해 주셔서 고맙습니다');
+                    // 새로 기록됐고 통계 카드가 있으면 잠깐 뒤 새로 불러와 숫자를 맞춘다
+                    if (!d.already && pb.getAttribute('data-signed') === '1' && document.querySelector('.ps')) setTimeout(function () { location.reload(); }, 900);
+                })
+                .catch(function () { pb.disabled = false; say('연결이 불안정해요. 다시 눌러 주세요.'); });
+            });
+        }
+
+        // 본문 복사
+        var cp = document.getElementById('pCopy');
+        if (cp) cp.addEventListener('click', function () {
+            var parts = [document.querySelector('.date').textContent.trim(), document.querySelector('.ttl').textContent.trim(), ''];
+            var vs = document.querySelector('.vs'); if (vs) parts.push(vs.innerText.trim(), '');
+            document.querySelectorAll('#pBody p').forEach(function (p) { parts.push(p.textContent.trim()); });
+            if (document.querySelector('.amen')) parts.push('아멘.');
+            var text = parts.join('\n');
+            (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+                .then(function () { toast('기도문을 복사했어요'); })
+                .catch(function () {
+                    var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+                    try { document.execCommand('copy'); toast('기도문을 복사했어요'); } catch (e) { } document.body.removeChild(ta);
+                });
+        });
+    })();
+</script>
+</body>
+</html>

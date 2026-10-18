@@ -70,6 +70,13 @@ public class Prayer365Controller : Controller
             catch { /* 기록 조회 실패로 기도문을 막지 않는다 */ }
         }
 
+        // 관리자 참여자 요약 — SuperAdmin 역할 · Basic 아이디에게만 (2026-10-18 홈 카드에서 옮김)
+        if (PrayManagerHelper.CanSeePrayParticipants(User))
+        {
+            try { vm.Participants = Prayer365ParticipantsVM.Build(await _svc.GetAllPrayDaysAsync(), today, "recent"); }
+            catch { vm.Participants = null; }   // 기록 표 문제면 그 줄만 빼고 기도문은 그대로
+        }
+
         // 조회 수 — 기도 관리자("Basic" · "SuperAdmin" 계정)는 관리자 보기든 일반 보기든 세지 않는다 (2026-10-11)
         bool noCount = IsStaff;
         if (vm.Item != null && !(IsStaff && !userView) && !noCount)
@@ -119,12 +126,12 @@ public class Prayer365Controller : Controller
         return Json(new { ok = true, already = !res.added, count = res.count });
     }
 
-    // ── 관리 : 기도 참여자 (홈 관리자 줄의 "참여자 보기") — Basic · SuperAdmin 만 ─────
+    // ── 관리 : 기도 참여자 (365 기도 화면 맨 아래 관리자 줄) — 기도 관리자 + SuperAdmin 역할 · Basic 아이디 ─────
     [HttpGet]
     [Authorize]
     public async Task<IActionResult> Participants(string? sort)
     {
-        if (!IsStaff) return RedirectToAction(nameof(Index));
+        if (!IsStaff && !PrayManagerHelper.CanSeePrayParticipants(User)) return RedirectToAction(nameof(Index));
         var rows = await _svc.GetAllPrayDaysAsync();
         return View(Prayer365ParticipantsVM.Build(rows, DateHelper.GetKoreaToday(), sort ?? "recent"));
     }
