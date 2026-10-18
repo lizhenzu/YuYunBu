@@ -110,6 +110,8 @@ namespace BulletinBoard.Models.Prayer365
         public bool            SignedIn    { get; set; }
         /// <summary>"나의 기도 기록" 통계 — 로그인한 사람에게만 (없으면 null)</summary>
         public Prayer365PrayStats? Stats   { get; set; }
+        /// <summary>관리자 참여자 요약(참여자 · 오늘 기도) — SuperAdmin 역할 · Basic 아이디에게만, 화면 맨 아래 (2026-10-18 홈에서 옮김)</summary>
+        public Prayer365ParticipantsVM? Participants { get; set; }
         /// <summary>링크에 붙일 꼬리 — 일반 보기면 "&amp;view=user"</summary>
         public string ViewQs => UserView ? "&view=user" : "";
         public string Prev => Prayer365Config.Step(MonthDay, -1);

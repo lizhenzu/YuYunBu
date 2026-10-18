@@ -28,6 +28,12 @@ namespace BulletinBoard.Helpers
             return string.Equals(user.Identity.Name, "Basic", StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// 365 기도 — 참여자 요약 줄 보기 · 참여자 화면 (2026-10-18 사용자 지정)
+        ///  · SuperAdmin 역할을 가진 계정  또는  로그인 아이디 "Basic"  (부부 기도 쓰기와 같은 기준)
+        /// </summary>
+        public static bool CanSeePrayParticipants(ClaimsPrincipal user) => CanAddCouplePray(user);
+
         public static bool IsPrayManager(ClaimsPrincipal user)
         {
             if (user?.Identity?.IsAuthenticated != true) return false;
