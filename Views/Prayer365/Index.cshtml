@@ -81,9 +81,6 @@
         .bar .fz { flex: none; }
         .src b { display: block; margin-bottom: 2px; font-size: 12px; font-weight: 700; color: var(--dim2); }
         .src span { display: block; }
-        .vcnt { display: inline-flex; align-items: baseline; gap: 4px; margin-top: 12px; padding: 6px 12px; border-radius: 999px; background: var(--mark); font-size: 12px; color: var(--dim2); }
-        .vcnt b { font-size: 14px; font-weight: 800; color: var(--acc); }
-        .vcnt span { margin-left: 6px; font-size: 11px; color: var(--dim); }
         /* 오늘 기도 했어요 (모든 사용자) */
         .pLike { margin-top: 22px; text-align: center; }
         /* 버튼 폭 = 아래 통계 카드 폭 (둘 다 본문 폭 100%) */
@@ -176,16 +173,7 @@
     {
         <div class="lock">지금은 로그인한 회원만 볼 수 있어요 (전체 공개 전)</div>
     }
-    @if (Model.IsStaff && it != null)
-    {
-        @* 관리자 보기에서만 — 이 날 기도문을 연 횟수 (관리자 보기로 연 것은 세지 않는다) *@
-        <div class="vcnt"><b>@it.ViewCount.ToString("N0")</b>회 조회<span>관리자 보기 · SuperAdmin · Basic 은 세지 않아요</span></div>
-    }
-    @if (Model.UserView && it != null && Model.TodayViews >= 0)
-    {
-        @* 일반 보기 — 오늘(KST) 조회 수 · 누적 조회 수 (모든 기도문 합계, 관리자가 연 것은 세지 않는다 · 2026-10-19) *@
-        <div class="vcnt" title="기도 관리자(Basic · SuperAdmin 아이디)가 연 것은 세지 않아요">오늘 조회 <b>@Model.TodayViews.ToString("N0")</b><span style="margin-left:4px;font-size:12px">·</span>누적 조회 <b>@Model.TotalViews.ToString("N0")</b></div>
-    }
+    @* 2026-10-19: 머리 아래 조회 수 줄 둘(관리자 보기 "N회 조회" · "오늘 조회 · 누적 조회")은 뺐다 — 아래 관리자 줄(참여자 · 오늘 기도 · 누적 방문자 · 오늘 방문자)로 옮김 *@
 
     @if (it != null)
     {
@@ -294,16 +282,44 @@
     {
         @* 관리자 참여자 줄 — SuperAdmin 역할 · Basic 아이디에게만, 출처("한 해의 N번째 날") 바로 위 (2026-10-18 홈 "오늘의 기도" 카드에서 옮김 · 모양은 홈 10-17 그대로) *@
         <style>
-            .pAdm { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; padding: 11px 16px; background: #F7F8FA; border: 1px solid #E8ECF2; border-radius: 10px; font-size: 12.5px; color: #374151; text-decoration: none; transition: background .15s; }
+            /* 2026-10-19 확정: 관리자 표시를 맨 위로, 아래에 기도자 · 방문자 두 묶음(각각 오늘 · 누적).
+               PC 는 두 묶음이 한 줄에 나란히, 휴대폰(600px 이하)은 묶음이 위아래로 쌓인다 */
+            .pAdm { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 10px 16px 12px; background: #F7F8FA; border: 1px solid #E8ECF2; border-radius: 10px; font-size: 12.5px; color: #6B7280; text-decoration: none; transition: background .15s; }
             .pAdm:hover { background: #EEF1F5; }
-            .pAdm .tag { font-style: normal; font-size: 10.5px; font-weight: 700; color: #B4531F; background: #FBEFE7; border-radius: 999px; padding: 2px 8px; }
-            .pAdm .st { display: flex; gap: 14px; flex: 1; flex-wrap: wrap; color: #6B7280; }
-            .pAdm .st b { margin-left: 4px; font-size: 14px; font-weight: 800; color: #111827; }
-            .pAdm .go { flex: none; margin-left: auto; font-size: 18px; font-weight: 300; color: #9CA3AF; }
+            .pAdm .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+            .pAdm .tag { align-self: flex-start; font-style: normal; font-size: 10.5px; font-weight: 700; color: #B4531F; background: #FBEFE7; border-radius: 999px; padding: 2px 8px; }
+            .pAdm .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; }
+            .pAdm .g { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+            .pAdm .gh { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #111827; }
+            .pAdm .gh i { width: 6px; height: 6px; border-radius: 50%; background: #9CA3AF; }
+            .pAdm .gh i.p { background: #2F80ED; }
+            .pAdm .vals { display: flex; gap: 14px; }
+            .pAdm .vals span { white-space: nowrap; }
+            .pAdm .vals b { margin-left: 4px; font-size: 14px; font-weight: 800; color: #111827; }
+            .pAdm .go { flex: none; font-size: 18px; font-weight: 300; color: #9CA3AF; }
+            @@media (max-width: 600px) {
+                .pAdm { padding: 10px 14px 12px; }
+                .pAdm .groups { grid-template-columns: 1fr; gap: 7px; }
+                .pAdm .g { flex-direction: row; align-items: baseline; gap: 10px; }
+                .pAdm .gh { min-width: 54px; }
+            }
+            @@media (max-width: 340px) {
+                .pAdm { padding: 10px 10px 12px; font-size: 12px; }
+                .pAdm .vals { gap: 10px; }
+            }
         </style>
+        @* 기도자 = 기도 버튼을 누른 로그인 사용자 (오늘 · 누적).  방문자 = 기도문을 연 횟수(오늘 · 누적) — 같은 사람이 여러 번 열면 늘고, 기도 관리자가 연 것은 세지 않는다 *@
         <a class="pAdm" href="/Prayer365/Participants" aria-label="관리자 — 기도 참여자 보기">
-            <em class="tag">관리자</em>
-            <span class="st"><span>참여자<b>@(Model.Participants.Total)명</b></span><span>오늘 기도<b>@(Model.Participants.Today)명</b></span>@if (it != null) {<span title="이 날 기도문을 연 횟수 — 기도 관리자(Basic · SuperAdmin 아이디)가 연 것은 세지 않아요">조회<b>@it.ViewCount.ToString("N0")회</b></span>}</span>
+            <span class="body">
+                <em class="tag">관리자</em>
+                <span class="groups">
+                    <span class="g"><span class="gh"><i class="p"></i>기도자</span><span class="vals"><span>오늘<b>@(Model.Participants.Today)명</b></span><span>누적<b>@(Model.Participants.Total)명</b></span></span></span>
+                    @if (Model.TodayViews >= 0)
+                    {
+                        <span class="g" title="기도문을 연 횟수 — 같은 사람이 여러 번 열면 늘어나요. 기도 관리자(Basic · SuperAdmin 아이디)가 연 것은 세지 않아요"><span class="gh"><i></i>방문자</span><span class="vals"><span>오늘<b>@(Model.TodayViews.ToString("N0"))명</b></span><span>누적<b>@(Model.TotalViews.ToString("N0"))명</b></span></span></span>
+                    }
+                </span>
+            </span>
             <span class="go" aria-hidden="true">›</span>
         </a>
     }
