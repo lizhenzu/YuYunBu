@@ -85,10 +85,10 @@ namespace BulletinBoard.Controllers
             public List<DevotionMyMonthlyPointVM> rows { get; set; } = new();
         }
 
-        private readonly IAuthService _authService;
+        private new readonly IAuthService _authService;
         private readonly IDevotionPointsService _DevotionPointsService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         public DevotionPointsController(IAuthService authService,
             IDevotionPointsService _IDevotionPointsService,
             UserManager<ApplicationUser> userManager,

@@ -305,7 +305,7 @@ IF (SELECT CoverPhotoId FROM dbo.Albums WHERE Id=@aid) IS NULL
             }
             catch (Exception ex)
             {
-                DbLogger.LogErrorAsync($"L Error : {ex.Message}");
+                _ = DbLogger.LogErrorAsync($"L Error : {ex.Message}");
                 tran.Rollback();
                 throw;
             }
@@ -483,7 +483,7 @@ WHERE AlbumId=@aid AND Id IN ({idTable});";
             }
             catch (Exception ex)
             {
-                DbLogger.LogErrorAsync($"L Error : {ex.Message}");
+                _ = DbLogger.LogErrorAsync($"L Error : {ex.Message}");
                 tran.Rollback();
                 throw;
             }

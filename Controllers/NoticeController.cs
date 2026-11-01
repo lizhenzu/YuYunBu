@@ -20,9 +20,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class NoticeController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         private readonly INoticeService _noticeService;
         private readonly IBandBoardService _bandBoardService;
 

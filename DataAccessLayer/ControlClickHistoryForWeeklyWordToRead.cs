@@ -1,6 +1,5 @@
 ﻿using BulletinBoard.Common;
 using Microsoft.Extensions.Logging;
-using BulletinBoard.Common;
 using System;
 using System.Data;
 using System.Reflection;

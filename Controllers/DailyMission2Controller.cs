@@ -25,9 +25,9 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class DailyMission2Controller : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         private readonly IUserSettingsService _userSettingsService;
         private readonly IDailyMission2Service _iDailyMission2Service;
         private readonly AppDbContext _db;

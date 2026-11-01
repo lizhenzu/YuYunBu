@@ -13,10 +13,10 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class ProfileController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         private readonly IAttendanceService _attendanceService;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         private readonly IProfileUpdateSqlService _profileUpdateSqlService;
 
 

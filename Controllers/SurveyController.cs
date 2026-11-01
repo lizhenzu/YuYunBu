@@ -11,8 +11,8 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class SurveyController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public SurveyController(IAuthService authService,
             UserManager<ApplicationUser> userManager) : base(authService, userManager)
         {

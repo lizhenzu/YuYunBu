@@ -12,6 +12,6 @@ namespace BulletinBoard.Models
         public string LastName { get; set; }
         public int UsernameChangeLimit { get; set; } = 10;
         public DateTime? InsertDT { get; set; }
-        public string? PhoneNumber { get; set; }        
+        public new string? PhoneNumber { get; set; }        
     }
 }

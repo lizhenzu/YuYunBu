@@ -19,8 +19,8 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class PopMessageController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         private readonly IPopMessageService _svc;
         private readonly IHttpContextAccessor _http;
 

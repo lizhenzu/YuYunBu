@@ -1,6 +1,5 @@
 ﻿using BulletinBoard.Common;
 using Microsoft.Extensions.Logging;
-using BulletinBoard.Common;
 using System;
 using System.Data; 
 using System.Reflection;
@@ -107,8 +106,8 @@ namespace BulletinBoard.DataAccessLayer
 
         // 2026-10-15: 글은 매개변수로 넘긴다 — 기도문에 작은따옴표(')가 들어가도 저장이 깨지지 않고, SQL 주입도 막는다.
         //             (Kind 는 컨트롤러에서 Wife · Husband 만 받으므로 표 이름에는 그대로 쓴다)
-        private static System.Data.SqlClient.SqlParameter NText(string name, string value)
-            => new System.Data.SqlClient.SqlParameter(name, SqlDbType.NVarChar, -1) { Value = (object)SharedComm.TrimString(value) ?? string.Empty };
+        private static Microsoft.Data.SqlClient.SqlParameter NText(string name, string value)
+            => new Microsoft.Data.SqlClient.SqlParameter(name, SqlDbType.NVarChar, -1) { Value = (object)SharedComm.TrimString(value) ?? string.Empty };
 
         /// <summary>새 기도문. PageNo 가 0 이하면 맨 끝 번호(+1)로 넣는다.</summary>
         public void CreateBessingACouple(string Kind, int PageNo, string PrayTitle, string PrayText, string PrayHolyWord)
@@ -123,9 +122,9 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat($"  DATEADD(HOUR,{ConstatsCommon.timeDifference16}, GETDATE())  ");
             sb.AppendFormat(" ) "); sb.Append(Environment.NewLine);
 
-            DataAccessModule.executeNonQuery(sb.ToString(), new System.Collections.Generic.List<System.Data.SqlClient.SqlParameter>
+            DataAccessModule.executeNonQuery(sb.ToString(), new System.Collections.Generic.List<Microsoft.Data.SqlClient.SqlParameter>
             {
-                new System.Data.SqlClient.SqlParameter("@PageNo", SqlDbType.Int) { Value = PageNo },
+                new Microsoft.Data.SqlClient.SqlParameter("@PageNo", SqlDbType.Int) { Value = PageNo },
                 NText("@PrayTitle", PrayTitle),
                 NText("@PrayText", PrayText),
                 NText("@PrayHolyWord", PrayHolyWord),
@@ -156,10 +155,10 @@ namespace BulletinBoard.DataAccessLayer
                 sb.AppendFormat("    , IsVerified = 0, VerifiedDT = null, VerifiedBy = null "); sb.Append(Environment.NewLine);
             }
             sb.AppendFormat(" where [Id]       = @Id "); sb.Append(Environment.NewLine);
-            DataAccessModule.executeNonQuery(sb.ToString(), new System.Collections.Generic.List<System.Data.SqlClient.SqlParameter>
+            DataAccessModule.executeNonQuery(sb.ToString(), new System.Collections.Generic.List<Microsoft.Data.SqlClient.SqlParameter>
             {
-                new System.Data.SqlClient.SqlParameter("@Id", SqlDbType.Int) { Value = Id },
-                new System.Data.SqlClient.SqlParameter("@PageNo", SqlDbType.Int) { Value = PageNo },
+                new Microsoft.Data.SqlClient.SqlParameter("@Id", SqlDbType.Int) { Value = Id },
+                new Microsoft.Data.SqlClient.SqlParameter("@PageNo", SqlDbType.Int) { Value = PageNo },
                 NText("@PrayTitle", PrayTitle),
                 NText("@PrayText", PrayText),
                 NText("@PrayHolyWord", PrayHolyWord),

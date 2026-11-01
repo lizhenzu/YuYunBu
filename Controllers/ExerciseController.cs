@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using BulletinBoard.Models;
 using BulletinBoard.Services;
 
 namespace BulletinBoard.Controllers
@@ -17,9 +16,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class ExerciseController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         private readonly IExerciseRepository _repo;
 
 

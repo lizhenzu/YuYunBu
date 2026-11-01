@@ -5,7 +5,7 @@ using BulletinBoard.Services.Abstract;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Data.SqlClient; // DataAccessModule 과 같은 SqlParameter 형식
+using Microsoft.Data.SqlClient; // DataAccessModule 과 같은 SqlParameter 형식
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -17,8 +17,8 @@ namespace BulletinBoard.Controllers
     {
         private const string StaffRoles = "Admin,SuperAdmin,Moderator";
 
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public StoryController(IAuthService authService,
             UserManager<ApplicationUser> userManager) : base(authService, userManager)
         {

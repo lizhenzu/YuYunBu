@@ -1,26 +1,17 @@
 ﻿using BulletinBoard.Common;
 using System;
 using System.Data;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.Text;
-using BulletinBoard.Common;
 using System;
-using BulletinBoard.Common;
 using Microsoft.Extensions.Logging;
-using BulletinBoard.Common;
 using System;
-using System.Data;
 using System.Reflection;
-using System.Text;
 using System.ComponentModel;
 using System.Threading.Tasks;
-using System.Data.SqlClient;
 using System.IO;
 using System.Runtime.Intrinsics.X86;
 using System.Collections.Generic;
-using System.Data;
-using System.Data.SqlClient;
-using System.Text;
 using BulletinBoard.Helpers;
 
 namespace BulletinBoard.DataAccessLayer

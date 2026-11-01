@@ -16,9 +16,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class FileUploadContestController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         public FileUploadContestController(IAuthService authService,
             UserManager<ApplicationUser> userManager,
                  IWebHostEnvironment hostingEnvironment) : base(authService, userManager, hostingEnvironment)
@@ -33,7 +33,7 @@ namespace BulletinBoard.Controllers
         {
             if (ModelState.IsValid)
             {
-                CreateUploadData(model);
+                await CreateUploadData(model);
  
                 ViewBag.Message = "파일 업로드 성공";
                 return View(model);

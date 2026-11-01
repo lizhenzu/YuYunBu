@@ -18,9 +18,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class FileUploadController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
 
         public FileUploadController(IAuthService authService,
             UserManager<ApplicationUser> userManager,
@@ -74,7 +74,7 @@ namespace BulletinBoard.Controllers
                     model.SelectedCategory == Category.Value ||
                     model.SelectedCategory == Category.Geomorphological)
                 {
-                    CreateUploadData(model);
+                    await CreateUploadData(model);
                 }
                 else
                 {

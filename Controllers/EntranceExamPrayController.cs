@@ -22,12 +22,12 @@ namespace BulletinBoard.Controllers
     /// ※ HealingAndRestorationPrayController 와 같은 구조입니다.
     /// </summary>
     [LogActionFilter]
-    [AllowAnonymous]
+    // 2026-11-01: 클래스의 [AllowAnonymous] 를 뺐다 — 동작마다 [AllowAnonymous] / [Authorize] 를 따로 달아 두었고, 클래스에 있으면 [Authorize] 가 무시된다 (ASP0026)
     public class EntranceExamPrayController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
 
         private readonly ManageEntranceExamPray _mgr = new ManageEntranceExamPray();
 
