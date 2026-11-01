@@ -709,6 +709,10 @@ public class Bible2Controller : Controller
         bool makeRead = existingCount < totalVerses;
         if (makeRead)
         {
+            var limitMsg = await BibleDailyLimitHelper.CheckAsync(_db, userId, User.Identity?.Name,
+                _db.EBibles.Where(e => e.BibleText == bookName && e.Jang == jang));
+            if (limitMsg != null) return Json(new { limited = true, message = limitMsg });
+
             var now = DateHelper.GetKoreaNow();
             await _db.Database.ExecuteSqlRawAsync(
                 @"INSERT INTO UserBibleProgress (UserId, VerseId, ReadDate)
@@ -757,6 +761,10 @@ public class Bible2Controller : Controller
 
         if (newState)
         {
+            var limitMsg = await BibleDailyLimitHelper.CheckAsync(_db, userId, User.Identity?.Name,
+                _db.EBibles.Where(e => e.BibleText == bookName));
+            if (limitMsg != null) return Json(new { limited = true, message = limitMsg });
+
             var now = DateHelper.GetKoreaNow();
             await _db.Database.ExecuteSqlRawAsync(
                 @"INSERT INTO UserBibleProgress (UserId, VerseId, ReadDate)
@@ -805,6 +813,10 @@ public class Bible2Controller : Controller
 
         if (progress == null)
         {
+            var limitMsg = await BibleDailyLimitHelper.CheckAsync(_db, userId, User.Identity?.Name,
+                _db.EBibles.Where(e => e.Id == verseId));
+            if (limitMsg != null) return Json(new { limited = true, message = limitMsg });
+
             _db.UserBibleProgresses.Add(new UserBibleProgress
             {
                 UserId = userId,
@@ -855,6 +867,10 @@ public class Bible2Controller : Controller
         // verseIds.Contains → CTE(WITH) 오류 방지: 서버사이드 COUNT + raw SQL INSERT
         var totalVerses = await _db.EBibles.CountAsync(e => e.BibleText == bookName && e.Jang == jang);
         if (totalVerses == 0) return NotFound();
+
+        var limitMsg = await BibleDailyLimitHelper.CheckAsync(_db, userId, User.Identity?.Name,
+            _db.EBibles.Where(e => e.BibleText == bookName && e.Jang == jang));
+        if (limitMsg != null) return Json(new { limited = true, message = limitMsg });
 
         var now = DateHelper.GetKoreaNow();
         await _db.Database.ExecuteSqlRawAsync(
