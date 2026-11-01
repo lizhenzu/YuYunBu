@@ -15,7 +15,7 @@ namespace BulletinBoard.Helpers
     /// </summary>
     public static class BibleDailyLimitHelper
     {
-        public const int MaxChaptersPerDay = 20;
+        public const int MaxChaptersPerDay = 15;
         private const string StudentRoleCode = "T1001";   // 학생
 
         /// <summary>
