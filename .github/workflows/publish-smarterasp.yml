@@ -1,0 +1,86 @@
+name: Publish to SmarterASP
+
+# 버튼(Run workflow)을 누를 때만 실행한다. push 할 때는 자동 게시하지 않는다.
+# (실제 DB SQL 을 먼저 돌려야 하는 변경이 있을 수 있기 때문)
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-smarterasp
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      PROJECT: YunYunBu2025.csproj
+      PUBLISH_DIR: ${{ github.workspace }}\publish
+    steps:
+      - name: 소스 가져오기
+        uses: actions/checkout@v4
+
+      - name: .NET 9 설치
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      # 테스트 프로젝트가 없다. 생기면 dotnet test 단계를 여기에 추가한다.
+      - name: 빌드 확인
+        run: dotnet build $env:PROJECT -c Release
+
+      - name: dotnet publish
+        run: dotnet publish $env:PROJECT -c Release -o $env:PUBLISH_DIR --no-self-contained
+
+      - name: 서버 설정 파일은 덮지 않도록 게시 결과에서 빼기
+        shell: pwsh
+        run: |
+          foreach ($n in 'appsettings.Production.json', 'appsettings.json', 'appsettings.Development.json') {
+            $p = Join-Path $env:PUBLISH_DIR $n
+            if (Test-Path $p) { Remove-Item $p -Force; Write-Host "제외: $n" }
+          }
+
+      - name: Web Deploy 준비
+        shell: pwsh
+        run: |
+          $exe = 'C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe'
+          if (-not (Test-Path $exe)) {
+            choco install webdeploy -y --no-progress
+          }
+          if (-not (Test-Path $exe)) { throw 'msdeploy.exe 를 찾을 수 없습니다.' }
+
+      - name: SmarterASP 에 올리기 (msdeploy)
+        shell: pwsh
+        env:
+          WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
+          WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
+          WEBDEPLOY_USER: ${{ secrets.WEBDEPLOY_USER }}
+          WEBDEPLOY_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
+        run: |
+          function Get-Secret([string]$name) {
+            $v = [Environment]::GetEnvironmentVariable($name)
+            if ($null -ne $v) { $v = $v.Trim() }
+            if ([string]::IsNullOrEmpty($v)) { throw "Secret $name 값이 비어 있습니다." }
+            return $v
+          }
+          $url  = Get-Secret 'WEBDEPLOY_URL'
+          $site = Get-Secret 'WEBDEPLOY_SITE'
+          $user = Get-Secret 'WEBDEPLOY_USER'
+          $pass = Get-Secret 'WEBDEPLOY_PASSWORD'
+
+          $exe  = 'C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe'
+          $dest = "contentPath=$site,computerName=$url,userName=$user,password=$pass,authType=Basic"
+
+          # 인자는 한 줄 문자열로 만들어 넘긴다. (PowerShell 이 인자를 따옴표로 감싸면 msdeploy 가 읽지 못함)
+          $argLine = "-verb:sync -source:contentPath=`"$env:PUBLISH_DIR`" -dest:$dest " +
+                     "-enableRule:AppOffline -enableRule:DoNotDeleteRule -allowUntrusted -retryAttempts:3"
+
+          $p = Start-Process -FilePath $exe -ArgumentList $argLine -NoNewWindow -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msdeploy 실패 (종료 코드 $($p.ExitCode))" }
+
+      - name: 올린 버전 기록
+        shell: pwsh
+        run: |
+          $v = git rev-parse --short HEAD
+          Write-Host "게시 완료: $v"
+          "### 게시 완료`n- 커밋: ``$v```n- 브랜치: ${{ github.ref_name }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
