@@ -18,9 +18,9 @@ namespace BulletinBoard.Controllers
     //[Authorize(Roles = nameof(Roles.Admin))]
     public class QuestionBankController : BaseController
     {
-        private readonly IAuthService _authService;
+        private new readonly IAuthService _authService;
         private string queryCode = "";
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public QuestionBankController(IAuthService authService,
             UserManager<ApplicationUser> userManager) : base(authService, userManager)
         {

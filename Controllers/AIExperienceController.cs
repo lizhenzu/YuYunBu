@@ -19,9 +19,9 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class AIExperienceController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         public AIExperienceController(IAuthService authService,
             UserManager<ApplicationUser> userManager,
                  IWebHostEnvironment hostingEnvironment) : base(authService, userManager, hostingEnvironment)

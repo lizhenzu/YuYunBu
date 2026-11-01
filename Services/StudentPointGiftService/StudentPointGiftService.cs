@@ -2,7 +2,7 @@
 using BulletinBoard.Enums;
 using BulletinBoard.Helpers;
 using BulletinBoard.Services.Abstract;
-//using System.Data.SqlClient;
+//using Microsoft.Data.SqlClient;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System;
@@ -278,7 +278,7 @@ WHERE OrderId=@Id AND Status='HIDDEN';", conn);
                 WHERE IsActive=1 AND MilestonePoint<=@M;", conn))
             {
                 cmd.Parameters.AddWithValue("@M", milestone);
-                DbLogger.LogDebugAsync($" 2) earned credit : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" 2) earned credit : {SqlDebugHelper.ToDebugSql(cmd)}");
                 earned = Convert.ToInt32(await cmd.ExecuteScalarAsync());
             }
 
@@ -293,7 +293,7 @@ WHERE OrderId=@Id AND Status='HIDDEN';", conn);
                     FROM dbo.AwardItem WITH (NOLOCK)
                     WHERE ISNULL(IsHidden,0)=0 AND UnitPrice<=@C;", conn);
                 cmd.Parameters.AddWithValue("@C", available);
-                DbLogger.LogDebugAsync($" 4) affordable gift exists? : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" 4) affordable gift exists? : {SqlDebugHelper.ToDebugSql(cmd)}");
                 var o = await cmd.ExecuteScalarAsync();
                 hasGift = (o != null && o != DBNull.Value);
             }
@@ -354,7 +354,7 @@ WHERE OrderId=@Id AND Status='HIDDEN';", conn);
 
             cmd.Parameters.AddWithValue("@UserName", userName);
             cmd.Parameters.AddWithValue("@StudentCode", RoleCodeType.T1001.ToString());
-            DbLogger.LogDebugAsync($" 학생여부 : {SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($" 학생여부 : {SqlDebugHelper.ToDebugSql(cmd)}");
             var result = await cmd.ExecuteScalarAsync();
 
             return Convert.ToInt32(result) == 1;
@@ -441,7 +441,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
                 cmd.Parameters.AddWithValue("@ActionType", actionType.ToString());
                 cmd.Parameters.AddWithValue("@CreatedAtUtc", DateHelper.GetKoreaNow());
 
-                DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -495,7 +495,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
             {
                 cmd.Parameters.AddWithValue("@U", userName);
 
-                DbLogger.LogDebugAsync($" current draft gift {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" current draft gift {SqlDebugHelper.ToDebugSql(cmd)}");
 
                 using var r = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
                 if (await r.ReadAsync())
@@ -528,7 +528,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
             {
                 cmd.Parameters.AddWithValue("@U", userName);
 
-                DbLogger.LogDebugAsync($" 재선택가능선물 : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" 재선택가능선물 : {SqlDebugHelper.ToDebugSql(cmd)}");
 
                 using var r = await cmd.ExecuteReaderAsync();
                 while (await r.ReadAsync())
@@ -593,7 +593,7 @@ WHERE UserName=@U
             {
                 cmd.Parameters.AddWithValue("@U", userName);
 
-                DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -609,7 +609,7 @@ VALUES(@U,@P,@C, @MileStone, 'DRAFT',1,@CreatedAt);", conn2, tx))
                 cmd.Parameters.AddWithValue("@MileStone", eval.Milestone);
                 cmd.Parameters.AddWithValue("@CreatedAt", DateHelper.GetKoreaNow());
 
-                DbLogger.LogDebugAsync($" 새 draft 생성 (유효 1개) : {SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($" 새 draft 생성 (유효 1개) : {SqlDebugHelper.ToDebugSql(cmd)}");
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -640,7 +640,7 @@ WHERE OrderId=@Id
             cmd.Parameters.AddWithValue("@Id", orderId);
             cmd.Parameters.AddWithValue("@U", userName);
 
-            DbLogger.LogDebugAsync($" CancelSelectedGift : {SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($" CancelSelectedGift : {SqlDebugHelper.ToDebugSql(cmd)}");
 
             await cmd.ExecuteNonQueryAsync();
         }
@@ -820,7 +820,7 @@ WHERE OrderId=@Id AND Status='DRAFT';", conn);
             cmd.Parameters.AddWithValue("@A", adminId);
             cmd.Parameters.AddWithValue("@PurchasedAt", DateHelper.GetKoreaNow());
 
-            DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
 
             var n = await cmd.ExecuteNonQueryAsync();
             if (n == 0) throw new InvalidOperationException("이미 처리되었거나 대상이 아닙니다.");
@@ -839,7 +839,7 @@ WHERE OrderId = @Id AND Status = 'PURCHASED';", conn);
             cmd.Parameters.AddWithValue("@Id", orderId);
             cmd.Parameters.AddWithValue("@A", adminId ?? "");
 
-            DbLogger.LogDebugAsync($" 구매 완료 취소 : {SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($" 구매 완료 취소 : {SqlDebugHelper.ToDebugSql(cmd)}");
 
             var n = await cmd.ExecuteNonQueryAsync();
             if (n == 0) throw new InvalidOperationException("구매 완료 상태가 아니거나 대상이 없습니다.");

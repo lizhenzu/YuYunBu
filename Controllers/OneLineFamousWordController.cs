@@ -16,9 +16,9 @@ namespace BulletinBoard.Controllers
     [Authorize(Roles = nameof(Roles.Admin))]
     public class OneLineFamousWordController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         public OneLineFamousWordController(IAuthService authService,
             UserManager<ApplicationUser> userManager,
                  IWebHostEnvironment hostingEnvironment) : base(authService, userManager, hostingEnvironment)

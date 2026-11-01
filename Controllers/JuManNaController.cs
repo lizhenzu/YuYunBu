@@ -17,8 +17,8 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class JuManNaController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public JuManNaController(IAuthService authService,
             UserManager<ApplicationUser> userManager) : base(authService, userManager)
         {

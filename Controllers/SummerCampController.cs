@@ -14,8 +14,8 @@ namespace BulletinBoard.Controllers
     
     public class SummerCampController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public SummerCampController(IAuthService authService,
             UserManager<ApplicationUser> userManager) : base(authService, userManager)
         {

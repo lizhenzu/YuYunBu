@@ -14,7 +14,7 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class SiteVisitController : BaseController
     {
-        private readonly IAuthService _authService;
+        private new readonly IAuthService _authService;
         private readonly AppDbContext _db;
 
         public SiteVisitController(IAuthService authService,

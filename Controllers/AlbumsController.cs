@@ -23,9 +23,9 @@ namespace BulletinBoard.Controllers
         private readonly IFileStorage _storage;
         private readonly IZipService _zip;
         private readonly IHttpContextAccessor _http;
-        private readonly IWebHostEnvironment _hostingEnvironment;
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
         public AlbumsController(
             IAlbumService svc,
             IAuthService authService,

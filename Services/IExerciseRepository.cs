@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using BulletinBoard.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using BulletinBoard.Models;
 
 namespace BulletinBoard.Services
 {

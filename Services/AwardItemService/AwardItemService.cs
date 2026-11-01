@@ -50,7 +50,7 @@ namespace BulletinBoard.Services
             using var cmd = new SqlCommand(sb.ToString(), conn);
             await conn.OpenAsync();
  
-            DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($" Birth AwardItem : {SqlDebugHelper.ToDebugSql(cmd)}");
 
 
             using var r = await cmd.ExecuteReaderAsync();

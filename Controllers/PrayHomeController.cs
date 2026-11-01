@@ -18,9 +18,9 @@ namespace BulletinBoard.Controllers
    
     public class PrayHomeController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         public PrayHomeController(IAuthService authService,
                 IWebHostEnvironment hostingEnvironment,
             UserManager<ApplicationUser> userManager) : base(authService, userManager, hostingEnvironment)

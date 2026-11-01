@@ -26,9 +26,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class HomeController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
         private readonly INoticeService _noticeService;
         private readonly IBandBoardService _bandBoardService;
         private readonly IPresentPickService _presentPickService;
@@ -427,7 +427,7 @@ namespace BulletinBoard.Controllers
                         }
                         catch (Exception exTl)
                         {
-                            try { DbLogger.LogErrorAsync($"[Home/Index] 선물 타임라인 실패: {exTl.Message}"); } catch { }
+                            try { _ = DbLogger.LogErrorAsync($"[Home/Index] 선물 타임라인 실패: {exTl.Message}"); } catch { }
                             ViewBag.GiftTimelineKids = null;
                             ViewBag.MyGiftTimeline = null;
                         }
@@ -470,7 +470,7 @@ namespace BulletinBoard.Controllers
                         }
                         catch (Exception exFg)
                         {
-                            try { DbLogger.LogErrorAsync($"[Home/Index] 가족 합산 카드 부가정보 실패: {exFg.Message}"); } catch { }
+                            try { _ = DbLogger.LogErrorAsync($"[Home/Index] 가족 합산 카드 부가정보 실패: {exFg.Message}"); } catch { }
                         }
 
                         // ── 9번 결과 적용 ── (마일스톤 표시 목록)
@@ -526,7 +526,7 @@ namespace BulletinBoard.Controllers
                         // ⚠️ 위 12개 조회 중 하나만 실패해도 여기로 온다.
                         //    예전에는 가족 마일스톤까지 null 로 비워, 로그인 사용자에게만 카드가 사라졌다.
                         //    마일스톤은 사용자와 무관한 공통 값이므로 따로 다시 채운다.
-                        try { DbLogger.LogErrorAsync($"[Home/Index] 로그인 사용자 조회 실패: {exHome.Message}"); } catch { }
+                        try { _ = DbLogger.LogErrorAsync($"[Home/Index] 로그인 사용자 조회 실패: {exHome.Message}"); } catch { }
 
                         ViewBag.GiftRecipientList = null;
                         ViewBag.FamilyTeamGift    = null;

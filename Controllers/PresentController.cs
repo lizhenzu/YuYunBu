@@ -26,11 +26,11 @@ namespace BulletinBoard.Controllers
     {
         private readonly IPresentPickService _presentPickService;
         private readonly IHttpContextAccessor _http;
-        private readonly IWebHostEnvironment _hostingEnvironment;
-        private readonly IAuthService _authService;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
         private readonly IAwardItemService _awardItemService;
         private readonly BulletinBoard.Services.GiftCatalog.IGiftCatalogService _giftCatalog;
-        private readonly UserManager<ApplicationUser> _userManager;
+        private new readonly UserManager<ApplicationUser> _userManager;
         private readonly string _connStr;
 
         // ✅ SourceType 허용값(카카오/쿠팡) - 컨트롤러에서도 방어

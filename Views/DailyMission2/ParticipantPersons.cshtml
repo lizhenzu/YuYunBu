@@ -6,7 +6,6 @@
 @inject IConfiguration Configuration
 @inject IAuthService AuthService
 @inject Microsoft.AspNetCore.Http.IHttpContextAccessor HttpContextAccessor
-@using BulletinBoard.Common;
 @using BulletinBoard.Models;
 @using BulletinBoard.Enums
 @using BulletinBoard.Helpers;
@@ -50,7 +49,7 @@
         var cs = Configuration.GetConnectionString("DefaultConnection");
         if (!string.IsNullOrWhiteSpace(cs))
         {
-            using var conn = new System.Data.SqlClient.SqlConnection(cs);
+            using var conn = new Microsoft.Data.SqlClient.SqlConnection(cs);
             conn.Open();
             const string sql = @"
 SELECT p.UserName AS ParentUserName,
@@ -64,7 +63,7 @@ LEFT JOIN dbo.view_PersonMaster_2026 pm WITH(NOLOCK) ON pm.UserId = u.Id
 LEFT JOIN dbo.ClassInfo_2026 ci WITH(NOLOCK) ON ci.PersonId = pm.PersonId
 WHERE p.IsActive = 1 AND p.RoleCode IN (1,2)
 ORDER BY p.UserName, ci.ClassYear, ci.ClassBan, ChildName;";
-            using var cmd = new System.Data.SqlClient.SqlCommand(sql, conn);
+            using var cmd = new Microsoft.Data.SqlClient.SqlCommand(sql, conn);
             using var rd  = cmd.ExecuteReader();
             var tmp = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             while (rd.Read())

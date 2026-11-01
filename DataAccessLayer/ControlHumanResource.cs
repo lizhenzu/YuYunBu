@@ -3,7 +3,7 @@ using System;
 using System.Data;
 using System.Text;
 using System.Threading.Tasks;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using System.IO;
 using BulletinBoard.Helpers;
 

@@ -17,7 +17,7 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class WorldviewController : BaseController
     {
-        private readonly IAuthService _authService;
+        private new readonly IAuthService _authService;
         private readonly IWorldviewLessonService _lessonService;
         private readonly IWorldviewAdminService _adminService;
 

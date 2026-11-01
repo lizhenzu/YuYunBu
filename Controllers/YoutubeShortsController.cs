@@ -15,9 +15,9 @@ namespace BulletinBoard.Controllers
     [LogActionFilter]
     public class YoutubeShortsController : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment; 
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment; 
 
         public YoutubeShortsController(IAuthService authService,
             UserManager<ApplicationUser> userManager,

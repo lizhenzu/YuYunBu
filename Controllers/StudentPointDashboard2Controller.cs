@@ -24,9 +24,9 @@ namespace BulletinBoard.Controllers
     [Authorize]
     public class StudentPointDashboard2Controller : BaseController
     {
-        private readonly IAuthService _authService;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IWebHostEnvironment _hostingEnvironment;
+        private new readonly IAuthService _authService;
+        private new readonly UserManager<ApplicationUser> _userManager;
+        private new readonly IWebHostEnvironment _hostingEnvironment;
 
         private readonly IAttendanceService _attendanceService;
         private readonly IDevotionPointsService _devotion;

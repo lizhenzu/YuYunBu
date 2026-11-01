@@ -1,6 +1,5 @@
 ﻿using BulletinBoard.Common;
 using Microsoft.Extensions.Logging;
-using BulletinBoard.Common;
 using System;
 using System.Data;
 using System.Reflection;
@@ -10,7 +9,7 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 using BulletinBoard.Models;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using static Microsoft.Extensions.Logging.EventSource.LoggingEventSource;
-using System.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 
 namespace BulletinBoard.DataAccessLayer
 {

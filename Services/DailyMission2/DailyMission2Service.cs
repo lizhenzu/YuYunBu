@@ -28,8 +28,8 @@ namespace BulletinBoard.Services.DailyMission2
         // ✅ SaveResult에 IsRead/IsBookmarked 같은 속성이 없어도 컴파일되게(컨트롤러는 reflection으로 읽음)
         private class SaveResultEx : SaveResult
         {
-            public bool IsRead { get; set; }
-            public bool IsBookmarked { get; set; }
+            public new bool IsRead { get; set; }
+            public new bool IsBookmarked { get; set; }
         }
         public async Task<int> GetTargetPointFromAwardBaseAsync()
         {
@@ -314,7 +314,7 @@ ORDER BY ISNULL(dm.YearPoint,0) DESC, ISNULL(pm.FullName,'') ASC;
             cmd.Parameters.AddWithValue("@F", from);
             cmd.Parameters.AddWithValue("@T", to);
      
-            DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
             using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
             {
@@ -578,7 +578,7 @@ ORDER BY Id;";
             // 🔍 디버그 SQL 출력 (있으면)
             try
             { 
-                DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
+                _ = DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
             }
             catch { /* ignore */ }
 
@@ -611,7 +611,7 @@ ORDER BY Id;";
                     langCD, userId
                 );
 
-                DbLogger.LogDebugAsync($"성경책 정보 : {detail.TodayeBiblesData?.eBibleDatas?.Count ?? 0}");
+                _ = DbLogger.LogDebugAsync($"성경책 정보 : {detail.TodayeBiblesData?.eBibleDatas?.Count ?? 0}");
             }
             catch
             {

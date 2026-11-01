@@ -188,7 +188,7 @@ ORDER BY v.bMonth, v.bDay, v.fullName;";
             if (month.HasValue)
                 cmd.Parameters.AddWithValue("@Month", month.Value);
  
-            DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
+            _ = DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
 
 
             await using var reader = await cmd.ExecuteReaderAsync();
