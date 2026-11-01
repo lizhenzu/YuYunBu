@@ -4,6 +4,14 @@ name: Publish to SmarterASP
 # (실제 DB SQL 을 먼저 돌려야 하는 변경이 있을 수 있기 때문)
 on:
   workflow_dispatch:
+    inputs:
+      site:
+        description: '게시할 사이트'
+        type: choice
+        default: site4
+        options:
+          - site4
+          - site3
 
 concurrency:
   group: publish-smarterasp
@@ -49,11 +57,14 @@ jobs:
           }
           if (-not (Test-Path $exe)) { throw 'msdeploy.exe 를 찾을 수 없습니다.' }
 
-      - name: SmarterASP 에 올리기 (msdeploy)
+      - name: ${{ format('{0} 에 올리기 (msdeploy)', inputs.site) }}
         shell: pwsh
         env:
-          WEBDEPLOY_URL: ${{ secrets.WEBDEPLOY_URL }}
-          WEBDEPLOY_SITE: ${{ secrets.WEBDEPLOY_SITE }}
+          SELECTED_SITE: ${{ inputs.site }}
+          WEBDEPLOY_URL_SITE3: ${{ secrets.WEBDEPLOY_URL_SITE3 }}
+          WEBDEPLOY_URL_SITE4: ${{ secrets.WEBDEPLOY_URL_SITE4 }}
+          WEBDEPLOY_SITE_SITE3: ${{ secrets.WEBDEPLOY_SITE_SITE3 }}
+          WEBDEPLOY_SITE_SITE4: ${{ secrets.WEBDEPLOY_SITE_SITE4 }}
           WEBDEPLOY_USER: ${{ secrets.WEBDEPLOY_USER }}
           WEBDEPLOY_PASSWORD: ${{ secrets.WEBDEPLOY_PASSWORD }}
         run: |
@@ -63,8 +74,8 @@ jobs:
             if ([string]::IsNullOrEmpty($v)) { throw "Secret $name 값이 비어 있습니다." }
             return $v
           }
-          $url  = Get-Secret 'WEBDEPLOY_URL'
-          $site = Get-Secret 'WEBDEPLOY_SITE'
+          $url  = Get-Secret ('WEBDEPLOY_URL_' + $env:SELECTED_SITE.ToUpper())
+          $site = Get-Secret ('WEBDEPLOY_SITE_' + $env:SELECTED_SITE.ToUpper())
           $user = Get-Secret 'WEBDEPLOY_USER'
           $pass = Get-Secret 'WEBDEPLOY_PASSWORD'
 
