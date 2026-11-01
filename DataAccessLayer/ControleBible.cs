@@ -9,7 +9,6 @@ using System;
 using System.Data; 
 using System.Reflection;
 using System.Text;
-using SixLabors.ImageSharp.Formats.Jpeg;
 using BulletinBoard.Helpers;
 
 namespace BulletinBoard.DataAccessLayer
