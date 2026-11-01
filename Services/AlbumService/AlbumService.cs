@@ -4,9 +4,6 @@ using BulletinBoard.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -40,22 +37,15 @@ namespace YunYunBu2024.Services
             const int thumbMaxSize = 400;
 
             await using var srcStream = file.OpenReadStream();
-            using var image = await Image.LoadAsync(srcStream);
+            using var image = ImageResizeHelper.LoadOriented(srcStream);
 
             // 긴 변 기준으로 리사이즈 (비율 유지, 최대 400px)
-            image.Mutate(x => x.Resize(new ResizeOptions
-            {
-                Mode = ResizeMode.Max,
-                Size = new Size(thumbMaxSize, thumbMaxSize)
-            }));
+            using var thumb = ImageResizeHelper.ResizeMax(image, thumbMaxSize);
 
             var thumbName = $"{Guid.NewGuid():N}_thumb.jpg";
 
             var ms = new MemoryStream();
-            await image.SaveAsJpegAsync(ms, new JpegEncoder
-            {
-                Quality = 80
-            });
+            ImageResizeHelper.SaveJpeg(thumb, ms, 80);
 
             ms.Position = 0;
 

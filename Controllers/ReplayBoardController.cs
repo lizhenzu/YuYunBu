@@ -5,9 +5,6 @@ using BulletinBoard.Services.Abstract;
 using BulletinBoard.Services.ReplayBoard;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Processing;
 using System.Globalization;
 
 namespace BulletinBoard.Controllers;
@@ -280,17 +277,9 @@ string? popupUntilRaw = null;
                         var thumbName = ThumbNameFromStored(stored);
                         var thumbAbsPath = Path.Combine(absDir, thumbName);
 
-                        using var image = await Image.LoadAsync(absPath);
-                        var ratio = (double)ThumbMaxWidth / image.Width;
-                        if (ratio < 1.0)
-                        {
-                            var newW = ThumbMaxWidth;
-                            var newH = (int)Math.Round(image.Height * ratio);
-                            image.Mutate(x => x.Resize(newW, newH));
-                        }
-
-                        var encoder = new WebpEncoder { Quality = 75 };
-                        await image.SaveAsWebpAsync(thumbAbsPath, encoder);
+                        using var image = ImageResizeHelper.LoadOriented(absPath);
+                        using var thumb = ImageResizeHelper.ResizeToFit(image, ThumbMaxWidth, int.MaxValue);
+                        ImageResizeHelper.SaveWebp(thumb, thumbAbsPath, 75);
                     }
                     catch
                     {
@@ -418,17 +407,9 @@ string? popupUntilRaw = null;
                         var thumbName = ThumbNameFromStored(stored);
                         var thumbAbsPath = Path.Combine(absDir, thumbName);
 
-                        using var image = await Image.LoadAsync(absPath);
-                        var ratio = (double)ThumbMaxWidth / image.Width;
-                        if (ratio < 1.0)
-                        {
-                            var newW = ThumbMaxWidth;
-                            var newH = (int)Math.Round(image.Height * ratio);
-                            image.Mutate(x => x.Resize(newW, newH));
-                        }
-
-                        var encoder = new WebpEncoder { Quality = 75 };
-                        await image.SaveAsWebpAsync(thumbAbsPath, encoder);
+                        using var image = ImageResizeHelper.LoadOriented(absPath);
+                        using var thumb = ImageResizeHelper.ResizeToFit(image, ThumbMaxWidth, int.MaxValue);
+                        ImageResizeHelper.SaveWebp(thumb, thumbAbsPath, 75);
                     }
                     catch { }
                 }

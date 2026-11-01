@@ -6,9 +6,6 @@ using BulletinBoard.Models.FamilyPhoto;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 using Cfg = BulletinBoard.Models.FamilyPhoto.FamilyPhotoContestConfig;
 
 namespace BulletinBoard.Services.FamilyPhoto;
@@ -366,28 +363,27 @@ IF NOT EXISTS (SELECT 1 FROM dbo.FamilyPhotoContest WHERE ContestId = 1)
         try
         {
             await using var src = file.OpenReadStream();
-            using var image = await Image.LoadAsync(src);
-            image.Mutate(x => x.AutoOrient());
+            using var image = ImageResizeHelper.LoadOriented(src);
 
             var dir = Path.Combine(Root(_env), entryId.ToString());
             Directory.CreateDirectory(dir);
             var stamp = now.Ticks.ToString();
 
-            using (var big = image.Clone(x => x.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(Cfg.LongEdge, Cfg.LongEdge) })))
+            using (var big = ImageResizeHelper.ResizeMax(image, Cfg.LongEdge))
             {
                 w = big.Width; h = big.Height;
                 var name = $"{slot}_{stamp}.jpg";
-                await big.SaveAsJpegAsync(Path.Combine(dir, name), new JpegEncoder { Quality = 85 });
+                ImageResizeHelper.SaveJpeg(big, Path.Combine(dir, name), 85);
                 filePath = $"/uploads/familyphoto/{entryId}/{name}";
             }
-            using (var th = image.Clone(x => x.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(Cfg.ThumbEdge, Cfg.ThumbEdge) })))
+            using (var th = ImageResizeHelper.ResizeMax(image, Cfg.ThumbEdge))
             {
                 var name = $"{slot}_{stamp}_t.jpg";
-                await th.SaveAsJpegAsync(Path.Combine(dir, name), new JpegEncoder { Quality = 80 });
+                ImageResizeHelper.SaveJpeg(th, Path.Combine(dir, name), 80);
                 thumbPath = $"/uploads/familyphoto/{entryId}/{name}";
             }
         }
-        catch (UnknownImageFormatException)
+        catch (UnsupportedImageFormatException)
         {
             return (false, "읽을 수 없는 사진 형식이에요. jpg · png 로 올려 주세요. (아이폰 HEIC 는 사진 앱에서 '호환성' 으로 저장하거나 카톡으로 한 번 보낸 사진을 쓰면 돼요)");
         }
