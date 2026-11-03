@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using System.Drawing;
 using BulletinBoard.Helpers;
+using BulletinBoard.Services.QuizPlatform;
 
 namespace BulletinBoard.Controllers
 {
@@ -22,11 +23,46 @@ namespace BulletinBoard.Controllers
     {
         private new readonly IAuthService _authService;
         private new readonly UserManager<ApplicationUser> _userManager;
+        private readonly IQuizPlatformClient _quizPlatform;
         public QuestionController(IAuthService authService,
-            UserManager<ApplicationUser> userManager) : base(authService, userManager)
+            UserManager<ApplicationUser> userManager,
+            IQuizPlatformClient quizPlatform) : base(authService, userManager)
         {
             _authService = authService;
             _userManager = userManager;
+            _quizPlatform = quizPlatform;
+        }
+
+        /// <summary>저장한 그날 퀴즈를 플랫폼으로 보내고, 결과를 달력 화면에 한 줄로 알린다</summary>
+        private async Task PushToPlatformAfterSave(QuestionTypeData quiz)
+        {
+            if (quiz == null || !_quizPlatform.IsConfigured) return;
+
+            var r = await _quizPlatform.PushAsync(quiz);
+            TempData["QuizPushOk"]  = r.Ok ? "y" : "n";
+            TempData["QuizPushMsg"] = r.Ok
+                ? $"{r.Date} 퀴즈를 플랫폼에 보냈어요. ({r.Message})"
+                : r.Skipped
+                    ? $"{r.Date} 퀴즈는 플랫폼에 보내지 않았어요. {r.Message}"
+                    : $"{r.Date} 퀴즈를 플랫폼에 보내지 못했어요. {r.Message} — 달력의 '이 달 퀴즈 보내기'로 다시 보낼 수 있어요.";
+        }
+
+        /// <summary>
+        /// 퀴즈 하나를 플랫폼으로 보낸다 (퀴즈 달력의 '이 달 퀴즈 보내기'가 하루씩 차례로 부른다)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PushToPlatform(int id)
+        {
+            if (!_quizPlatform.IsConfigured)
+                return Json(new QuizPushResult { Skipped = true, Message = "플랫폼 주소나 API 키가 설정되지 않았어요." });
+
+            ManageQuestion manageQuestion = new ManageQuestion();
+            var found = manageQuestion.getQuestionObject(id, false, "o", false, false, SharedComm.GetToday(), string.Empty);
+            if (found == null || found.Count == 0)
+                return Json(new QuizPushResult { Message = "퀴즈를 찾지 못했어요." });
+
+            return Json(await _quizPlatform.PushAsync(found[0]));
         }
 
         //// GET: JobCategory
@@ -88,6 +124,7 @@ namespace BulletinBoard.Controllers
             ViewBag.PrevDateTime = workDT.AddMonths(-1).ToString("yyyy-MM-dd");
             ViewBag.NowDateTime = SharedComm.GetTodayString();
             ViewBag.NextDateTime = workDT.AddMonths(1).ToString("yyyy-MM-dd");
+            ViewBag.QuizPlatformReady = _quizPlatform.IsConfigured;
             return View(model);
         }
 
@@ -362,6 +399,7 @@ namespace BulletinBoard.Controllers
                 questionTypeDataObject.UserName = userName;
 
                 manageQuestion.UpdateQuestionObject(questionTypeDataObject);
+                await PushToPlatformAfterSave(questionTypeDataObject);
             }
             return RedirectToAction("Index");
         }
@@ -404,6 +442,7 @@ namespace BulletinBoard.Controllers
                 questionTypeDataObject.UserName = userName;
 
 				manageQuestion.CreateQuestionObject(questionTypeDataObject);
+                await PushToPlatformAfterSave(questionTypeDataObject);
             }
             return RedirectToAction("Index");
         }
@@ -505,6 +544,14 @@ namespace BulletinBoard.Controllers
         {
             ManageQuestionBank manageQuestionBank = new ManageQuestionBank();
             manageQuestionBank.CreateQuizById(Id, WhenDate);
+
+            // 문제은행에서 그날로 옮긴 퀴즈도 플랫폼으로 보낸다
+            if (DateTime.TryParse(WhenDate, out var when))
+            {
+                var saved = new ManageQuestion().getQuestionObject(0, true, "o", false, false, when, string.Empty);
+                if (saved != null && saved.Count > 0)
+                    await PushToPlatformAfterSave(saved[0]);
+            }
             return RedirectToAction("Index");
         }
     }
