@@ -177,8 +177,8 @@ namespace BulletinBoard
             services.AddScoped<IDevotionPointsService, DevotionPointsService>();
 
             services.AddScoped<IStudentPointGiftService, BulletinBoard.Services.StudentPointGift.StudentPointGiftService>();
-            // 도전!!! 성경말씀 플랫폼 퀴즈 입력 API
-            services.AddHttpClient<BulletinBoard.Services.QuizPlatform.IQuizPlatformClient, BulletinBoard.Services.QuizPlatform.QuizPlatformClient>();
+            // 도전!!! 성경말씀 플랫폼 말씀 · 퀴즈 입력 API
+            services.AddHttpClient<BulletinBoard.Services.ContentPlatform.IContentPlatformClient, BulletinBoard.Services.ContentPlatform.ContentPlatformClient>();
             services.AddScoped<IGiftPopupStateRepo, GiftPopupStateRepo>();
 
             services.AddScoped<IBirthdayRepository, BirthdayRepository>();
