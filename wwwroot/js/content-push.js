@@ -3,6 +3,7 @@
 //   ContentPush.run({ panel, url, token, items: [{ id, date }], label })
 //   - url 에 id 와 __RequestVerificationToken 을 POST 하고, 응답 { ok, skipped, fatal, message } 를 받는다
 //   - fatal(401 · 404 · 503)이면 남은 날은 보내지 않고 멈춘다
+//   - 성공한 날도 플랫폼이 돌려준 내용(예: 구간 2개로 바꿨어요)을 목록에 적는다
 //   - 끝나면 실패한 날만 다시 보내는 버튼을 보여 준다
 (function () {
     var CSS =
@@ -16,7 +17,7 @@
         '.cpu-stop{margin-top:8px;padding:9px 12px;border-radius:10px;background:#FDECEC;color:#B42318;font-size:12.5px;font-weight:700;line-height:1.5}' +
         '.cpu-log{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:4px;max-height:240px;overflow:auto}' +
         '.cpu-log li{font-size:12px;line-height:1.5;padding:6px 10px;border-radius:10px;background:#fff;color:#374151;word-break:break-all}' +
-        '.cpu-log li.er{color:#B42318}.cpu-log li.sk{color:#B45309}' +
+        '.cpu-log li.er{color:#B42318}.cpu-log li.sk{color:#B45309}.cpu-log li.ok{color:#15803D}' +
         '.cpu-retry{margin-top:10px;width:100%;padding:10px;border:0;border-radius:12px;font:inherit;font-size:13px;font-weight:800;background:#fff;color:#2F80ED;box-shadow:inset 0 0 0 1px #C9DDF8;cursor:pointer}';
 
     function addStyle() {
@@ -77,7 +78,7 @@
             var item = list[i];
             var r = await pushOne(opt.url, opt.token, item);
             done++;
-            if (r.ok) ok++;
+            if (r.ok) { ok++; log('ok', item.date + ' · ' + (r.message || '성공')); }
             else if (r.skipped) { sk++; log('sk', item.date + ' · ' + r.message); }
             else { er++; failed.push(item); log('er', item.date + ' · ' + r.message); }
             paint();
