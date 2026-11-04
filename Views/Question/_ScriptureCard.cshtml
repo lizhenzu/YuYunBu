@@ -1,30 +1,14 @@
 @using BulletinBoard.Models
 @*  ══════════════════════════════════════════════════════════════
-    "오늘의 말씀" 카드 + 본문 복사 아이콘 (CreateQuizByBank · FromTemplate 공용)
-    · 아이콘을 누르면 "[제목] 위치" + 절 번호가 붙은 본문 전체를 복사한다
+    "오늘의 말씀" 카드 + 구절 복사 아이콘 (CreateQuizByBank · FromTemplate 공용)
+    · 아이콘을 누르면 화면에 보이는 구절 위치만 복사한다 (예: 고린도후서 11장 16절 ~ 11장 33절)
     · 아이폰 사파리: navigator.clipboard 가 안 되면 숨긴 textarea 를 선택해 execCommand('copy')
-    · 둘 다 안 되면 본문을 띄워 길게 눌러 복사하게 한다
+    · 둘 다 안 되면 구절을 띄워 길게 눌러 복사하게 한다
     ══════════════════════════════════════════════════════════════ *@
 @{
     TodayWordToReads? word = ViewBag.TodayWordToReads as TodayWordToReads;
-    eBibles? bible = ViewBag._eBibles as eBibles;
 
     string range = word == null ? "" : $"{word.BibleText} {word.FromJang}장 {word.FromZul}절 ~ {word.ToJang}장 {word.ToZul}절";
-
-    // 복사할 글: 첫 줄은 제목 · 위치, 빈 줄 다음에 한 절씩. 장이 여러 개면 "장:절"
-    string copyText = "";
-    if (word != null)
-    {
-        var lines = new List<string> { string.IsNullOrWhiteSpace(word.BibleSubject) ? range : $"[{word.BibleSubject.Trim()}] {range}" };
-        var verses = bible?.eBibleDatas?.Where(v => !string.IsNullOrWhiteSpace(v.BibleData)).ToList() ?? new List<eBible>();
-        if (verses.Count > 0)
-        {
-            bool manyChapters = verses.Select(v => v.Jang).Distinct().Count() > 1;
-            lines.Add("");
-            lines.AddRange(verses.Select(v => $"{(manyChapters ? v.Jang + ":" : "")}{v.zul} {v.BibleData.Trim()}"));
-        }
-        copyText = string.Join("\n", lines);
-    }
 }
 @if (word != null)
 {
@@ -42,7 +26,7 @@
         .qb-cpbox .in { width: 100%; max-width: 480px; padding: 16px; border-radius: 16px; background: #fff; }
         .qb-cpbox b { display: block; font-size: 14px; color: #111827; }
         .qb-cpbox small { display: block; margin-top: 2px; font-size: 12px; color: #6B7280; }
-        .qb-cpbox textarea { box-sizing: border-box; width: 100%; height: 45vh; margin-top: 10px; padding: 10px; border: 1px solid #E5E7EB; border-radius: 10px; font: inherit; font-size: 16px; line-height: 1.6; }
+        .qb-cpbox textarea { box-sizing: border-box; width: 100%; height: 5em; margin-top: 10px; padding: 10px; border: 1px solid #E5E7EB; border-radius: 10px; font: inherit; font-size: 16px; line-height: 1.6; }
         .qb-cpbox button { margin-top: 10px; width: 100%; padding: 11px; border: 0; border-radius: 12px; font: inherit; font-weight: 800; background: #2F80ED; color: #fff; }
     </style>
 
@@ -51,14 +35,14 @@
         <b>@word.BibleSubject</b>
         <div class="rg">
             <small>@range</small>
-            <button type="button" class="qb-cp" id="qbCopyBtn" aria-label="본문 복사" title="본문 복사" data-copy="@copyText" onclick="qbCopyScripture(this)">
+            <button type="button" class="qb-cp" id="qbCopyBtn" aria-label="구절 복사" title="구절 복사" data-copy="@range" onclick="qbCopyScripture(this)">
                 <svg class="cp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
                 <svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
             </button>
         </div>
     </div>
 
-    <div class="qb-cpbox" id="qbCopyBox" role="dialog" aria-modal="true" aria-label="본문 복사">
+    <div class="qb-cpbox" id="qbCopyBox" role="dialog" aria-modal="true" aria-label="구절 복사">
         <div class="in">
             <b>자동 복사가 안 됐어요</b>
             <small>아래 글을 길게 눌러 '전체 선택' → '복사' 해 주세요.</small>
@@ -101,7 +85,7 @@
                     btn.classList.add('done');
                     btn.setAttribute('aria-label', '복사됨');
                     clearTimeout(btn._t);
-                    btn._t = setTimeout(function () { btn.classList.remove('done'); btn.setAttribute('aria-label', '본문 복사'); }, 2000);
+                    btn._t = setTimeout(function () { btn.classList.remove('done'); btn.setAttribute('aria-label', '구절 복사'); }, 2000);
                 } else {
                     var box = document.getElementById('qbCopyBox');
                     document.getElementById('qbCopyArea').value = text;
