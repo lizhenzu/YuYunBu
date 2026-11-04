@@ -35,11 +35,13 @@ namespace BulletinBoard.Services.ContentPlatform
         bool IsConfigured { get; }
         Task<ContentPushResult> PushQuizAsync(QuestionTypeData quiz);
         Task<ContentPushResult> PushWordAsync(TodayWordToRead word);
+        Task<ContentPushResult> PushClipsAsync(JuManNaSegDay day);
     }
 
     /// <summary>
     /// "도전!!! 성경말씀" 콘텐츠 입력 API
     /// - 말씀: PUT /api/platform/words/{yyyy-MM-dd},  퀴즈: PUT /api/platform/quizzes/{yyyy-MM-dd}
+    /// - 말씀 영상 구간: PUT /api/platform/words/{yyyy-MM-dd}/clips (그날 목록 전체를 통째로 바꾼다)
     /// - 키: 환경 변수 CONTENT_API_KEY (설정에서 같은 이름으로 읽는다. 코드 · Git · 로그에 쓰지 않는다)
     /// - 사이트 주소: appsettings 의 QuizPlatform:BaseUrl
     /// - 항상 바로 공개(publish = true), 같은 날은 확인 없이 덮어쓴다
@@ -86,7 +88,7 @@ namespace BulletinBoard.Services.ContentPlatform
             {
                 return Task.FromResult(Skip(date, ex.Message));
             }
-            return SendAsync("quizzes", date, body);
+            return SendAsync($"quizzes/{date}", date, body);
         }
 
         private static object BuildQuizBody(QuestionTypeData quiz)
@@ -178,7 +180,7 @@ namespace BulletinBoard.Services.ContentPlatform
                 summary,                // commentary 는 보내지 않는다
                 publish      = true
             };
-            return await SendAsync("words", date, body);
+            return await SendAsync($"words/{date}", date, body);
         }
 
         private async Task<bool> VerseExistsAsync(int book, int chapter, int verse)
@@ -192,9 +194,41 @@ namespace BulletinBoard.Services.ContentPlatform
             return names.Any(n => BibleBooks.ToNumber(n) == book);
         }
 
+        // ─────────────────────────── 말씀 영상 구간 ───────────────────────────
+
+        /// <summary>
+        /// 그날 "🎧 듣기" 영상 구간 목록을 통째로 보낸다 (말씀 · 퀴즈와 별개)
+        /// - 구간 n = 그날 말씀의 FromJang + (n-1) 장 (YuYunBu 와 같은 규칙, 최대 5개)
+        /// - youtube: YuYunBu 의 그 장 영상 주소 (시작 · 끝 시간이 이 영상 기준이므로 함께 보낸다). 없으면 비워서 플랫폼 기본 영상
+        /// - start · end: 0 초면 칸을 빼서 처음부터 · 끝까지
+        /// </summary>
+        public Task<ContentPushResult> PushClipsAsync(JuManNaSegDay day)
+        {
+            var date = day.ExposeDate.ToString("yyyy-MM-dd");
+            var clips = new List<object>();
+            foreach (var seg in day.Segs.OrderBy(x => x.Slot))
+            {
+                if (seg.Jang < 1 || seg.Jang > 150)
+                    return Task.FromResult(Skip(date, $"구간 {seg.Slot}의 장({seg.Jang})이 올바르지 않아요. 말씀 장절을 확인해 주세요."));
+                if (seg.StartSec > 0 && seg.EndSec > 0 && seg.EndSec <= seg.StartSec)
+                    return Task.FromResult(Skip(date, $"{seg.Jang}장 구간의 끝({Mmss(seg.EndSec)})이 시작({Mmss(seg.StartSec)})보다 뒤가 아니에요."));
+
+                clips.Add(new
+                {
+                    chapter = seg.Jang,
+                    youtube = string.IsNullOrWhiteSpace(seg.Url) ? null : seg.Url.Trim(),
+                    start   = seg.StartSec > 0 ? Mmss(seg.StartSec) : null,
+                    end     = seg.EndSec > 0 ? Mmss(seg.EndSec) : null
+                });
+            }
+            return SendAsync($"words/{date}/clips", date, new { clips });
+        }
+
+        private static string Mmss(int sec) => $"{sec / 60}:{sec % 60:D2}";
+
         // ─────────────────────────── 공통 ───────────────────────────
 
-        private async Task<ContentPushResult> SendAsync(string kind, string date, object body)
+        private async Task<ContentPushResult> SendAsync(string path, string date, object body)
         {
             var result = new ContentPushResult { Date = date };
             if (!IsConfigured)
@@ -207,7 +241,7 @@ namespace BulletinBoard.Services.ContentPlatform
                 bool transient;
                 try
                 {
-                    using var req = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/api/platform/{kind}/{date}")
+                    using var req = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/api/platform/{path}")
                     {
                         // 길이가 정해진 UTF-8 본문으로 보낸다 (조각 전송을 못 받는 서버 대비)
                         Content = new StringContent(json, Encoding.UTF8, "application/json")
@@ -226,7 +260,10 @@ namespace BulletinBoard.Services.ContentPlatform
                             result.Status  = ok.TryGetProperty("status", out var s) ? s.GetString() : null;
                             result.Created = ok.TryGetProperty("created", out var c) && c.ValueKind is JsonValueKind.True or JsonValueKind.False ? c.GetBoolean() : null;
                         }
-                        result.Message = result.Created == true ? "새로 넣었어요" : "바꿨어요";
+                        int? count = null;
+                        if (TryParse(text, out var okc) && okc.TryGetProperty("count", out var cnt) && cnt.ValueKind == JsonValueKind.Number) count = cnt.GetInt32();
+                        result.Message = count != null ? $"구간 {count}개로 바꿨어요"
+                                       : result.Created == true ? "새로 넣었어요" : "바꿨어요";
                         return result;
                     }
 

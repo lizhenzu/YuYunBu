@@ -49,6 +49,25 @@ namespace BulletinBoard.Controllers
             return Json(await _contentPlatform.PushWordAsync(found[0]));
         }
 
+        /// <summary>
+        /// 말씀 영상 구간 하루치를 플랫폼으로 보낸다 (영상 구간 편집의 '이 달 영상 구간 보내기'가 하루씩 차례로 부른다)
+        /// 그날 목록 전체를 통째로 덮어쓴다
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public async Task<IActionResult> PushClipsToPlatform(int id)
+        {
+            if (!_contentPlatform.IsConfigured)
+                return Json(new ContentPushResult { Skipped = true, Message = "플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 설정되지 않았어요." });
+
+            var day = new ManageJuManNa().getJuManNaSegDay(id);
+            if (day == null)
+                return Json(new ContentPushResult { Message = "그날 말씀을 찾지 못했어요." });
+
+            return Json(await _contentPlatform.PushClipsAsync(day));
+        }
+
         // 목록 · 수정 · 저장은 SuperAdmin 전용.  상세(IndexByID)는 QT 홈에서 일반 사용자도 들어온다
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
         public async Task<IActionResult> Index()
@@ -128,6 +147,7 @@ namespace BulletinBoard.Controllers
             {
                 return RedirectToAction(nameof(IndexGroupByYYYYMM));
             }
+            ViewBag.ContentPlatformReady = _contentPlatform.IsConfigured;
             return View(new ManageJuManNa().getJuManNaSegMonth(firstDay));
         }
 
