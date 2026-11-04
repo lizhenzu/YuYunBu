@@ -23,6 +23,11 @@
     int missing = list.Count(x => string.IsNullOrWhiteSpace(x.BibleSubject));
 
     string Range(int sm, int ss, int em, int es) => $"{sm}:{ss:D2} ~ {em}:{es:D2}";
+
+    // 도전!!! 성경말씀 플랫폼으로 보낼 목록 (날짜 순, 하루 하나)
+    bool platformReady = ViewBag.ContentPlatformReady as bool? ?? false;
+    var pushItems = list.GroupBy(x => x.ExposeDate.Date).OrderBy(g => g.Key)
+                        .Select(g => new { id = g.First().Id, date = g.Key.ToString("yyyy-MM-dd") }).ToList();
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -33,7 +38,13 @@
     <title>날짜별 말씀</title>
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
-    <style>body { margin: 0; background: #FFFFFF; }</style>
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pf { margin-top: 14px; padding: 14px; border-radius: 14px; background: #F4F6F9; }
+        .pf .pf-h { font-size: 12px; font-weight: 800; color: #2F80ED; }
+        .pf .pf-d { margin-top: 4px; font-size: 12.5px; color: #6B7280; line-height: 1.6; }
+        .pf .qb-btn { margin-top: 10px; }
+    </style>
 </head>
 <body>
 <div class="qb">
@@ -59,6 +70,24 @@
             <a class="@(opt == "rough" ? "on" : "")" href="/JuManNa/IndexQueryByYYYYMM?option=Rough&YYYYMM=@ym">주제까지</a>
             <a class="@(opt == "detail" ? "on" : "")" href="/JuManNa/IndexQueryByYYYYMM?option=Detail&YYYYMM=@ym">전체 내용</a>
             <a href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@ym">영상 구간</a>
+        </div>
+    }
+
+    @if (pushItems.Count > 0)
+    {
+        <div class="pf">
+            <div class="pf-h">도전!!! 성경말씀 플랫폼</div>
+            @if (platformReady)
+            {
+                <div class="pf-d">이 달 말씀 @(pushItems.Count)일을 하루씩 차례로 보내요. 바로 공개되고, 이미 있는 날은 바뀌어요.</div>
+                <button type="button" class="qb-btn p w" id="pf-start" onclick="pushWordMonth()">이 달 말씀 보내기</button>
+            }
+            else
+            {
+                <div class="pf-d">플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 서버 설정에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
+            }
+            <div id="pf-run"></div>
+            <form id="pf-token" hidden>@Html.AntiForgeryToken()</form>
         </div>
     }
 
@@ -129,5 +158,28 @@
         <span><a href="/JuManNa/IndexGroupByYYYYMM">말씀 정리</a><a href="/">@ConstatsCommon.ToHome</a></span>
     </div>
 </div>
+
+@if (pushItems.Count > 0 && platformReady)
+{
+    <script src="/js/content-push.js" asp-append-version="true"></script>
+    <script>
+        // 이 달 말씀을 플랫폼으로 하루씩 차례로 보낸다 (wwwroot/js/content-push.js)
+        const pushItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pushItems));
+        function pushWordMonth() {
+            if (ContentPush.isBusy()) return;
+            const monthLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthLabel));
+            if (!confirm(monthLabel + ' 말씀 ' + pushItems.length + '일을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.')) return;
+            const startBtn = document.getElementById('pf-start');
+            startBtn.disabled = true;
+            ContentPush.run({
+                panel: document.getElementById('pf-run'),
+                url: '/JuManNa/PushWordToPlatform',
+                token: document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value,
+                items: pushItems,
+                onDone: function () { startBtn.disabled = false; }
+            });
+        }
+    </script>
+}
 </body>
 </html>

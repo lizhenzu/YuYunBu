@@ -3,6 +3,7 @@ using BulletinBoard.Common;
 using BulletinBoard.Enums;
 using BulletinBoard.Models;
 using BulletinBoard.Services.Abstract;
+using BulletinBoard.Services.ContentPlatform;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -19,13 +20,35 @@ namespace BulletinBoard.Controllers
     {
         private new readonly IAuthService _authService;
         private new readonly UserManager<ApplicationUser> _userManager;
+        private readonly IContentPlatformClient _contentPlatform;
         public JuManNaController(IAuthService authService,
-            UserManager<ApplicationUser> userManager) : base(authService, userManager)
+            UserManager<ApplicationUser> userManager,
+            IContentPlatformClient contentPlatform) : base(authService, userManager)
         {
             _authService = authService;
             _userManager = userManager;
-        }  
-        
+            _contentPlatform = contentPlatform;
+        }
+
+        /// <summary>
+        /// 말씀 하루치를 플랫폼으로 보낸다 (날짜별 말씀 목록의 '이 달 말씀 보내기'가 하루씩 차례로 부른다)
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public async Task<IActionResult> PushWordToPlatform(int id)
+        {
+            if (!_contentPlatform.IsConfigured)
+                return Json(new ContentPushResult { Skipped = true, Message = "플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 설정되지 않았어요." });
+
+            ManageJuManNa manageJuManNa = new ManageJuManNa();
+            var found = manageJuManNa.getJuManNa(id, false, GetWorkDT());
+            if (found == null || found.Count == 0)
+                return Json(new ContentPushResult { Message = "말씀을 찾지 못했어요." });
+
+            return Json(await _contentPlatform.PushWordAsync(found[0]));
+        }
+
         // 목록 · 수정 · 저장은 SuperAdmin 전용.  상세(IndexByID)는 QT 홈에서 일반 사용자도 들어온다
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
         public async Task<IActionResult> Index()
@@ -51,6 +74,7 @@ namespace BulletinBoard.Controllers
             List<JuManNas> values = manageJuManNa.getJuManNaByYYYYMM(YYYYMM);
             ViewBag.option = option.ToLower();
             ViewBag.YYYYMM = YYYYMM;   // 화면 위 보기 방식 칩(본문만 · 주제까지 · 전체 내용 · 영상 구간)이 같은 달로 이동할 때 쓴다
+            ViewBag.ContentPlatformReady = _contentPlatform.IsConfigured;
 
             if (option == "DetailSerail")
             {

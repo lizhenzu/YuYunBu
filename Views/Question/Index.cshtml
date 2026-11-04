@@ -68,15 +68,6 @@
         .pf .pf-h { font-size: 12px; font-weight: 800; color: #2F80ED; }
         .pf .pf-d { margin-top: 4px; font-size: 12.5px; color: #6B7280; line-height: 1.6; }
         .pf .qb-btn { margin-top: 10px; }
-        .pf-bar { margin-top: 12px; height: 10px; border-radius: 999px; background: #E5E7EB; overflow: hidden; }
-        .pf-bar i { display: block; height: 100%; width: 0; background: #2F80ED; transition: width .2s; }
-        .pf-cnt { margin-top: 8px; display: flex; justify-content: space-between; font-size: 12.5px; color: #374151; }
-        .pf-cnt b { font-size: 14px; color: #111827; }
-        .pf-sum { margin-top: 6px; font-size: 12px; color: #6B7280; }
-        .pf-sum .ok { color: #15803D; font-weight: 700; } .pf-sum .sk { color: #B45309; font-weight: 700; } .pf-sum .er { color: #B42318; font-weight: 700; }
-        .pf-log { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 220px; overflow: auto; }
-        .pf-log li { font-size: 12px; line-height: 1.5; padding: 6px 10px; border-radius: 10px; background: #fff; color: #374151; word-break: break-all; }
-        .pf-log li.er { color: #B42318; } .pf-log li.sk { color: #B45309; }
         [hidden] { display: none !important; }
     </style>
 </head>
@@ -87,6 +78,7 @@
     var selectedDate = null;
 </script>
 <script src="/js/common2.js"></script>
+<script src="/js/content-push.js" asp-append-version="true"></script>
 
 <div class="qb">
 
@@ -136,19 +128,13 @@
         @if (platformReady)
         {
             <div class="pf-d">이 달 퀴즈를 날짜마다 하나씩 플랫폼 공용 퀴즈로 보내요. 바로 공개되고, 이미 있는 날은 바뀌어요. O/X 퀴즈는 보내지 않아요.</div>
-            <button type="button" class="qb-btn p w" id="pf-start" onclick="pushMonth(false)">이 달 퀴즈 보내기</button>
+            <button type="button" class="qb-btn p w" id="pf-start" onclick="pushMonth()">이 달 퀴즈 보내기</button>
         }
         else
         {
-            <div class="pf-d">플랫폼 주소와 API 키가 서버 설정(QuizPlatform)에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
+            <div class="pf-d">플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 서버 설정에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
         }
-        <div id="pf-run" hidden>
-            <div class="pf-bar"><i id="pf-fill"></i></div>
-            <div class="pf-cnt"><span id="pf-state">보내는 중…</span><span><span id="pf-total">0</span>개 중 <b id="pf-done">0</b>개 보냄</span></div>
-            <div class="pf-sum">성공 <span class="ok" id="pf-ok">0</span> · 건너뜀 <span class="sk" id="pf-sk">0</span> · 실패 <span class="er" id="pf-er">0</span></div>
-            <ul class="pf-log" id="pf-log"></ul>
-            <button type="button" class="qb-btn w" id="pf-retry" onclick="pushMonth(true)" hidden>실패한 날만 다시 보내기</button>
-        </div>
+        <div id="pf-run"></div>
         <form id="pf-token" hidden>@Html.AntiForgeryToken()</form>
     </div>
 
@@ -295,17 +281,13 @@
 
     renderCalendar(currentDate);
 
-    // ── 이 달 퀴즈를 플랫폼으로 하루씩 차례로 보낸다 ──
-    let pfFailed = [];
-    let pfBusy = false;
-
+    // ── 이 달 퀴즈를 플랫폼으로 하루씩 차례로 보낸다 (wwwroot/js/content-push.js) ──
     // 날짜마다 하나 (달력이 보여 주는 것과 같은 첫 번째 퀴즈)
     function monthQuizzes() {
         const seen = {};
         const list = [];
         events.forEach(function (e) {
-            const d = new Date(e.Date);
-            const key = toYmdLocal(d);
+            const key = toYmdLocal(new Date(e.Date));
             if (seen[key] || !e.QuestionData) return;
             seen[key] = true;
             list.push({ id: e.QuestionData.Id, date: key });
@@ -313,70 +295,25 @@
         return list.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
     }
 
-    async function pushOne(item) {
-        const token = document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value;
-        const body = new URLSearchParams({ id: item.id, __RequestVerificationToken: token });
-        try {
-            const res = await fetch('/Question/PushToPlatform', { method: 'POST', body: body });
-            if (!res.ok) return { ok: false, message: '우리 서버 오류 (' + res.status + ')' };
-            const d = await res.json();
-            return { ok: !!d.ok, skipped: !!d.skipped, message: d.message || '' };
-        } catch (e) {
-            return { ok: false, message: '네트워크 오류' };
-        }
-    }
-
-    async function pushMonth(retryOnly) {
-        if (pfBusy) return;
-        const list = retryOnly ? pfFailed.slice() : monthQuizzes();
+    async function pushMonth() {
+        if (ContentPush.isBusy()) return;
+        const list = monthQuizzes();
         if (list.length === 0) {
             await confirmMessage(false, ['이 달에는 보낼 퀴즈가 없어요.'], null, '확인');
             return;
         }
-        if (!retryOnly) {
-            const ans = await confirmMessage(true, [document.getElementById('month').textContent + ' 퀴즈 ' + list.length + '개를 플랫폼에 보낼까요?', '바로 공개되고, 이미 있는 날은 바뀌어요.'], null, '보내기');
-            if (ans !== 'y') return;
-        }
+        const ans = await confirmMessage(true, [document.getElementById('month').textContent + ' 퀴즈 ' + list.length + '개를 플랫폼에 보낼까요?', '바로 공개되고, 이미 있는 날은 바뀌어요.'], null, '보내기');
+        if (ans !== 'y') return;
 
-        pfBusy = true;
-        pfFailed = [];
-        let done = 0, ok = 0, sk = 0, er = 0;
-        const $ = function (id) { return document.getElementById(id); };
-        const startBtn = $('pf-start');
+        const startBtn = document.getElementById('pf-start');
         if (startBtn) startBtn.disabled = true;
-        $('pf-retry').hidden = true;
-        $('pf-run').hidden = false;
-        $('pf-log').innerHTML = '';
-        $('pf-total').textContent = list.length;
-        $('pf-state').textContent = '보내는 중…';
-
-        function paint() {
-            $('pf-done').textContent = done;
-            $('pf-ok').textContent = ok; $('pf-sk').textContent = sk; $('pf-er').textContent = er;
-            $('pf-fill').style.width = (done / list.length * 100) + '%';
-        }
-        paint();
-
-        for (const item of list) {
-            const r = await pushOne(item);
-            done++;
-            let cls = '';
-            if (r.ok) ok++;
-            else if (r.skipped) { sk++; cls = 'sk'; }
-            else { er++; cls = 'er'; pfFailed.push(item); }
-            if (cls) {
-                const li = document.createElement('li');
-                li.className = cls;
-                li.textContent = item.date + ' · ' + r.message;
-                $('pf-log').appendChild(li);
-            }
-            paint();
-        }
-
-        $('pf-state').textContent = er === 0 ? '다 보냈어요' : '끝났어요 · 실패한 날이 있어요';
-        $('pf-retry').hidden = er === 0;
-        if (startBtn) startBtn.disabled = false;
-        pfBusy = false;
+        ContentPush.run({
+            panel: document.getElementById('pf-run'),
+            url: '/Question/PushToPlatform',
+            token: document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value,
+            items: list,
+            onDone: function () { if (startBtn) startBtn.disabled = false; }
+        });
     }
 </script>
 </body>

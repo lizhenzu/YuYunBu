@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using System.Drawing;
 using BulletinBoard.Helpers;
-using BulletinBoard.Services.QuizPlatform;
+using BulletinBoard.Services.ContentPlatform;
 
 namespace BulletinBoard.Controllers
 {
@@ -23,10 +23,10 @@ namespace BulletinBoard.Controllers
     {
         private new readonly IAuthService _authService;
         private new readonly UserManager<ApplicationUser> _userManager;
-        private readonly IQuizPlatformClient _quizPlatform;
+        private readonly IContentPlatformClient _quizPlatform;
         public QuestionController(IAuthService authService,
             UserManager<ApplicationUser> userManager,
-            IQuizPlatformClient quizPlatform) : base(authService, userManager)
+            IContentPlatformClient quizPlatform) : base(authService, userManager)
         {
             _authService = authService;
             _userManager = userManager;
@@ -38,7 +38,7 @@ namespace BulletinBoard.Controllers
         {
             if (quiz == null || !_quizPlatform.IsConfigured) return;
 
-            var r = await _quizPlatform.PushAsync(quiz);
+            var r = await _quizPlatform.PushQuizAsync(quiz);
             TempData["QuizPushOk"]  = r.Ok ? "y" : "n";
             TempData["QuizPushMsg"] = r.Ok
                 ? $"{r.Date} 퀴즈를 플랫폼에 보냈어요. ({r.Message})"
@@ -55,14 +55,14 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> PushToPlatform(int id)
         {
             if (!_quizPlatform.IsConfigured)
-                return Json(new QuizPushResult { Skipped = true, Message = "플랫폼 주소나 API 키가 설정되지 않았어요." });
+                return Json(new ContentPushResult { Skipped = true, Message = "플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 설정되지 않았어요." });
 
             ManageQuestion manageQuestion = new ManageQuestion();
             var found = manageQuestion.getQuestionObject(id, false, "o", false, false, SharedComm.GetToday(), string.Empty);
             if (found == null || found.Count == 0)
-                return Json(new QuizPushResult { Message = "퀴즈를 찾지 못했어요." });
+                return Json(new ContentPushResult { Message = "퀴즈를 찾지 못했어요." });
 
-            return Json(await _quizPlatform.PushAsync(found[0]));
+            return Json(await _quizPlatform.PushQuizAsync(found[0]));
         }
 
         //// GET: JobCategory
