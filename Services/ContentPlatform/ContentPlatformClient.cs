@@ -47,7 +47,7 @@ namespace BulletinBoard.Services.ContentPlatform
     /// </summary>
     public class ContentPlatformClient : IContentPlatformClient
     {
-        // 비어 있는 선택 칸(background · explanation · commentary)은 아예 보내지 않고, 한글은 그대로 쓴다
+        // 비어 있는 선택 칸(background · explanation)은 아예 보내지 않고, 한글은 그대로 쓴다
         private static readonly JsonSerializerOptions JsonOptions = new()
         {
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
@@ -150,9 +150,9 @@ namespace BulletinBoard.Services.ContentPlatform
             var date = word.ExposeDate.ToString("yyyy-MM-dd");
 
             string title   = (word.BibleSubject ?? "").Trim();
-            string summary = (word.BibleSummary ?? "").Trim();
+            string summary = (word.Synopsis ?? "").Trim();   // 줄거리 = 아이들이 읽는 오늘 이야기
             if (title.Length == 0)   return Skip(date, "말씀 주제(제목)가 비어 있어요.");
-            if (summary.Length == 0) return Skip(date, "말씀 요약이 비어 있어요.");
+            if (summary.Length == 0) return Skip(date, "줄거리가 비어 있어요.");
 
             int book = BibleBooks.ToNumber(word.BibleText);
             if (book == 0) return Skip(date, $"책 이름 '{word.BibleText}' 을(를) 66권에서 찾지 못했어요.");
@@ -175,8 +175,7 @@ namespace BulletinBoard.Services.ContentPlatform
                 startVerse   = sv,
                 endChapter   = ec,
                 endVerse     = ev,
-                summary,
-                commentary   = Clean(word.Synopsis, ""),
+                summary,                // commentary 는 보내지 않는다
                 publish      = true
             };
             return await SendAsync("words", date, body);
