@@ -18,6 +18,11 @@
     string[] week = { "일", "월", "화", "수", "목", "금", "토" };
     string F(int sec) => $"{sec / 60}:{sec % 60:D2}";
     int crossDays = Model.Days.Count(d => d.Segs.Count > 1);
+
+    // 도전!!! 성경말씀 플랫폼으로 보낼 목록 (날짜 순, 하루 하나)
+    bool platformReady = ViewBag.ContentPlatformReady as bool? ?? false;
+    var pushItems = Model.Days.GroupBy(d => d.ExposeDate.Date).OrderBy(g => g.Key)
+                         .Select(g => new { id = g.First().Id, date = g.Key.ToString("yyyy-MM-dd") }).ToList();
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -28,7 +33,13 @@
     <title>영상 구간 편집</title>
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
-    <style>body { margin: 0; background: #FFFFFF; }</style>
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pf { margin-top: 14px; padding: 14px; border-radius: 14px; background: #F4F6F9; }
+        .pf .pf-h { font-size: 12px; font-weight: 800; color: #2F80ED; }
+        .pf .pf-d { margin-top: 4px; font-size: 12.5px; color: #6B7280; line-height: 1.6; }
+        .pf .qb-btn { margin-top: 10px; }
+    </style>
 </head>
 <body>
 <div id="segTok" hidden>@Html.AntiForgeryToken()</div>
@@ -49,6 +60,23 @@
         <a href="/JuManNa/SegmentEditor?YYYYMM=@nextYm">@(first.AddMonths(1).Month)월 →</a>
         <a href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@Model.YYYYMM">영상 구간 보기</a>
     </div>
+
+    @if (pushItems.Count > 0)
+    {
+        <div class="pf">
+            <div class="pf-h">도전!!! 성경말씀 플랫폼 · 영상 구간</div>
+            @if (platformReady)
+            {
+                <div class="pf-d">이 달 @(pushItems.Count)일의 '듣기' 영상 구간을 하루씩 차례로 보내요. 그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.</div>
+                <button type="button" class="qb-btn p w" id="pf-start" onclick="pushClipMonth()">이 달 영상 구간 보내기</button>
+            }
+            else
+            {
+                <div class="pf-d">플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 서버 설정에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
+            }
+            <div id="pf-run"></div>
+        </div>
+    }
 
     @if (Model.Days.Count == 0)
     {
@@ -109,5 +137,27 @@
 </div>
 
 <script src="/js/jumanna-segedit.js" asp-append-version="true"></script>
+@if (pushItems.Count > 0 && platformReady)
+{
+    <script src="/js/content-push.js" asp-append-version="true"></script>
+    <script>
+        // 이 달 영상 구간을 플랫폼으로 하루씩 차례로 보낸다 (wwwroot/js/content-push.js)
+        const pushItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pushItems));
+        const pushMonthLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthLabel));
+        function pushClipMonth() {
+            if (ContentPush.isBusy()) return;
+            if (!confirm(pushMonthLabel + ' 영상 구간 ' + pushItems.length + '일을 플랫폼에 보낼까요?\n그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.')) return;
+            const startBtn = document.getElementById('pf-start');
+            startBtn.disabled = true;
+            ContentPush.run({
+                panel: document.getElementById('pf-run'),
+                url: '/JuManNa/PushClipsToPlatform',
+                token: document.querySelector('#segTok input[name="__RequestVerificationToken"]').value,
+                items: pushItems,
+                onDone: function () { startBtn.disabled = false; }
+            });
+        }
+    </script>
+}
 </body>
 </html>

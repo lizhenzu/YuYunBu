@@ -121,6 +121,14 @@ namespace BulletinBoard.BusinessLayer
             return result;
         }
 
+        /// <summary>하루치 영상 구간 (없으면 null) — 플랫폼으로 보낼 때 쓴다</summary>
+        public JuManNaSegDay getJuManNaSegDay(int id)
+        {
+            DataSet ds = new ControlJuManNa().fetchJuManNaSeg(null, id);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+            return ToSegDay(ds.Tables[0].Rows[0]);
+        }
+
         /// <summary>
         /// 영상 구간 한 점 저장.  화면 값은 믿지 않고 표에서 그날을 다시 읽어 검사한다.
         /// sec 0 = 기본값으로 되돌림(시작 → 영상 처음, 종료 → 영상 끝).
