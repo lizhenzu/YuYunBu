@@ -1,18 +1,35 @@
 namespace BulletinBoard.Helpers
 {
     /// <summary>
-    /// 퀴즈 직접 작성(객관식) 화면의 AI 버튼이 복사하는 프람프트.
-    /// 성경 범위와 출제 일자만 채워서 돌려준다. 문구를 바꾸려면 아래 Template 만 고치면 된다.
+    /// AI 버튼(퀴즈 달력 · 목록 · 직접 작성 객관식)이 복사하는 프람프트.
+    /// 문구는 dbo.QuizAiPrompt 에 있다 (/QuizAiPrompt/Index 에서 수정).
+    /// 여기의 DefaultTemplate 은 DB 에서 읽지 못할 때만 쓰는 기본 문구다.
     /// </summary>
     public static class QuizAiPromptHelper
     {
-        public static string Build(string bibleRange, string exposeDate)
-            => Template
-                .Replace("{{BibleRange}}", bibleRange)
-                .Replace("{{ExposeDate}}", exposeDate)
-                .Replace("\r\n", "\n");
+        public const string BibleRangeToken = "{{BibleRange}}";
+        public const string ExposeDateToken = "{{ExposeDate}}";
 
-        private const string Template = """
+        /// <summary>구절과 날짜를 채운다</summary>
+        public static string Build(string template, string bibleRange, string exposeDate)
+            => Normalize(template)
+                .Replace(BibleRangeToken, bibleRange)
+                .Replace(ExposeDateToken, exposeDate);
+
+        /// <summary>줄바꿈을 LF 로 맞추고 앞뒤 공백을 지운다 (입력칸은 CRLF 로 보낸다)</summary>
+        public static string Normalize(string? template)
+            => (template ?? "").Replace("\r\n", "\n").Trim();
+
+        /// <summary>문구에 빠진 자리 표시</summary>
+        public static List<string> MissingTokens(string? template)
+        {
+            var missing = new List<string>();
+            if (template == null || !template.Contains(BibleRangeToken)) missing.Add(BibleRangeToken);
+            if (template == null || !template.Contains(ExposeDateToken)) missing.Add(ExposeDateToken);
+            return missing;
+        }
+
+        public const string DefaultTemplate = """
 너는 성경 교육 전문가이자 유년부 문제 출제자다.
 아래 입력을 바탕으로 문제 5개와 각 문제의 SQL문(있으면 UPDATE, 없으면 INSERT)을 만들어라.
 

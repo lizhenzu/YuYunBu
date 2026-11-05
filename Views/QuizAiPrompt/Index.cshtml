@@ -1,0 +1,106 @@
+@model BulletinBoard.BusinessLayer.QuizAiPromptInfo
+@using BulletinBoard.Common;
+@using BulletinBoard.Helpers;
+
+@*  ══════════════════════════════════════════════════════════════
+    AI 프람프트 관리 — 2026-11-06 시안 A (한 칸에서 수정, 이력 없음)
+    · AI 버튼(퀴즈 달력 · 목록 · 직접 작성 객관식)이 복사하는 문구를 dbo.QuizAiPrompt 한 줄에 둔다
+    · 권한: SuperAdmin 롤 + "Basic" 계정 (QuizAiPromptController)
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    string? error = ViewBag.PromptError as string;
+    string? saved = TempData["PromptSaved"] as string;
+    string today = DateHelper.GetKoreaNow().ToString("yyyy-MM-dd");
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>AI 프람프트 관리</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .ap-in { display: block; width: 100%; box-sizing: border-box; min-height: 460px; border: 0; border-radius: 14px; background: var(--grey); padding: 12px 14px;
+                 font-family: ui-monospace, "Cascadia Mono", Consolas, "Malgun Gothic", monospace; font-size: 12.5px; line-height: 1.7; color: var(--ink); resize: vertical; white-space: pre-wrap; word-break: break-word; }
+        .ap-in:focus { outline: 0; background: #fff; box-shadow: inset 0 0 0 2px var(--blue); }
+        .ap-pre { display: none; margin: 0; }
+        .ap-pre.on { display: block; }
+        .ap-msg { margin-top: 12px; padding: 11px 14px; border-radius: 14px; font-size: 13px; line-height: 1.6; background: #EAF7EF; color: #15803D; word-break: break-word; }
+        .ap-msg.err { background: #FDECEC; color: #B42318; }
+        .ap-msg.warn { background: #FFF7E6; color: #92400E; }
+        .ap-tk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--dim2); }
+        .ap-tk code { padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--blue); font-size: 11.5px; }
+        .ap-at { margin-top: 8px; font-size: 12px; color: var(--dim2); }
+    </style>
+</head>
+<body>
+<div class="qb">
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/Question/Index">퀴즈</a><span class="sep">›</span>AI 프람프트</span>
+        <span>ADMIN</span>
+    </div>
+
+    <div class="qb-k">관리 · 퀴즈</div>
+    <h1 class="qb-h1">AI 프람프트 관리</h1>
+    <div class="qb-sub">저장하면 AI 버튼이 있는 모든 화면에 바로 적용돼요. 저장하면 이전 문구는 되돌릴 수 없어요.</div>
+
+    @if (error != null)
+    {
+        <div class="ap-msg err">@error</div>
+    }
+    else if (saved != null)
+    {
+        <div class="ap-msg">@saved</div>
+    }
+    @if (!Model.FromDb)
+    {
+        <div class="ap-msg warn">DB에서 문구를 읽지 못해 코드의 기본 문구를 보여 주고 있어요. 표(dbo.QuizAiPrompt)를 만들었는지 확인해 주세요.</div>
+    }
+
+    <form asp-action="Save" method="post">
+        <div class="qb-f">
+            <label for="apText">프람프트 문구</label>
+            <textarea id="apText" name="promptText" class="ap-in" spellcheck="false">@Model.PromptText</textarea>
+            <pre id="apPre" class="ap-in ap-pre"></pre>
+        </div>
+        <div class="ap-tk">꼭 있어야 하는 자리 <code>@QuizAiPromptHelper.BibleRangeToken</code><code>@QuizAiPromptHelper.ExposeDateToken</code></div>
+        @if (Model.UpdatedAt != null)
+        {
+            <div class="ap-at">마지막 수정: @Model.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm") @Model.UpdatedBy</div>
+        }
+
+        <div class="qb-btns">
+            <button type="button" class="qb-btn g" id="apPreview">예시로 보기</button>
+            <button type="submit" class="qb-btn p">저장</button>
+        </div>
+    </form>
+
+    <div class="qb-ft">
+        <span>AI 프람프트</span>
+        <span><a href="/Question/Index">퀴즈 달력</a><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    // 저장 전에 구절 · 날짜가 어떻게 채워지는지 본다 (예시 구절, 오늘 날짜)
+    (function () {
+        var text = document.getElementById('apText'), pre = document.getElementById('apPre'), btn = document.getElementById('apPreview');
+        btn.addEventListener('click', function () {
+            var on = !pre.classList.contains('on');
+            if (on) {
+                pre.textContent = text.value
+                    .split('@QuizAiPromptHelper.BibleRangeToken').join('시편 25장 1절 ~ 25장 22절')
+                    .split('@QuizAiPromptHelper.ExposeDateToken').join('@today');
+            }
+            pre.classList.toggle('on', on);
+            text.style.display = on ? 'none' : '';
+            btn.textContent = on ? '수정으로 돌아가기' : '예시로 보기';
+        });
+    })();
+</script>
+</body>
+</html>

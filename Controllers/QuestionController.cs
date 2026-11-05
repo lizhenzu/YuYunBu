@@ -126,6 +126,7 @@ namespace BulletinBoard.Controllers
             ViewBag.NextDateTime = workDT.AddMonths(1).ToString("yyyy-MM-dd");
             ViewBag.QuizPlatformReady = _quizPlatform.IsConfigured;
             ViewBag.MonthWords = new ManageTodayWordToRead().getMonthWordSummaries(workDT);
+            ViewBag.QuizAiTemplate = new ManageQuizAiPrompt().GetTemplate();
             return View(model);
         }
 
@@ -319,7 +320,10 @@ namespace BulletinBoard.Controllers
 
             // 직접 작성 · 객관식 화면에만 AI 프람프트 버튼을 보인다 (_ScriptureCard)
             if (string.Equals(QuestionType, "o", StringComparison.OrdinalIgnoreCase))
+            {
                 ViewBag.QuizAiDate = data.ExposeDate.ToString("yyyy-MM-dd");
+                ViewBag.QuizAiTemplate = new ManageQuizAiPrompt().GetTemplate();
+            }
 
             //            ViewBag.WhenDate = data.ExposeDate.ToString("yyyy-MM-dd");
             return View("CreateQuizByBank", data);
@@ -530,6 +534,8 @@ namespace BulletinBoard.Controllers
             ViewBag.KindData = KindData;
 
             List<QuestionTypeDataObjects> data = manageQuestion.getQuestionObject(0, false, "O", false, true, SharedComm.GetToday(), KindData);
+
+            ViewBag.QuizAiTemplate = new ManageQuizAiPrompt().GetTemplate();
 
             // 문제마다 그날 말씀을 함께 보여 준다
             ViewBag.WordsByDate = data.Count == 0
