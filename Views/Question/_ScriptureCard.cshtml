@@ -1,14 +1,19 @@
 @using BulletinBoard.Models
+@using BulletinBoard.Helpers
 @*  ══════════════════════════════════════════════════════════════
     "오늘의 말씀" 카드 + 구절 복사 아이콘 (CreateQuizByBank · FromTemplate 공용)
     · 아이콘을 누르면 화면에 보이는 구절 위치만 복사한다 (예: 고린도후서 11장 16절 ~ 11장 33절)
     · 아이폰 사파리: navigator.clipboard 가 안 되면 숨긴 textarea 를 선택해 execCommand('copy')
     · 둘 다 안 되면 구절을 띄워 길게 눌러 복사하게 한다
+    · 2026-11-05: ViewBag.QuizAiDate 가 있으면(직접 작성 · 객관식) 옆에 AI 버튼 — 구절 · 날짜를 채운 프람프트를 복사한다
     ══════════════════════════════════════════════════════════════ *@
 @{
     TodayWordToReads? word = ViewBag.TodayWordToReads as TodayWordToReads;
 
     string range = word == null ? "" : $"{word.BibleText} {word.FromJang}장 {word.FromZul}절 ~ {word.ToJang}장 {word.ToZul}절";
+
+    string? quizAiDate = ViewBag.QuizAiDate as string;
+    string? aiPrompt = (word != null && !string.IsNullOrEmpty(quizAiDate)) ? QuizAiPromptHelper.Build(range, quizAiDate) : null;
 }
 @if (word != null)
 {
@@ -21,6 +26,7 @@
         .qb-cp.done { background: #EAF7EF; color: #15803D; box-shadow: inset 0 0 0 1px #B7E4C7; }
         .qb-cp.done .cp { display: none; }
         .qb-cp.done .ok { display: block; }
+        .qb-cp.ai { font-size: 11px; font-weight: 800; letter-spacing: -.02em; }
         .qb-cpbox { position: fixed; inset: 0; z-index: 9999; display: none; place-items: center; padding: 16px; background: rgba(17,24,39,.45); }
         .qb-cpbox.on { display: grid; }
         .qb-cpbox .in { width: 100%; max-width: 480px; padding: 16px; border-radius: 16px; background: #fff; }
@@ -39,10 +45,17 @@
                 <svg class="cp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
                 <svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
             </button>
+            @if (aiPrompt != null)
+            {
+                <button type="button" class="qb-cp ai" aria-label="AI 프람프트 복사" title="AI 프람프트 복사" data-copy="@aiPrompt" onclick="qbCopyScripture(this)">
+                    <span class="cp">AI</span>
+                    <svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                </button>
+            }
         </div>
     </div>
 
-    <div class="qb-cpbox" id="qbCopyBox" role="dialog" aria-modal="true" aria-label="구절 복사">
+    <div class="qb-cpbox" id="qbCopyBox" role="dialog" aria-modal="true" aria-label="복사">
         <div class="in">
             <b>자동 복사가 안 됐어요</b>
             <small>아래 글을 길게 눌러 '전체 선택' → '복사' 해 주세요.</small>
@@ -85,7 +98,7 @@
                     btn.classList.add('done');
                     btn.setAttribute('aria-label', '복사됨');
                     clearTimeout(btn._t);
-                    btn._t = setTimeout(function () { btn.classList.remove('done'); btn.setAttribute('aria-label', '구절 복사'); }, 2000);
+                    btn._t = setTimeout(function () { btn.classList.remove('done'); btn.setAttribute('aria-label', btn.title); }, 2000);
                 } else {
                     var box = document.getElementById('qbCopyBox');
                     document.getElementById('qbCopyArea').value = text;
