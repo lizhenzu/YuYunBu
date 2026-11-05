@@ -51,6 +51,7 @@
         .calendar .day.picked { background: #2F80ED; color: #fff; }
         #event-details { margin-top: 16px; padding: 14px; border-radius: 14px; background: #F4F6F9; font-size: 13.5px; line-height: 1.7; color: #374151; }
         #event-details .dt { font-size: 12px; font-weight: 800; color: #2F80ED; }
+        #event-details .qb-scr { margin-top: 8px; }
         #event-details .sec { margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: #EAF2FD; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; word-wrap: break-word; }
         #event-details .sec.q { font-size: 14.5px; color: #111827; }
         #event-details .sec .gk { font-size: 11.5px; font-weight: 800; color: #2F80ED; }
@@ -191,6 +192,8 @@
     const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
     let currentDate = new Date(@Model.CurrentDate.Year, @Model.CurrentDate.Month - 1, @Model.CurrentDate.Day);
     let events = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(@Model.Events));
+    // 날짜별 그날 말씀 — "</script>" 같은 글자가 들어 있어도 스크립트가 끊기지 않게 HTML 문자를 이스케이프한다
+    const monthWords = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject((object)ViewBag.MonthWords, new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
     let pickedCell = null;
 
     function renderCalendar(date) {
@@ -242,11 +245,19 @@
         return s.toLowerCase() === placeholder ? '' : s;
     }
 
+    // 고른 날짜의 말씀 카드 (말씀이 없는 날은 그리지 않는다)
+    function wordCardHtml(date) {
+        const w = monthWords ? monthWords[toYmdLocal(date)] : null;
+        if (!w) return '';
+        return '<div class="qb-scr"><i>오늘의 말씀</i><b>' + esc(w.Subject) + '</b><small>' + esc(w.Range) + '</small></div>';
+    }
+
     function showEventDetails(event) {
         const q = event.QuestionData || {};
         const t = String(q.QuestionType || '').toLowerCase();
         const typeName = t === 'o' ? '객관식' : (t === 'a' ? 'O/X' : '주관식');
         let html = '<div class="dt">' + esc(toKorDate(selectedDate)) + ' · ' + typeName + '</div>';
+        html += wordCardHtml(selectedDate);
         const background = filledText(q.QuestionBackground, 'blank');
         if (background) {
             html += '<div class="sec"><div class="gk">문제 배경</div>' + esc(background) + '</div>';
@@ -281,6 +292,7 @@
     function showAddButton() {
         const d = toKorDate(selectedDate);
         document.getElementById("event-details").innerHTML =
+            wordCardHtml(selectedDate) +
             '<div class="none"><b>' + esc(d) + '에는 퀴즈가 없어요</b>아래 버튼으로 이 날 퀴즈를 새로 넣을 수 있어요.</div>';
         document.getElementById("event-details-guide").style.display = "none";
         document.getElementById('btns-has').hidden = true;
