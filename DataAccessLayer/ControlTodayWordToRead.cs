@@ -11,16 +11,14 @@ namespace BulletinBoard.DataAccessLayer
     public class ControlTodayWordToRead
     {
 
-        /// <summary>그달 날짜별 말씀 제목 · 구절만 읽는다 (퀴즈 달력용)</summary>
-        public DataSet fetchMonthWordSummaries(DateTime workDT)
+        /// <summary>날짜 범위의 말씀 제목 · 구절만 읽는다 (퀴즈 달력 · 목록용). toDate 는 그 날을 포함한다</summary>
+        public DataSet fetchWordSummaries(DateTime fromDate, DateTime toDate)
         {
-            var first = new DateTime(workDT.Year, workDT.Month, 1);
-
             StringBuilder sb = new StringBuilder();
             sb.Append(" select ExposeDate, isnull(BibleSubject, '') BibleSubject, isnull(BibleText, '') BibleText, "); sb.Append(Environment.NewLine);
             sb.Append(" isnull(FromJang, 0) FromJang, isnull(FromZul, 0) FromZul, isnull(ToJang, 0) ToJang, isnull(ToZul, 0) ToZul "); sb.Append(Environment.NewLine);
             sb.Append(" from [dbo].[TodayWordToRead] "); sb.Append(Environment.NewLine);
-            sb.Append($" where ExposeDate >= '{first:yyyy-MM-dd}' and ExposeDate < '{first.AddMonths(1):yyyy-MM-dd}' "); sb.Append(Environment.NewLine);
+            sb.Append($" where ExposeDate >= '{fromDate:yyyy-MM-dd}' and ExposeDate < '{toDate.AddDays(1):yyyy-MM-dd}' "); sb.Append(Environment.NewLine);
             sb.Append(" order by ExposeDate, Id "); sb.Append(Environment.NewLine);
 
             return DataAccessModule.commonQuery(sb.ToString());

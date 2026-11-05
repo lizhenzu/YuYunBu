@@ -17,11 +17,18 @@ namespace BulletinBoard.BusinessLayer
 
     public class ManageTodayWordToRead
     {        
-        /// <summary>그달 말씀을 "yyyy-MM-dd" 날짜별로 돌려준다. 같은 날이 여럿이면 첫 번째만 쓴다</summary>
+        /// <summary>그달 말씀을 "yyyy-MM-dd" 날짜별로 돌려준다</summary>
         public Dictionary<string, MonthWordSummary> getMonthWordSummaries(DateTime workDT)
         {
+            var first = new DateTime(workDT.Year, workDT.Month, 1);
+            return getWordSummaries(first, first.AddMonths(1).AddDays(-1));
+        }
+
+        /// <summary>날짜 범위의 말씀을 "yyyy-MM-dd" 날짜별로 돌려준다. 같은 날이 여럿이면 첫 번째만 쓴다</summary>
+        public Dictionary<string, MonthWordSummary> getWordSummaries(DateTime fromDate, DateTime toDate)
+        {
             var result = new Dictionary<string, MonthWordSummary>();
-            DataSet ds = new ControlTodayWordToRead().fetchMonthWordSummaries(workDT);
+            DataSet ds = new ControlTodayWordToRead().fetchWordSummaries(fromDate, toDate);
 
             foreach (DataRow row in ds.Tables[0].Rows)
             {

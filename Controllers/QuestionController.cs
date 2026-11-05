@@ -531,6 +531,11 @@ namespace BulletinBoard.Controllers
 
             List<QuestionTypeDataObjects> data = manageQuestion.getQuestionObject(0, false, "O", false, true, SharedComm.GetToday(), KindData);
 
+            // 문제마다 그날 말씀을 함께 보여 준다
+            ViewBag.WordsByDate = data.Count == 0
+                ? new Dictionary<string, MonthWordSummary>()
+                : new ManageTodayWordToRead().getWordSummaries(data.Min(x => x.ExposeDate), data.Max(x => x.ExposeDate));
+
             return View("QuestionDetailList", data);
         }
 

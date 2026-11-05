@@ -19,6 +19,7 @@
     bool isBroad = kind == QuizCategory.Broad.ToString();
     string kindName = isBroad ? "돌발" : "일반";
     var list = Model?.ToList() ?? new List<BulletinBoard.Models.QuestionTypeDataObjects>();
+    var wordsByDate = ViewBag.WordsByDate as Dictionary<string, BulletinBoard.BusinessLayer.MonthWordSummary>;
 
     string TypeName(string? t) => (t ?? "").ToLower() switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
     string TypeCls(string? t)  => (t ?? "").ToLower() switch { "o" => "o", "a" => "x", _ => "" };
@@ -40,6 +41,7 @@
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <style>
         body { margin: 0; background: #FFFFFF; }
+        .qb-q .qb-scr { margin-top: 8px; }
         .qb-q .sec { margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: #EAF2FD; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; word-wrap: break-word; }
         .qb-q .sec.q { font-size: 14.5px; color: #111827; }
         .qb-q .sec .gk { font-size: 11.5px; font-weight: 800; color: #2F80ED; }
@@ -72,8 +74,14 @@
         string t = (item.QuestionType ?? "").ToLower();
         string background = Filled(item.QuestionBackground, "blank");
         string hint = Filled(item.AnswerGuide, "...");
+        BulletinBoard.BusinessLayer.MonthWordSummary? word = null;
+        wordsByDate?.TryGetValue(item.ExposeDate.ToString("yyyy-MM-dd"), out word);
         <div class="qb-q">
             <div class="h"><b>@item.ExposeDate.ToString("M월 d일") @(item.WeekDayKor)요일</b><span class="qb-tg @TypeCls(t)">@TypeName(t)</span></div>
+            @if (word != null)
+            {
+                <div class="qb-scr"><i>오늘의 말씀</i><b>@word.Subject</b><small>@word.Range</small></div>
+            }
             @if (background.Length > 0)
             {
                 <div class="sec"><div class="gk">문제 배경</div>@background</div>
