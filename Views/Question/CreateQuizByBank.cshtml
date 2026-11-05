@@ -21,14 +21,9 @@
     TodayWordToReads todayWordToReads = ViewBag.TodayWordToReads as TodayWordToReads;
     eBibles _eBibles = ViewBag._eBibles as eBibles;
 
-    // ⚠️ QuestionBackground 는 [Required] 다.
-    //    textarea 에 asp-for 를 붙이면 태그 헬퍼가 안쪽에 적어 둔 글자를 모델 값으로 갈아치운다.
-    //    모델 값이 비어 있으면 화면엔 빈 칸이 나오고, 등록을 눌러도 필수 검사에 걸려 저장되지 않는다.
-    //    그래서 기본값을 모델 쪽에 넣어 준다.
-    if (string.IsNullOrWhiteSpace(Model.QuestionBackground))
-    {
-        Model.QuestionBackground = "blank";
-    }
+    // 2026-11-05: "문제 배경" 칸을 화면에 보여 준다 (예전에는 숨겨 두고 "blank" 를 자동으로 넣었다).
+    //   · 입력은 선택 사항 — 비워 두면 서버(CreateQuestionProcess)가 예전처럼 "blank" 로 저장한다.
+    //   · 모델의 [Required] 때문에 붙는 화면 쪽 필수 검사는 data-val="false" 로 끈다.
 
     string qt = Model.QuestionType?.ToLower() ?? "";
     string questionTypeLabel = qt switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
@@ -65,9 +60,9 @@
     <form asp-action="CreateQuestionProcess" method="post" onsubmit="return beforeSubmit(this);">
         <div asp-validation-summary="ModelOnly"></div>
 
-        <div class="qb-f" style="display:none">
-            <label asp-for="@Model.QuestionBackground"></label>
-            <textarea class="qb-in" id="QuestionBackground" name="QuestionBackground" asp-for="QuestionBackground" rows="1"></textarea>
+        <div class="qb-f">
+            <label asp-for="@Model.QuestionBackground">문제 배경 (선택)</label>
+            <textarea class="qb-in" id="QuestionBackground" name="QuestionBackground" asp-for="QuestionBackground" rows="4" placeholder="문제의 배경이 되는 말씀 · 설명을 입력하세요 (비워 두면 blank 로 저장돼요)" data-val="false"></textarea>
             <span asp-validation-for="QuestionBackground" class="field-error"></span>
         </div>
 

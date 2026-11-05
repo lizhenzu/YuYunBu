@@ -421,6 +421,7 @@ namespace BulletinBoard.Controllers
             ModelState.Remove("QuestionTypeDesc");
             ModelState.Remove("UserName");
             ModelState.Remove("WeekDayKor");
+            ModelState.Remove("QuestionBackground");   // 2026-11-05: 배경은 선택 입력 — 비면 저장할 때 "blank" 로 채운다
 
             if(questionTypeDataObject.QuestionType == "s" || questionTypeDataObject.QuestionType == "a")
             {
@@ -440,6 +441,8 @@ namespace BulletinBoard.Controllers
             else
             {
                 questionTypeDataObject.UserName = userName;
+                if (string.IsNullOrWhiteSpace(questionTypeDataObject.QuestionBackground))
+                    questionTypeDataObject.QuestionBackground = "blank";
 
 				manageQuestion.CreateQuestionObject(questionTypeDataObject);
                 await PushToPlatformAfterSave(questionTypeDataObject);
