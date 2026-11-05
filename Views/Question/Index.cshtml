@@ -18,6 +18,7 @@
     string kind = ViewBag.KindData as string ?? "";
     bool isBroad = kind == QuizCategory.Broad.ToString();
     bool platformReady = ViewBag.QuizPlatformReady as bool? ?? false;
+    bool canRunBulkSql = ViewBag.CanRunBulkSql as bool? ?? false;
     string? pushMsg = TempData["QuizPushMsg"] as string;
     bool pushOk = (TempData["QuizPushOk"] as string) == "y";
 }
@@ -63,6 +64,7 @@
         #event-details-guide { margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: #EAF2FD; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; }
         #event-details-guide .gk { font-size: 11.5px; font-weight: 800; color: #2F80ED; }
         .qb-btns[hidden] { display: none; }
+        .qb-btns.three { grid-template-columns: repeat(3, 1fr); }
 
         /* 플랫폼 보내기 */
         .pf-note { margin-top: 12px; padding: 11px 14px; border-radius: 14px; font-size: 13px; line-height: 1.6; background: #EAF7EF; color: #15803D; }
@@ -118,13 +120,21 @@
     <div id="event-details"><div class="none">위 달력에서 날짜를 눌러 퀴즈를 확인하세요.</div></div>
     <div id="event-details-guide" style="display:none;"></div>
 
-    <div class="qb-btns" id="btns-has" hidden>
+    <div class="qb-btns @(canRunBulkSql ? "three" : "")" id="btns-has" hidden>
         <button type="button" class="qb-btn" id="modify-button" onclick="modifyQuestion()">퀴즈 수정</button>
         <button type="button" class="qb-btn d" id="delete-button" onclick="deleteQuestion()">퀴즈 삭제</button>
+        @if (canRunBulkSql)
+        {
+            <button type="button" class="qb-btn" onclick="location.href='/BibleBulk/EnrollBulkQuiz'">SQL 실행</button>
+        }
         <button type="button" class="qb-btn p w" id="preview-button" onclick="PreViewQuestion()">퀴즈 미리보기</button>
     </div>
     <div class="qb-btns" id="btns-none" hidden>
         <button type="button" class="qb-btn p w" id="add-button" onclick="AddQuestion()">이 날 퀴즈 입력</button>
+        @if (canRunBulkSql)
+        {
+            <button type="button" class="qb-btn w" onclick="location.href='/BibleBulk/EnrollBulkQuiz'">SQL 실행</button>
+        }
     </div>
 
     <div class="pf">
