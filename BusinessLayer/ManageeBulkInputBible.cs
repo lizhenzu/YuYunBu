@@ -193,11 +193,14 @@ namespace BulletinBoard.BusinessLayer
             controlBulkInputBible.SyncENtoNIC();
 
         }
-        public void CreateBulkQuiz(BibleBulkQuiz param)
+        /// <summary>붙여 넣은 SQL 을 GO 단위로 실행한다. 묶음 수와 바뀐 행 수를 돌려준다</summary>
+        public (int batchCount, int affected) CreateBulkQuiz(BibleBulkQuiz param)
         {
-            ControlBulkInputBible controlBulkInputBible = new ControlBulkInputBible();
-            controlBulkInputBible.CreateBulkQuiz(param.SQLs);
+            var batches = SqlBatchRunner.Split(param.SQLs);
+            if (batches.Count == 0) return (0, 0);
 
+            ControlBulkInputBible controlBulkInputBible = new ControlBulkInputBible();
+            return (batches.Count, controlBulkInputBible.CreateBulkQuiz(batches));
         }
 
     

@@ -128,6 +128,13 @@ namespace BulletinBoard.Common
 
             }
         }
+        /// <summary>GO 로 나뉜 SQL 을 한 트랜잭션으로 실행한다 (SqlBatchRunner)</summary>
+        public static int executeBatches(IReadOnlyList<string> batches)
+        {
+            string connectionString = ConstatsCommon.timeDifference16 == 16 ? connectionString_Server : connectionString_Local;
+            return SqlBatchRunner.Run(connectionString, batches);
+        }
+
         public static int executeNonQuery(string sql, List<SqlParameter> parameters)
         {
             string connectionString = connectionString_Local;

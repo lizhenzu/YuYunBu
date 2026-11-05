@@ -601,13 +601,9 @@ namespace BulletinBoard.DataAccessLayer
 		}
 
 
-        public void CreateBulkQuiz(string param)
-        { 
-             
-
-            DataAccessModule.executeNonQuery(param);
-
-             
+        public int CreateBulkQuiz(IReadOnlyList<string> batches)
+        {
+            return DataAccessModule.executeBatches(batches);
         }
     }
 }
