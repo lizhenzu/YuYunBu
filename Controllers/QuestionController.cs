@@ -125,6 +125,9 @@ namespace BulletinBoard.Controllers
             ViewBag.NowDateTime = SharedComm.GetTodayString();
             ViewBag.NextDateTime = workDT.AddMonths(1).ToString("yyyy-MM-dd");
             ViewBag.QuizPlatformReady = _quizPlatform.IsConfigured;
+            // SQL 실행 버튼 — SuperAdmin 롤 + "Basic" 계정만
+            ViewBag.CanRunBulkSql = User.IsInRole(nameof(Roles.SuperAdmin))
+                || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
             ViewBag.MonthWords = new ManageTodayWordToRead().getMonthWordSummaries(workDT);
             ViewBag.QuizAiTemplate = new ManageQuizAiPrompt().GetTemplate();
             return View(model);
