@@ -125,6 +125,7 @@ namespace BulletinBoard.Controllers
             ViewBag.NowDateTime = SharedComm.GetTodayString();
             ViewBag.NextDateTime = workDT.AddMonths(1).ToString("yyyy-MM-dd");
             ViewBag.QuizPlatformReady = _quizPlatform.IsConfigured;
+            ViewBag.MonthWords = new ManageTodayWordToRead().getMonthWordSummaries(workDT);
             return View(model);
         }
 
