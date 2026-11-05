@@ -22,6 +22,13 @@
 
     string TypeName(string? t) => (t ?? "").ToLower() switch { "o" => "객관식", "a" => "O/X", _ => "주관식" };
     string TypeCls(string? t)  => (t ?? "").ToLower() switch { "o" => "o", "a" => "x", _ => "" };
+
+    // 비었거나 자리 채움 값(blank · ...)이면 빈 글자 — 그때는 구역을 그리지 않는다
+    string Filled(string? value, string placeholder)
+    {
+        var s = (value ?? "").Trim();
+        return s.Equals(placeholder, StringComparison.OrdinalIgnoreCase) ? "" : s;
+    }
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -31,7 +38,12 @@
     <meta name="theme-color" content="#FFFFFF">
     <title>@(kindName) 퀴즈 목록</title>
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
-    <style>body { margin: 0; background: #FFFFFF; }</style>
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .qb-q .sec { margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: #EAF2FD; font-size: 13px; line-height: 1.7; color: #374151; white-space: pre-wrap; word-wrap: break-word; }
+        .qb-q .sec.q { font-size: 14.5px; color: #111827; }
+        .qb-q .sec .gk { font-size: 11.5px; font-weight: 800; color: #2F80ED; }
+    </style>
 </head>
 <body>
 <div class="qb">
@@ -46,7 +58,7 @@
     <div class="qb-sub">출제한 퀴즈를 날짜순으로 보여요</div>
 
     <div class="qb-chips">
-        <a class="on" href="/Question/QuestionDetailList?KindData=@kind">목록</a>
+        <a class="on" href="/Question/QuestionDetailList?view=list&KindData=@kind">목록</a>
         <a href="/Question/Index?KindData=@kind">달력</a>
     </div>
 
@@ -58,9 +70,15 @@
     @foreach (var item in list)
     {
         string t = (item.QuestionType ?? "").ToLower();
+        string background = Filled(item.QuestionBackground, "blank");
+        string hint = Filled(item.AnswerGuide, "...");
         <div class="qb-q">
             <div class="h"><b>@item.ExposeDate.ToString("M월 d일") @(item.WeekDayKor)요일</b><span class="qb-tg @TypeCls(t)">@TypeName(t)</span></div>
-            <p>@item.QuestionQ</p>
+            @if (background.Length > 0)
+            {
+                <div class="sec"><div class="gk">문제 배경</div>@background</div>
+            }
+            <div class="sec q"><div class="gk">문제</div>@item.QuestionQ</div>
             @if (t == "o")
             {
                 <ol>
@@ -73,6 +91,10 @@
             else
             {
                 <div class="ans-line">정답 @item.CorrectAnswer</div>
+            }
+            @if (hint.Length > 0)
+            {
+                <div class="sec"><div class="gk">힌트 · 해설</div>@hint</div>
             }
             <div class="ac">
                 <a href="/Question/ModifyQuiz?Id=@item.Id">수정</a>
