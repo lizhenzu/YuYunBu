@@ -3,8 +3,7 @@
 @*  ══════════════════════════════════════════════════════════════
     "오늘의 말씀" 카드 + 구절 복사 아이콘 (CreateQuizByBank · FromTemplate 공용)
     · 아이콘을 누르면 화면에 보이는 구절 위치만 복사한다 (예: 고린도후서 11장 16절 ~ 11장 33절)
-    · 아이폰 사파리: navigator.clipboard 가 안 되면 숨긴 textarea 를 선택해 execCommand('copy')
-    · 둘 다 안 되면 구절을 띄워 길게 눌러 복사하게 한다
+    · 복사 스타일과 스크립트는 _CopyButtonAssets 에 있다
     · 2026-11-05: ViewBag.QuizAiDate 가 있으면(직접 작성 · 객관식) 옆에 AI 버튼 — 구절 · 날짜를 채운 프람프트를 복사한다
     ══════════════════════════════════════════════════════════════ *@
 @{
@@ -17,24 +16,7 @@
 }
 @if (word != null)
 {
-    <style>
-        .qb-scr .rg { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-        .qb-cp { flex: none; position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: #fff; color: #2F80ED; box-shadow: inset 0 0 0 1px #C9DDF8; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .qb-cp::after { content: ""; position: absolute; inset: -8px; }   /* 손가락으로 누르기 쉽게 누르는 영역만 넓힌다 */
-        .qb-cp svg { width: 15px; height: 15px; }
-        .qb-cp .ok { display: none; }
-        .qb-cp.done { background: #EAF7EF; color: #15803D; box-shadow: inset 0 0 0 1px #B7E4C7; }
-        .qb-cp.done .cp { display: none; }
-        .qb-cp.done .ok { display: block; }
-        .qb-cp.ai { font-size: 11px; font-weight: 800; letter-spacing: -.02em; }
-        .qb-cpbox { position: fixed; inset: 0; z-index: 9999; display: none; place-items: center; padding: 16px; background: rgba(17,24,39,.45); }
-        .qb-cpbox.on { display: grid; }
-        .qb-cpbox .in { width: 100%; max-width: 480px; padding: 16px; border-radius: 16px; background: #fff; }
-        .qb-cpbox b { display: block; font-size: 14px; color: #111827; }
-        .qb-cpbox small { display: block; margin-top: 2px; font-size: 12px; color: #6B7280; }
-        .qb-cpbox textarea { box-sizing: border-box; width: 100%; height: 5em; margin-top: 10px; padding: 10px; border: 1px solid #E5E7EB; border-radius: 10px; font: inherit; font-size: 16px; line-height: 1.6; }
-        .qb-cpbox button { margin-top: 10px; width: 100%; padding: 11px; border: 0; border-radius: 12px; font: inherit; font-weight: 800; background: #2F80ED; color: #fff; }
-    </style>
+    @await Html.PartialAsync("_CopyButtonAssets")
 
     <div class="qb-scr">
         <i>오늘의 말씀</i>
@@ -55,62 +37,5 @@
         </div>
     </div>
 
-    <div class="qb-cpbox" id="qbCopyBox" role="dialog" aria-modal="true" aria-label="복사">
-        <div class="in">
-            <b>자동 복사가 안 됐어요</b>
-            <small>아래 글을 길게 눌러 '전체 선택' → '복사' 해 주세요.</small>
-            <textarea readonly id="qbCopyArea"></textarea>
-            <button type="button" onclick="document.getElementById('qbCopyBox').classList.remove('on')">닫기</button>
-        </div>
-    </div>
 
-    <script>
-        // 아이폰 사파리 등 navigator.clipboard 가 없거나 막힌 곳에서 쓰는 예전 방식
-        function qbLegacyCopy(text) {
-            var ta = document.createElement('textarea');
-            ta.value = text;
-            ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;';  // 16px: iOS 확대 방지
-            document.body.appendChild(ta);
-            ta.focus({ preventScroll: true });
-            ta.select();
-            // iOS 는 readonly 칸을 선택하지 못해서, 범위를 직접 잡고 setSelectionRange 로 한 번 더 선택한다
-            if (/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-                ta.contentEditable = 'true';
-                var range = document.createRange();
-                range.selectNodeContents(ta);
-                var sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-            ta.setSelectionRange(0, text.length);
-            var ok = false;
-            try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-            ta.blur();
-            document.body.removeChild(ta);
-            if (window.getSelection) window.getSelection().removeAllRanges();
-            return ok;
-        }
-
-        function qbCopyScripture(btn) {
-            var text = btn.getAttribute('data-copy') || '';
-            var done = function (ok) {
-                if (ok) {
-                    btn.classList.add('done');
-                    btn.setAttribute('aria-label', '복사됨');
-                    clearTimeout(btn._t);
-                    btn._t = setTimeout(function () { btn.classList.remove('done'); btn.setAttribute('aria-label', btn.title); }, 2000);
-                } else {
-                    var box = document.getElementById('qbCopyBox');
-                    document.getElementById('qbCopyArea').value = text;
-                    box.classList.add('on');
-                }
-            };
-            // 누른 순간 바로 부른다 (사파리는 누른 동작 안에서만 클립보드 쓰기를 허락)
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(qbLegacyCopy(text)); });
-            } else {
-                done(qbLegacyCopy(text));
-            }
-        }
-    </script>
 }
