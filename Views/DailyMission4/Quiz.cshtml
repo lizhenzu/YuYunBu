@@ -65,7 +65,7 @@
         catch { return "오늘의 말씀"; }
     }
 
-    // 문제 본문이 "배경 … Q. 질문" 형태이면 배경과 질문을 갈라 준다.
+    // (예전 방식) 배경 열이 비어 있을 때만 쓴다: 문제 본문이 "배경 … Q. 질문" 형태이면 배경과 질문을 갈라 준다.
     // 갈리지 않으면 배경은 비우고 전체를 질문으로 쓴다.
     (string bg, string q) SplitQuestion(string raw)
     {
@@ -120,9 +120,24 @@
     bool doneByStatus = Model.DayStatus?.QuizDone ?? false;
     bool finished = doneByStatus || isCorrect || tryCnt >= 2;
 
-    var parts = SplitQuestion(q?.QuestionQ);
-    string qBg   = parts.bg;
-    string qBody = parts.q;
+    // 2026-11-05: "01 배경" = QuestionBackground 열, "02 문제" = QuestionQ 열.
+    //   · 배경 열이 비었거나 "blank"(예전 등록 화면이 자동으로 넣던 값)이면, 예전 방식대로
+    //     QuestionQ 안의 "Q." 표시로 배경과 문제를 갈라 본다 — 예전에 만든 퀴즈가 그대로 보이도록.
+    string bgCol = (q?.QuestionBackground ?? "").Replace("\r\n", "\n").Trim();
+    bool hasBgCol = bgCol.Length > 0 && !string.Equals(bgCol, "blank", StringComparison.OrdinalIgnoreCase);
+
+    string qBg, qBody;
+    if (hasBgCol)
+    {
+        qBg   = bgCol;
+        qBody = (q?.QuestionQ ?? "").Replace("\r\n", "\n").Trim();
+    }
+    else
+    {
+        var parts = SplitQuestion(q?.QuestionQ);
+        qBg   = parts.bg;
+        qBody = parts.q;
+    }
 
     int chancesLeft = Math.Max(0, 2 - tryCnt);
 
