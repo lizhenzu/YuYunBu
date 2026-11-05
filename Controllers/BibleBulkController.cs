@@ -1,4 +1,5 @@
 ﻿using BulletinBoard.BusinessLayer;
+using BulletinBoard.Common;
 using BulletinBoard.Enums;
 using BulletinBoard.Helpers;
 using BulletinBoard.Models;
@@ -230,9 +231,20 @@ namespace BulletinBoard.Controllers
         {
             ManageeBulkInputBible manageeBulkInputBible = new ManageeBulkInputBible();
 
-            manageeBulkInputBible.CreateBulkQuiz(param);
-
-            return RedirectToAction("EnrollBulkQuiz");
+            try
+            {
+                var (batchCount, affected) = manageeBulkInputBible.CreateBulkQuiz(param);
+                TempData["BulkSqlOk"] = batchCount == 0
+                    ? "실행할 SQL이 없어요."
+                    : $"{batchCount}개 묶음을 실행했어요. 바뀐 행 {affected}개.";
+                return RedirectToAction("EnrollBulkQuiz");
+            }
+            catch (SqlBatchException ex)
+            {
+                // 전체를 되돌렸다. 고쳐서 다시 실행할 수 있게 붙여 넣은 SQL 을 그대로 둔다
+                ViewBag.BulkSqlError = $"전체 {ex.BatchCount}개 묶음 중 {ex.BatchNo}번째에서 오류가 나서 아무것도 저장하지 않았어요. ({ex.Message})";
+                return View("EnrollBulkQuiz", param);
+            }
         }
 
         static List<VirtualA> CreateVirtualATable(int count)
