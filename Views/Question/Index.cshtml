@@ -82,6 +82,7 @@
 </script>
 <script src="/js/common2.js"></script>
 <script src="/js/content-push.js" asp-append-version="true"></script>
+@await Html.PartialAsync("_CopyButtonAssets")
 
 <div class="qb">
 
@@ -194,6 +195,8 @@
     let events = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(@Model.Events));
     // 날짜별 그날 말씀 — 제목에 태그 글자가 있어도 스크립트가 끊기지 않게 HTML 문자를 이스케이프한다
     const monthWords = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject((object)ViewBag.MonthWords, new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
+    // AI 프람프트 틀 — 날짜를 누르면 그날 구절 · 날짜를 채운다
+    const quizAiPromptTemplate = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(QuizAiPromptHelper.Build("{{BibleRange}}", "{{ExposeDate}}"), new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
     let pickedCell = null;
 
     function renderCalendar(date) {
@@ -249,7 +252,13 @@
     function wordCardHtml(date) {
         const w = monthWords ? monthWords[toYmdLocal(date)] : null;
         if (!w) return '';
-        return '<div class="qb-scr"><i>오늘의 말씀</i><b>' + esc(w.Subject) + '</b><small>' + esc(w.Range) + '</small></div>';
+        const prompt = quizAiPromptTemplate.split('{{BibleRange}}').join(w.Range).split('{{ExposeDate}}').join(toYmdLocal(date));
+        const okIcon = '<svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>';
+        const copyIcon = '<svg class="cp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>';
+        return '<div class="qb-scr"><i>오늘의 말씀</i><b>' + esc(w.Subject) + '</b><div class="rg"><small>' + esc(w.Range) + '</small>'
+            + '<button type="button" class="qb-cp" aria-label="구절 복사" title="구절 복사" data-copy="' + esc(w.Range) + '" onclick="qbCopyScripture(this)">' + copyIcon + okIcon + '</button>'
+            + '<button type="button" class="qb-cp ai" aria-label="AI 프람프트 복사" title="AI 프람프트 복사" data-copy="' + esc(prompt) + '" onclick="qbCopyScripture(this)"><span class="cp">AI</span>' + okIcon + '</button>'
+            + '</div></div>';
     }
 
     function showEventDetails(event) {

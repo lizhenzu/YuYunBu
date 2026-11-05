@@ -48,6 +48,7 @@
     </style>
 </head>
 <body>
+@await Html.PartialAsync("_CopyButtonAssets")
 <div class="qb">
 
     <div class="qb-top">
@@ -80,7 +81,21 @@
             <div class="h"><b>@item.ExposeDate.ToString("M월 d일") @(item.WeekDayKor)요일</b><span class="qb-tg @TypeCls(t)">@TypeName(t)</span></div>
             @if (word != null)
             {
-                <div class="qb-scr"><i>오늘의 말씀</i><b>@word.Subject</b><small>@word.Range</small></div>
+                <div class="qb-scr">
+                    <i>오늘의 말씀</i>
+                    <b>@word.Subject</b>
+                    <div class="rg">
+                        <small>@word.Range</small>
+                        <button type="button" class="qb-cp" aria-label="구절 복사" title="구절 복사" data-copy="@word.Range" onclick="qbCopyScripture(this)">
+                            <svg class="cp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>
+                            <svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                        </button>
+                        <button type="button" class="qb-cp ai" aria-label="AI 프람프트 복사" title="AI 프람프트 복사" data-range="@word.Range" data-date="@item.ExposeDate.ToString("yyyy-MM-dd")" onclick="qbCopyAiPrompt(this)">
+                            <span class="cp">AI</span>
+                            <svg class="ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                        </button>
+                    </div>
+                </div>
             }
             @if (background.Length > 0)
             {
@@ -119,6 +134,13 @@
 
 <script src="/js/common2.js"></script>
 <script>
+    // AI 프람프트 — 문제마다 긴 글을 넣지 않고, 틀 하나를 누를 때 그날 구절 · 날짜로 채운다
+    const quizAiPromptTemplate = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(QuizAiPromptHelper.Build("{{BibleRange}}", "{{ExposeDate}}"), new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
+    function qbCopyAiPrompt(btn) {
+        btn.setAttribute('data-copy', quizAiPromptTemplate.split('{{BibleRange}}').join(btn.getAttribute('data-range')).split('{{ExposeDate}}').join(btn.getAttribute('data-date')));
+        qbCopyScripture(btn);
+    }
+
     // 삭제 — 예전에는 확인 없이 바로 지웠다. 달력 화면과 같은 확인창을 거친다.
     document.addEventListener('click', async function (e) {
         var b = e.target.closest('[data-del]');
