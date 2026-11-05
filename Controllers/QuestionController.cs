@@ -476,7 +476,7 @@ namespace BulletinBoard.Controllers
 
 				manageQuestion.CreateQuestionSubject(questionTypeData);
             }
-            return RedirectToAction("QuestionDetailList");
+            return RedirectToAction("QuestionDetailList", new { view = "list" });
         }
 
         [HttpPost]
@@ -495,7 +495,7 @@ namespace BulletinBoard.Controllers
             {
                 manageQuestion.UpdateQuestionSubject(questionTypeData);
             }
-            return RedirectToAction("QuestionDetailList");
+            return RedirectToAction("QuestionDetailList", new { view = "list" });
         }
 
         [HttpPost]
@@ -514,11 +514,15 @@ namespace BulletinBoard.Controllers
             {
                 manageQuestion.UpdateQuestionObject(questionTypeDataObject);
             }
-            return RedirectToAction("QuestionDetailList");
+            return RedirectToAction("QuestionDetailList", new { view = "list" });
         }
 
-        public async Task<IActionResult> QuestionDetailList(string KindData)
+        // 2026-11-05: 메뉴로 들어오면 달력이 먼저 뜬다. 목록은 ?view=list 로 본다 (화면의 "목록" 링크가 붙여 준다)
+        public async Task<IActionResult> QuestionDetailList(string KindData, string? view = null)
         { 
+            if (!string.Equals(view, "list", StringComparison.OrdinalIgnoreCase))
+                return RedirectToAction("Index", new { KindData });
+
             ManageQuestion manageQuestion = new ManageQuestion();
             ViewBag.KindData = KindData;
 
