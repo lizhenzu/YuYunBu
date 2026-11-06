@@ -18,6 +18,54 @@ namespace BulletinBoard.BusinessLayer
             List<JuManNaYYYYMM> value = ds.Tables[0].ToList<JuManNaYYYYMM>();
             return value;
         }
+        /// <summary>
+        /// 말씀 정리 화면(달력형) — 한 달의 날짜별 내용과 빠진 곳.
+        /// 영상은 그날 말씀이 걸친 장(최대 5)마다 영상 주소가 있어야 "있음"으로 본다 (영상 구간 편집과 같은 규칙)
+        /// </summary>
+        public JuManNaMonthBoard getJuManNaBoard(DateTime firstDay)
+        {
+            var board = new JuManNaMonthBoard { First = firstDay, YYYYMM = firstDay.ToString("yyyy-MM") };
+
+            foreach (var g in getJuManNaByYYYYMM(board.YYYYMM).GroupBy(x => x.ExposeDate.Date).OrderBy(g => g.Key))
+            {
+                board.Days.Add(ToBoardDay(g.First()));
+            }
+            return board;
+        }
+
+        /// <summary>하루치를 화면용으로 바꾼다 (빠진 곳 판정 포함)</summary>
+        public static JuManNaBoardDay ToBoardDay(JuManNas x)
+        {
+            var day = new JuManNaBoardDay
+            {
+                Id = x.Id,
+                Date = x.ExposeDate.Date.ToString("yyyy-MM-dd"),
+                Ref = $"{x.BibleText} {SharedComm.MakeBibleSerialJangZul(x.BibleText, x.FromJang, x.FromZul, x.ToJang, x.ToZul)}".Trim(),
+                Subject = (x.BibleSubject ?? "").Trim(),
+                Synopsis = (x.Synopsis ?? "").Trim(),
+                Summary = (x.BibleSummary ?? "").Trim()
+            };
+
+            var urls   = new[] { x.URL, x.URL2, x.URL3, x.URL4, x.URL5 };
+            var starts = new[] { x.YouTuBuStartMM * 60 + x.YouTuBuStartSS, x.YouTuBuStartMM2 * 60 + x.YouTuBuStartSS2, x.YouTuBuStartMM3 * 60 + x.YouTuBuStartSS3, x.YouTuBuStartMM4 * 60 + x.YouTuBuStartSS4, x.YouTuBuStartMM5 * 60 + x.YouTuBuStartSS5 };
+            var ends   = new[] { x.YouTuBuEndMM * 60 + x.YouTuBuEndSS, x.YouTuBuEndMM2 * 60 + x.YouTuBuEndSS2, x.YouTuBuEndMM3 * 60 + x.YouTuBuEndSS3, x.YouTuBuEndMM4 * 60 + x.YouTuBuEndSS4, x.YouTuBuEndMM5 * 60 + x.YouTuBuEndSS5 };
+
+            string F(int sec) => $"{sec / 60}:{sec % 60:D2}";
+            int need = Math.Min(5, Math.Max(1, x.ToJang - x.FromJang + 1));
+            bool videoOk = true;
+            for (int i = 0; i < 5; i++)
+            {
+                bool has = !string.IsNullOrWhiteSpace(urls[i]);
+                if (has) day.Clips.Add($"{F(Math.Max(0, starts[i]))} ~ {(ends[i] > 0 ? F(ends[i]) : "끝")}");
+                if (i < need && !has) videoOk = false;
+            }
+
+            if (day.Subject.Length == 0) day.Missing.Add("주제");
+            if (day.Synopsis.Length == 0) day.Missing.Add("줄거리");
+            if (day.Summary.Length == 0) day.Missing.Add("요약");
+            if (!videoOk) day.Missing.Add("영상");
+            return day;
+        }
         public List<JuManNas> getJuManNa(int Id, bool activeData, DateTime workDT)
         {
             ControlJuManNa controlJuManNa = new ControlJuManNa();
