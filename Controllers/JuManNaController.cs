@@ -78,13 +78,19 @@ namespace BulletinBoard.Controllers
             return View(values);
         }
 
+        // 말씀 정리 — 한 달을 달력으로 보고, 날짜를 눌러 열고, 입력 · 수정 · 영상 구간 · 보내기로 이동한다 (2026-11-07 재구성)
+        // 달을 안 주면 이번 달(한국 시간).  옛 주소(IndexQueryByYYYYMM 등)는 그대로 열린다
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
-        public async Task<IActionResult> IndexGroupByYYYYMM()
+        public async Task<IActionResult> IndexGroupByYYYYMM(string? YYYYMM)
         {
-            ManageJuManNa manageJuManNa = new ManageJuManNa();
-            List<JuManNaYYYYMM> values = manageJuManNa.getJuManNaGroupByYYYYMM();
+            if (!TryParseMonth(YYYYMM, out var firstDay))
+            {
+                var now = BulletinBoard.Helpers.DateHelper.GetKoreaNow();
+                firstDay = new DateTime(now.Year, now.Month, 1);
+            }
 
-            return View(values);
+            ViewBag.ContentPlatformReady = _contentPlatform.IsConfigured;
+            return View(new ManageJuManNa().getJuManNaBoard(firstDay));
         }
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
         public async Task<IActionResult> IndexQueryByYYYYMM(string option,  string YYYYMM)

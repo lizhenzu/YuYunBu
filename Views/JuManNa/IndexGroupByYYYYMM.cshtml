@@ -1,32 +1,32 @@
 @using BulletinBoard.Common;
-@model IEnumerable<BulletinBoard.Models.JuManNaYYYYMM>
+@model BulletinBoard.Models.JuManNaMonthBoard
 
 @*  ══════════════════════════════════════════════════════════════
-    매일성경 말씀 정리 — 월 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · quiz-bright.css + jumanna-bright.css)
-    · 최근 달이 위.  보기 방식 이름: 최소 → 본문만, 약식 → 주제까지, 상세 → 전체 내용, 날짜S → 영상 구간 (주소 · option 값은 그대로)
-    · 배경 음악 버튼(외부 bensound 음악)은 시안대로 뺐다
-    · 이전 화면은 IndexGroupByYYYYMM.cshtml.bak_before_bright
+    매일성경 말씀 정리 — 2026-11-07 재구성 (달력형 · quiz-bright.css + jumanna-bright.css)
+    · 한 달을 달력으로 본다: 초록 = 다 채움 · 주황 = 빠진 곳 있음 · 회색 = 말씀 없음.  날짜를 누르면 아래에 그날 내용과 바로가기가 열린다
+    · 위 칩(주제 · 줄거리 · 요약 · 영상)을 누르면 그게 빠진 날만 달력에 표시한다
+    · 이 달 관리: 한 달 입력(MonthlyBulk) · 영상 구간 편집(SegmentEditor) · 플랫폼으로 보내기(말씀 → 영상 구간 차례로)
+    · 예전의 날짜별 목록 3가지 보기 · 영상 구간 목록은 이 화면으로 합쳤다 (옛 주소는 그대로 열림)
+    · 이전 화면은 IndexGroupByYYYYMM.cshtml.bak_before_board
     ══════════════════════════════════════════════════════════════ *@
 
 @{
     Layout = null;
-    var months = (Model ?? Enumerable.Empty<BulletinBoard.Models.JuManNaYYYYMM>())
-                 .OrderByDescending(m => m.YYYYMMCodeString).ToList();
+    DateTime first = Model.First;
+    string ym = first.ToString("yyyy-MM");
+    string monthLabel = $"{first.Year}년 {first.Month}월";
+    string prevYm = first.AddMonths(-1).ToString("yyyy-MM");
+    string nextYm = first.AddMonths(1).ToString("yyyy-MM");
 
-    // "2026-10" → "2026년 10월"
-    string MonthLabel(BulletinBoard.Models.JuManNaYYYYMM m)
-    {
-        var p = (m.YYYYMMCodeString ?? "").Split('-');
-        return p.Length == 2 && int.TryParse(p[0], out var y) && int.TryParse(p[1], out var mm) ? $"{y}년 {mm}월" : m.YYYYMMDsiaplyString;
-    }
-    int no = 0;
+    DateTime today = BulletinBoard.Helpers.DateHelper.GetKoreaNow().Date;
+    string selected = (today.Year == first.Year && today.Month == first.Month ? today : first).ToString("yyyy-MM-dd");
 
-    // 새 달 일괄 입력 — 기본값은 마지막 달의 다음 달 (없으면 이번 달, KST)
-    string nextYm = BulletinBoard.Helpers.DateHelper.GetKoreaNow().ToString("yyyy-MM");
-    if (months.Count > 0 && DateTime.TryParse(months[0].YYYYMMCodeString + "-01", out var lastFirst))
-    {
-        nextYm = lastFirst.AddMonths(1).ToString("yyyy-MM");
-    }
+    bool platformReady = ViewBag.ContentPlatformReady as bool? ?? false;
+    var pushItems = Model.Days.Where(d => d.Id > 0).OrderBy(d => d.Date).Select(d => new { id = d.Id, date = d.Date }).ToList();
+
+    int have = Model.Days.Count;
+    int full = Model.Days.Count(d => d.Missing.Count == 0);
+    int Miss(string kind) => Model.Days.Count(d => d.Missing.Contains(kind));
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -37,7 +37,52 @@
     <title>말씀 정리</title>
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <link rel="stylesheet" href="/css/jumanna-bright.css" asp-append-version="true">
-    <style>body { margin: 0; background: #FFFFFF; }</style>
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .jb-nav { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+        .jb-nav .sp { flex: 1; }
+        .jb-nav a, .jb-nav input { border: 0; font: inherit; font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 7px 12px; background: var(--grey); color: var(--dim2); }
+        .jb-nav a:hover { color: var(--blue); }
+        .jb-nav input { width: 128px; }
+        .jb-fl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+        .jb-fl .t { font-size: 12px; color: var(--dim2); margin-right: 2px; }
+        .jb-fc { border: 0; font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 11px; background: var(--grey); color: var(--dim2); cursor: pointer; }
+        .jb-fc.w { background: var(--warnbg); color: var(--warn); }
+        .jb-fc.z { background: var(--okbg); color: var(--ok); cursor: default; }
+        .jb-fc.on { background: var(--warn); color: #fff; }
+        .jb-leg { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 11.5px; color: var(--dim2); }
+        .jb-leg i { display: inline-block; width: 11px; height: 11px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; background: var(--okbg); }
+        .jb-leg i.w { background: var(--warnbg); }
+        .jb-leg i.n { background: var(--grey); }
+        .jb-wk, .jb-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .jb-wk { margin-top: 12px; }
+        .jb-wk div { text-align: center; font-size: 11px; font-weight: 700; color: var(--dim); padding: 4px 0; }
+        .jb-wk div:first-child { color: #B4531F; }
+        .jb-cal { margin-top: 4px; }
+        .jb-cal > div, .jb-cd { aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; font-size: 13px; }
+        .jb-cd { border: 0; font-family: inherit; cursor: pointer; background: var(--grey); color: var(--dim); }
+        .jb-cd.ok { background: var(--okbg); color: var(--ok); font-weight: 800; }
+        .jb-cd.w { background: var(--warnbg); color: var(--warn); font-weight: 800; }
+        .jb-cd.sun { text-decoration: underline; text-decoration-color: #F0B28E; text-underline-offset: 3px; }
+        .jb-cd.sel { box-shadow: 0 0 0 2px var(--blue); background: #fff; }
+        .jb-cd.dim { opacity: .28; }
+        .jb-cd.hit { box-shadow: 0 0 0 2px var(--warn); }
+        .jb-pn { margin-top: 14px; padding: 14px; border-radius: 14px; background: var(--grey); }
+        .jb-pn .h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; font-weight: 800; color: var(--blue); }
+        .jb-pn .rf { margin-top: 2px; font-size: 14px; font-weight: 800; color: var(--ink); }
+        .jb-pn .kv { margin-top: 10px; }
+        .jb-pn .kv b { display: block; font-size: 11.5px; font-weight: 800; color: var(--dim2); margin-bottom: 2px; }
+        .jb-pn .kv div { font-size: 13.5px; line-height: 1.7; color: var(--tx); white-space: pre-wrap; word-break: keep-all; }
+        .jb-pn .none b { display: block; font-size: 14px; color: var(--ink); }
+        .jb-pn .none { margin-top: 8px; font-size: 13px; color: var(--dim2); line-height: 1.7; }
+        .jb-pn .ac { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+        .jb-pf { margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--grey); }
+        .jb-pf .pf-h { font-size: 12px; font-weight: 800; color: var(--blue); }
+        .jb-pf .pf-d { margin-top: 4px; font-size: 12.5px; color: var(--dim2); line-height: 1.6; }
+        .jb-pf .qb-btn { margin-top: 10px; }
+        .jb-pf .sub { margin-top: 12px; font-size: 12px; font-weight: 800; color: var(--ink); }
+        .jb-pf[hidden], #pf-wrap[hidden] { display: none; }
+    </style>
 </head>
 <body>
 <div class="qb">
@@ -48,36 +93,70 @@
     </div>
 
     <div class="qb-k">DAILY WORD</div>
-    <h1 class="qb-h1">매일성경 말씀 정리</h1>
-    <div class="qb-sub">달을 고르고, 보고 싶은 방식을 눌러 주세요</div>
+    <h1 class="qb-h1">@monthLabel<small>@(have > 0 ? $"{have}일 중 {full}일 완성" : "아직 없어요")</small></h1>
+    <div class="qb-sub">날짜를 누르면 그날 내용이 열려요</div>
 
-    <div class="qb-sec">새 달 일괄 입력<small>있는 달이면 수정, 없으면 새로 추가</small></div>
-    <form class="jm-newmo" method="get" action="/JuManNa/MonthlyBulk">
-        <input type="month" name="YYYYMM" value="@nextYm" class="qb-in" required aria-label="일괄 입력할 달" />
-        <button type="submit" class="jm-pill p">월별일괄</button>
-    </form>
+    <div class="jb-nav">
+        <a href="/JuManNa/IndexGroupByYYYYMM?YYYYMM=@prevYm">← @(first.AddMonths(-1).Month)월</a>
+        <a href="/JuManNa/IndexGroupByYYYYMM?YYYYMM=@nextYm">@(first.AddMonths(1).Month)월 →</a>
+        <span class="sp"></span>
+        <form method="get" action="/JuManNa/IndexGroupByYYYYMM" style="margin:0">
+            <input type="month" name="YYYYMM" value="@ym" aria-label="다른 달 고르기" onchange="this.form.submit()" />
+        </form>
+    </div>
 
-    <div class="qb-sec">달<small>최근 달이 위에</small></div>
-
-    @if (months.Count == 0)
+    @if (have > 0)
     {
-        <div class="qb-empty">등록된 말씀이 없어요</div>
+        <div class="jb-fl" id="filters">
+            <span class="t">빠진 곳</span>
+            @foreach (var kind in new[] { "주제", "줄거리", "요약", "영상" })
+            {
+                int n = Miss(kind);
+                if (n == 0)
+                {
+                    <span class="jb-fc z">@kind 없음 0</span>
+                }
+                else
+                {
+                    <button type="button" class="jb-fc w" data-k="@kind">@kind 없음 @n</button>
+                }
+            }
+        </div>
     }
 
-    @foreach (var item in months)
+    <div class="jb-leg"><span><i></i>모두 채움</span><span><i class="w"></i>빠진 곳 있음</span><span><i class="n"></i>말씀 없음</span></div>
+
+    <div class="jb-wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+    <div class="jb-cal" id="cal"></div>
+
+    <div class="jb-pn" id="pn"></div>
+
+    <div class="qb-sec">이 달 관리</div>
+    <div class="qb-btns">
+        <a class="qb-btn" href="/JuManNa/MonthlyBulk?YYYYMM=@ym">@(have == 0 ? "이 달 입력하기" : "한 달 입력")</a>
+        <a class="qb-btn" href="/JuManNa/SegmentEditor?YYYYMM=@ym">영상 구간 편집</a>
+    </div>
+
+    @if (pushItems.Count > 0)
     {
-        no++;
-        string ym = item.YYYYMMCodeString;
-        <div class="jm-mo">
-            <div class="h"><span class="n">@no.ToString("00")</span><b>@MonthLabel(item)</b><small>말씀 @(item.DC)개</small></div>
-            <div class="op">
-                <a class="jm-pill p" href="/JuManNa/MonthlyBulk?YYYYMM=@ym">월별일괄</a>
-                <a class="jm-pill" href="/JuManNa/IndexQueryByYYYYMM?option=Minimal&YYYYMM=@ym">본문만</a>
-                <a class="jm-pill" href="/JuManNa/IndexQueryByYYYYMM?option=Rough&YYYYMM=@ym">주제까지</a>
-                <a class="jm-pill" href="/JuManNa/IndexQueryByYYYYMM?option=Detail&YYYYMM=@ym">전체 내용</a>
-                <a class="jm-pill s" href="/JuManNa/IndexQueryByYYYYMM?option=DetailSerail&YYYYMM=@ym"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z" /></svg>영상 구간</a>
-                <a class="jm-pill" href="/JuManNa/SegmentEditor?YYYYMM=@ym">구간 편집</a>
+        <div class="jb-pf">
+            <div class="pf-h">도전!!! 성경말씀 플랫폼</div>
+            @if (platformReady)
+            {
+                <div class="pf-d">이 달 말씀 @(pushItems.Count)일과 영상 구간을 차례로 보내요. 바로 공개되고, 이미 있는 날은 바뀌어요. 영상 구간은 그날 목록이 통째로 바뀌어요.</div>
+                <button type="button" class="qb-btn p w" id="pf-start" onclick="pushMonth()">플랫폼으로 보내기 (말씀 · 영상 구간)</button>
+            }
+            else
+            {
+                <div class="pf-d">플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 서버 설정에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
+            }
+            <div id="pf-wrap" hidden>
+                <div class="sub">말씀</div>
+                <div id="pf-run1"></div>
+                <div class="sub">영상 구간</div>
+                <div id="pf-run2"></div>
             </div>
+            <form id="pf-token" hidden>@Html.AntiForgeryToken()</form>
         </div>
     }
 
@@ -86,5 +165,149 @@
         <span><a href="/HumanResource/ManageUserInfo#g4">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
     </div>
 </div>
+
+<script src="/js/content-push.js" asp-append-version="true"></script>
+<script>
+    const BOARD = {
+        ym: "@ym",
+        monthLabel: "@monthLabel",
+        selected: "@selected",
+        days: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Days)),
+        pushItems: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pushItems))
+    };
+
+    (function () {
+        var byDate = {};
+        BOARD.days.forEach(function (d) { byDate[d.Date] = d; });
+
+        var cal = document.getElementById('cal');
+        var pn = document.getElementById('pn');
+        var parts = BOARD.ym.split('-');
+        var year = parseInt(parts[0], 10), month = parseInt(parts[1], 10);
+        var WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+        var filter = '';
+        var selected = BOARD.selected;
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+        }
+        function two(n) { return n < 10 ? '0' + n : String(n); }
+
+        // 달력 칸 만들기
+        function drawCalendar() {
+            var firstDow = new Date(year, month - 1, 1).getDay();
+            var last = new Date(year, month, 0).getDate();
+            var html = '';
+            for (var i = 0; i < firstDow; i++) html += '<div></div>';
+            for (var d = 1; d <= last; d++) {
+                var key = year + '-' + two(month) + '-' + two(d);
+                var item = byDate[key];
+                var cls = !item ? '' : (item.Missing.length === 0 ? 'ok' : 'w');
+                var sun = new Date(year, month - 1, d).getDay() === 0 ? ' sun' : '';
+                html += '<button type="button" class="jb-cd ' + cls + sun + '" data-d="' + key + '" aria-label="' + month + '월 ' + d + '일">' + d + '</button>';
+            }
+            cal.innerHTML = html;
+            paint();
+        }
+
+        // 선택 · 빠진 곳 필터 표시
+        function paint() {
+            cal.querySelectorAll('.jb-cd').forEach(function (b) {
+                var item = byDate[b.dataset.d];
+                var hit = filter && item && item.Missing.indexOf(filter) >= 0;
+                b.classList.toggle('sel', b.dataset.d === selected);
+                b.classList.toggle('hit', !!hit);
+                b.classList.toggle('dim', !!filter && !hit);
+            });
+        }
+
+        function field(label, value) {
+            if (!value) return '<div class="kv"><b>' + label + '</b><span class="jm-miss">없음</span></div>';
+            return '<div class="kv"><b>' + label + '</b><div>' + esc(value) + '</div></div>';
+        }
+
+        // 고른 날짜 내용
+        function render(key) {
+            var p = key.split('-');
+            var head = parseInt(p[1], 10) + '월 ' + parseInt(p[2], 10) + '일 ' + WEEK[new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10)).getDay()] + '요일';
+            var d = byDate[key];
+            if (!d) {
+                pn.innerHTML = '<div class="h"><span>' + head + '</span></div>' +
+                    '<div class="none"><b>이 날은 아직 말씀이 없어요</b>한 달 입력에서 이 달 전체를 한꺼번에 넣을 수 있어요.</div>' +
+                    '<div class="ac"><a class="jm-pill p" href="/JuManNa/MonthlyBulk?YYYYMM=' + BOARD.ym + '">한 달 입력</a></div>';
+                return;
+            }
+            pn.innerHTML =
+                '<div class="h"><span>' + head + '</span>' + (d.Missing.length ? '<span class="jm-miss">빠진 곳 ' + esc(d.Missing.join(' · ')) + '</span>' : '') + '</div>' +
+                '<div class="rf">' + esc(d.Ref) + '</div>' +
+                field('주제', d.Subject) +
+                field('줄거리', d.Synopsis) +
+                field('말씀 요약', d.Summary) +
+                field('영상 구간', d.Clips.length ? d.Clips.join('  ·  ') : '') +
+                '<div class="ac">' +
+                '<a class="jm-pill p" href="/JuManNa/ModifyJuManNa?Id=' + d.Id + '">수정</a>' +
+                '<a class="jm-pill s" href="/JuManNa/IndexByID?Id=' + d.Id + '">보기</a>' +
+                '<a class="jm-pill" href="/JuManNa/SegmentEditor?YYYYMM=' + BOARD.ym + '">영상 구간 편집</a>' +
+                '</div>';
+        }
+
+        cal.addEventListener('click', function (e) {
+            var b = e.target.closest('.jb-cd');
+            if (!b) return;
+            selected = b.dataset.d;
+            paint();
+            render(selected);
+        });
+
+        var filters = document.getElementById('filters');
+        if (filters) {
+            filters.addEventListener('click', function (e) {
+                var b = e.target.closest('.jb-fc.w');
+                if (!b) return;
+                filter = filter === b.dataset.k ? '' : b.dataset.k;
+                filters.querySelectorAll('.jb-fc.w').forEach(function (x) { x.classList.toggle('on', x.dataset.k === filter); });
+                paint();
+            });
+        }
+
+        drawCalendar();
+        render(selected);
+    })();
+
+    // 이 달 말씀 → 영상 구간을 차례로 플랫폼에 보낸다 (wwwroot/js/content-push.js)
+    function pushMonth() {
+        if (ContentPush.isBusy()) return;
+        var n = BOARD.pushItems.length;
+        if (!confirm(BOARD.monthLabel + ' 말씀 ' + n + '일과 영상 구간을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.\n영상 구간은 그날 목록이 보낸 내용으로 통째로 바뀌어요.')) return;
+
+        var btn = document.getElementById('pf-start');
+        var token = document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value;
+        var run2 = document.getElementById('pf-run2');
+        document.getElementById('pf-wrap').hidden = false;
+        run2.innerHTML = '<div class="pf-d">말씀을 다 보낸 뒤에 시작해요.</div>';
+        btn.disabled = true;
+
+        ContentPush.run({
+            panel: document.getElementById('pf-run1'),
+            url: '/JuManNa/PushWordToPlatform',
+            token: token,
+            items: BOARD.pushItems,
+            onDone: function (r) {
+                if (r.stopped) {
+                    run2.innerHTML = '<div class="pf-d">말씀 보내기가 멈춰서 영상 구간은 보내지 않았어요.</div>';
+                    btn.disabled = false;
+                    return;
+                }
+                ContentPush.run({
+                    panel: run2,
+                    url: '/JuManNa/PushClipsToPlatform',
+                    token: token,
+                    items: BOARD.pushItems,
+                    onDone: function () { btn.disabled = false; }
+                });
+            }
+        });
+    }
+</script>
 </body>
 </html>
