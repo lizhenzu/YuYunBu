@@ -451,6 +451,10 @@ ORDER BY r.CreatedAt;";
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t AND Kind='R' AND TargetUserName=@u;", ("@t", teamId), ("@u", userName)) > 0)
                     return Rollback(tx, "이미 신청했어요. 수락을 기다려 주세요.");
 
+                // 한 번에 한 팀에만 신청할 수 있다 — 다른 팀에 신청 중이면 그 신청을 취소해야 한다
+                if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE Kind='R' AND TargetUserName=@u;", ("@u", userName)) > 0)
+                    return Rollback(tx, "다른 팀에 가입 신청 중이에요. 그 신청을 취소한 뒤 다시 신청해 주세요.");
+
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyRequest (FamilyTeamId, Kind, TargetUserName, FromUserName, RelationKey, CreatedAt) VALUES (@t,'R',@u,@u,@k,@now);",
                     ("@t", teamId), ("@u", userName), ("@k", relationKey), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
                 tx.Commit();
