@@ -11,7 +11,7 @@ namespace BulletinBoard.Services
     //   · 누구나 팀을 만들고(이름은 "○○○네 가족팀" 자동), 누구나 초대한다
     //   · 가입 신청은 팀원 한 명이 수락하면 바로 팀원, 초대는 초대받은 본인이 수락
     //   · 2026-11-08 재시상 방지: 시상은 팀 키(AwardKey, 처음 이름으로 고정)로 관리하고 팀 이름은 팀원이 바꿀 수 있다
-    //   · 만든 사람(CreatorUserName)은 탈퇴할 수 없고, 다른 팀원을 내보낼 수 있는 사람도 만든 사람뿐이다. 다른 팀원은 언제든 탈퇴
+    //   · 처음 만든 사람(CreatorUserName)이 방장이다. 보호자일 필요 없다. 방장은 탈퇴할 수 없고, 다른 팀원을 내보낼 수 있는 사람도 방장뿐이다. 다른 팀원은 언제든 탈퇴
     //   · 팀 삭제는 관리자만. 예외: 혼자이고 시상 기록이 없는 팀은 다른 팀에 신청할 때 지운다
     //   · 처리 안 된 신청·초대는 30일 뒤 지운다
     //  표: dbo.DM2_FamilyRequest · dbo.DM2_FamilyNotice (SQL/CreateFamilyTeamSelfService_20261107.sql)
@@ -673,7 +673,7 @@ ORDER BY r.CreatedAt;";
                 int teamId = await MyTeamIdAsync(c, tx, userName);
                 if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
                 if (string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
-                    return Rollback(tx, "팀을 만든 사람은 팀에서 나갈 수 없어요.");
+                    return Rollback(tx, "방장은 팀에서 나갈 수 없어요.");
                 await RemoveMemberAsync(c, tx, teamId, userName, hardDeleteIfEmpty: false);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에서 나왔어요.");
@@ -681,7 +681,7 @@ ORDER BY r.CreatedAt;";
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
 
-        /// <summary>만든 사람만 다른 구성원을 내보낼 수 있다</summary>
+        /// <summary>방장만 다른 구성원을 내보낼 수 있다</summary>
         public async Task<FamilyTeamResult> KickAsync(string userName, string targetUserName)
         {
             if (string.Equals(userName, targetUserName, StringComparison.OrdinalIgnoreCase)) return await LeaveAsync(userName);
@@ -695,7 +695,7 @@ ORDER BY r.CreatedAt;";
                 int targetTeam = await MyTeamIdAsync(c, tx, targetUserName);
                 if (targetTeam != teamId) return Rollback(tx, "같은 팀의 구성원만 내보낼 수 있어요.");
                 if (!string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
-                    return Rollback(tx, "팀을 만든 사람만 내보낼 수 있어요.");
+                    return Rollback(tx, "방장만 내보낼 수 있어요.");
                 await RemoveMemberAsync(c, tx, teamId, targetUserName, hardDeleteIfEmpty: false);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에서 내보냈어요.");

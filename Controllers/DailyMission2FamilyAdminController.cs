@@ -128,15 +128,15 @@ namespace BulletinBoard.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // 만든 사람 바꾸기
+        // 방장 바꾸기
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> SetCreator(int teamId, string userName)
         {
             if (teamId <= 0) return RedirectToAction(nameof(Index));
 
             bool ok = !string.IsNullOrWhiteSpace(userName) && await _svc.SetCreatorAsync(teamId, userName);
-            if (ok) TempData["Info"] = "만든 사람을 바꿨습니다.";
-            else TempData["Error"] = "이 팀의 활성 구성원만 만든 사람으로 정할 수 있습니다.";
+            if (ok) TempData["Info"] = "방장을 바꿨습니다.";
+            else TempData["Error"] = "이 팀의 활성 구성원만 방장으로 정할 수 있습니다.";
             return RedirectToAction(nameof(Index), new { teamId });
         }
 
