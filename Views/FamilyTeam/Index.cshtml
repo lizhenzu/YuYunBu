@@ -13,6 +13,9 @@
     var rels    = ViewBag.Relations as (string Key, int Role, string Label)[] ?? FamilyTeamService.Relations;
     string? msg = ViewBag.Msg as string;
     bool msgOk  = ViewBag.MsgOk is bool b && b;
+
+    // 한 번에 한 팀에만 신청할 수 있다 — 이미 신청한 팀이 있으면 다른 팀의 [가입 신청]은 누를 수 없다
+    bool hasPendingApply = teams.Any(t => t.RequestId != 0);
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -87,7 +90,12 @@
             <div class="l">
                 <div class="ft-nm">@t.Name</div>
                 <div class="ft-mem">@string.Join(" · ", t.MemberNames)</div>
-                @if (t.RequestId == 0)
+                @if (t.RequestId == 0 && hasPendingApply)
+                {
+                    <button class="ft-btn g" type="button" disabled aria-disabled="true" style="margin-top:8px;opacity:.55;cursor:not-allowed">가입 신청</button>
+                    <div class="ft-mem" style="margin-top:4px">다른 팀에 신청 중이에요. 그 신청을 취소하면 신청할 수 있어요.</div>
+                }
+                else if (t.RequestId == 0)
                 {
                     <details class="ft-ap">
                         <summary><span class="ft-btn p" style="margin-top:8px;display:inline-block">가입 신청</span></summary>

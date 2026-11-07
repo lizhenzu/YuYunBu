@@ -354,6 +354,15 @@ namespace BulletinBoard.Controllers
 
             ViewBag.Toast = TempData["Toast"]?.ToString() ?? "";
 
+            // 가족팀: 수락을 기다리는 가입 신청 수 (팀원에게는 받은 신청, 팀이 없는 사람에게는 내가 낸 신청)
+            {
+                var pend = await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                    .GetRequiredService<BulletinBoard.Services.FamilyTeamService>(HttpContext.RequestServices)
+                    .GetPendingCountsAsync(this.UserName);
+                ViewBag.FamilyPendingIn = pend.In;
+                ViewBag.FamilyPendingOut = pend.Out;
+            }
+
             // ── 선물 : MyGiftBox 와 같은 기준으로 계산해 넘긴다 ──
             //   통합 점수 → 100점 단위 마일스톤 → 쌓인 크레딧(원) − 쓴 금액 = 쓸 수 있는 크레딧
             try

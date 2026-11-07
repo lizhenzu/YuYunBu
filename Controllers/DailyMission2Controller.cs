@@ -284,6 +284,13 @@ namespace BulletinBoard.Controllers
             {
                 try { ViewBag.FamilyCardTree = await _giftService.GetMyFamilyTreeAsync(this.UserName, DateHelper.GetKoreaNow().Year); }
                 catch { ViewBag.FamilyCardTree = null; }
+
+                // 수락을 기다리는 가입 신청 (팀원에게는 받은 신청, 팀이 없는 사람에게는 내가 낸 신청)
+                var pend = await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+                    .GetRequiredService<BulletinBoard.Services.FamilyTeamService>(HttpContext.RequestServices)
+                    .GetPendingCountsAsync(this.UserName);
+                ViewBag.FamilyPendingIn = pend.In;
+                ViewBag.FamilyPendingOut = pend.Out;
             }
 
             // 버전 선택 클릭수 — Basic · SuperAdmin 계정에게만
