@@ -113,6 +113,9 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> Kick(string targetUserName) => Done(await _svc.KickAsync(Me, targetUserName));
 
         [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> ChangeRelation(string targetUserName, string relation) => Done(await _svc.ChangeRelationAsync(Me, targetUserName, relation));
+
+        [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Rename(string? teamName) => Done(await _svc.RenameTeamAsync(Me, teamName));
     }
 }

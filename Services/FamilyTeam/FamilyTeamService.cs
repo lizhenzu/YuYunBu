@@ -40,6 +40,8 @@ namespace BulletinBoard.Services
         public string FullName { get; set; } = "";
         public string RelLabel { get; set; } = "";
         public bool IsMe { get; set; }
+        public int RoleCode { get; set; }
+        public string RelKey { get; set; } = "";      // 지금 관계의 키 (child · mom · dad · grandma · grandpa)
     }
 
     public sealed class FamilyRequestInfo
@@ -96,16 +98,18 @@ namespace BulletinBoard.Services
         public FamilyTeamService(string connectionString) { _conn = connectionString; }
 
         // ── 관계 ──────────────────────────────────────────────────
-        //   key → (RoleCode, 글자).  RoleCode 는 기존 가계도와 같다: 0=학생(자녀) 1=엄마 2=아빠 3=할머니 4=할아버지 5=그 밖의 가족
+        //   관계는 다섯 가지뿐이다 (그 밖의 가족 · 삼촌 · 이모는 없다). key → (RoleCode, 글자). RoleCode 는 기존 가계도와 같다: 0=학생 1=엄마 2=아빠 3=할머니 4=할아버지
+        //   (key "child" 는 학생. 예전 이름 그대로 두어 이미 저장된 요청과 맞는다)
         public static readonly (string Key, int Role, string Label)[] Relations =
         {
-            ("dad",     2, "아빠"),
+            ("child",   0, "학생"),
             ("mom",     1, "엄마"),
-            ("child",   0, "자녀"),
-            ("grandpa", 4, "할아버지"),
+            ("dad",     2, "아빠"),
             ("grandma", 3, "할머니"),
-            ("etc",     5, "삼촌·이모"),
+            ("grandpa", 4, "할아버지"),
         };
+
+        public static string KeyOfRole(int role) => role switch { 0 => "child", 1 => "mom", 2 => "dad", 3 => "grandma", 4 => "grandpa", _ => "" };
 
         public static bool TryRelation(string? key, out int role, out string label)
         {
@@ -198,13 +202,14 @@ ORDER BY m.RoleCode, m.RelationCode, m.SortNo;";
                 while (await rd.ReadAsync())
                 {
                     var un = rd.GetString(0);
-                    string lbl = rd.GetString(3);
-                    if (string.IsNullOrWhiteSpace(lbl)) lbl = DefaultLabel(Convert.ToInt32(rd[2]));
+                    int role = Convert.ToInt32(rd[2]);
                     d.Members.Add(new FamilyMemberInfo
                     {
                         UserName = un,
                         FullName = rd.GetString(1),
-                        RelLabel = lbl,
+                        RelLabel = DefaultLabel(role),   // 화면에는 다섯 관계 이름만 쓴다 (예전에 손으로 적은 글자는 보이지 않는다)
+                        RoleCode = role,
+                        RelKey = KeyOfRole(role),
                         IsMe = string.Equals(un, userName, StringComparison.OrdinalIgnoreCase),
                     });
                 }
@@ -244,7 +249,7 @@ ORDER BY r.CreatedAt;";
 
         private static string DefaultLabel(int role) => role switch
         {
-            0 => "자녀", 1 => "엄마", 2 => "아빠", 3 => "할머니", 4 => "할아버지", _ => "가족"
+            0 => "학생", 1 => "엄마", 2 => "아빠", 3 => "할머니", 4 => "할아버지", _ => "가족"
         };
 
         /// <summary>
@@ -585,6 +590,13 @@ ORDER BY r.CreatedAt;";
             {
                 var r = await ReadRequestAsync(c, tx, requestId);
                 if (r == null || r.Kind != "R") return Rollback(tx, "이미 처리됐거나 사라진 신청이에요.");
+                if (!TryRelation(r.RelationKey, out _, out _))
+                {
+                    // 없어진 관계(예전 "삼촌·이모" 등)로 들어온 신청 — 지우고 다시 신청하게 한다
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("이 신청은 없어진 관계로 들어온 신청이라 지웠어요. 상대에게 다시 신청해 달라고 해 주세요.");
+                }
 
                 int myTeam = await MyTeamIdAsync(c, tx, userName);
                 if (myTeam == 0 || myTeam != r.TeamId) return Rollback(tx, "이 팀의 구성원만 수락할 수 있어요.");
@@ -628,6 +640,12 @@ ORDER BY r.CreatedAt;";
                 var r = await ReadRequestAsync(c, tx, requestId);
                 if (r == null || r.Kind != "I" || !string.Equals(r.Target, userName, StringComparison.OrdinalIgnoreCase))
                     return Rollback(tx, "이미 처리됐거나 사라진 초대예요.");
+                if (!TryRelation(r.RelationKey, out _, out _))
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("이 초대는 없어진 관계로 보낸 초대라 지웠어요. 다시 초대해 달라고 해 주세요.");
+                }
                 if (await HasActiveMembershipAsync(c, tx, userName))
                     return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", r.TeamId)) == 0)
@@ -718,6 +736,54 @@ ORDER BY r.CreatedAt;";
                 return FamilyTeamResult.Success("팀에서 내보냈어요.");
             }
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("내보내지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
+        }
+
+        // ── 관계 바꾸기 ──────────────────────────────────────────
+        /// <summary>
+        /// 구성원의 관계를 바꾼다. 본인은 자기 것, 방장은 모든 구성원의 것을 바꿀 수 있다.
+        /// 시상 기록이 있는 팀은 선물 받는 사람(학생 본인)이 달라질 수 있어서 아무도 바꿀 수 없다.
+        /// </summary>
+        public async Task<FamilyTeamResult> ChangeRelationAsync(string userName, string targetUserName, string relationKey)
+        {
+            if (!TryRelation(relationKey, out int role, out string label)) return FamilyTeamResult.Fail("관계를 골라 주세요.");
+
+            using var c = Conn();
+            using var tx = await BeginAsync(c);
+            try
+            {
+                int teamId = await MyTeamIdAsync(c, tx, userName);
+                if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
+                if (await MyTeamIdAsync(c, tx, targetUserName) != teamId) return Rollback(tx, "같은 팀의 구성원만 바꿀 수 있어요.");
+
+                bool self = string.Equals(userName, targetUserName, StringComparison.OrdinalIgnoreCase);
+                bool owner = string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase);
+                if (!self && !owner) return Rollback(tx, "다른 구성원의 관계는 방장만 바꿀 수 있어요.");
+                if (await HasAwardRecordAsync(c, tx, teamId))
+                    return Rollback(tx, "시상 기록이 있는 팀은 관계를 바꿀 수 없어요. 관리자에게 문의해 주세요.");
+
+                int curRole = 0, curRel = 9;
+                using (var rd = await Cmd(c, tx, "SELECT RoleCode, RelationCode FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND UserName=@u AND IsActive=1;", ("@t", teamId), ("@u", targetUserName)).ExecuteReaderAsync())
+                {
+                    if (!await rd.ReadAsync()) return Rollback(tx, "구성원을 찾을 수 없어요.");
+                    curRole = Convert.ToInt32(rd[0]); curRel = Convert.ToInt32(rd[1]);
+                }
+                if (curRole == role) return Rollback(tx, "지금 관계와 같아요.");
+
+                // 팀마다 '본인(학생, 관계 0)' 은 한 명만 — 이미 있으면 일반 학생(9)으로 둔다
+                int rel = 9;
+                if (role == 0)
+                {
+                    bool selfTaken = await ScalarAsync<int>(c, tx,
+                        "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1 AND RoleCode=0 AND RelationCode=0 AND UserName<>@u;", ("@t", teamId), ("@u", targetUserName)) > 0;
+                    rel = selfTaken ? 9 : 0;
+                }
+
+                await Cmd(c, tx, "UPDATE dbo.DM2_FamilyMember SET RoleCode=@role, RelationCode=@rel, RelationLabel=@lbl, UpdateDT=GETDATE() WHERE FamilyTeamId=@t AND UserName=@u;",
+                    ("@role", (byte)role), ("@rel", (byte)rel), ("@lbl", label), ("@t", teamId), ("@u", targetUserName)).ExecuteNonQueryAsync();
+                tx.Commit();
+                return FamilyTeamResult.Success(self ? $"내 관계를 {label}(으)로 바꿨어요." : $"관계를 {label}(으)로 바꿨어요.");
+            }
+            catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("관계를 바꾸지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
 
         // ── 팀 이름 바꾸기 ───────────────────────────────────────

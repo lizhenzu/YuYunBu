@@ -91,10 +91,38 @@
     <div class="ft-sh"><span>구성원</span></div>
     @foreach (var m in Model.Members)
     {
-        <div class="ft-row">
+        <div class="ft-row" style="align-items:flex-start">
             <div class="l">
                 <div class="ft-nm">@m.FullName@if (m.IsMe) {<i style="font-style:normal;font-size:11px;color:var(--blue);margin-left:6px">나</i>}@if (string.Equals(m.UserName, Model.CreatorUserName, StringComparison.OrdinalIgnoreCase)) {<i style="font-style:normal;font-size:11px;color:var(--dim2);margin-left:6px">방장</i>}</div>
-                <div class="ft-mem">@m.RelLabel</div>
+                @{ bool canChange = m.IsMe || Model.IsCreator; }
+                @if (canChange && !Model.HasAwardRecord)
+                {
+                    @* 관계 칩을 누르면 이 줄 아래로 펼쳐진다 (본인 · 방장) *@
+                    <details class="ft-ap ft-rel">
+                        <summary><span class="ft-rchip">@m.RelLabel <i>▾</i></span></summary>
+                        <form class="box" method="post" asp-action="ChangeRelation">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="targetUserName" value="@m.UserName" />
+                            <div class="ft-q" style="margin-top:0">@(m.IsMe ? "나는" : m.FullName + "님은") 우리 가족의…</div>
+                            <div class="ft-chips">
+                                @foreach (var r2 in rels)
+                                {
+                                    <label><input type="radio" name="relation" value="@r2.Key" checked="@(r2.Key == m.RelKey)" required /><span>@r2.Label</span></label>
+                                }
+                            </div>
+                            <div style="margin-top:12px"><button class="ft-btn p w" type="submit">관계 저장</button></div>
+                        </form>
+                    </details>
+                }
+                else if (canChange)
+                {
+                    @* 시상 기록이 있으면 관계를 바꿀 수 없다 — 칩은 보이되 눌리지 않게 *@
+                    <span class="ft-rchip off" title="시상 기록이 있는 팀은 관계를 바꿀 수 없어요">@m.RelLabel</span>
+                }
+                else
+                {
+                    <div class="ft-mem">@m.RelLabel</div>
+                }
             </div>
             @if (Model.IsCreator && !m.IsMe && Model.HasAwardRecord)
             {
@@ -126,7 +154,7 @@
         <div class="ft-chips">
             @for (int i = 0; i < rels.Length; i++)
             {
-                <label><input type="radio" name="relation" value="@rels[i].Key" @(i == rels.Length - 1 ? "checked" : "") /><span>@rels[i].Label</span></label>
+                <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
             }
         </div>
     </form>
