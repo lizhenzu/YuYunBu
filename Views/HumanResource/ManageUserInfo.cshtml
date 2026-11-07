@@ -32,7 +32,9 @@
     bool Can(string roles)
     {
         if (roles == "all") return isSignedIn;
-        if (isSuperAdmin) return true;                       // S 는 모든 줄을 본다
+        // "own" = 내 화면일 때만 (SuperAdmin 은 탈퇴를 요청할 수 없으므로 제외)
+        if (roles == "own") return isSignedIn && !isSuperAdmin && string.Equals(Model?.UserName, User.Identity?.Name, StringComparison.OrdinalIgnoreCase);
+        if (isSuperAdmin) return true;                      // S 는 모든 줄을 본다
         if (roles.Contains('B') && isBasicAcct) return true; // B = "Basic" 계정에게만 추가로 열어 준다 (Admin 롤은 제외)
         return (isAdminRole || isBasicAcct) && roles.Contains('A');
     }
@@ -47,6 +49,7 @@
         // ① 내 정보
         ("g1", "사진 정보 수정",   "프로필 사진 바꾸기",           $"/HumanResource/ModifyHRPhoto?UserId={uid}", "all", new (string,string)[0]),
         ("g1", "나의 정보 수정",   "이름 · 연락처 · 생일",         "/Profile/Edit",                              "all", new (string,string)[0]),
+        ("g1", "탈퇴 요청",       "삭제될 정보를 보고 요청하기",     "/Withdraw/Request",                          "own", new (string,string)[0]),
 
 
         // ③ 선물
@@ -68,7 +71,8 @@
         ("g5", "이 사람 역할 · 반 수정", "",                        $"/HumanResource/ChangeUseRoleMain?UserId={uid}", "S", new (string,string)[0]),
         ("g5", "미배정 회원 배정", "가입 후 역할 · 학년반 정하기", "/HumanResource/UnassignedMembers",                  "S", new (string,string)[0]),
         ("g5", "연결 요청 확인", "가입 후 같은 이름 기록 연결", "/PersonMatch/Requests", "S", new (string,string)[0]),
-        ("g5", "팀 구성",         "도전성경 팀 구성",             "/DailyMission2FamilyAdmin",                  "S", new (string,string)[0]),
+        ("g5", "탈퇴 요청 확인", "탈퇴 요청 승인 · 반려",       "/Withdraw/Requests", "S", new (string,string)[0]),
+        ("g5", "팀 구성",        "도전성경 팀 구성",             "/DailyMission2FamilyAdmin",                  "S", new (string,string)[0]),
         ("g5", "Role 관리",         "Role 만들기 · 정리",           "/RoleManager/Index",                         "S", new (string,string)[0]),
         ("g5", "사용자별 Role 설정", "사람마다 Role 지정",          "/UserRoles/Index",                           "S", new (string,string)[0]),
 

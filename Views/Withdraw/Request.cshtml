@@ -1,0 +1,128 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.DataAccessLayer;
+@using System.Collections.Generic;
+
+@*  ══════════════════════════════════════════════════════════════
+    탈퇴 요청 — 2026-11-08 시안 확정 (DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
+    · 삭제될 정보를 목록으로 보여 주고, 확인 체크 → "그대로 탈퇴하나요?" → 요청 저장
+    · 요청만 저장된다. SuperAdmin 이 승인해야 실제로 삭제된다. 그 전에는 계속 쓸 수 있고 요청을 취소할 수 있다.
+    · 남는 것: 쓴 글 · 댓글 · 쪽지 · 올린 사진, 행사 신청 기록
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var fullName = (string)ViewData["FullName"];
+    var msg = ViewData["Msg"] as string;
+    var pending = ViewData["Pending"] as WithdrawRequestRow;
+    var groups = ViewData["Groups"] as List<WithdrawGroup>;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>탈퇴 요청</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .wd-row { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #E8EBF0; }
+        .wd-row b { font-size: 15px; font-weight: 700; display: block; }
+        .wd-row small { font-size: 12px; color: #6B7684; }
+        .wd-row .c { flex: none; align-self: center; font-size: 13px; font-weight: 700; color: #D13B3B; white-space: nowrap; }
+        .wd-keep { margin-top: 10px; padding: 10px 12px; background: #F5F7FA; border-radius: 10px; font-size: 12.5px; color: #6B7684; }
+        .wd-msg { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: #EAF2FD; color: #2F7BF5; font-size: 13px; }
+        .wd-pend { margin: 12px 0; padding: 12px 14px; border-radius: 12px; background: #FFF4E0; color: #9A5B00; font-size: 14px; }
+        .wd-ta { width: 100%; box-sizing: border-box; height: 64px; margin-top: 12px; border: 1px solid #D9DEE6; border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 14px; }
+        .wd-ck { display: flex; gap: 8px; align-items: center; margin-top: 10px; font-size: 14px; }
+        .wd-err { min-height: 18px; font-size: 13px; color: #D13B3B; margin: 4px 0; }
+        .wd-btn { width: 100%; height: 46px; border-radius: 12px; border: 1px solid #F0C4C4; background: #FDEEEE; color: #D13B3B; font-weight: 800; font-size: 15px; }
+        .wd-dlg { display: none; margin-top: 12px; border: 1px solid #F0C4C4; border-radius: 12px; padding: 14px; }
+        .wd-dlg.on { display: block; }
+        .wd-dlg b { display: block; font-size: 16px; margin-bottom: 4px; }
+        .wd-dlg p { margin: 0 0 10px; font-size: 13px; color: #6B7684; }
+        .wd-two { display: flex; gap: 8px; }
+        .wd-two button { flex: 1; height: 42px; border-radius: 10px; border: 1px solid #D9DEE6; background: #fff; font-weight: 700; font-size: 14px; }
+        .wd-two button.d { background: #D13B3B; border-color: #D13B3B; color: #fff; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>탈퇴 요청</span>
+        <span>WITHDRAW</span>
+    </div>
+
+    <div class="qb-k" style="color:#D13B3B">WITHDRAW</div>
+    <h1 class="qb-h1">탈퇴를 요청할까요?</h1>
+
+    @if (!string.IsNullOrEmpty(msg)) { <div class="wd-msg">@msg</div> }
+
+    @if (pending != null)
+    {
+        <div class="qb-sub">@fullName 님의 탈퇴 요청을 보냈어요.</div>
+        <div class="wd-pend">
+            탈퇴 요청 중이에요 (@pending.InsertDT.ToString("M월 d일")).<br />
+            SuperAdmin이 확인하면 정리돼요. 그 전에는 계속 이용하실 수 있어요.
+        </div>
+        <form method="post" action="/Withdraw/Cancel">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="requestId" value="@pending.Id" />
+            <button type="submit" class="qb-submit">요청 취소</button>
+        </form>
+    }
+    else
+    {
+        <div class="qb-sub">@fullName 님의 아래 정보가 모두 사라지고 되돌릴 수 없어요.</div>
+
+        @foreach (var g in groups)
+        {
+            <div class="wd-row">
+                <div><b>@g.Title</b><small>@g.Desc</small></div>
+                <span class="c">@(g.Count > 0 ? g.Count.ToString("N0") + "건" : "없음")</span>
+            </div>
+        }
+        <div class="wd-keep">남는 것: 쓴 글 · 댓글 · 쪽지 · 올린 사진, 행사 신청 기록</div>
+
+        <form method="post" action="/Withdraw/Request" id="wdForm" onsubmit="return false;">
+            @Html.AntiForgeryToken()
+            <textarea class="wd-ta" name="reason" maxlength="500" placeholder="탈퇴하는 이유 (선택)"></textarea>
+            <label class="wd-ck"><input type="checkbox" name="agree" value="true" id="wdAgree" /> 위 내용을 확인했어요</label>
+            <div class="wd-err" id="wdErr"></div>
+            <button type="button" class="wd-btn" onclick="wdAsk()">탈퇴 요청 보내기</button>
+
+            <div class="wd-dlg" id="wdDlg">
+                <b>그대로 탈퇴하나요?</b>
+                <p>SuperAdmin이 확인하면 위 정보가 삭제돼요. 그 전에는 계속 쓸 수 있고, 요청을 취소할 수 있어요.</p>
+                <div class="wd-two">
+                    <button type="button" onclick="document.getElementById('wdDlg').classList.remove('on')">아니요</button>
+                    <button type="button" class="d" onclick="wdSend()">예, 요청합니다</button>
+                </div>
+            </div>
+        </form>
+    }
+
+    <div class="qb-btns" style="margin-top:16px">
+        <a class="qb-btn g" href="/HumanResource/ManageUserInfo">정보 관리</a>
+        <a class="qb-btn g" href="/">@ConstatsCommon.ToHome</a>
+    </div>
+
+    <div class="qb-ft">
+        <span>탈퇴 요청</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+<script>
+    function wdAsk() {
+        if (!document.getElementById('wdAgree').checked) {
+            document.getElementById('wdErr').textContent = '위 내용을 확인했다고 체크해 주세요';
+            return;
+        }
+        document.getElementById('wdErr').textContent = '';
+        document.getElementById('wdDlg').classList.add('on');
+    }
+    function wdSend() { document.getElementById('wdForm').onsubmit = null; document.getElementById('wdForm').submit(); }
+</script>
+</body>
+</html>
