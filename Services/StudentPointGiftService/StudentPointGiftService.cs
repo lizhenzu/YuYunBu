@@ -1686,7 +1686,8 @@ SELECT
     ISNULL(m2.RoleCode, 0)            AS RoleCode,
     ISNULL(m2.RelationCode, 9)        AS RelationCode,
     t.FamilyTeamId,
-    t.TeamName
+    t.TeamName,
+    ISNULL(m2.RelationLabel, '')      AS RelationLabel
 FROM dbo.DM2_FamilyMember m1 WITH (NOLOCK)
 JOIN dbo.DM2_FamilyTeam   t  WITH (NOLOCK) ON t.FamilyTeamId = m1.FamilyTeamId AND t.IsActive = 1
 JOIN dbo.DM2_FamilyMember m2 WITH (NOLOCK) ON m2.FamilyTeamId = m1.FamilyTeamId AND m2.IsActive = 1
@@ -1723,6 +1724,7 @@ ORDER BY m2.RoleCode, m2.RelationCode;";
                         RoleCode     = rd.IsDBNull(3) ? 0 : Convert.ToInt32(rd[3]),
                         RelationCode = rd.IsDBNull(4) ? 9 : Convert.ToInt32(rd[4]),
                         IsMe         = string.Equals(rd.GetString(0), userName, StringComparison.OrdinalIgnoreCase),
+                        RelationLabel = rd.IsDBNull(7) ? "" : rd.GetString(7),
                     });
                 }
             }
@@ -1782,6 +1784,9 @@ GROUP BY n.UserName;";
             {
                 if (m.IsMe) { m.RelLabel = "본인"; continue; }
 
+                // 그 밖의 가족(삼촌·이모 등)은 팀에 들어올 때 고른 글자를 그대로 쓴다
+                if (m.RoleCode > 4 && !string.IsNullOrWhiteSpace(m.RelationLabel)) { m.RelLabel = m.RelationLabel; continue; }
+
                 if (myRoleCode == 0) // 로그인: 학생
                 {
                     m.RelLabel = m.RoleCode switch
@@ -1814,7 +1819,8 @@ GROUP BY n.UserName;";
                 }
                 else
                 {
-                    m.RelLabel = "가족";
+                    // 로그인한 사람이 '그 밖의 가족'이면 그 사람의 자리(역할) 이름을 그대로 보여 준다
+                    m.RelLabel = m.RoleCode switch { 0 => "자녀", 1 => "엄마", 2 => "아빠", 3 => "할머니", 4 => "할아버지", _ => "가족" };
                 }
             }
 

@@ -277,6 +277,15 @@ namespace BulletinBoard.Controllers
             try { ViewBag.TodayCheckCompositeData = new ManageeCommon().getTodayStatusData(this.UserName, kToday); }
             catch { ViewBag.TodayCheckCompositeData = null; }
 
+            // 가족팀 카드 — 팀이 있으면 팀 이름 · 구성원 · 올해 팀 점수, 없으면 "우리 가족팀 만들기"
+            ViewBag.FamilyCardSignedIn = !string.IsNullOrWhiteSpace(this.UserName);
+            ViewBag.FamilyCardTree = null;
+            if (!string.IsNullOrWhiteSpace(this.UserName))
+            {
+                try { ViewBag.FamilyCardTree = await _giftService.GetMyFamilyTreeAsync(this.UserName, DateHelper.GetKoreaNow().Year); }
+                catch { ViewBag.FamilyCardTree = null; }
+            }
+
             // 버전 선택 클릭수 — Basic · SuperAdmin 계정에게만
             ViewBag.IsHubStatsViewer = IsDm2HubStatsViewer();
             if (ViewBag.IsHubStatsViewer)
