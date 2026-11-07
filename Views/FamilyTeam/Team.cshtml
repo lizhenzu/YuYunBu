@@ -1,4 +1,4 @@
-@model BulletinBoard.Services.FamilyTeamDetail
+﻿@model BulletinBoard.Services.FamilyTeamDetail
 @using BulletinBoard.Common
 @using BulletinBoard.Services
 @using BulletinBoard.Services.Abstract
@@ -14,6 +14,8 @@
     bool msgOk  = ViewBag.MsgOk is bool b && b;
     var tree = ViewBag.FamilyTree as FamilyTreeVM;
     int sum  = tree?.Members.Sum(m => m.YearPoint) ?? 0;
+    bool isSolo = Model.Members.Count == 1;   // 내 팀에 나 혼자면 다른 팀에 신청할 수 있다
+    string relsJson = System.Text.Json.JsonSerializer.Serialize(rels.Select(r => new { k = r.Key, l = r.Label }));
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -95,9 +97,13 @@
         </div>
     }
 
-    @* ── 가족 초대하기 ── *@
-    <div class="ft-sh"><span>가족 초대하기</span></div>
-    <p class="ft-sub" style="margin-top:8px">이름으로 찾아 초대해요. 상대가 로그인해서 승인해야 팀에 들어와요.</p>
+    @* ── 이름 조회 · 가족 초대 ── *@
+    <div class="ft-sh"><span>이름 조회 · 가족 초대</span></div>
+    <p class="ft-sub" style="margin-top:8px">이름을 찾으면 그 사람이 속한 팀과 구성원을 보여 줘요. 팀이 없는 분은 초대할 수 있어요. 상대가 로그인해서 승인해야 팀에 들어와요.</p>
+    @if (isSolo)
+    {
+        <p class="ft-sub" style="margin-top:6px">가족이 이미 팀을 만들었다면 그 팀에 가입 신청하세요. 신청하면 내가 만든 팀은 바로 삭제돼요.</p>
+    }
     <form id="invForm" method="post" asp-action="Invite">
         @Html.AntiForgeryToken()
         <input type="hidden" name="targetUserName" id="invTarget" value="" />
@@ -108,9 +114,11 @@
                 <label><input type="radio" name="relation" value="@rels[i].Key" @(i == rels.Length - 1 ? "checked" : "") /><span>@rels[i].Label</span></label>
             }
         </div>
-        <div style="margin-top:12px"><input id="invQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="초대할 사람 이름" /></div>
-        <div id="invRes" class="ft-res" aria-live="polite"></div>
     </form>
+    <div id="ftSearch" data-invite="1" data-apply="@(isSolo ? "1" : "0")" data-solo="@(isSolo ? Model.TeamName : "")" data-blocked="0" data-rels="@relsJson">
+        <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
+        <div id="ftRes" class="ft-res" aria-live="polite"></div>
+    </div>
 
     @if (Model.Invites.Count > 0)
     {
@@ -120,7 +128,7 @@
             <div class="ft-row">
                 <div class="l">
                     <div class="ft-nm">@r.TargetFullName</div>
-                    <div class="ft-mem">@(r.RelLabel)(으)로 초대 ·@r.FromFullName 님이 보냄 · 30일 뒤 사라져요</div>
+                    <div class="ft-mem">@(r.RelLabel)(으)로 초대 · @r.FromFullName 님이 보냄 · 30일 뒤 사라져요</div>
                 </div>
                 <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn g" type="submit">취소</button></form>
             </div>
@@ -137,6 +145,7 @@
 </div>
 
 <script src="/js/qb-confirm.js" asp-append-version="true"></script>
+<script src="/js/family-team-search.js" asp-append-version="true"></script>
 <script>
 (function () {
     // 내보내기 · 탈퇴는 한 번 더 묻는다  (data-confirm = "제목|설명|확인 버튼 글자")
@@ -148,40 +157,6 @@
         var r = await window.qbConfirm(true, [p[0], p[1] || ''], '', p[2] || '확인', '취소');
         if (r === 'y') { f.dataset.ok = '1'; f.submit(); }
     });
-
-    // 이름 검색 (두 글자 이상) — 결과마다 [초대] 버튼
-    var q = document.getElementById('invQ'), res = document.getElementById('invRes'), tgt = document.getElementById('invTarget'), form = document.getElementById('invForm');
-    var timer = 0, seq = 0;
-    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-    q.addEventListener('input', function () {
-        clearTimeout(timer);
-        var v = q.value.trim();
-        if (v.length < 2) { res.innerHTML = ''; return; }
-        timer = setTimeout(function () {
-            var my = ++seq;
-            fetch('/FamilyTeam/Search?q=' + encodeURIComponent(v), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
-                .then(function (r) { return r.ok ? r.json() : []; })
-                .then(function (list) {
-                    if (my !== seq) return;
-                    if (!list.length) { res.innerHTML = '<div class="ft-empty">찾은 사람이 없어요.</div>'; return; }
-                    res.innerHTML = list.map(function (h) {
-                        var btn = h.state === 'ok' ? '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '">초대</button>'
-                                : h.state === 'invited' ? '<span class="ft-btn g">초대 보냄</span>'
-                                : '<span class="ft-btn g">이미 다른 팀</span>';
-                        var st = h.state === 'ok' ? '가입 가능' : h.state === 'invited' ? '이미 초대했어요' : '이미 다른 가족팀에 있어요';
-                        return '<div class="ft-row"><div class="l"><div class="ft-nm">' + esc(h.fullName) + '</div><div class="st">' + st + '</div></div>' + btn + '</div>';
-                    }).join('');
-                }).catch(function () { res.innerHTML = '<div class="ft-empty">검색하지 못했어요. 잠시 후 다시 해 주세요.</div>'; });
-        }, 250);
-    });
-    res.addEventListener('click', function (e) {
-        var b = e.target.closest('button[data-u]');
-        if (!b) return;
-        tgt.value = b.getAttribute('data-u');
-        b.disabled = true;
-        form.submit();
-    });
-    q.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
 })();
 </script>
 </body>

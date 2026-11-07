@@ -68,7 +68,11 @@ namespace BulletinBoard.Services
     {
         public string UserName { get; set; } = "";
         public string FullName { get; set; } = "";
-        public string State { get; set; } = "ok";   // ok | inTeam | invited
+        public string State { get; set; } = "ok";   // ok(팀 없음) | inTeam(다른 팀) | mine(우리 팀) | invited(우리 팀이 초대함)
+        public int TeamId { get; set; }             // 그 사람이 속한 팀 (없으면 0)
+        public string TeamName { get; set; } = "";
+        public List<string> MemberNames { get; set; } = new();   // 그 팀의 구성원 이름
+        public bool Requested { get; set; }         // 내가 그 팀에 이미 가입 신청을 보냈다
     }
 
     public class FamilyTeamService
@@ -304,35 +308,78 @@ ORDER BY ft.FamilyTeamId DESC, m.RoleCode, m.RelationCode;";
             return order;
         }
 
-        /// <summary>초대할 사람 찾기 — 이름(실명)으로만 찾는다</summary>
+        /// <summary>
+        /// 이름(실명)으로 사람 찾기 — 그 사람이 어느 팀에 있는지(팀 이름 · 구성원 명단)도 함께 돌려준다.
+        /// 팀이 없는 사람도 찾을 수 있다 (가족이 만든 팀을 찾아 신청하려고).
+        /// </summary>
         public async Task<List<FamilyUserHit>> SearchUsersAsync(string userName, string query)
         {
             var list = new List<FamilyUserHit>();
             query = (query ?? "").Trim();
             if (query.Length < 2) return list;
 
-            int teamId;
             using var c = Conn();
             await c.OpenAsync();
-            teamId = await MyTeamIdAsync(c, null, userName);
-            if (teamId == 0) return list;
+            int myTeam = await MyTeamIdAsync(c, null, userName);
 
             string like = "%" + query.Replace("[", "[[]").Replace("%", "[%]").Replace("_", "[_]") + "%";
             const string sql = @"
-SELECT TOP 20 u.UserName, pm.FullName,
-  CASE WHEN EXISTS (SELECT 1 FROM dbo.DM2_FamilyMember m
-                    JOIN dbo.DM2_FamilyTeam ft ON ft.FamilyTeamId = m.FamilyTeamId AND ft.IsActive = 1
-                    WHERE m.UserName = u.UserName AND m.IsActive = 1) THEN 'inTeam'
-       WHEN EXISTS (SELECT 1 FROM dbo.DM2_FamilyRequest r
-                    WHERE r.Kind = 'I' AND r.FamilyTeamId = @team AND r.TargetUserName = u.UserName) THEN 'invited'
-       ELSE 'ok' END
+SELECT TOP 20 u.UserName, pm.FullName, ISNULL(tm.FamilyTeamId, 0), ISNULL(tm.TeamName, N''),
+  CASE WHEN EXISTS (SELECT 1 FROM dbo.DM2_FamilyRequest r
+                    WHERE r.Kind = 'I' AND r.FamilyTeamId = @team AND r.TargetUserName = u.UserName) THEN 1 ELSE 0 END
 FROM [Identity].[User] u
 JOIN dbo.view_PersonMaster_2026 pm ON pm.UserId = u.Id
+OUTER APPLY (SELECT TOP 1 m.FamilyTeamId, ft.TeamName
+             FROM dbo.DM2_FamilyMember m
+             JOIN dbo.DM2_FamilyTeam ft ON ft.FamilyTeamId = m.FamilyTeamId AND ft.IsActive = 1
+             WHERE m.UserName = u.UserName AND m.IsActive = 1) tm
 WHERE u.UserName <> @me AND pm.FullName LIKE @q
 ORDER BY pm.FullName, u.UserName;";
-            using var rd = await Cmd(c, null, sql, ("@me", userName), ("@team", teamId), ("@q", like)).ExecuteReaderAsync();
-            while (await rd.ReadAsync())
-                list.Add(new FamilyUserHit { UserName = rd.GetString(0), FullName = rd.GetString(1), State = rd.GetString(2) });
+            using (var rd = await Cmd(c, null, sql, ("@me", userName), ("@team", myTeam), ("@q", like)).ExecuteReaderAsync())
+            {
+                while (await rd.ReadAsync())
+                {
+                    int tid = rd.GetInt32(2);
+                    list.Add(new FamilyUserHit
+                    {
+                        UserName = rd.GetString(0),
+                        FullName = rd.GetString(1),
+                        TeamId = tid,
+                        TeamName = rd.GetString(3),
+                        State = tid == 0 ? (rd.GetInt32(4) == 1 ? "invited" : "ok")
+                              : (tid == myTeam ? "mine" : "inTeam"),
+                    });
+                }
+            }
+
+            // 팀별 구성원 명단 (같은 팀이 여러 번 나와도 한 번만 읽는다)
+            var names = new Dictionary<int, List<string>>();
+            foreach (int tid in list.Where(h => h.TeamId != 0).Select(h => h.TeamId).Distinct())
+            {
+                var one = new List<string>();
+                using var rd = await Cmd(c, null,
+                    @"SELECT ISNULL(pm.FullName, m.UserName) FROM dbo.DM2_FamilyMember m
+                      LEFT JOIN [Identity].[User] u ON u.UserName = m.UserName
+                      LEFT JOIN dbo.view_PersonMaster_2026 pm ON pm.UserId = u.Id
+                      WHERE m.FamilyTeamId = @t AND m.IsActive = 1 ORDER BY m.RoleCode, m.RelationCode;", ("@t", tid)).ExecuteReaderAsync();
+                while (await rd.ReadAsync()) one.Add(rd.GetString(0));
+                names[tid] = one;
+            }
+
+            // 내가 이미 신청한 팀 표시
+            var requested = new HashSet<int>();
+            using (var rd = await Cmd(c, null,
+                "SELECT FamilyTeamId FROM dbo.DM2_FamilyRequest WHERE Kind='R' AND TargetUserName=@u;", ("@u", userName)).ExecuteReaderAsync())
+            {
+                while (await rd.ReadAsync()) requested.Add(rd.GetInt32(0));
+            }
+
+            foreach (var h in list)
+            {
+                if (h.TeamId == 0) continue;
+                h.MemberNames = names[h.TeamId];
+                h.Requested = requested.Contains(h.TeamId);
+            }
             return list;
         }
 
@@ -434,7 +481,14 @@ ORDER BY r.CreatedAt;";
             using var tx = await BeginAsync(c);
             try
             {
-                if (await HasActiveMembershipAsync(c, tx, userName)) return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                // 내 팀에 나 혼자뿐이면 다른 팀에 신청할 수 있다 (신청이 들어가는 순간 내 팀은 지운다).
+                // 다른 구성원이 있으면 먼저 탈퇴해야 한다.
+                int myTeam = await MyTeamIdAsync(c, tx, userName);
+                if (myTeam == teamId && myTeam != 0) return Rollback(tx, "이미 이 팀의 구성원이에요.");
+                if (myTeam != 0 && await ScalarAsync<int>(c, tx,
+                        "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", myTeam)) > 1)
+                    return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", teamId)) == 0)
                     return Rollback(tx, "그 팀은 이제 없어요.");
                 if (await PendingCountAsync(c, tx, userName) >= MaxPendingPerUser) return Rollback(tx, "보낸 신청과 초대가 너무 많아요. 일부를 취소한 뒤 다시 보내 주세요.");
@@ -444,8 +498,19 @@ ORDER BY r.CreatedAt;";
                     "SELECT TOP 1 Id FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t AND Kind='I' AND TargetUserName=@u;", ("@t", teamId), ("@u", userName));
                 if (inv != 0)
                 {
-                    tx.Rollback();
-                    return await AcceptInviteAsync(userName, inv);
+                    if (myTeam == 0)
+                    {
+                        tx.Rollback();
+                        return await AcceptInviteAsync(userName, inv);
+                    }
+
+                    // 혼자인 내 팀을 지우고 초대한 팀으로 바로 들어간다 (한 트랜잭션)
+                    var invited = await ReadRequestAsync(c, tx, inv);
+                    await RemoveMemberAsync(c, tx, myTeam, userName);
+                    await InsertMemberAsync(c, tx, teamId, userName, invited!.RelationKey);
+                    await ClearPendingOfAsync(c, tx, userName);
+                    tx.Commit();
+                    return FamilyTeamResult.Success("초대받은 팀에 들어왔어요. 내가 만든 팀은 삭제했어요.", teamId);
                 }
 
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t AND Kind='R' AND TargetUserName=@u;", ("@t", teamId), ("@u", userName)) > 0)
@@ -455,10 +520,15 @@ ORDER BY r.CreatedAt;";
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE Kind='R' AND TargetUserName=@u;", ("@u", userName)) > 0)
                     return Rollback(tx, "다른 팀에 가입 신청 중이에요. 그 신청을 취소한 뒤 다시 신청해 주세요.");
 
+                // 모든 확인을 통과했다 → 혼자인 내 팀은 지금 지운다
+                if (myTeam != 0) await RemoveMemberAsync(c, tx, myTeam, userName);
+
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyRequest (FamilyTeamId, Kind, TargetUserName, FromUserName, RelationKey, CreatedAt) VALUES (@t,'R',@u,@u,@k,@now);",
                     ("@t", teamId), ("@u", userName), ("@k", relationKey), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
                 tx.Commit();
-                return FamilyTeamResult.Success("가입 신청을 보냈어요. 팀원이 수락하면 팀원이 돼요.");
+                return FamilyTeamResult.Success(myTeam != 0
+                    ? "가입 신청을 보냈어요. 내가 만든 팀은 삭제했어요. 팀원이 수락하면 팀원이 돼요."
+                    : "가입 신청을 보냈어요. 팀원이 수락하면 팀원이 돼요.");
             }
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("신청하지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
