@@ -22,6 +22,8 @@
     bool famSignedIn = ViewBag.FamilyCardSignedIn is bool _fs && _fs;
     var famTree = ViewBag.FamilyCardTree as BulletinBoard.Services.Abstract.FamilyTreeVM;
     bool famHasTeam = famTree != null && famTree.Members.Count > 0;
+    int famPendIn  = ViewBag.FamilyPendingIn  is int _pi ? _pi : 0;   // 팀원: 수락을 기다리는 가입 신청
+    int famPendOut = ViewBag.FamilyPendingOut is int _po ? _po : 0;   // 팀 없음: 내가 낸 신청
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -79,6 +81,9 @@
         .ftc .ds { font-size: 13px; margin-top: 4px; opacity: .92; line-height: 1.6; }
         .ftc .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
         .ftc .chips span { background: rgba(255,255,255,.2); border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 700; }
+        .ftc .pend { margin-top: 12px; padding: 9px 12px; border-radius: 12px; background: #fff; color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1.5; }
+        .ftc .pend b { color: #E5484D; }
+        .ftc .pend.wait { font-weight: 700; color: var(--dim2); }
         .ftc .go { display: inline-block; margin-top: 14px; background: #fff; color: var(--blue); border-radius: 999px; padding: 7px 16px; font-size: 13.5px; font-weight: 800; }
 
         /* 관리자 전용 클릭수 */
@@ -162,7 +167,11 @@
                         <span>@fm.FullName</span>
                     }
                 </div>
-                <span class="go">우리 가족팀 보기 ›</span>
+                @if (famPendIn > 0)
+                {
+                    <div class="pend">가입 신청 <b>@famPendIn 건</b>이 수락을 기다려요. 눌러서 확인해 주세요.</div>
+                }
+                <span class="go">@(famPendIn > 0 ? "신청 확인하기 ›" : "우리 가족팀 보기 ›")</span>
             </a>
         }
         else
@@ -171,6 +180,10 @@
                 <div class="tg">가족과 함께</div>
                 <div class="nm">우리 가족팀 만들기</div>
                 <div class="ds">가족과 함께 점수를 모으고 선물을 받아요.<br>팀을 만들거나 이미 만든 팀에 들어갈 수 있어요.</div>
+                @if (famPendOut > 0)
+                {
+                    <div class="pend wait">가입 신청 @famPendOut 건을 보냈어요. 팀원이 수락하기를 기다리는 중이에요.</div>
+                }
                 <span class="go">팀 만들기 · 찾기 ›</span>
             </a>
         }

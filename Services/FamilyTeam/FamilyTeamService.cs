@@ -236,6 +236,34 @@ ORDER BY r.CreatedAt;";
             0 => "자녀", 1 => "엄마", 2 => "아빠", 3 => "할머니", 4 => "할아버지", _ => "가족"
         };
 
+        /// <summary>
+        /// 대기 중인 요청 개수 — 화면에 "수락을 기다려요" 문구를 띄우는 데 쓴다.
+        ///  In  = 우리 팀으로 들어오고 싶다는 신청 (내가 팀원일 때)
+        ///  Out = 내가 낸 가입 신청 (아직 팀이 없을 때)
+        ///  표가 없거나 오류가 나면 (0, 0)
+        /// </summary>
+        public async Task<(int In, int Out)> GetPendingCountsAsync(string userName)
+        {
+            if (string.IsNullOrWhiteSpace(userName)) return (0, 0);
+            try
+            {
+                await PurgeExpiredAsync();
+                using var c = Conn();
+                await c.OpenAsync();
+                int teamId = await MyTeamIdAsync(c, null, userName);
+                if (teamId != 0)
+                {
+                    int n = await ScalarAsync<int>(c, null,
+                        "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t AND Kind='R';", ("@t", teamId));
+                    return (n, 0);
+                }
+                int mine = await ScalarAsync<int>(c, null,
+                    "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE Kind='R' AND TargetUserName=@u;", ("@u", userName));
+                return (0, mine);
+            }
+            catch { return (0, 0); }
+        }
+
         // ── 팀 찾기 ──────────────────────────────────────────────
         public async Task<List<FamilyTeamBrief>> ListOpenTeamsAsync(string userName)
         {
