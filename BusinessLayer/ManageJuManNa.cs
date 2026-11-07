@@ -33,7 +33,13 @@ namespace BulletinBoard.BusinessLayer
             return board;
         }
 
-        /// <summary>하루치를 화면용으로 바꾼다 (빠진 곳 판정 포함)</summary>
+        /// <summary>
+        /// 하루치를 화면용으로 바꾼다.  입력 여부 네 가지 (빠진 것은 Missing 에 이름이 들어간다):
+        ///  · 키워드   = 주제(BibleSubject)가 있음
+        ///  · 줄거리   = Synopsis 가 있음
+        ///  · 말씀 구간 = 성경 이름 · 시작 장 · 시작 절 · 끝 장 · 끝 절이 모두 있음
+        ///  · 영상 구간 = 그날 말씀이 걸친 장(최대 5)의 시작 · 종료 시점 중 하나라도 지정됨 (0 = 기본값이라 지정 안 한 것)
+        /// </summary>
         public static JuManNaBoardDay ToBoardDay(JuManNas x)
         {
             var day = new JuManNaBoardDay
@@ -52,18 +58,19 @@ namespace BulletinBoard.BusinessLayer
 
             string F(int sec) => $"{sec / 60}:{sec % 60:D2}";
             int need = Math.Min(5, Math.Max(1, x.ToJang - x.FromJang + 1));
-            bool videoOk = true;
+            bool clipSet = false;
             for (int i = 0; i < 5; i++)
             {
-                bool has = !string.IsNullOrWhiteSpace(urls[i]);
-                if (has) day.Clips.Add($"{F(Math.Max(0, starts[i]))} ~ {(ends[i] > 0 ? F(ends[i]) : "끝")}");
-                if (i < need && !has) videoOk = false;
+                if (!string.IsNullOrWhiteSpace(urls[i])) day.Clips.Add($"{F(Math.Max(0, starts[i]))} ~ {(ends[i] > 0 ? F(ends[i]) : "끝")}");
+                if (i < need && (starts[i] > 0 || ends[i] > 0)) clipSet = true;
             }
 
-            if (day.Subject.Length == 0) day.Missing.Add("주제");
+            bool rangeSet = !string.IsNullOrWhiteSpace(x.BibleText) && x.FromJang >= 1 && x.FromZul >= 1 && x.ToJang >= 1 && x.ToZul >= 1;
+
+            if (day.Subject.Length == 0) day.Missing.Add("키워드");
             if (day.Synopsis.Length == 0) day.Missing.Add("줄거리");
-            if (day.Summary.Length == 0) day.Missing.Add("요약");
-            if (!videoOk) day.Missing.Add("영상");
+            if (!rangeSet) day.Missing.Add("말씀 구간");
+            if (!clipSet) day.Missing.Add("영상 구간");
             return day;
         }
         public List<JuManNas> getJuManNa(int Id, bool activeData, DateTime workDT)
