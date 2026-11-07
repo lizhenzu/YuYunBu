@@ -276,18 +276,30 @@ namespace BulletinBoard.Controllers
                 }
             }
 
+            // 누구인지 모르면 조건 없이 조회돼 엉뚱한 사람(목록 첫 줄)이 보인다 — 로그인 화면으로 보낸다
+            if (string.IsNullOrEmpty(UserId) && PersonId == 0)
+                return Redirect("/Identity/Account/Login?ReturnUrl=%2FHumanResource%2FManageUserInfo");
+
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment , UserId, string.Empty, PersonId, 0,0, string.Empty, string.Empty, RankQueryOption.None);
-                        
+            if (userInfo.Count == 0)
+                return Content("사용자 정보를 찾을 수 없어요.");
+
             return View(userInfo[0]);
         }
 
         public async Task<IActionResult> ChangeUserInfo(string UserId, int PersonId)
         {
+            // 대상이 없으면 조건 없이 조회돼 엉뚱한 사람이 열린다
+            if (string.IsNullOrEmpty(UserId) && PersonId == 0)
+                return RedirectToAction(nameof(ManageUserInfo));
+
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, PersonId, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            if (userInfo.Count == 0)
+                return Content("사용자 정보를 찾을 수 없어요.");
 
             return View(userInfo[0]);
         }

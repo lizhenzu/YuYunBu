@@ -65,7 +65,12 @@ namespace BulletinBoard.Controllers
             // 없으면 현재 Identity 클레임 기준으로 채움
             else
             {
-                await SetUserInfo();
+                // 로그인 쿠키는 있는데 계정이 지워졌으면(탈퇴 승인 등) 로그아웃시키고 로그인 화면으로 보낸다
+                if (await SetUserInfo() == "USER_DELETED")
+                {
+                    context.Result = new RedirectResult("/Identity/Account/Login");
+                    return;
+                }
             }
 
             // 4) 공통 메타데이터(교회명/부서명 등) 세션 보장
@@ -117,6 +122,14 @@ namespace BulletinBoard.Controllers
                     $"{user.LastName}{user.FirstName}",
                     "", ""
                 );
+            }
+            else
+            {
+                // 쿠키만 남고 계정은 없다 — 남은 로그인과 세션을 지운다
+                await _authService.Logout();
+                HttpContext.Session.Clear();
+                UserId = ""; UserName = ""; UserFullName = "";
+                return "USER_DELETED";
             }
 
             return "OK";
