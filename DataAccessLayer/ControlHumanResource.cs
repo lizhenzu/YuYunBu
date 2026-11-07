@@ -503,36 +503,42 @@ namespace BulletinBoard.DataAccessLayer
             {
                 await conn.OpenAsync();
 
-                string sqlUpdate = @$"
-                                    UPDATE [ClassInfo]
-                                    SET [ClassYear] = @ClassYear,
-                                        [ClassBan]  = @ClassBan,
-                                        [updateDT]  = @updateDT
-                                    WHERE [UserId]  = @UserId";
-
-                using (SqlCommand cmdUpdate = new SqlCommand(sqlUpdate, conn))
+                // 실제 반 표는 ClassInfo_2026(PersonID 기준). UserId → PersonId 는 view_PersonMaster_2026 로 찾고, 없으면 PersonMaster_2026 을 만든다.
+                using (SqlTransaction tx = conn.BeginTransaction())
                 {
-                    cmdUpdate.Parameters.AddWithValue("@UserId", UserId);
-                    cmdUpdate.Parameters.AddWithValue("@ClassYear", ClassYear);
-                    cmdUpdate.Parameters.AddWithValue("@ClassBan", ClassBan);
-                    cmdUpdate.Parameters.AddWithValue("@updateDT", SharedComm.GetKoreaNow());
-
-                    int rowsAffected = await cmdUpdate.ExecuteNonQueryAsync();
-
-                    if (rowsAffected == 0)
+                    try
                     {
-                        string sqlInsert = @$"
-                                            INSERT INTO [ClassInfo] ([UserId], [ClassYear], [ClassBan])
-                                            VALUES (@UserId, @ClassYear, @ClassBan)";
-
-                        using (SqlCommand cmdInsert = new SqlCommand(sqlInsert, conn))
+                        int? personId = await GetPersonIdByUserIdAsync(conn, tx, UserId);
+                        if (!personId.HasValue)
                         {
-                            cmdInsert.Parameters.AddWithValue("@UserId", UserId);
-                            cmdInsert.Parameters.AddWithValue("@ClassYear", ClassYear);
-                            cmdInsert.Parameters.AddWithValue("@ClassBan", ClassBan);
-
-                            await cmdInsert.ExecuteNonQueryAsync();
+                            string? fullName = await GetFullNameByUserIdAsync(conn, tx, UserId);
+                            if (!string.IsNullOrWhiteSpace(fullName))
+                            {
+                                await InsertPersonMaster2026Async(conn, tx, fullName!, null, 0, 0);
+                            }
+                            personId = await GetPersonIdByUserIdAsync(conn, tx, UserId);
                         }
+                        if (!personId.HasValue) throw new InvalidOperationException("PersonId 를 찾을 수 없습니다.");
+
+                        string sql = @"
+                            DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @PersonId;
+                            INSERT INTO [dbo].[ClassInfo_2026] ([ClassYear], [ClassBan], [PersonID])
+                            VALUES (@ClassYear, @ClassBan, @PersonId);";
+
+                        using (SqlCommand cmd = new SqlCommand(sql, conn, tx))
+                        {
+                            cmd.Parameters.AddWithValue("@PersonId", personId.Value);
+                            cmd.Parameters.AddWithValue("@ClassYear", ClassYear);
+                            cmd.Parameters.AddWithValue("@ClassBan", ClassBan);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+
+                        tx.Commit();
+                    }
+                    catch
+                    {
+                        tx.Rollback();
+                        throw;
                     }
                 }
             }
@@ -562,13 +568,12 @@ namespace BulletinBoard.DataAccessLayer
             {
                 await conn.OpenAsync();
 
-                string sqlDelete = @$"
-                            DELETE FROM [ClassInfo]
-                            WHERE [UserId] = @UserId";
+                int? personId = await GetPersonIdByUserIdAsync(conn, null, UserId);
+                if (!personId.HasValue) return;   // 사람 정보가 아직 없으면 지울 반 정보도 없다
 
-                using (SqlCommand cmdDelete = new SqlCommand(sqlDelete, conn))
+                using (SqlCommand cmdDelete = new SqlCommand("DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @PersonId", conn))
                 {
-                    cmdDelete.Parameters.AddWithValue("@UserId", UserId);
+                    cmdDelete.Parameters.AddWithValue("@PersonId", personId.Value);
                     await cmdDelete.ExecuteNonQueryAsync();
                 }
             }
