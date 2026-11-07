@@ -261,6 +261,10 @@ namespace BulletinBoard.Controllers
 
             var kToday = DateHelper.GetKoreaToday();
 
+            // 상단 인사: "안녕하세요 / ○○님 / ○○부에 오심을 환영해요" (로그인한 사람에게만)
+            ViewBag.HubFullName = this.UserFullName;
+            ViewBag.HubDepartmentName = HttpContext.Session.GetString(CommonMetaDataCategory.DepartmentName.ToString()) ?? "";
+
             // 오늘 참여자 수 (홈 카드와 같은 계산)
             try { ViewBag.TodayJoinCount = await _iDailyMission2Service.GetTodayWordParticipantCountAsync(kToday); }
             catch { ViewBag.TodayJoinCount = 0; }

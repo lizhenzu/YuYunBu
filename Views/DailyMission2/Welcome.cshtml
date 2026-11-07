@@ -15,6 +15,9 @@
     var stats = ViewBag.HubClickStats as BulletinBoard.Models.DailyMission2.DM2HubClickStats;
     bool canSeeStats = ViewBag.IsHubStatsViewer is bool _s && _s;
 
+    string hubFullName = (ViewBag.HubFullName as string ?? "").Trim();
+    string hubDept     = (ViewBag.HubDepartmentName as string ?? "").Trim();
+
     var kNow = DateHelper.GetKoreaNow();
     string[] dayKor = { "일", "월", "화", "수", "목", "금", "토" };
 
@@ -49,6 +52,13 @@
         .top a:hover { color: var(--blue); }
 
         .k { font-size: 12px; font-weight: 800; letter-spacing: .02em; color: var(--blue); margin-top: 22px; }
+        /* 상단 인사 — 안녕하세요 / ○○님 / ○○부에 오심을 환영해요 */
+        .hi { margin-top: 22px; }
+        .hi small { display: block; font-size: 13px; font-weight: 600; color: var(--dim2); }
+        .hi h1 { margin: 2px 0 0; font-size: 32px; font-weight: 800; line-height: 1.25; letter-spacing: -.02em; color: var(--ink); word-break: keep-all; }
+        .hi h1 u { text-decoration: none; margin-left: 3px; font-size: 16px; font-weight: 600; color: var(--dim2); }
+        .hi p { margin: 8px 0 0; font-size: 16px; font-weight: 800; color: var(--ink); word-break: keep-all; }
+        .hi p em { font-style: normal; font-size: 1.25em; font-weight: 900; color: #D9730D; padding: 0 2px; border-radius: 4px; background: linear-gradient(transparent 62%, #FFE7CC 62%); }
         .T { font-weight: 800; font-size: 26px; line-height: 1.35; letter-spacing: -.02em; color: var(--ink); margin: 6px 0 0; word-break: keep-all; }
 
         .ask { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid var(--line); font-size: 16px; font-weight: 800; color: var(--ink); }
@@ -149,8 +159,19 @@
         <span><a href="/">홈</a> › <b>@hubTitle</b></span>
         <span>@kNow.ToString("M월 d일") @(dayKor[(int)kNow.DayOfWeek])요일</span>
     </div>
-    <div class="k">DAILY MISSION</div>
-    <h1 class="T">@(hubTitle)에<br>오신 것을 환영합니다</h1>
+    @if (famSignedIn && hubFullName.Length > 0)
+    {
+        <div class="hi">
+            <small>안녕하세요</small>
+            <h1>@hubFullName<u>님</u></h1>
+            <p>@if (hubDept.Length > 0) { <em>@hubDept</em><text>에 오심을 환영해요</text> } else { <text>@(hubTitle)에 오심을 환영해요</text> }</p>
+        </div>
+    }
+    else
+    {
+        <div class="k">DAILY MISSION</div>
+        <h1 class="T">@(hubTitle)에<br>오신 것을 환영합니다</h1>
+    }
 
     @* ── 가족팀 (로그인한 사람에게만) — 팀이 있으면 우리 가족팀, 없으면 만들기 ── *@
     @if (famSignedIn)
