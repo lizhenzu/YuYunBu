@@ -1,0 +1,81 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.DataAccessLayer;
+@model List<PersonCandidate>
+
+@*  ══════════════════════════════════════════════════════════════
+    회원 가입 후 "같은 이름이 이미 있어요" — 2026-11-08 시안 확정 (DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
+    · 같은 한글 이름의 기존 기록 중 아직 계정이 없는 것은 "이 사람이 저예요"로 내 계정과 연결
+    · 이미 다른 계정과 연결된 기록은 고를 수 없다
+    · "동명이인이에요"는 새 기록을 만든다
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var fullName = (string)ViewData["FullName"];
+    var returnUrl = (string)ViewData["ReturnUrl"];
+    var msg = TempData["PersonMatchMsg"] as string;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>같은 이름이 있어요</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .pm-opt { display: block; border: 1px solid #E1E5EB; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+        .pm-opt.off { opacity: .55; cursor: not-allowed; }
+        .pm-opt input { margin: 3px 10px 0 0; float: left; }
+        .pm-opt .t { font-size: 15px; font-weight: 700; }
+        .pm-opt .s { font-size: 12px; color: #8A93A0; margin-top: 2px; }
+        .pm-opt .a { font-size: 12px; color: #2F7BF5; margin-top: 2px; }
+        .pm-err { min-height: 18px; font-size: 13px; color: #D13B3B; margin: 4px 0; }
+    </style>
+</head>
+<body>
+<div class="qb">
+    <div class="qb-k">STEP 2</div>
+    <h1 class="qb-h1">같은 이름이 이미 있어요</h1>
+    <div class="qb-sub"><b>@fullName</b> 님과 같은 이름이 있어요. 어느 쪽이 나인지 골라 주세요.</div>
+
+    <form method="post" action="/PersonMatch/Choose" onsubmit="return pmCheck();">
+        <input type="hidden" name="fullName" value="@fullName" />
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+        @foreach (var p in Model)
+        {
+            bool linked = !string.IsNullOrEmpty(p.UserName);
+            string cls = p.ClassYear > 0 && p.ClassBan > 0 ? $"{p.ClassYear}학년 {p.ClassBan}반" : "반 정보 없음";
+            string bd = p.BMonth > 0 && p.BDay > 0 ? $"생일 {p.BMonth}월 {p.BDay}일" : "생일 정보 없음";
+            <label class="pm-opt @(linked ? "off" : "")">
+                <input type="radio" name="personId" value="@p.PersonId" disabled="@linked" />
+                <div class="t">@p.FullName · @cls</div>
+                <div class="s">@bd · @(linked ? "이미 다른 계정과 연결됨" : "아직 연결된 계정 없음")</div>
+                <div class="a">@(linked ? "이미 연결돼 있어서 고를 수 없어요" : "이 사람이 저예요 — 내 계정과 연결")</div>
+            </label>
+        }
+
+        <label class="pm-opt">
+            <input type="radio" name="personId" value="0" />
+            <div class="t">위 사람들과 다른 사람이에요</div>
+            <div class="s">새로 만들어 드려요</div>
+            <div class="a">동명이인이에요 — 새로 등록</div>
+        </label>
+
+        <div class="pm-err" id="pmErr">@msg</div>
+        <button type="submit" class="qb-submit">이 선택으로 계속</button>
+    </form>
+</div>
+<script>
+    function pmCheck() {
+        if (!document.querySelector('input[name=personId]:checked')) {
+            document.getElementById('pmErr').textContent = '어느 쪽이 나인지 골라 주세요';
+            return false;
+        }
+        return true;
+    }
+</script>
+</body>
+</html>
