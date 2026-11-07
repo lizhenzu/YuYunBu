@@ -11,7 +11,7 @@ namespace BulletinBoard.Services
     //   · 누구나 팀을 만들고(이름은 "○○○네 가족팀" 자동), 누구나 초대한다
     //   · 가입 신청은 팀원 한 명이 수락하면 바로 팀원, 초대는 초대받은 본인이 수락
     //   · 2026-11-08 재시상 방지: 시상은 팀 키(AwardKey, 처음 이름으로 고정)로 관리하고 팀 이름은 팀원이 바꿀 수 있다
-    //   · 처음 만든 사람(CreatorUserName)이 방장이다. 보호자일 필요 없다. 시상 기록이 있는 팀은 누구도 탈퇴할 수 없다. 방장은 탈퇴할 수 없고(혼자이고 시상 기록이 없으면 탈퇴 가능, 팀 삭제), 다른 팀원을 내보낼 수 있는 사람도 방장뿐이다. 다른 팀원은 언제든 탈퇴
+    //   · 처음 만든 사람(CreatorUserName)이 방장이다. 보호자일 필요 없다. 시상 기록이 있는 팀은 누구도 탈퇴할 수 없고 내보낼 수도 없다. 방장은 탈퇴할 수 없고(혼자이고 시상 기록이 없으면 탈퇴 가능, 팀 삭제), 다른 팀원을 내보낼 수 있는 사람도 방장뿐이다. 다른 팀원은 언제든 탈퇴
     //   · 팀 삭제는 관리자만. 예외: 혼자이고 시상 기록이 없는 팀은 다른 팀에 신청할 때 지운다
     //   · 처리 안 된 신청·초대는 30일 뒤 지운다
     //  표: dbo.DM2_FamilyRequest · dbo.DM2_FamilyNotice (SQL/CreateFamilyTeamSelfService_20261107.sql)
@@ -710,6 +710,9 @@ ORDER BY r.CreatedAt;";
                 if (targetTeam != teamId) return Rollback(tx, "같은 팀의 구성원만 내보낼 수 있어요.");
                 if (!string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
                     return Rollback(tx, "방장만 내보낼 수 있어요.");
+                // 시상 기록이 있는 팀은 구성원을 옮길 수 없다 (내보낸 사람이 다른 팀에서 재시상 받는 것을 막는다)
+                if (await HasAwardRecordAsync(c, tx, teamId))
+                    return Rollback(tx, "시상 기록이 있는 팀은 구성원을 내보낼 수 없어요. 관리자에게 문의해 주세요.");
                 await RemoveMemberAsync(c, tx, teamId, targetUserName, hardDeleteIfEmpty: false);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에서 내보냈어요.");

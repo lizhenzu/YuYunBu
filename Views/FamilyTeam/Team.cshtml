@@ -96,7 +96,12 @@
                 <div class="ft-nm">@m.FullName@if (m.IsMe) {<i style="font-style:normal;font-size:11px;color:var(--blue);margin-left:6px">나</i>}@if (string.Equals(m.UserName, Model.CreatorUserName, StringComparison.OrdinalIgnoreCase)) {<i style="font-style:normal;font-size:11px;color:var(--dim2);margin-left:6px">방장</i>}</div>
                 <div class="ft-mem">@m.RelLabel</div>
             </div>
-            @if (Model.IsCreator && !m.IsMe)
+            @if (Model.IsCreator && !m.IsMe && Model.HasAwardRecord)
+            {
+                @* 시상 기록이 있으면 구성원을 내보낼 수 없다 — 버튼은 보이되 눌리지 않게 *@
+                <button class="ft-btn d" type="button" disabled aria-disabled="true" style="opacity:.5;cursor:not-allowed" title="시상 기록이 있는 팀은 구성원을 내보낼 수 없어요">내보내기</button>
+            }
+            else if (Model.IsCreator && !m.IsMe)
             {
                 <form method="post" asp-action="Kick" data-confirm="@(m.FullName)님을 팀에서 내보낼까요?|내보내도 그분의 점수는 그대로예요.|내보내기">
                     @Html.AntiForgeryToken()
