@@ -1253,7 +1253,11 @@ VALUES
             var gridStart = monthFirst.AddDays(-startOffset).Date;
             var gridEndExclusive = gridStart.AddDays(42).Date;
 
-            var days = Enumerable.Range(0, 42).Select(i => gridStart.AddDays(i).Date).ToList();
+            // 달력 앞쪽 + "최근 7일" 막대(선택일 6일 전부터)가 달력 밖으로 걸칠 때까지 포함한다
+            var rangeStart = selectedDate.Date.AddDays(-6) < gridStart ? selectedDate.Date.AddDays(-6) : gridStart;
+            gridStart = rangeStart;
+
+            var days = Enumerable.Range(0, (int)(gridEndExclusive - gridStart).TotalDays).Select(i => gridStart.AddDays(i).Date).ToList();
 
             var wordDoneDates = await GetWordDoneDatesAsync(userName, gridStart, gridEndExclusive);
             var prayDoneDates = await GetPrayDoneDatesAsync(userName, gridStart, gridEndExclusive);

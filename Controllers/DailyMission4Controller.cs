@@ -309,12 +309,6 @@ namespace BulletinBoard.Controllers
 
             var vm = await BuildDashboardVM(this.UserName, date);
 
-            // ================================
-            // 🔎 DEBUG 1: 현재 포인트 확인
-            // ================================
-            TempData["DM2_DEBUG_POINT"] =
-                $"Year={vm.SelectedDate.Year}, TotalPoint={vm.YearPoint?.YearTotalPoint}";
-
             // ✅ AWARD: 도달한 레벨 Eligible 보장
             await _awardService.EnsureEligibleAwardsByTotalAsync(
                 this.UserName,
@@ -327,14 +321,7 @@ namespace BulletinBoard.Controllers
             //    → _OkPopup.cshtml의 @ViewBag.YearTotalPoint 가 값을 표시할 수 있도록
             ViewBag.YearTotalPoint = vm.YearPoint?.YearTotalPoint ?? 0;
 
-            // ================================
-            // 🔎 DEBUG 2: 기존 팝업 존재 여부
-            // ================================
             var existingPopup = TempData.Peek("DM2_OK_POPUP")?.ToString();
-            TempData["DM2_DEBUG_EXISTING_POPUP"] =
-                string.IsNullOrWhiteSpace(existingPopup)
-                    ? "NO existing popup"
-                    : $"EXISTING POPUP = {existingPopup}";
 
             int currentYearPoint = vm.YearPoint?.YearTotalPoint ?? 0;
 
@@ -347,23 +334,11 @@ namespace BulletinBoard.Controllers
                         currentYearPoint   // ✅ Bug fix: 실제 포인트 전달 → 이 값 이하의 레벨만 팝업
                     );
 
-                // ================================
-                // 🔎 DEBUG 3: Pending Award 상태
-                // ================================
-                TempData["DM2_DEBUG_PENDING"] =
-                    $"hasPending={hasPending}, pendingLevel={pendingLevel}";
-
                 if (hasPending)
                 {
                     const string key = "DM2_AwardPopupHide";
                     bool suppressed =
                         await _userSettingsService.IsCookieSuppressedAsync(this.UserId, key);
-
-                    // ================================
-                    // 🔎 DEBUG 4: Suppress 여부
-                    // ================================
-                    TempData["DM2_DEBUG_SUPPRESS"] =
-                        $"suppressed={suppressed}";
 
                     if (!suppressed)
                     {
@@ -373,13 +348,7 @@ namespace BulletinBoard.Controllers
           TempData["DM2_OK_POPUP"] =
     $"🎁 축하해요!\n" +
     $"시상 포인트 {pendingLevel}점을 달성했어요!\n" +
-    $"지금 선물을 골라볼까요?";
-
-                        // ================================
-                        // 🔎 DEBUG 5: 팝업 생성 확인
-                        // ================================
-                        TempData["DM2_DEBUG_POPUP_CREATED"] = "POPUP CREATED";
-                    }
+    $"지금 선물을 골라볼까요?";                    }
                 }
             }
 
@@ -1205,12 +1174,19 @@ namespace BulletinBoard.Controllers
                 NoticeMessage = (selected != today) ? "📌 다른 날짜 미션을 보고 있습니다" : ""
             };
 
-            vm.Content = await _iDailyMission2Service.GetContentIdsAsync(selected);
-            vm.DayStatus = await _iDailyMission2Service.GetDayStatusAsync(userName, selected);
-            vm.YearPoint = await _iDailyMission2Service.GetYearPointAsync(userName, selected.Year);
-            vm.CalendarAllDoneMap = await _iDailyMission2Service.GetCalendarAllDoneMapAsync(userName, selected);
-            // vm.CalendarDayPointMap = await _iDailyMission2Service.GetCalendarDayPointMapAsync(userName, selected);
-            vm.CalendarDayPointMap = await BuildCalendarDayPointMapByUserDailyPointsAsync(userName, selected);
+            // 서로 독립된 조회(각자 따로 연결을 연다)라서 한꺼번에 보낸다.
+            var tContent = _iDailyMission2Service.GetContentIdsAsync(selected);
+            var tStatus  = _iDailyMission2Service.GetDayStatusAsync(userName, selected);
+            var tYear    = _iDailyMission2Service.GetYearPointAsync(userName, selected.Year);
+            var tDone    = _iDailyMission2Service.GetCalendarAllDoneMapAsync(userName, selected);
+            var tPoints  = BuildCalendarDayPointMapByUserDailyPointsAsync(userName, selected);
+            await Task.WhenAll(tContent, tStatus, tYear, tDone, tPoints);
+
+            vm.Content = tContent.Result;
+            vm.DayStatus = tStatus.Result;
+            vm.YearPoint = tYear.Result;
+            vm.CalendarAllDoneMap = tDone.Result;
+            vm.CalendarDayPointMap = tPoints.Result;
 
 
             return vm;
@@ -1234,9 +1210,17 @@ namespace BulletinBoard.Controllers
             //    선택일 6일 전부터 읽는다.  달력은 다른 달 칸에 점수를 쓰지 않으므로 영향 없음.
             var fromDate = selected.Date.AddDays(-6) < monthFirst ? selected.Date.AddDays(-6) : monthFirst;
 
+            // ✅ "이어온 날"은 오늘부터 거꾸로 세므로, 달이 바뀌어도 끊기지 않게 60일 전까지 읽는다.
+            //    (연속 기록이 60일을 넘으면 60일로 보인다.)
+            const int StreakLookBackDays = 60;
+            var streakFrom = now.AddDays(-StreakLookBackDays);
+            if (streakFrom < fromDate) fromDate = streakFrom;
+
             // ✅ 현재 월이면 "오늘"까지만 (UserMonthlyPoints와 동일 정책)
             var toDate = (year == now.Year && month == now.Month) ? now : endOfMonth;
 
+            // ✅ 지난 달을 보고 있어도 오늘 점수는 읽는다 (이어온 날 계산에 필요)
+            if (toDate < now) toDate = now;
             if (toDate < monthFirst) toDate = monthFirst;
 
             // ✅ 이게 "정답 데이터" (UserMonthlyPoints에서 쓰는 것)
