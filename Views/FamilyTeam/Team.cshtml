@@ -1,0 +1,188 @@
+@model BulletinBoard.Services.FamilyTeamDetail
+@using BulletinBoard.Common
+@using BulletinBoard.Services
+@using BulletinBoard.Services.Abstract
+@*  ══════════════════════════════════════════════════════════════
+    우리 가족팀 (팀이 있을 때) — 카톡 방식
+    · 팀 이름 · 올해 팀 점수 · 팀 트리(기존 가계도 그대로) · 받은 가입 신청(수락/거절)
+    · 구성원(누구나 다른 구성원을 내보낼 수 있다) · 가족 초대하기(이름 검색) · 보낸 초대 · 팀 탈퇴
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    var rels   = ViewBag.Relations as (string Key, int Role, string Label)[] ?? FamilyTeamService.Relations;
+    string? msg = ViewBag.Msg as string;
+    bool msgOk  = ViewBag.MsgOk is bool b && b;
+    var tree = ViewBag.FamilyTree as FamilyTreeVM;
+    int sum  = tree?.Members.Sum(m => m.YearPoint) ?? 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@Model.TeamName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/family-team.css" asp-append-version="true">
+    <style>
+        .qz .ftb { margin-top: 18px; }
+        .ft-res .ft-row .st { font-size: 12px; color: var(--dim2); }
+    </style>
+</head>
+<body>
+<div class="ft">
+    <div class="ft-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <b>가족팀</b></span>
+    </div>
+
+    <h1 class="ft-h1">@Model.TeamName</h1>
+    <p class="ft-sub">우리 가족팀 · 구성원 @Model.Members.Count 명</p>
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
+    }
+
+    <div class="ft-kv">
+        <div><small>올해 팀 점수</small><b>@sum.ToString("N0")</b></div>
+        <div><small>구성원</small><b>@Model.Members.Count</b></div>
+    </div>
+
+    @* ── 팀 트리 : 미션 홈과 같은 가계도 ── *@
+    <div class="qz">
+        @await Html.PartialAsync("~/Views/DailyMission4/Partials/_FamilyTreeBone.cshtml")
+    </div>
+
+    @* ── 받은 가입 신청 ── *@
+    <div class="ft-sh"><span>받은 가입 신청</span><small>@Model.Requests.Count 건</small></div>
+    @if (Model.Requests.Count == 0)
+    {
+        <div class="ft-empty">들어오고 싶다는 신청이 없어요.</div>
+    }
+    @foreach (var r in Model.Requests)
+    {
+        <div class="ft-row">
+            <div class="l">
+                <div class="ft-nm">@r.TargetFullName</div>
+                <div class="ft-mem">우리 팀의 <b>@r.RelLabel</b>(으)로 신청했어요</div>
+            </div>
+            <div class="ft-acts">
+                <form method="post" asp-action="DeclineRequest">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn g" type="submit">거절</button></form>
+                <form method="post" asp-action="AcceptRequest">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn p" type="submit">수락</button></form>
+            </div>
+        </div>
+    }
+
+    @* ── 구성원 ── *@
+    <div class="ft-sh"><span>구성원</span></div>
+    @foreach (var m in Model.Members)
+    {
+        <div class="ft-row">
+            <div class="l">
+                <div class="ft-nm">@m.FullName@if (m.IsMe) {<i style="font-style:normal;font-size:11px;color:var(--blue);margin-left:6px">나</i>}</div>
+                <div class="ft-mem">@m.RelLabel</div>
+            </div>
+            @if (!m.IsMe)
+            {
+                <form method="post" asp-action="Kick" data-confirm="@(m.FullName)님을 팀에서 내보낼까요?|내보내도 그분의 점수는 그대로예요.|내보내기">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="targetUserName" value="@m.UserName" />
+                    <button class="ft-btn d" type="submit">내보내기</button>
+                </form>
+            }
+        </div>
+    }
+
+    @* ── 가족 초대하기 ── *@
+    <div class="ft-sh"><span>가족 초대하기</span></div>
+    <p class="ft-sub" style="margin-top:8px">이름으로 찾아 초대해요. 상대가 로그인해서 승인해야 팀에 들어와요.</p>
+    <form id="invForm" method="post" asp-action="Invite">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="targetUserName" id="invTarget" value="" />
+        <div class="ft-q">초대받는 분은 우리 팀의…</div>
+        <div class="ft-chips">
+            @for (int i = 0; i < rels.Length; i++)
+            {
+                <label><input type="radio" name="relation" value="@rels[i].Key" @(i == rels.Length - 1 ? "checked" : "") /><span>@rels[i].Label</span></label>
+            }
+        </div>
+        <div style="margin-top:12px"><input id="invQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="초대할 사람 이름" /></div>
+        <div id="invRes" class="ft-res" aria-live="polite"></div>
+    </form>
+
+    @if (Model.Invites.Count > 0)
+    {
+        <div class="ft-sh"><span>보낸 초대</span><small>@Model.Invites.Count 건</small></div>
+        @foreach (var r in Model.Invites)
+        {
+            <div class="ft-row">
+                <div class="l">
+                    <div class="ft-nm">@r.TargetFullName</div>
+                    <div class="ft-mem">@(r.RelLabel)(으)로 초대 ·@r.FromFullName 님이 보냄 · 30일 뒤 사라져요</div>
+                </div>
+                <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn g" type="submit">취소</button></form>
+            </div>
+        }
+    }
+
+    @* ── 탈퇴 ── *@
+    <div style="margin-top:32px;padding-top:18px;border-top:1px solid var(--line);text-align:center">
+        <form method="post" asp-action="Leave" data-confirm="팀에서 나갈까요?|나가도 내 점수는 그대로예요. 마지막 한 명이 나가면 팀은 사라져요.|탈퇴">
+            @Html.AntiForgeryToken()
+            <button class="ft-btn g" type="submit">팀 탈퇴</button>
+        </form>
+    </div>
+</div>
+
+<script src="/js/qb-confirm.js" asp-append-version="true"></script>
+<script>
+(function () {
+    // 내보내기 · 탈퇴는 한 번 더 묻는다  (data-confirm = "제목|설명|확인 버튼 글자")
+    document.addEventListener('submit', async function (e) {
+        var f = e.target.closest('form[data-confirm]');
+        if (!f || f.dataset.ok === '1') return;
+        e.preventDefault();
+        var p = f.dataset.confirm.split('|');
+        var r = await window.qbConfirm(true, [p[0], p[1] || ''], '', p[2] || '확인', '취소');
+        if (r === 'y') { f.dataset.ok = '1'; f.submit(); }
+    });
+
+    // 이름 검색 (두 글자 이상) — 결과마다 [초대] 버튼
+    var q = document.getElementById('invQ'), res = document.getElementById('invRes'), tgt = document.getElementById('invTarget'), form = document.getElementById('invForm');
+    var timer = 0, seq = 0;
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    q.addEventListener('input', function () {
+        clearTimeout(timer);
+        var v = q.value.trim();
+        if (v.length < 2) { res.innerHTML = ''; return; }
+        timer = setTimeout(function () {
+            var my = ++seq;
+            fetch('/FamilyTeam/Search?q=' + encodeURIComponent(v), { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (list) {
+                    if (my !== seq) return;
+                    if (!list.length) { res.innerHTML = '<div class="ft-empty">찾은 사람이 없어요.</div>'; return; }
+                    res.innerHTML = list.map(function (h) {
+                        var btn = h.state === 'ok' ? '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '">초대</button>'
+                                : h.state === 'invited' ? '<span class="ft-btn g">초대 보냄</span>'
+                                : '<span class="ft-btn g">이미 다른 팀</span>';
+                        var st = h.state === 'ok' ? '가입 가능' : h.state === 'invited' ? '이미 초대했어요' : '이미 다른 가족팀에 있어요';
+                        return '<div class="ft-row"><div class="l"><div class="ft-nm">' + esc(h.fullName) + '</div><div class="st">' + st + '</div></div>' + btn + '</div>';
+                    }).join('');
+                }).catch(function () { res.innerHTML = '<div class="ft-empty">검색하지 못했어요. 잠시 후 다시 해 주세요.</div>'; });
+        }, 250);
+    });
+    res.addEventListener('click', function (e) {
+        var b = e.target.closest('button[data-u]');
+        if (!b) return;
+        tgt.value = b.getAttribute('data-u');
+        b.disabled = true;
+        form.submit();
+    });
+    q.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+})();
+</script>
+</body>
+</html>

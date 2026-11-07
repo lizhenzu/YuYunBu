@@ -1,0 +1,85 @@
+﻿@using BulletinBoard.Services
+@inject FamilyTeamService FamilyTeamSvc
+@*  ══════════════════════════════════════════════════════════════
+    가족팀 알림 팝업 — 로그인한 사람이 들어올 때 (Welcome · 미션 홈에 붙인다)
+      1) "팀원이 되었어요"   내가 낸 가입 신청이 수락된 뒤 처음 들어올 때 한 번만 (읽으면 지운다)
+      2) "○○님이 초대했어요" 받은 초대가 있으면 — 승인해야 팀에 들어간다. [나중에] 는 12시간 동안 다시 안 보여 준다
+    · 표(DM2_FamilyRequest · DM2_FamilyNotice)를 아직 만들지 않았거나 DB 오류가 나도 화면은 그대로 나온다
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    string? joinedTeam = null;
+    FamilyRequestInfo? invite = null;
+    try
+    {
+        var me = User.Identity?.Name ?? "";
+        if (User.Identity?.IsAuthenticated == true && !string.IsNullOrWhiteSpace(me))
+        {
+            joinedTeam = await FamilyTeamSvc.TakeJoinedNoticeAsync(me);
+            if (joinedTeam == null)
+            {
+                var inv = await FamilyTeamSvc.GetIncomingInvitesAsync(me);
+                invite = inv.FirstOrDefault();
+            }
+        }
+    }
+    catch { joinedTeam = null; invite = null; }
+}
+@if (joinedTeam != null)
+{
+    <link rel="stylesheet" href="/css/family-team-popup.css" asp-append-version="true">
+    <div class="ftp-ov on" id="ftpJoined" role="dialog" aria-modal="true" aria-labelledby="ftpJT">
+        <div class="ftp">
+            <div class="ic" aria-hidden="true">&#128106;</div>
+            <h2 id="ftpJT">팀원이 되었어요</h2>
+            <p>@joinedTeam 에 들어왔어요.<br />이제 내 점수가 팀에 더해져요.</p>
+            <div class="bar one"><a class="ft-btn p" href="/FamilyTeam/Index">우리 가족팀 보기</a></div>
+            <div class="bar one" style="margin-top:8px"><button class="ft-btn g" type="button" id="ftpJClose">닫기</button></div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var ov = document.getElementById('ftpJoined');
+            document.getElementById('ftpJClose').addEventListener('click', function () { ov.classList.remove('on'); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') ov.classList.remove('on'); });
+        })();
+    </script>
+}
+else if (invite != null)
+{
+    <link rel="stylesheet" href="/css/family-team-popup.css" asp-append-version="true">
+    <div class="ftp-ov" id="ftpInvite" role="dialog" aria-modal="true" aria-labelledby="ftpIT">
+        <div class="ftp">
+            <div class="ic" aria-hidden="true">&#9993;</div>
+            <h2 id="ftpIT">@invite.FromFullName 님이 초대했어요</h2>
+            <p>"@invite.TeamName"의 <b>@invite.RelLabel</b>(으)로 함께하고 싶대요.<small>구성원: @string.Join(" · ", invite.MemberNames)</small></p>
+            <div class="bar">
+                <button class="ft-btn g" type="button" id="ftpILater">나중에</button>
+                <form method="post" action="/FamilyTeam/AcceptInvite">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="requestId" value="@invite.Id" />
+                    <button class="ft-btn p" type="submit">팀에 들어가기</button>
+                </form>
+            </div>
+            <div class="bar one" style="margin-top:8px">
+                <form method="post" action="/FamilyTeam/DeclineInvite">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="requestId" value="@invite.Id" />
+                    <button class="ft-btn g" type="submit" style="background:none;font-weight:500">거절하기</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var ov = document.getElementById('ftpInvite');
+            var key = 'ftInviteLater';
+            var later = false;
+            try { later = (document.cookie || '').indexOf(key + '=1') >= 0; } catch (e) { }
+            if (!later) ov.classList.add('on');
+            document.getElementById('ftpILater').addEventListener('click', function () {
+                try { document.cookie = key + '=1; max-age=' + (12 * 3600) + '; path=/; SameSite=Lax'; } catch (e) { }
+                ov.classList.remove('on');
+            });
+        })();
+    </script>
+}

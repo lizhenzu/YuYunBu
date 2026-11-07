@@ -1,0 +1,120 @@
+@using BulletinBoard.Common
+@using BulletinBoard.Services
+@*  ══════════════════════════════════════════════════════════════
+    가족팀 만들기 · 찾기 (팀이 없을 때) — 카톡 방식
+    · 내 팀 만들기: 이름은 "○○○네 가족팀" 으로 자동, 관계를 고른다
+    · 기존 팀 목록: 팀 이름 + 구성원 이름을 보여 주고 가입 신청 (관계 고르기)
+    · 받은 초대가 있으면 맨 위에 보여 준다
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    var teams   = ViewBag.Teams as List<FamilyTeamBrief> ?? new List<FamilyTeamBrief>();
+    var invites = ViewBag.Invites as List<FamilyRequestInfo> ?? new List<FamilyRequestInfo>();
+    var rels    = ViewBag.Relations as (string Key, int Role, string Label)[] ?? FamilyTeamService.Relations;
+    string? msg = ViewBag.Msg as string;
+    bool msgOk  = ViewBag.MsgOk is bool b && b;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>가족팀 만들기 · 찾기</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/family-team.css" asp-append-version="true">
+</head>
+<body>
+<div class="ft">
+    <div class="ft-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <b>가족팀</b></span>
+    </div>
+
+    <h1 class="ft-h1">가족팀 만들기 · 찾기</h1>
+    <p class="ft-sub">가족과 함께 점수를 모으고 선물을 받아요. 한 사람은 한 팀에만 들어갈 수 있어요.</p>
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
+    }
+
+    @* ── 받은 초대 ── *@
+    @if (invites.Count > 0)
+    {
+        <div class="ft-sh"><span>받은 초대</span><small>@invites.Count 건</small></div>
+        @foreach (var inv in invites)
+        {
+            <div class="ft-row" style="align-items:flex-start">
+                <div class="l">
+                    <div class="ft-nm">@inv.TeamName</div>
+                    <div class="ft-mem">@inv.FromFullName 님이 <b>@inv.RelLabel</b>(으)로 초대했어요</div>
+                    <div class="ft-mem">@string.Join(" · ", inv.MemberNames)</div>
+                </div>
+                <div class="ft-acts">
+                    <form method="post" asp-action="DeclineInvite">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@inv.Id" /><button class="ft-btn g" type="submit">거절</button></form>
+                    <form method="post" asp-action="AcceptInvite">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@inv.Id" /><button class="ft-btn p" type="submit">들어가기</button></form>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── 내 팀 만들기 ── *@
+    <div class="ft-sh"><span>내 팀 만들기</span></div>
+    <form method="post" asp-action="Create">
+        @Html.AntiForgeryToken()
+        <p class="ft-sub" style="margin-top:8px">팀 이름은 내 이름으로 정해져요. 예) 홍길동네 가족팀</p>
+        <div class="ft-q">나는 이 팀의…</div>
+        <div class="ft-chips">
+            @for (int i = 0; i < rels.Length; i++)
+            {
+                <label><input type="radio" name="relation" value="@rels[i].Key" @(i == 0 ? "checked" : "") /><span>@rels[i].Label</span></label>
+            }
+        </div>
+        <div style="margin-top:16px"><button class="ft-btn p w" type="submit">팀 만들기</button></div>
+    </form>
+
+    @* ── 이미 만들어진 팀 ── *@
+    <div class="ft-sh"><span>이미 만들어진 팀</span><small>@teams.Count 개</small></div>
+    @if (teams.Count == 0)
+    {
+        <div class="ft-empty">아직 만들어진 팀이 없어요. 위에서 첫 팀을 만들어 보세요.</div>
+    }
+    @foreach (var t in teams)
+    {
+        <div class="ft-row" style="align-items:flex-start">
+            <div class="l">
+                <div class="ft-nm">@t.Name</div>
+                <div class="ft-mem">@string.Join(" · ", t.MemberNames)</div>
+                @if (t.RequestId == 0)
+                {
+                    <details class="ft-ap">
+                        <summary><span class="ft-btn p" style="margin-top:8px;display:inline-block">가입 신청</span></summary>
+                        <form class="box" method="post" asp-action="Apply">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="teamId" value="@t.Id" />
+                            <div class="ft-q" style="margin-top:0">나는 이 팀의…</div>
+                            <div class="ft-chips">
+                                @for (int i = 0; i < rels.Length; i++)
+                                {
+                                    <label><input type="radio" name="relation" value="@rels[i].Key" @(i == 0 ? "checked" : "") /><span>@rels[i].Label</span></label>
+                                }
+                            </div>
+                            <div style="margin-top:12px"><button class="ft-btn p w" type="submit">신청 보내기</button></div>
+                            <div class="ft-mem" style="margin-top:8px">팀원 한 명이 수락하면 바로 팀원이 돼요. 30일 안에 수락이 없으면 사라져요.</div>
+                        </form>
+                    </details>
+                }
+            </div>
+            @if (t.RequestId != 0)
+            {
+                <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@t.RequestId" /><button class="ft-btn g" type="submit">신청 보냄 · 취소</button></form>
+            }
+        </div>
+    }
+
+    <div class="ft-lk" style="margin-top:26px"><a href="/DailyMission2/Welcome" style="flex:1">미션 시작 화면으로</a><i>›</i></div>
+</div>
+</body>
+</html>

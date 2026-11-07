@@ -185,6 +185,7 @@ namespace BulletinBoard
             services.AddScoped<IBirthdayService, BirthdayService>();
             services.AddScoped<IUserSettingsService, UserSettingsService>();
             services.AddScoped<DailyMission2FamilyAdminService>();
+            services.AddScoped<FamilyTeamService>();   // 가족팀 직접 구성 (카톡 방식)
             services.AddScoped<IStudentPointTotalRankService, StudentPointTotalRankService>();
 
             services.AddScoped<IPlaceService, PlaceService>();

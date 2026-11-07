@@ -287,6 +287,7 @@ namespace BulletinBoard.Services.Abstract
         public int    YearPoint { get; set; }
         public DateTime? LastActionDate { get; set; }
         public bool   IsMe      { get; set; }  // 로그인한 본인 여부
+        public string RelationLabel { get; set; } = "";   // 가족팀에 넣을 때 고른 글자 (예: 삼촌·이모)
         // 로그인한 사용자 관점에서 이 멤버의 관계 레이블
         public string RelLabel  { get; set; } = "";
     }
