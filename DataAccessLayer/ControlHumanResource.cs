@@ -189,6 +189,14 @@ namespace BulletinBoard.DataAccessLayer
         }
 
 
+        /// <summary>미배정 회원 배정 화면의 학년·반 선택지 (현재 등록된 학년·반 조합)</summary>
+        public DataSet fetchClassOptions()
+        {
+            string sql = " select distinct ClassYear, ClassBan from [dbo].[view_UserCompositeInfo_2026] " +
+                         " where ClassYear > 0 and ClassBan > 0 order by ClassYear, ClassBan ";
+            return DataAccessModule.commonQuery(sql);
+        }
+
         public void CreateHumanResource(string MessageText, string FromWhom, string ToWhom)
         {
             StringBuilder sb = new StringBuilder();

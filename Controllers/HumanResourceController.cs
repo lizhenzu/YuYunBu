@@ -386,6 +386,64 @@ namespace BulletinBoard.Controllers
 
         //    return View("ChangeUserDeptInfoProcessResult", userInfo[0]);
         //}
+        // ── 미배정 회원 배정 (SuperAdmin 전용) ───────────────────────────
+        // 대상: ① 부서가 없는 회원  ② 학생·교사인데 학년·반이 없는 회원
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public async Task<IActionResult> UnassignedMembers()
+        {
+            ManageHumanResource manageHumanResource = new ManageHumanResource();
+
+            var noDept = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.UnClassify);
+            var inRole = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.All);
+            var noClass = inRole.Where(u => (u.RoleCode == "T1001" || u.RoleCode == "T1002") && (u.ClassYear <= 0 || u.ClassBan <= 0));
+
+            var members = noDept.Concat(noClass)
+                                .GroupBy(u => u.UserId)
+                                .Select(g => g.First())
+                                .OrderBy(u => u.FullName)
+                                .ToList();
+
+            ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
+            ViewData["Depts"] = manageDeptInfo.getCodeData("D001");
+            ViewData["Roles"] = manageDeptInfo.getCodeData("T001");
+
+            var years = new SortedSet<int>();
+            var bans = new SortedSet<int>();
+            var ds = new ControlHumanResource().fetchClassOptions();
+            foreach (System.Data.DataRow r in ds.Tables[0].Rows)
+            {
+                years.Add(Convert.ToInt32(r["ClassYear"]));
+                bans.Add(Convert.ToInt32(r["ClassBan"]));
+            }
+            if (years.Count == 0) for (int i = 1; i <= 6; i++) years.Add(i);
+            if (bans.Count == 0) for (int i = 1; i <= 8; i++) bans.Add(i);
+            ViewData["Years"] = years.ToList();
+            ViewData["Bans"] = bans.ToList();
+
+            return View(members);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public async Task<IActionResult> UnassignedMembersSave(string UserId, string DeptCode, string RoleCode, int ClassYear, int ClassBan)
+        {
+            if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(DeptCode) || string.IsNullOrWhiteSpace(RoleCode))
+                return Json(new { ok = false, message = "부서와 역할을 골라 주세요." });
+
+            bool needClass = RoleCode == "T1001" || RoleCode == "T1002";
+            if (needClass && (ClassYear <= 0 || ClassBan <= 0))
+                return Json(new { ok = false, message = "학년과 반을 골라 주세요." });
+
+            ControlHumanResource controlHumanResource = new ControlHumanResource();
+            await controlHumanResource.DeleteClassInfoAsync(UserId);
+            await controlHumanResource.DeleteDeptRoleUserAssocAsync(UserId);
+            if (needClass)
+                await controlHumanResource.SaveClassInfoAsync(UserId, ClassYear, ClassBan);
+            await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, DeptCode, RoleCode);
+
+            return Json(new { ok = true });
+        }
+
         public async Task<IActionResult> ChangeUserClassInfo(string UserId)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
