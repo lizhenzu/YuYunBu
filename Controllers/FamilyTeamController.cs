@@ -62,7 +62,16 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> Search(string? q)
         {
             var hits = await _svc.SearchUsersAsync(Me, q ?? "");
-            return Json(hits.Select(h => new { userName = h.UserName, fullName = h.FullName, state = h.State }));
+            return Json(hits.Select(h => new
+            {
+                userName = h.UserName,
+                fullName = h.FullName,
+                state = h.State,
+                teamId = h.TeamId,
+                teamName = h.TeamName,
+                members = h.MemberNames,
+                requested = h.Requested,
+            }));
         }
 
         private IActionResult Done(FamilyTeamResult r)

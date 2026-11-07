@@ -1,4 +1,4 @@
-@using BulletinBoard.Common
+﻿@using BulletinBoard.Common
 @using BulletinBoard.Services
 @*  ══════════════════════════════════════════════════════════════
     가족팀 만들기 · 찾기 (팀이 없을 때) — 카톡 방식
@@ -16,6 +16,7 @@
 
     // 한 번에 한 팀에만 신청할 수 있다 — 이미 신청한 팀이 있으면 다른 팀의 [가입 신청]은 누를 수 없다
     bool hasPendingApply = teams.Any(t => t.RequestId != 0);
+    string relsJson = System.Text.Json.JsonSerializer.Serialize(rels.Select(r => new { k = r.Key, l = r.Label }));
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -62,6 +63,14 @@
             </div>
         }
     }
+
+    @* ── 이름으로 찾기 : 가족이 이미 만든 팀에 합류 ── *@
+    <div class="ft-sh"><span>이름으로 찾기</span></div>
+    <p class="ft-sub" style="margin-top:8px">가족 이름을 찾으면 그분이 속한 팀과 구성원을 보여 줘요. 그 팀에 바로 가입 신청할 수 있어요.</p>
+    <div id="ftSearch" data-invite="0" data-apply="1" data-solo="" data-blocked="@(hasPendingApply ? "1" : "0")" data-rels="@relsJson">
+        <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
+        <div id="ftRes" class="ft-res" aria-live="polite"></div>
+    </div>
 
     @* ── 내 팀 만들기 ── *@
     <div class="ft-sh"><span>내 팀 만들기</span></div>
@@ -124,5 +133,6 @@
 
     <div class="ft-lk" style="margin-top:26px"><a href="/DailyMission2/Welcome" style="flex:1">미션 시작 화면으로</a><i>›</i></div>
 </div>
+<script src="/js/family-team-search.js" asp-append-version="true"></script>
 </body>
 </html>
