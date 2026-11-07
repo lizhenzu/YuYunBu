@@ -13,15 +13,6 @@ namespace BulletinBoard.BusinessLayer
 	{
         
 
-        public List<BibleMissingList> getBibleMissingList()
-        {
-            ControlBulkInputBible controlBulkInputBible = new ControlBulkInputBible();
-            DataSet ds = controlBulkInputBible.fetchBibleMissingList();
-            List<BibleMissingList> value = ds.Tables[0].ToList<BibleMissingList>();
-            return value;
-        }
-
-
         public List<BibleMissingListByLang> getBibleMissingListByLang(string KO_BibleText)
         {
             ControlBulkInputBible controlBulkInputBible = new ControlBulkInputBible();

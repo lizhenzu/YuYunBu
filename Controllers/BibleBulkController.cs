@@ -159,13 +159,6 @@ namespace BulletinBoard.Controllers
         }
 
 
-        public async Task<IActionResult> BibleMissingList(string screenName)
-        {
-            ManageeBulkInputBible manageeBulkInputBible = new ManageeBulkInputBible();
-            ViewBag.screenName = screenName;
-            return View(manageeBulkInputBible.getBibleMissingList());
-        }
-
         public async Task<IActionResult> BibleMissingListByLang(string screenName, string KO_BibleText)
         {
             ManageeBulkInputBible manageeBulkInputBible = new ManageeBulkInputBible();

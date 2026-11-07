@@ -424,18 +424,6 @@ namespace BulletinBoard.DataAccessLayer
             return DataAccessModule.commonQuery(sb.ToString());
         }
 
-        public DataSet fetchBibleMissingList()
-        {
-            StringBuilder sb = new StringBuilder();
-
-            sb.AppendFormat(" select top 1005 ROW_NUMBER() OVER(ORDER BY  BibleTextToPray , BibleTextToPrayFromJang )  sequenceNo ,");
-            sb.AppendFormat(" BibleTextToPray, BibleTextToPrayFromJang, isnull(Jang, -1) Jang   "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" from [bibleMissing] "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" where 1 = 1 "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" and Jang is null "); sb.Append(Environment.NewLine);
-            return DataAccessModule.commonQuery(sb.ToString());
-        }
-
         public DataSet fetchBibleMissingListByLang(string KO_BibleText)
         {
             StringBuilder sb = new StringBuilder();
