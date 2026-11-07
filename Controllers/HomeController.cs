@@ -448,7 +448,7 @@ namespace BulletinBoard.Controllers
                                 ViewBag.FamilyGiftPurchasedAt = fgRow?.PurchasedAt;
 
                                 // 메모 "가족합산:팀이름" = 1,000점 단계, "가족합산:팀이름:3000" = 3,000점 단계
-                                string fgKey = "가족합산:" + fg.TeamName;
+                                string fgKey = "가족합산:" + (string.IsNullOrWhiteSpace(fg.AwardKey) ? fg.TeamName : fg.AwardKey);
                                 int FgMs(string memo) => memo.Length > fgKey.Length + 1 && int.TryParse(memo.Substring(fgKey.Length + 1), out var v) ? v : 1000;
                                 ViewBag.FamilyGiftPast = (giftList ?? new List<AdminPurchaseRowVM>())
                                     .Where(r => r.Memo != null && (r.Memo == fgKey || r.Memo.StartsWith(fgKey + ":"))

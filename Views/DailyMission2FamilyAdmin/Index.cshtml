@@ -1,4 +1,4 @@
-@model BulletinBoard.Models.DailyMission2.FamilyAdminVM
+﻿@model BulletinBoard.Models.DailyMission2.FamilyAdminVM
 @using BulletinBoard.Common;
 
 @*  ══════════════════════════════════════════════════════════════
@@ -98,7 +98,7 @@
 
 <div class="qb-pop" id="pop"><div class="box">
     <h3 id="popTitle"></h3>
-    <p>지금까지의 기록은 지워지지 않아요.<br />나중에 "다시 넣기"로 되돌릴 수 있어요.</p>
+    <p id="popBody">지금까지의 기록은 지워지지 않아요.<br />나중에 "다시 넣기"로 되돌릴 수 있어요.</p>
     <div class="bt"><button type="button" id="popNo">취소</button><button type="button" id="popYes" style="background:#FDEEEE;color:#D9534F">빼기</button></div>
 </div></div>
 
@@ -191,7 +191,31 @@ else
             <div class="fm-hint">끄면 홈 화면과 도전성경에서 이 팀이 보이지 않아요.</div>
         </div>
         <div class="qb-btns"><button type="button" class="qb-btn g" data-close="teamEdit">닫기</button><button type="submit" class="qb-btn p">팀 저장</button></div>
+        <div class="fm-hint">팀 이름을 바꿔도 시상 기록은 그대로 이어져요.</div>
     </form>
+
+    <div class="fm-panel">
+        <form method="post" action="/DailyMission2FamilyAdmin/SetCreator">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+            <div class="qb-f">
+                <span class="lbl">방장</span>
+                <div class="fm-seg">
+                    @foreach (var cm in activeM)
+                    {
+                        <label><input type="radio" name="userName" value="@cm.UserName" checked="@(string.Equals(cm.UserName, team.CreatorUserName, StringComparison.OrdinalIgnoreCase))" /><span>@cm.FullName</span></label>
+                    }
+                </div>
+                <div class="fm-hint">방장은 처음 팀을 만든 사람이에요. 팀에서 나갈 수 없고, 다른 구성원을 내보낼 수 있어요. 보호자가 아니어도 돼요.</div>
+            </div>
+            <div class="qb-btns"><button type="submit" class="qb-btn">방장 저장</button></div>
+        </form>
+        <form method="post" action="/DailyMission2FamilyAdmin/DeleteTeam" data-confirm="@team.TeamName 팀을 삭제할까요?" data-confirm-body="구성원과 대기 중인 신청이 함께 사라지고 되돌릴 수 없어요. 선물 기록은 남아요." data-confirm-ok="삭제" data-wait="삭제하는 중이에요">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+            <button type="submit" class="qb-btn d fm-out">이 팀 강제 삭제</button>
+        </form>
+    </div>
 
     <div class="qb-sec">구성원 <small>@(activeM.Count)명@(offM.Count > 0 ? $" · 뺀 사람 {offM.Count}명" : "")</small></div>
 
@@ -433,6 +457,10 @@ else
         if (f.dataset.confirm && f.dataset.ok !== '1') {
             e.preventDefault(); pending = f;
             document.getElementById('popTitle').textContent = f.dataset.confirm;
+            var pb = document.getElementById('popBody'), py = document.getElementById('popYes');
+            if (pb.dataset.def === undefined) { pb.dataset.def = pb.innerHTML; py.dataset.def = py.textContent; }   // 기본 문구 기억
+            if (f.dataset.confirmBody) pb.textContent = f.dataset.confirmBody; else pb.innerHTML = pb.dataset.def;
+            py.textContent = f.dataset.confirmOk || py.dataset.def;
             pop.style.display = 'flex'; return;
         }
         if (f.id === 'addPanel') {

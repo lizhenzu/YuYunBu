@@ -85,6 +85,7 @@ namespace BulletinBoard.Services.Abstract
     {
         public int FamilyTeamId { get; set; }
         public string TeamName { get; set; } = "";
+        public string AwardKey { get; set; } = "";   // 시상 기록을 찾는 고정 키 (팀 이름이 바뀌어도 그대로)
         public int TeamTotalDm2 { get; set; }
         public string TopScorerUserName { get; set; } = "";
         public string TopScorerFullName { get; set; } = "";

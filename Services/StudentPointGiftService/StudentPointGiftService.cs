@@ -784,15 +784,17 @@ ORDER BY
                     await conn2.OpenAsync();
                     foreach (var item in familyItems)
                     {
-                        var teamName = item.Memo!.Substring("가족합산:".Length).Trim();
+                        // 메모 = "가족합산:{팀 키}" 또는 "가족합산:{팀 키}:{단계}"
+                        var awardKey = System.Text.RegularExpressions.Regex.Replace(
+                            item.Memo!.Substring("가족합산:".Length).Trim(), @":\d+$", "");
                         using var cmd2 = new SqlCommand(@"
 SELECT LTRIM(RTRIM(ISNULL(u.LastName,'') + ' ' + ISNULL(u.FirstName,'')))
 FROM dbo.DM2_FamilyTeam ft WITH (NOLOCK)
-JOIN dbo.DM2_FamilyMember fm WITH (NOLOCK) ON fm.FamilyTeamId = ft.Id
+JOIN dbo.DM2_FamilyMember fm WITH (NOLOCK) ON fm.FamilyTeamId = ft.FamilyTeamId AND fm.IsActive = 1
 LEFT JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = fm.UserName
-WHERE ft.TeamName = @TeamName
+WHERE ISNULL(ft.AwardKey, ft.TeamName) = @AwardKey
 ORDER BY u.LastName, u.FirstName;", conn2);
-                        cmd2.Parameters.AddWithValue("@TeamName", teamName);
+                        cmd2.Parameters.AddWithValue("@AwardKey", awardKey);
                         using var r2 = await cmd2.ExecuteReaderAsync();
                         while (await r2.ReadAsync())
                         {
@@ -941,6 +943,7 @@ WHERE m1.UserName = @MyUser AND m1.IsActive = 1;
 
             var teamName     = memberRows[0].TeamName;
             var familyTeamId = memberRows[0].FamilyTeamId;
+            var awardKey     = await AwardKeyOfAsync(teamName);   // 시상 기록은 팀 이름이 아니라 팀 키로 찾는다
 
             // Step 2: 각 구성원의 DM2 포인트만 계산 (합산 기준)
             var members = new List<FamilyMemberGiftRow>();
@@ -1008,7 +1011,7 @@ ORDER BY CASE o.Status WHEN 'DRAFT' THEN 1 WHEN 'PURCHASED' THEN 2 ELSE 3 END;
                 using (var conn = Conn())
                 using (var cmd  = new SqlCommand(sqlGift, conn))
                 {
-                    cmd.Parameters.AddWithValue("@MemoKey", MilestoneGiftMemoKey(teamName, t));
+                    cmd.Parameters.AddWithValue("@MemoKey", MilestoneGiftMemoKey(awardKey, t));
                     await conn.OpenAsync();
                     using var r = await cmd.ExecuteReaderAsync();
                     if (await r.ReadAsync())
@@ -1028,6 +1031,7 @@ ORDER BY CASE o.Status WHEN 'DRAFT' THEN 1 WHEN 'PURCHASED' THEN 2 ELSE 3 END;
             {
                 FamilyTeamId       = familyTeamId,
                 TeamName           = teamName,
+                AwardKey           = awardKey,
                 TeamTotalDm2       = teamTotal,
                 TopScorerUserName  = topScorer.UserName,
                 TopScorerFullName  = topScorer.FullName,
@@ -1045,7 +1049,7 @@ ORDER BY CASE o.Status WHEN 'DRAFT' THEN 1 WHEN 'PURCHASED' THEN 2 ELSE 3 END;
         public async Task SelectFamilyGiftAsync(string topScorerUserName, int productId, int teamTotalDm2, string teamName)
         {
             if (string.IsNullOrWhiteSpace(topScorerUserName)) throw new ArgumentException("topScorerUserName required");
-            string memoKey = $"가족합산:{teamName}";
+            string memoKey = $"가족합산:{await AwardKeyOfAsync(teamName)}";
 
             // 기존 DRAFT가 있으면 삭제 후 새로 삽입 (변경 허용)
             const string sql = @"
@@ -1093,7 +1097,42 @@ ORDER BY o.CreatedAt DESC;";
                 if (!string.IsNullOrWhiteSpace(teamName2) && !result.ContainsKey(teamName2))
                     result[teamName2] = (pid, pname, status);
             }
+            await r.CloseAsync();
+
+            // 메모에는 팀 키가 적혀 있다. 부르는 쪽은 지금 팀 이름으로 찾으므로, 이름이 바뀐 팀은 지금 이름으로도 넣어 준다.
+            using var cmdTeams = new SqlCommand(
+                "SELECT ISNULL(AwardKey, TeamName), TeamName FROM dbo.DM2_FamilyTeam WITH (NOLOCK) WHERE AwardKey IS NOT NULL AND AwardKey <> TeamName;", conn);
+            using var rt = await cmdTeams.ExecuteReaderAsync();
+            var renamed = new List<(string Key, string Name)>();
+            while (await rt.ReadAsync()) renamed.Add((rt.GetString(0), rt.GetString(1)));
+
+            foreach (var (key, name) in renamed)
+            {
+                foreach (var kv in result.Where(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase)
+                                                  || x.Key.StartsWith(key + ":", StringComparison.OrdinalIgnoreCase)).ToList())
+                    result[name + kv.Key.Substring(key.Length)] = kv.Value;
+            }
             return result;
+        }
+
+        /// <summary>
+        ///  팀 이름 → 팀 키. 시상 기록(메모)은 이 키로 저장한다. 이름이 바뀌어도 키는 그대로다.
+        ///  못 찾으면 받은 값을 그대로 돌려준다 (이미 키이거나, 사라진 팀).
+        /// </summary>
+        private async Task<string> AwardKeyOfAsync(string teamName)
+        {
+            if (string.IsNullOrWhiteSpace(teamName)) return teamName;
+            const string sql = @"
+SELECT TOP 1 ISNULL(AwardKey, TeamName)
+FROM dbo.DM2_FamilyTeam WITH (NOLOCK)
+WHERE TeamName = @N OR AwardKey = @N
+ORDER BY CASE WHEN TeamName = @N THEN 0 ELSE 1 END, IsActive DESC;";
+            using var conn = Conn();
+            using var cmd  = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@N", teamName);
+            await conn.OpenAsync();
+            var o = await cmd.ExecuteScalarAsync();
+            return o == null || o == DBNull.Value ? teamName : (string)o;
         }
 
         public async Task<List<EligibleFamilyRowVM>> GetAllEligibleFamilyTeamsAsync(int year, int targetPoint)
@@ -1195,7 +1234,7 @@ ORDER BY t.FamilyTeamId, m.RelationCode;";
 
         public async Task CancelFamilyGiftAsync(string topScorerUserName, string teamName)
         {
-            string memoKey = $"가족합산:{teamName}";
+            string memoKey = $"가족합산:{await AwardKeyOfAsync(teamName)}";
             const string sql = @"
 DELETE FROM dbo.StudentPointGiftOrder
 WHERE Memo = @Memo AND Status = 'DRAFT';
@@ -1351,7 +1390,8 @@ SELECT t.FamilyTeamId, t.TeamName,
        ISNULL(pm.FullName, m.UserName) AS FullName,
        u.Id AS UserId,
        ISNULL(m.RoleCode, 9) AS RoleCode,
-       ISNULL(pm.Sex, '') AS Sex
+       ISNULL(pm.Sex, '') AS Sex,
+       ISNULL(t.AwardKey, t.TeamName) AS AwardKey
 FROM dbo.DM2_FamilyTeam t WITH (NOLOCK)
 JOIN dbo.DM2_FamilyMember m WITH (NOLOCK) ON m.FamilyTeamId = t.FamilyTeamId AND m.IsActive = 1
 JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = m.UserName
@@ -1375,6 +1415,7 @@ ORDER BY t.FamilyTeamId, m.RoleCode, m.RelationCode;";
             };
 
             var teamMap = new Dictionary<int, (string Name, List<(string UserName, string FullName, string Photo, int RelCode, string RelLabel, string Sex)> Members)>();
+            var awardKeys = new Dictionary<int, string>();   // 팀 번호 → 팀 키 (시상 기록을 찾을 때 쓴다)
             using (var conn = Conn())
             using (var cmd  = new SqlCommand(sqlMembers, conn))
             {
@@ -1396,7 +1437,10 @@ ORDER BY t.FamilyTeamId, m.RoleCode, m.RelationCode;";
                     var displayLabel = MemberRoleLabel(roleCode, relCode);
 
                     if (!teamMap.ContainsKey(tid))
+                    {
                         teamMap[tid] = (tname, new());
+                        awardKeys[tid] = r.IsDBNull(8) ? tname : r.GetString(8);
+                    }
                     teamMap[tid].Members.Add((uname, full, photo, relCode, displayLabel, sex));
                 }
             }
@@ -1518,7 +1562,7 @@ FROM dbo.DM2_FamilyMilestoneHidden WITH (NOLOCK);";
 
                     if (type == "AWARD")
                     {
-                        var memoKey = MilestoneGiftMemoKey(teamName, threshold);
+                        var memoKey = MilestoneGiftMemoKey(awardKeys[tid], threshold);
                         if (giftOrders.TryGetValue(memoKey, out var g))
                         {
                             vm.GiftStatus  = g.Status;
@@ -1594,7 +1638,7 @@ WHERE UserName = @U AND FamilyTeamId = @T AND IsActive = 1;";
 SELECT COUNT(1)
 FROM dbo.DM2_FamilyMember m WITH (NOLOCK)
 JOIN dbo.DM2_FamilyTeam   t WITH (NOLOCK) ON t.FamilyTeamId = m.FamilyTeamId AND t.IsActive = 1
-WHERE m.UserName = @U AND m.IsActive = 1 AND t.TeamName = @T;";
+WHERE m.UserName = @U AND m.IsActive = 1 AND (t.TeamName = @T OR t.AwardKey = @T);";
 
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
@@ -1607,7 +1651,7 @@ WHERE m.UserName = @U AND m.IsActive = 1 AND t.TeamName = @T;";
 
         public async Task SelectFamilyGiftForMilestoneAsync(string topScorerUserName, int productId, int teamTotalDm2, string teamName, int threshold)
         {
-            var memoKey = MilestoneGiftMemoKey(teamName, threshold);
+            var memoKey = MilestoneGiftMemoKey(await AwardKeyOfAsync(teamName), threshold);
             const string sql = @"
 DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND Status = 'DRAFT';
 INSERT INTO dbo.StudentPointGiftOrder
@@ -1630,7 +1674,7 @@ VALUES
         {
             if (string.IsNullOrWhiteSpace(teamName)) return null;
 
-            var memoKey = MilestoneGiftMemoKey(teamName, threshold);
+            var memoKey = MilestoneGiftMemoKey(await AwardKeyOfAsync(teamName), threshold);
             const string sql = @"
 SELECT TOP 1 o.OrderId, o.ProductID, a.ProductName, ISNULL(a.ProductDescription, '') AS ProductDescription,
        o.CreditCostSnapshot, o.Status, o.CreatedAt, o.PurchasedAt, ISNULL(o.MileStone, 0) AS MileStone
@@ -1663,7 +1707,7 @@ ORDER BY o.OrderId DESC;";
 
         public async Task CancelFamilyGiftForMilestoneAsync(string teamName, int threshold)
         {
-            var memoKey = MilestoneGiftMemoKey(teamName, threshold);
+            var memoKey = MilestoneGiftMemoKey(await AwardKeyOfAsync(teamName), threshold);
             const string sql = @"DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND Status = 'DRAFT';";
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
