@@ -1,4 +1,4 @@
-using BulletinBoard.Helpers;
+﻿using BulletinBoard.Helpers;
 using BulletinBoard.Services;
 using BulletinBoard.Services.Abstract;
 using Microsoft.AspNetCore.Authorization;
@@ -78,6 +78,7 @@ namespace BulletinBoard.Controllers
         {
             TempData["FamilyMsg"] = r.Message;
             TempData["FamilyMsgOk"] = r.Ok;
+            if (r.Ok) HomeCacheHelper.InvalidateFamilyMilestones(HttpContext);   // 팀 구성 · 이름이 바뀌면 홈 가족 마일스톤도 새로
             return RedirectToAction(nameof(Index));
         }
 
@@ -110,5 +111,8 @@ namespace BulletinBoard.Controllers
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> Kick(string targetUserName) => Done(await _svc.KickAsync(Me, targetUserName));
+
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> Rename(string? teamName) => Done(await _svc.RenameTeamAsync(Me, teamName));
     }
 }

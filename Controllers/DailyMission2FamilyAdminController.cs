@@ -115,6 +115,31 @@ namespace BulletinBoard.Controllers
             return RedirectToAction(nameof(Index), new { teamId });
         }
 
+        // 팀 강제 삭제 — 일반 사용자는 팀을 지울 수 없고 관리자만 할 수 있다
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteTeam(int teamId)
+        {
+            if (teamId <= 0) return RedirectToAction(nameof(Index));
+
+            await _svc.DeleteTeamAsync(teamId);
+
+            BulletinBoard.Helpers.HomeCacheHelper.InvalidateFamilyMilestones(HttpContext);
+            TempData["Info"] = "팀을 삭제했습니다.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        // 만든 사람 바꾸기
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetCreator(int teamId, string userName)
+        {
+            if (teamId <= 0) return RedirectToAction(nameof(Index));
+
+            bool ok = !string.IsNullOrWhiteSpace(userName) && await _svc.SetCreatorAsync(teamId, userName);
+            if (ok) TempData["Info"] = "만든 사람을 바꿨습니다.";
+            else TempData["Error"] = "이 팀의 활성 구성원만 만든 사람으로 정할 수 있습니다.";
+            return RedirectToAction(nameof(Index), new { teamId });
+        }
+
         private static string FriendlySqlError(SqlException ex)
         {
             // 팀 내 본인(RelationCode=0) 중복 방지 인덱스가 있을 경우 흔히 2601/2627 발생

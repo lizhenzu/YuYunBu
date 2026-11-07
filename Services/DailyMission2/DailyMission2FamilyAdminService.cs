@@ -50,7 +50,7 @@ ORDER BY t.IsActive DESC, t.FamilyTeamId DESC;";
         public async Task<FamilyTeamRow?> GetTeamAsync(int teamId)
         {
             const string sql = @"
-SELECT TOP 1 FamilyTeamId, TeamName, IsActive, Memo, InsertDT, UpdateDT
+SELECT TOP 1 FamilyTeamId, TeamName, IsActive, Memo, InsertDT, UpdateDT, CreatorUserName
 FROM dbo.DM2_FamilyTeam WITH (NOLOCK)
 WHERE FamilyTeamId=@id;";
 
@@ -70,6 +70,7 @@ WHERE FamilyTeamId=@id;";
                 Memo = r.IsDBNull(3) ? null : r.GetString(3),
                 InsertDT = r.GetDateTime(4),
                 UpdateDT = r.GetDateTime(5),
+                CreatorUserName = r.IsDBNull(6) ? null : r.GetString(6),
             };
         }
 
@@ -113,8 +114,8 @@ ORDER BY m.IsActive DESC, m.SortNo ASC, m.RoleCode ASC, m.UserName ASC;";
         public async Task<int> CreateTeamAsync(string teamName, string? memo = null)
         {
             const string sql = @"
-INSERT INTO dbo.DM2_FamilyTeam (TeamName, Memo)
-VALUES (@name, @memo);
+INSERT INTO dbo.DM2_FamilyTeam (TeamName, AwardKey, Memo)
+VALUES (@name, @name, @memo);
 SELECT SCOPE_IDENTITY();";
 
             using var conn = Conn();
@@ -125,6 +126,40 @@ SELECT SCOPE_IDENTITY();";
 
             var idObj = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(idObj);
+        }
+
+        /// <summary>관리자 강제 삭제 — 구성원 · 대기 요청과 함께 팀을 지운다. 선물 기록은 남는다(그 이름도 다시 쓰이지 않는다)</summary>
+        public async Task DeleteTeamAsync(int teamId)
+        {
+            const string sql = @"
+DELETE FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@id;
+DELETE FROM dbo.DM2_FamilyMember  WHERE FamilyTeamId=@id;
+DELETE FROM dbo.DM2_FamilyTeam    WHERE FamilyTeamId=@id;";
+
+            using var conn = Conn();
+            await conn.OpenAsync();
+            using var tx = conn.BeginTransaction();
+            using var cmd = new SqlCommand(sql, conn, tx);
+            cmd.Parameters.AddWithValue("@id", teamId);
+            await cmd.ExecuteNonQueryAsync();
+            tx.Commit();
+        }
+
+        /// <summary>만든 사람 바꾸기 (관리자) — 그 팀의 활성 구성원만 지정할 수 있다</summary>
+        public async Task<bool> SetCreatorAsync(int teamId, string userName)
+        {
+            const string sql = @"
+UPDATE t SET CreatorUserName=@u, UpdateDT=GETDATE()
+FROM dbo.DM2_FamilyTeam t
+WHERE t.FamilyTeamId=@id
+  AND EXISTS (SELECT 1 FROM dbo.DM2_FamilyMember m WHERE m.FamilyTeamId=t.FamilyTeamId AND m.UserName=@u AND m.IsActive=1);";
+
+            using var conn = Conn();
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@id", teamId);
+            cmd.Parameters.AddWithValue("@u", userName.Trim());
+            await conn.OpenAsync();
+            return await cmd.ExecuteNonQueryAsync() > 0;
         }
 
         public async Task UpdateTeamAsync(int teamId, string teamName, bool isActive, string? memo = null)

@@ -1,4 +1,4 @@
-using BulletinBoard.Helpers;
+﻿using BulletinBoard.Helpers;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System.Data;
@@ -10,8 +10,9 @@ namespace BulletinBoard.Services
     //   · 한 사람은 한 팀에만 (DM2_FamilyMember 의 UserName 은 표 전체에서 유일)
     //   · 누구나 팀을 만들고(이름은 "○○○네 가족팀" 자동), 누구나 초대한다
     //   · 가입 신청은 팀원 한 명이 수락하면 바로 팀원, 초대는 초대받은 본인이 수락
-    //   · 본인은 언제든 탈퇴, 팀원 누구나 다른 팀원을 내보낼 수 있다
-    //   · 마지막 팀원이 나가면 팀을 지운다 (선물 기록에 이름이 남아 있으면 이름을 보존하려고 숨김만)
+    //   · 2026-11-08 재시상 방지: 시상은 팀 키(AwardKey, 처음 이름으로 고정)로 관리하고 팀 이름은 팀원이 바꿀 수 있다
+    //   · 만든 사람(CreatorUserName)은 탈퇴할 수 없고, 다른 팀원을 내보낼 수 있는 사람도 만든 사람뿐이다. 다른 팀원은 언제든 탈퇴
+    //   · 팀 삭제는 관리자만. 예외: 혼자이고 시상 기록이 없는 팀은 다른 팀에 신청할 때 지운다
     //   · 처리 안 된 신청·초대는 30일 뒤 지운다
     //  표: dbo.DM2_FamilyRequest · dbo.DM2_FamilyNotice (SQL/CreateFamilyTeamSelfService_20261107.sql)
     // ──────────────────────────────────────────────────────────────
@@ -59,6 +60,9 @@ namespace BulletinBoard.Services
     {
         public int TeamId { get; set; }
         public string TeamName { get; set; } = "";
+        public string CreatorUserName { get; set; } = "";
+        public bool IsCreator { get; set; }        // 로그인한 내가 만든 사람인가
+        public bool HasAwardRecord { get; set; }   // 이 팀에 시상 기록이 있는가
         public List<FamilyMemberInfo> Members { get; set; } = new();
         public List<FamilyRequestInfo> Requests { get; set; } = new();   // 들어오고 싶다는 신청
         public List<FamilyRequestInfo> Invites { get; set; } = new();    // 우리 팀이 보낸 초대
@@ -178,6 +182,9 @@ namespace BulletinBoard.Services
 
             var d = new FamilyTeamDetail { TeamId = teamId };
             d.TeamName = await ScalarAsync<string>(c, null, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+            d.CreatorUserName = await CreatorOfAsync(c, null, teamId);
+            d.IsCreator = string.Equals(d.CreatorUserName, userName, StringComparison.OrdinalIgnoreCase);
+            d.HasAwardRecord = await HasAwardRecordAsync(c, null, teamId);
 
             const string sqlMembers = @"
 SELECT m.UserName, ISNULL(pm.FullName, m.UserName), m.RoleCode, ISNULL(m.RelationLabel, N'')
@@ -462,8 +469,8 @@ ORDER BY r.CreatedAt;";
                     name = baseName + " " + n;
 
                 int teamId = await ScalarAsync<int>(c, tx,
-                    @"INSERT INTO dbo.DM2_FamilyTeam (TeamName, Memo) VALUES (@n, N'직접 만든 팀');
-                      SELECT CAST(SCOPE_IDENTITY() AS INT);", ("@n", name));
+                    @"INSERT INTO dbo.DM2_FamilyTeam (TeamName, AwardKey, CreatorUserName, Memo) VALUES (@n, @n, @u, N'직접 만든 팀');
+                      SELECT CAST(SCOPE_IDENTITY() AS INT);", ("@n", name), ("@u", userName));
 
                 await InsertMemberAsync(c, tx, teamId, userName, relationKey);
                 tx.Commit();
@@ -481,13 +488,18 @@ ORDER BY r.CreatedAt;";
             using var tx = await BeginAsync(c);
             try
             {
-                // 내 팀에 나 혼자뿐이면 다른 팀에 신청할 수 있다 (신청이 들어가는 순간 내 팀은 지운다).
-                // 다른 구성원이 있으면 먼저 탈퇴해야 한다.
+                // 내 팀에 나 혼자이고 시상 기록이 없으면 다른 팀에 신청할 수 있다 (신청이 들어가는 순간 내 팀은 지운다).
+                // 시상 기록이 있는 팀은 지우면 재시상으로 이어지므로 관리자만 정리한다.
                 int myTeam = await MyTeamIdAsync(c, tx, userName);
                 if (myTeam == teamId && myTeam != 0) return Rollback(tx, "이미 이 팀의 구성원이에요.");
-                if (myTeam != 0 && await ScalarAsync<int>(c, tx,
-                        "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", myTeam)) > 1)
-                    return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                if (myTeam != 0)
+                {
+                    if (await ScalarAsync<int>(c, tx,
+                            "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", myTeam)) > 1)
+                        return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                    if (await HasAwardRecordAsync(c, tx, myTeam))
+                        return Rollback(tx, "시상 기록이 있는 팀은 없앨 수 없어요. 관리자에게 문의해 주세요.");
+                }
 
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", teamId)) == 0)
                     return Rollback(tx, "그 팀은 이제 없어요.");
@@ -506,7 +518,7 @@ ORDER BY r.CreatedAt;";
 
                     // 혼자인 내 팀을 지우고 초대한 팀으로 바로 들어간다 (한 트랜잭션)
                     var invited = await ReadRequestAsync(c, tx, inv);
-                    await RemoveMemberAsync(c, tx, myTeam, userName);
+                    await RemoveMemberAsync(c, tx, myTeam, userName, hardDeleteIfEmpty: true);
                     await InsertMemberAsync(c, tx, teamId, userName, invited!.RelationKey);
                     await ClearPendingOfAsync(c, tx, userName);
                     tx.Commit();
@@ -521,7 +533,7 @@ ORDER BY r.CreatedAt;";
                     return Rollback(tx, "다른 팀에 가입 신청 중이에요. 그 신청을 취소한 뒤 다시 신청해 주세요.");
 
                 // 모든 확인을 통과했다 → 혼자인 내 팀은 지금 지운다
-                if (myTeam != 0) await RemoveMemberAsync(c, tx, myTeam, userName);
+                if (myTeam != 0) await RemoveMemberAsync(c, tx, myTeam, userName, hardDeleteIfEmpty: true);
 
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyRequest (FamilyTeamId, Kind, TargetUserName, FromUserName, RelationKey, CreatedAt) VALUES (@t,'R',@u,@u,@k,@now);",
                     ("@t", teamId), ("@u", userName), ("@k", relationKey), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
@@ -660,14 +672,16 @@ ORDER BY r.CreatedAt;";
             {
                 int teamId = await MyTeamIdAsync(c, tx, userName);
                 if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
-                await RemoveMemberAsync(c, tx, teamId, userName);
+                if (string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
+                    return Rollback(tx, "팀을 만든 사람은 팀에서 나갈 수 없어요.");
+                await RemoveMemberAsync(c, tx, teamId, userName, hardDeleteIfEmpty: false);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에서 나왔어요.");
             }
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
 
-        /// <summary>같은 팀 구성원이면 누구나 다른 구성원을 내보낼 수 있다</summary>
+        /// <summary>만든 사람만 다른 구성원을 내보낼 수 있다</summary>
         public async Task<FamilyTeamResult> KickAsync(string userName, string targetUserName)
         {
             if (string.Equals(userName, targetUserName, StringComparison.OrdinalIgnoreCase)) return await LeaveAsync(userName);
@@ -680,11 +694,44 @@ ORDER BY r.CreatedAt;";
                 if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
                 int targetTeam = await MyTeamIdAsync(c, tx, targetUserName);
                 if (targetTeam != teamId) return Rollback(tx, "같은 팀의 구성원만 내보낼 수 있어요.");
-                await RemoveMemberAsync(c, tx, teamId, targetUserName);
+                if (!string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
+                    return Rollback(tx, "팀을 만든 사람만 내보낼 수 있어요.");
+                await RemoveMemberAsync(c, tx, teamId, targetUserName, hardDeleteIfEmpty: false);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에서 내보냈어요.");
             }
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("내보내지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
+        }
+
+        // ── 팀 이름 바꾸기 ───────────────────────────────────────
+        public const int MaxTeamNameLength = 30;
+
+        /// <summary>팀원이면 누구나 바꿀 수 있다. 시상을 찾는 팀 키는 그대로다</summary>
+        public async Task<FamilyTeamResult> RenameTeamAsync(string userName, string? newName)
+        {
+            string name = (newName ?? "").Trim();
+            if (name.Length == 0) return FamilyTeamResult.Fail("팀 이름을 적어 주세요.");
+            if (name.Length > MaxTeamNameLength) return FamilyTeamResult.Fail($"팀 이름은 {MaxTeamNameLength}자까지 쓸 수 있어요.");
+
+            using var c = Conn();
+            using var tx = await BeginAsync(c);
+            try
+            {
+                int teamId = await MyTeamIdAsync(c, tx, userName);
+                if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
+                string cur = await ScalarAsync<string>(c, tx, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+                if (string.Equals(cur, name, StringComparison.Ordinal)) return Rollback(tx, "지금 쓰는 이름과 같아요.");
+                string key = await ScalarAsync<string>(c, tx, "SELECT ISNULL(AwardKey, TeamName) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+
+                // 우리 팀의 처음 이름(팀 키)으로 되돌리는 것은 괜찮다
+                if (!string.Equals(key, name, StringComparison.OrdinalIgnoreCase) && await NameTakenAsync(c, tx, name))
+                    return Rollback(tx, "이미 쓰이는 이름이에요. 다른 이름을 적어 주세요.");
+
+                await Cmd(c, tx, "UPDATE dbo.DM2_FamilyTeam SET TeamName=@n, UpdateDT=GETDATE() WHERE FamilyTeamId=@t;", ("@n", name), ("@t", teamId)).ExecuteNonQueryAsync();
+                tx.Commit();
+                return FamilyTeamResult.Success("팀 이름을 바꿨어요.");
+            }
+            catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
 
         // ── 안쪽 도우미 ──────────────────────────────────────────
@@ -722,7 +769,7 @@ ORDER BY r.CreatedAt;";
         {
             const string sql = @"
 DECLARE @r INT = 0;
-IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyTeam WITH (UPDLOCK, HOLDLOCK) WHERE TeamName = @n) SET @r = 1;
+IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyTeam WITH (UPDLOCK, HOLDLOCK) WHERE TeamName = @n OR AwardKey = @n) SET @r = 1;
 IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
     EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'') SET @o = 1',
          N'@p NVARCHAR(300), @o INT OUTPUT', @p = @pref, @o = @r OUTPUT;
@@ -762,7 +809,12 @@ SELECT @r;";
         private static async Task ClearPendingOfAsync(SqlConnection c, SqlTransaction tx, string userName)
             => await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE TargetUserName=@u OR FromUserName=@u;", ("@u", userName)).ExecuteNonQueryAsync();
 
-        private static async Task RemoveMemberAsync(SqlConnection c, SqlTransaction tx, int teamId, string userName)
+        /// <summary>
+        /// 구성원을 뺀다. 아무도 남지 않으면 팀을 정리한다.
+        ///  hardDeleteIfEmpty = true  : 표에서 지운다 (혼자 + 시상 기록 없는 팀이 다른 팀에 신청할 때만)
+        ///  hardDeleteIfEmpty = false : 숨기기만 한다 (팀 키와 이름을 남겨 재시상을 막는다)
+        /// </summary>
+        private static async Task RemoveMemberAsync(SqlConnection c, SqlTransaction tx, int teamId, string userName, bool hardDeleteIfEmpty)
         {
             await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyMember WHERE FamilyTeamId=@t AND UserName=@u;", ("@t", teamId), ("@u", userName)).ExecuteNonQueryAsync();
             // 이 사람이 보낸 신청 · 초대는 그만 둔다
@@ -771,30 +823,33 @@ SELECT @r;";
             int left = await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", teamId));
             if (left > 0) return;
 
-            // 마지막 구성원이 나갔다 → 팀을 지운다 (숨겨진 줄 · 대기 중 신청은 같이)
-            await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyMember WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
             await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
-
-            string name = await ScalarAsync<string>(c, tx, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
-            bool referenced = await ScalarAsync<int>(c, tx,
-                @"DECLARE @r INT = 0;
-                  IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyMilestoneHidden WHERE FamilyTeamId = @t) SET @r = 1;
-                  SELECT @r;", ("@t", teamId)) == 1;
-            if (!referenced && name.Length > 0)
+            if (hardDeleteIfEmpty)
             {
-                // 선물 기록에 팀 이름이 남아 있으면 이름을 보존해야 해서 지우지 않고 숨긴다
-                referenced = await ScalarAsync<int>(c, tx,
-                    @"DECLARE @r INT = 0;
-                      IF OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
-                          EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'') SET @o = 1',
-                               N'@p NVARCHAR(300), @o INT OUTPUT', @p = @pref, @o = @r OUTPUT;
-                      SELECT @r;", ("@pref", "가족합산:" + name)) == 1;
-            }
-
-            if (referenced)
-                await Cmd(c, tx, "UPDATE dbo.DM2_FamilyTeam SET IsActive=0, UpdateDT=GETDATE() WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
-            else
+                await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyMember WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
                 await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
+            }
+            else
+            {
+                await Cmd(c, tx, "UPDATE dbo.DM2_FamilyTeam SET IsActive=0, UpdateDT=GETDATE() WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
+            }
+        }
+
+        private static async Task<string> CreatorOfAsync(SqlConnection c, SqlTransaction? tx, int teamId)
+            => await ScalarAsync<string>(c, tx, "SELECT ISNULL(CreatorUserName, N'') FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+
+        /// <summary>이 팀에 시상 기록이 있는가 — 선물 기록(메모의 팀 키) 또는 박수 숨김 기록</summary>
+        private static async Task<bool> HasAwardRecordAsync(SqlConnection c, SqlTransaction? tx, int teamId)
+        {
+            string key = await ScalarAsync<string>(c, tx, "SELECT ISNULL(AwardKey, TeamName) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+            const string sql = @"
+DECLARE @r INT = 0;
+IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyMilestoneHidden WHERE FamilyTeamId = @t) SET @r = 1;
+IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'') SET @o = 1',
+         N'@p NVARCHAR(300), @o INT OUTPUT', @p = @pref, @o = @r OUTPUT;
+SELECT @r;";
+            return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@pref", "가족합산:" + key)) == 1;
         }
     }
 }

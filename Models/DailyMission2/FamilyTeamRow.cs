@@ -9,6 +9,7 @@
         public DateTime InsertDT { get; set; }
         public DateTime UpdateDT { get; set; }
         public int MemberCount { get; set; }      // 활성 구성원 수 (관리 화면 목록용)
+        public string? CreatorUserName { get; set; }   // 만든 사람 (탈퇴 불가 · 내보내기 권한)
     }
 
     public class FamilyMemberRow2
