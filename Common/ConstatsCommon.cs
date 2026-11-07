@@ -17,6 +17,9 @@ namespace BulletinBoard.Common
         public static string MissionBibleWithparent = "부모님과 함께하는 미션북";
         public static string HolyWordAndRead = "감사가 자라는 말씀과 일기노트";
         public static string ToHome = "홈으로";
+
+        // 이 사이트는 유년부 전용이다 — 부서는 고르지 않고 이 값으로 고정한다(DB 의 DeptCode 열·DeptRoleUserAssoc 표는 그대로 둔다)
+        public const string FixedDeptCode = "D1001";
         
         public static string myDoToRi = "나의 도토리!!!";
 
