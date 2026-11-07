@@ -126,6 +126,72 @@ namespace BulletinBoard.DataAccessLayer
             }
         }
 
+        /// <summary>
+        /// 사람 한 명의 데이터 삭제 — PersonMaster_2026 · ClassInfo_2026 · DeptRoleUserAssoc · PersonLinkRequest (한 트랜잭션).
+        /// [Identity].[User] 는 호출한 쪽이 UserManager 로 지운다.
+        /// 출석 기록이 있는 사람은 지우지 않는다. 반환: (성공 여부, 안내 문구)
+        /// </summary>
+        public async Task<(bool Ok, string Message)> DeletePersonDataAsync(string userId, string userName)
+        {
+            using (var conn = new SqlConnection(DataAccessModule.connectionString_Server))
+            {
+                await conn.OpenAsync();
+                await EnsureRequestTableAsync(conn);
+                using (var tx = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        var personIds = new List<int>();
+                        using (var cmd = new SqlCommand("SELECT [PersonId] FROM [dbo].[PersonMaster_2026] WHERE [UserName] = @UserName", conn, tx))
+                        {
+                            cmd.Parameters.AddWithValue("@UserName", userName);
+                            using (var rd = await cmd.ExecuteReaderAsync())
+                            {
+                                while (await rd.ReadAsync()) personIds.Add(Convert.ToInt32(rd[0]));
+                            }
+                        }
+
+                        foreach (int pid in personIds)
+                        {
+                            using (var cmd = new SqlCommand("SELECT COUNT(1) FROM [dbo].[AttendanceCheck_2026] WHERE [PersonId] = @PersonId", conn, tx))
+                            {
+                                cmd.Parameters.AddWithValue("@PersonId", pid);
+                                if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) > 0)
+                                {
+                                    tx.Rollback();
+                                    return (false, "출석 기록이 있는 사람이라 삭제할 수 없어요.");
+                                }
+                            }
+                        }
+
+                        foreach (int pid in personIds)
+                        {
+                            using (var cmd = new SqlCommand("DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @PersonId; DELETE FROM [dbo].[PersonMaster_2026] WHERE [PersonId] = @PersonId;", conn, tx))
+                            {
+                                cmd.Parameters.AddWithValue("@PersonId", pid);
+                                await cmd.ExecuteNonQueryAsync();
+                            }
+                        }
+
+                        using (var cmd = new SqlCommand("DELETE FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @UserId; DELETE FROM [dbo].[PersonLinkRequest] WHERE [UserName] = @UserName;", conn, tx))
+                        {
+                            cmd.Parameters.AddWithValue("@UserId", userId);
+                            cmd.Parameters.AddWithValue("@UserName", userName);
+                            await cmd.ExecuteNonQueryAsync();
+                        }
+
+                        tx.Commit();
+                        return (true, "");
+                    }
+                    catch
+                    {
+                        tx.Rollback();
+                        throw;
+                    }
+                }
+            }
+        }
+
         /// <summary>SuperAdmin 확인 대기 목록</summary>
         public async Task<List<PersonLinkRequestRow>> GetPendingRequestsAsync()
         {

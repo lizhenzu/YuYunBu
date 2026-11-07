@@ -431,6 +431,43 @@ namespace BulletinBoard.Controllers
             }
         }
 
+        /// <summary>미배정 회원 한 명 삭제 — PersonMaster_2026(+반·역할·연결 요청) 과 [Identity].[User] 를 지운다. 되돌릴 수 없다.</summary>
+        [HttpPost]
+        [Authorize(Roles = nameof(Roles.SuperAdmin))]
+        public async Task<IActionResult> UnassignedMembersDelete(string UserId)
+        {
+            if (string.IsNullOrWhiteSpace(UserId))
+                return Json(new { ok = false, message = "삭제할 회원을 찾을 수 없어요." });
+
+            try
+            {
+                var user = await _userManager.FindByIdAsync(UserId);
+                if (user == null)
+                    return Json(new { ok = false, message = "이미 삭제됐거나 없는 회원이에요." });
+
+                if (string.Equals(user.Id, _userManager.GetUserId(User), StringComparison.Ordinal))
+                    return Json(new { ok = false, message = "내 계정은 삭제할 수 없어요." });
+
+                if (await _userManager.IsInRoleAsync(user, nameof(Roles.SuperAdmin)))
+                    return Json(new { ok = false, message = "SuperAdmin 계정은 삭제할 수 없어요." });
+
+                // 데이터(사람 명부 등)를 먼저 지운다 — 실패하면 계정이 남아 목록에서 다시 시도할 수 있다
+                var data = await new ControlPersonMatch().DeletePersonDataAsync(user.Id, user.UserName ?? "");
+                if (!data.Ok)
+                    return Json(new { ok = false, message = data.Message });
+
+                var result = await _userManager.DeleteAsync(user);
+                if (!result.Succeeded)
+                    return Json(new { ok = false, message = "계정 삭제 오류: " + string.Join(", ", result.Errors.Select(e => e.Description)) });
+
+                return Json(new { ok = true });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { ok = false, message = "삭제 오류: " + ex.Message });
+            }
+        }
+
         public async Task<IActionResult> ChangeUserClassInfo(string UserId)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
