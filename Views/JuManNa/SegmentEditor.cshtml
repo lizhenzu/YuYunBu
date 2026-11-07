@@ -137,6 +137,7 @@
 </div>
 
 <script src="/js/jumanna-segedit.js" asp-append-version="true"></script>
+<script src="/js/qb-confirm.js" asp-append-version="true"></script>
 @if (pushItems.Count > 0 && platformReady)
 {
     <script src="/js/content-push.js" asp-append-version="true"></script>
@@ -144,9 +145,9 @@
         // 이 달 영상 구간을 플랫폼으로 하루씩 차례로 보낸다 (wwwroot/js/content-push.js)
         const pushItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pushItems));
         const pushMonthLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthLabel));
-        function pushClipMonth() {
+        async function pushClipMonth() {
             if (ContentPush.isBusy()) return;
-            if (!confirm(pushMonthLabel + ' 영상 구간 ' + pushItems.length + '일을 플랫폼에 보낼까요?\n그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.')) return;
+            if ((await qbConfirm(true, [pushMonthLabel + ' 영상 구간 ' + pushItems.length + '일을 플랫폼에 보낼까요?', '그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.'], null, '보내기')) !== 'y') return;
             const startBtn = document.getElementById('pf-start');
             startBtn.disabled = true;
             ContentPush.run({
