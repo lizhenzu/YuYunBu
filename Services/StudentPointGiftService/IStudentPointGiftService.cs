@@ -70,6 +70,12 @@ namespace BulletinBoard.Services.Abstract
         Task<List<FamilyMilestoneDisplayVM>> GetMyFamilyMilestonesAsync(string userName, int year);
         /// <summary>홈 가계도용: 로그인 사용자의 가족팀 구성원 (RoleCode 포함, 점수 제한 없음)</summary>
         Task<FamilyTreeVM?> GetMyFamilyTreeAsync(string userName, int year);
+
+        // 친구팀 선물 (두 사람이 각각 받는다)
+        Task<FriendGiftBoardVM?> GetMyFriendGiftBoardAsync(string userName, int year);
+        Task<bool> SelectFriendGiftAsync(string userName, int productId, int teamTotal, string awardKey, int threshold);
+        Task CancelFriendGiftAsync(string userName, string awardKey, int threshold);
+        Task<List<FriendCelebrationVM>> GetFriendCelebrationsAsync(int year);
     }
 
     public sealed class GiftEvalPreload
@@ -266,8 +272,47 @@ namespace BulletinBoard.Services.Abstract
         public string? Memo { get; set; }          // ✅ 가족팀 선물 메모 (예: "가족팀: 김민지 가족")
         public int MileStoneVal { get; set; }       // ✅ 마일스톤 (1000/2000/3000, 개인은 0)
         public bool IsTeamGift => !string.IsNullOrWhiteSpace(Memo) && Memo.StartsWith("가족팀:");
-        public bool IsFamilyCombinedGift => !string.IsNullOrWhiteSpace(Memo) && Memo.StartsWith("가족합산:");
+        public bool IsFamilyCombinedGift => !string.IsNullOrWhiteSpace(Memo) && (Memo.StartsWith("가족합산:") || Memo.StartsWith("친구합산:"));
         public List<string> FamilyMemberNames { get; set; } = new();
+    }
+
+    // ── 친구팀 선물 ──────────────────────────────────────────────
+    public sealed class FriendMemberVM
+    {
+        public string UserName { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public int Point { get; set; }
+    }
+
+    public sealed class FriendGiftStepVM
+    {
+        public int Threshold { get; set; }
+        public string? MineStatus { get; set; }      // null | DRAFT | PURCHASED | HIDDEN
+        public int? MineProductId { get; set; }
+        public string? MineProductName { get; set; }
+        public DateTime? MineDate { get; set; }
+        public string PartnerName { get; set; } = "";
+        public string? PartnerStatus { get; set; }
+        public string? PartnerProductName { get; set; }
+    }
+
+    public sealed class FriendGiftBoardVM
+    {
+        public int TeamId { get; set; }
+        public string TeamName { get; set; } = "";
+        public string AwardKey { get; set; } = "";
+        public int Total { get; set; }
+        public int NextThreshold { get; set; }       // 0 = 모든 단계 달성
+        public List<FriendMemberVM> Members { get; set; } = new();
+        public List<FriendGiftStepVM> Steps { get; set; } = new();   // 2명이 찼고 도달한 단계만
+    }
+
+    public sealed class FriendCelebrationVM
+    {
+        public string TeamName { get; set; } = "";
+        public int Total { get; set; }
+        public int Threshold { get; set; }
+        public int PickedCount { get; set; }
     }
 
     // ── 홈 가계도용 ──────────────────────────────────────────────
@@ -275,6 +320,7 @@ namespace BulletinBoard.Services.Abstract
     {
         public int    FamilyTeamId { get; set; }
         public string TeamName     { get; set; } = "";
+        public string TeamType     { get; set; } = "FAMILY";   // FAMILY | FRIEND
         public List<FamilyTreeMemberVM> Members { get; set; } = new();
     }
 

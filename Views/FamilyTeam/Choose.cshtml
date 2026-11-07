@@ -1,0 +1,85 @@
+@using BulletinBoard.Common
+@using BulletinBoard.Services
+@*  ══════════════════════════════════════════════════════════════
+    어떤 팀을 구성할까요? (팀이 없을 때 첫 화면) — 2026-11-08 친구팀 신설
+    · 가족팀 / 친구팀 중 하나를 고른다. 두 팀은 서로 배타적이다 (한 사람 한 팀)
+    · 친구팀은 학생끼리만 — 학생이 아니면 카드를 잠그고 가족팀을 안내한다
+    · 받은 초대가 있으면 먼저 보여 준다
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    var invites = ViewBag.Invites as List<FamilyRequestInfo> ?? new List<FamilyRequestInfo>();
+    bool isStudent = ViewBag.IsStudent is bool s && s;
+    string? msg = ViewBag.Msg as string;
+    bool msgOk  = ViewBag.MsgOk is bool b && b;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>어떤 팀을 구성할까요?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/family-team.css" asp-append-version="true">
+</head>
+<body>
+<div class="ft">
+    <div class="ft-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <b>팀 구성</b></span>
+    </div>
+
+    <h1 class="ft-h1">어떤 팀을 구성할까요?</h1>
+    <p class="ft-sub">한 사람은 한 팀에만 들어갈 수 있어요. 가족팀과 친구팀 중 하나를 골라요.</p>
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
+    }
+
+    <a class="ft-pick" href="/FamilyTeam/Index?type=family">
+        <span class="t"><b>가족팀</b><small>가족끼리 · 인원 제한 없음</small></span>
+        <i>›</i>
+    </a>
+
+    @if (isStudent)
+    {
+        <a class="ft-pick fr" href="/FamilyTeam/Index?type=friend">
+            <span class="t"><b>친구팀</b><small>학생 친구와 둘이서 · 최대 2명</small></span>
+            <i>›</i>
+        </a>
+    }
+    else
+    {
+        <div class="ft-pick fr off" aria-disabled="true">
+            <span class="t"><b>친구팀</b><small>학생만 만들 수 있어요</small></span>
+        </div>
+        <div class="ft-msg info">친구팀은 학생끼리 만드는 팀이에요. 가족팀을 만들거나 가족이 만든 팀에 들어가 보세요.</div>
+    }
+
+    @if (invites.Count > 0)
+    {
+        <div class="ft-sh"><span>받은 초대</span><small>@invites.Count 건</small></div>
+        @foreach (var inv in invites)
+        {
+            bool friend = inv.TeamType == FamilyTeamService.TypeFriend;
+            <div class="ft-row" style="align-items:flex-start">
+                <div class="l">
+                    <div class="ft-nm">@inv.TeamName<span class="ft-kind @(friend ? "fr" : "")">@(friend ? "친구팀" : "가족팀")</span></div>
+                    <div class="ft-mem">@inv.FromFullName 님이 @(friend ? "" : inv.RelLabel + "(으)로 ")초대했어요</div>
+                    <div class="ft-mem">@string.Join(" · ", inv.MemberNames)</div>
+                </div>
+                <div class="ft-acts">
+                    <form method="post" asp-action="DeclineInvite">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@inv.Id" /><button class="ft-btn g" type="submit">거절</button></form>
+                    <form method="post" asp-action="AcceptInvite">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@inv.Id" /><button class="ft-btn p" type="submit">들어가기</button></form>
+                </div>
+            </div>
+        }
+    }
+
+    <div class="ft-lk" style="margin-top:26px"><a href="/DailyMission2/Welcome" style="flex:1">미션 시작 화면으로</a><i>›</i></div>
+</div>
+</body>
+</html>

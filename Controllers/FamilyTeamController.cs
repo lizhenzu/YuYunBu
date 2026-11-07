@@ -26,7 +26,7 @@ namespace BulletinBoard.Controllers
 
         // GET: /FamilyTeam  — 팀이 있으면 우리 가족팀, 없으면 팀 만들기 · 찾기
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? type = null)
         {
             ViewBag.Msg = TempData["FamilyMsg"] as string;
             ViewBag.MsgOk = TempData["FamilyMsgOk"] is bool b && b;
@@ -37,13 +37,29 @@ namespace BulletinBoard.Controllers
                 var detail = await _svc.GetTeamDetailAsync(Me);
                 if (detail != null)
                 {
+                    if (detail.IsFriend)
+                    {
+                        try { ViewBag.FriendBoard = await _gift.GetMyFriendGiftBoardAsync(Me, DateHelper.GetKoreaNow().Year); }
+                        catch { ViewBag.FriendBoard = null; }
+                        return View("FriendTeam", detail);
+                    }
+
                     try { ViewBag.FamilyTree = await _gift.GetMyFamilyTreeAsync(Me, DateHelper.GetKoreaNow().Year); }
                     catch { ViewBag.FamilyTree = null; }
                     return View("Team", detail);
                 }
 
-                ViewBag.Teams = await _svc.ListOpenTeamsAsync(Me);
+                bool isStudent = await _svc.IsStudentAsync(Me);
+                ViewBag.IsStudent = isStudent;
                 ViewBag.Invites = await _svc.GetIncomingInvitesAsync(Me);
+
+                // 팀이 없으면 먼저 종류를 고른다. 친구팀은 학생만
+                string? mode = NormalizeType(type);
+                if (mode == null || (mode == FamilyTeamService.TypeFriend && !isStudent))
+                    return View("Choose");
+
+                ViewBag.Mode = mode;
+                ViewBag.Teams = await _svc.ListOpenTeamsAsync(Me, mode);
                 return View("Index");
             }
             catch (Microsoft.Data.SqlClient.SqlException)
@@ -51,9 +67,9 @@ namespace BulletinBoard.Controllers
                 // 표(DM2_FamilyRequest / DM2_FamilyNotice)를 아직 만들지 않았을 때
                 ViewBag.Msg = "가족팀 기능 준비 중이에요. 잠시 후 다시 들어와 주세요.";
                 ViewBag.MsgOk = false;
-                ViewBag.Teams = new List<FamilyTeamBrief>();
+                ViewBag.IsStudent = false;
                 ViewBag.Invites = new List<FamilyRequestInfo>();
-                return View("Index");
+                return View("Choose");
             }
         }
 
@@ -64,6 +80,9 @@ namespace BulletinBoard.Controllers
             var hits = await _svc.SearchUsersAsync(Me, q ?? "");
             return Json(hits.Select(h => new
             {
+                teamType = h.TeamType,
+                isFull = h.IsFull,
+                isStudent = h.IsStudent,
                 userName = h.UserName,
                 fullName = h.FullName,
                 state = h.State,
@@ -74,22 +93,27 @@ namespace BulletinBoard.Controllers
             }));
         }
 
-        private IActionResult Done(FamilyTeamResult r)
+        private static string? NormalizeType(string? type)
+            => string.Equals(type, "friend", StringComparison.OrdinalIgnoreCase) || string.Equals(type, FamilyTeamService.TypeFriend, StringComparison.OrdinalIgnoreCase) ? FamilyTeamService.TypeFriend
+             : string.Equals(type, "family", StringComparison.OrdinalIgnoreCase) || string.Equals(type, FamilyTeamService.TypeFamily, StringComparison.OrdinalIgnoreCase) ? FamilyTeamService.TypeFamily
+             : null;
+
+        private IActionResult Done(FamilyTeamResult r, string? type = null)
         {
             TempData["FamilyMsg"] = r.Message;
             TempData["FamilyMsgOk"] = r.Ok;
             if (r.Ok) HomeCacheHelper.InvalidateFamilyMilestones(HttpContext);   // 팀 구성 · 이름이 바뀌면 홈 가족 마일스톤도 새로
-            return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index), new { type });
         }
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(string relation) => Done(await _svc.CreateTeamAsync(Me, relation));
+        public async Task<IActionResult> Create(string? relation, string? type) => Done(await _svc.CreateTeamAsync(Me, relation, NormalizeType(type) ?? FamilyTeamService.TypeFamily), type);
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Apply(int teamId, string relation) => Done(await _svc.ApplyAsync(Me, teamId, relation));
+        public async Task<IActionResult> Apply(int teamId, string? relation, string? type) => Done(await _svc.ApplyAsync(Me, teamId, relation), type);
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Cancel(int requestId) => Done(await _svc.CancelAsync(Me, requestId));
+        public async Task<IActionResult> Cancel(int requestId, string? type) => Done(await _svc.CancelAsync(Me, requestId), type);
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> AcceptRequest(int requestId) => Done(await _svc.AcceptRequestAsync(Me, requestId));
@@ -98,7 +122,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> DeclineRequest(int requestId) => Done(await _svc.DeclineRequestAsync(Me, requestId));
 
         [HttpPost, ValidateAntiForgeryToken]
-        public async Task<IActionResult> Invite(string targetUserName, string relation) => Done(await _svc.InviteAsync(Me, targetUserName, relation));
+        public async Task<IActionResult> Invite(string targetUserName, string? relation) => Done(await _svc.InviteAsync(Me, targetUserName, relation));
 
         [HttpPost, ValidateAntiForgeryToken]
         public async Task<IActionResult> AcceptInvite(int requestId) => Done(await _svc.AcceptInviteAsync(Me, requestId));

@@ -35,6 +35,7 @@
 
         public int? FamilyTeamId { get; set; }             // 가족팀 ID (개인이면 null)
         public string FamilyTeamName { get; set; } = "";   // 예: "김민지 가족"
+        public string TeamType { get; set; } = "FAMILY";   // FAMILY | FRIEND
 
         // 가족 구성원(학생/엄마/아빠) 목록
         public List<FamilyMemberRow> FamilyMembers { get; set; } = new();

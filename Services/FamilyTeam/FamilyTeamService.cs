@@ -32,6 +32,7 @@ namespace BulletinBoard.Services
         public string Name { get; set; } = "";
         public List<string> MemberNames { get; set; } = new();
         public int RequestId { get; set; }          // 내가 이미 신청했으면 그 번호 (취소용), 아니면 0
+        public bool IsFull { get; set; }            // 친구팀 정원(2명)이 찼다
     }
 
     public sealed class FamilyMemberInfo
@@ -56,6 +57,7 @@ namespace BulletinBoard.Services
         public string RelLabel { get; set; } = "";
         public DateTime CreatedAt { get; set; }
         public List<string> MemberNames { get; set; } = new();
+        public string TeamType { get; set; } = "FAMILY";
     }
 
     public sealed class FamilyTeamDetail
@@ -65,6 +67,8 @@ namespace BulletinBoard.Services
         public string CreatorUserName { get; set; } = "";
         public bool IsCreator { get; set; }        // 로그인한 내가 만든 사람인가
         public bool HasAwardRecord { get; set; }   // 이 팀에 시상 기록이 있는가
+        public string TeamType { get; set; } = "FAMILY";   // FAMILY | FRIEND
+        public bool IsFriend => TeamType == FamilyTeamService.TypeFriend;
         public List<FamilyMemberInfo> Members { get; set; } = new();
         public List<FamilyRequestInfo> Requests { get; set; } = new();   // 들어오고 싶다는 신청
         public List<FamilyRequestInfo> Invites { get; set; } = new();    // 우리 팀이 보낸 초대
@@ -79,6 +83,9 @@ namespace BulletinBoard.Services
         public string TeamName { get; set; } = "";
         public List<string> MemberNames { get; set; } = new();   // 그 팀의 구성원 이름
         public bool Requested { get; set; }         // 내가 그 팀에 이미 가입 신청을 보냈다
+        public string TeamType { get; set; } = "";  // 그 사람이 속한 팀의 종류 (FAMILY | FRIEND)
+        public bool IsFull { get; set; }            // 그 팀이 친구팀이고 정원이 찼다
+        public bool IsStudent { get; set; }         // 학생인가 (친구팀은 학생끼리만)
     }
 
     public class FamilyTeamService
@@ -87,6 +94,12 @@ namespace BulletinBoard.Services
 
         public const int ExpireDays = 30;
         public const int MaxPendingPerUser = 20;
+
+        // 팀 종류. 가족팀과 친구팀은 서로 배타적이다 (한 사람 한 팀)
+        public const string TypeFamily = "FAMILY";
+        public const string TypeFriend = "FRIEND";
+        public const int FriendCapacity = 2;
+        private const string FriendRelationKey = "child";   // 친구팀은 관계를 고르지 않는다 (학생으로 저장)
 
         public FamilyTeamService(IConfiguration config)
         {
@@ -189,6 +202,7 @@ namespace BulletinBoard.Services
             d.CreatorUserName = await CreatorOfAsync(c, null, teamId);
             d.IsCreator = string.Equals(d.CreatorUserName, userName, StringComparison.OrdinalIgnoreCase);
             d.HasAwardRecord = await HasAwardRecordAsync(c, null, teamId);
+            d.TeamType = await TeamTypeOfAsync(c, null, teamId);
 
             const string sqlMembers = @"
 SELECT m.UserName, ISNULL(pm.FullName, m.UserName), m.RoleCode, ISNULL(m.RelationLabel, N'')
@@ -281,7 +295,7 @@ ORDER BY r.CreatedAt;";
         }
 
         // ── 팀 찾기 ──────────────────────────────────────────────
-        public async Task<List<FamilyTeamBrief>> ListOpenTeamsAsync(string userName)
+        public async Task<List<FamilyTeamBrief>> ListOpenTeamsAsync(string userName, string teamType = TypeFamily)
         {
             await PurgeExpiredAsync();
             using var c = Conn();
@@ -295,9 +309,9 @@ FROM dbo.DM2_FamilyTeam ft
 JOIN dbo.DM2_FamilyMember m ON m.FamilyTeamId = ft.FamilyTeamId AND m.IsActive = 1
 LEFT JOIN [Identity].[User] u ON u.UserName = m.UserName
 LEFT JOIN dbo.view_PersonMaster_2026 pm ON pm.UserId = u.Id
-WHERE ft.IsActive = 1
+WHERE ft.IsActive = 1 AND ft.TeamType = @type
 ORDER BY ft.FamilyTeamId DESC, m.RoleCode, m.RelationCode;";
-            using (var rd = await Cmd(c, null, sql).ExecuteReaderAsync())
+            using (var rd = await Cmd(c, null, sql, ("@type", teamType)).ExecuteReaderAsync())
             {
                 while (await rd.ReadAsync())
                 {
@@ -316,6 +330,13 @@ ORDER BY ft.FamilyTeamId DESC, m.RoleCode, m.RelationCode;";
             {
                 while (await rd.ReadAsync())
                     if (map.TryGetValue(rd.GetInt32(1), out var b)) b.RequestId = rd.GetInt32(0);
+            }
+
+            // 친구팀은 자리가 있는 팀만 보여 준다 (내가 신청해 둔 팀은 그대로 둔다)
+            if (teamType == TypeFriend)
+            {
+                foreach (var b in order) b.IsFull = b.MemberNames.Count >= FriendCapacity;
+                order = order.Where(b => !b.IsFull || b.RequestId != 0).ToList();
             }
             return order;
         }
@@ -338,16 +359,18 @@ ORDER BY ft.FamilyTeamId DESC, m.RoleCode, m.RelationCode;";
             const string sql = @"
 SELECT TOP 20 u.UserName, pm.FullName, ISNULL(tm.FamilyTeamId, 0), ISNULL(tm.TeamName, N''),
   CASE WHEN EXISTS (SELECT 1 FROM dbo.DM2_FamilyRequest r
-                    WHERE r.Kind = 'I' AND r.FamilyTeamId = @team AND r.TargetUserName = u.UserName) THEN 1 ELSE 0 END
+                    WHERE r.Kind = 'I' AND r.FamilyTeamId = @team AND r.TargetUserName = u.UserName) THEN 1 ELSE 0 END,
+  ISNULL(tm.TeamType, ''),
+  CASE WHEN EXISTS (SELECT 1 FROM dbo.view_UserCompositeInfo_2026 ui WHERE ui.UserName = u.UserName AND ui.RoleCode = @student) THEN 1 ELSE 0 END
 FROM [Identity].[User] u
 JOIN dbo.view_PersonMaster_2026 pm ON pm.UserId = u.Id
-OUTER APPLY (SELECT TOP 1 m.FamilyTeamId, ft.TeamName
+OUTER APPLY (SELECT TOP 1 m.FamilyTeamId, ft.TeamName, ft.TeamType
              FROM dbo.DM2_FamilyMember m
              JOIN dbo.DM2_FamilyTeam ft ON ft.FamilyTeamId = m.FamilyTeamId AND ft.IsActive = 1
              WHERE m.UserName = u.UserName AND m.IsActive = 1) tm
 WHERE u.UserName <> @me AND pm.FullName LIKE @q
 ORDER BY pm.FullName, u.UserName;";
-            using (var rd = await Cmd(c, null, sql, ("@me", userName), ("@team", myTeam), ("@q", like)).ExecuteReaderAsync())
+            using (var rd = await Cmd(c, null, sql, ("@me", userName), ("@team", myTeam), ("@q", like), ("@student", StudentRoleCode)).ExecuteReaderAsync())
             {
                 while (await rd.ReadAsync())
                 {
@@ -358,6 +381,8 @@ ORDER BY pm.FullName, u.UserName;";
                         FullName = rd.GetString(1),
                         TeamId = tid,
                         TeamName = rd.GetString(3),
+                        TeamType = rd.GetString(5),
+                        IsStudent = rd.GetInt32(6) == 1,
                         State = tid == 0 ? (rd.GetInt32(4) == 1 ? "invited" : "ok")
                               : (tid == myTeam ? "mine" : "inTeam"),
                     });
@@ -390,6 +415,7 @@ ORDER BY pm.FullName, u.UserName;";
             {
                 if (h.TeamId == 0) continue;
                 h.MemberNames = names[h.TeamId];
+                h.IsFull = h.TeamType == TypeFriend && h.MemberNames.Count >= FriendCapacity;
                 h.Requested = requested.Contains(h.TeamId);
             }
             return list;
@@ -406,7 +432,7 @@ ORDER BY pm.FullName, u.UserName;";
             await c.OpenAsync();
 
             const string sql = @"
-SELECT r.Id, r.FamilyTeamId, ft.TeamName, r.FromUserName, ISNULL(fp.FullName, r.FromUserName), r.RelationKey, r.CreatedAt
+SELECT r.Id, r.FamilyTeamId, ft.TeamName, r.FromUserName, ISNULL(fp.FullName, r.FromUserName), r.RelationKey, r.CreatedAt, ft.TeamType
 FROM dbo.DM2_FamilyRequest r
 JOIN dbo.DM2_FamilyTeam ft ON ft.FamilyTeamId = r.FamilyTeamId AND ft.IsActive = 1
 LEFT JOIN [Identity].[User] fu ON fu.UserName = r.FromUserName
@@ -420,7 +446,7 @@ ORDER BY r.CreatedAt;";
                     {
                         Id = rd.GetInt32(0), TeamId = rd.GetInt32(1), TeamName = rd.GetString(2),
                         FromUserName = rd.GetString(3), FromFullName = rd.GetString(4),
-                        RelLabel = LabelOf(rd.GetString(5)), CreatedAt = rd.GetDateTime(6),
+                        RelLabel = LabelOf(rd.GetString(5)), CreatedAt = rd.GetDateTime(6), TeamType = rd.GetString(7),
                     });
             }
             if (list.Count == 0) return list;
@@ -452,8 +478,10 @@ ORDER BY r.CreatedAt;";
         }
 
         // ── 팀 만들기 ────────────────────────────────────────────
-        public async Task<FamilyTeamResult> CreateTeamAsync(string userName, string relationKey)
+        public async Task<FamilyTeamResult> CreateTeamAsync(string userName, string? relationKey, string teamType = TypeFamily)
         {
+            bool friend = teamType == TypeFriend;
+            if (friend) relationKey = FriendRelationKey;
             if (!TryRelation(relationKey, out _, out _)) return FamilyTeamResult.Fail("관계를 골라 주세요.");
 
             using var c = Conn();
@@ -461,23 +489,24 @@ ORDER BY r.CreatedAt;";
             try
             {
                 if (await UserExistsAsync(c, tx, userName) == false) return Rollback(tx, "로그인 정보를 찾을 수 없어요.");
-                if (await HasActiveMembershipAsync(c, tx, userName)) return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                if (await HasActiveMembershipAsync(c, tx, userName)) return Rollback(tx, "이미 팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                if (friend && !await IsStudentAsync(c, tx, userName)) return Rollback(tx, "친구팀은 학생만 만들 수 있어요.");
 
                 string full = await ScalarAsync<string>(c, tx,
                     @"SELECT TOP 1 ISNULL(pm.FullName, u.UserName) FROM [Identity].[User] u
                       LEFT JOIN dbo.view_PersonMaster_2026 pm ON pm.UserId = u.Id WHERE u.UserName = @u;", ("@u", userName)) ?? userName;
                 full = full.Trim();
 
-                string baseName = full + "네 가족팀";
+                string baseName = full + (friend ? "네 친구팀" : "네 가족팀");
                 string name = baseName;
                 for (int n = 2; await NameTakenAsync(c, tx, name); n++)
                     name = baseName + " " + n;
 
                 int teamId = await ScalarAsync<int>(c, tx,
-                    @"INSERT INTO dbo.DM2_FamilyTeam (TeamName, AwardKey, CreatorUserName, Memo) VALUES (@n, @n, @u, N'직접 만든 팀');
-                      SELECT CAST(SCOPE_IDENTITY() AS INT);", ("@n", name), ("@u", userName));
+                    @"INSERT INTO dbo.DM2_FamilyTeam (TeamName, AwardKey, CreatorUserName, Memo, TeamType) VALUES (@n, @n, @u, N'직접 만든 팀', @type);
+                      SELECT CAST(SCOPE_IDENTITY() AS INT);", ("@n", name), ("@u", userName), ("@type", friend ? TypeFriend : TypeFamily));
 
-                await InsertMemberAsync(c, tx, teamId, userName, relationKey);
+                await InsertMemberAsync(c, tx, teamId, userName, relationKey!);
                 tx.Commit();
                 return FamilyTeamResult.Success($"\"{name}\"을 만들었어요.", teamId);
             }
@@ -485,14 +514,22 @@ ORDER BY r.CreatedAt;";
         }
 
         // ── 가입 신청 ────────────────────────────────────────────
-        public async Task<FamilyTeamResult> ApplyAsync(string userName, int teamId, string relationKey)
+        public async Task<FamilyTeamResult> ApplyAsync(string userName, int teamId, string? relationKey)
         {
-            if (!TryRelation(relationKey, out _, out _)) return FamilyTeamResult.Fail("관계를 골라 주세요.");
-
             using var c = Conn();
             using var tx = await BeginAsync(c);
             try
             {
+                // 친구팀은 관계를 고르지 않고, 학생만, 자리가 있을 때만 신청할 수 있다
+                string targetType = await TeamTypeOfAsync(c, tx, teamId);
+                if (targetType == TypeFriend)
+                {
+                    relationKey = FriendRelationKey;
+                    if (!await IsStudentAsync(c, tx, userName)) return Rollback(tx, "친구팀은 학생만 들어갈 수 있어요.");
+                    if (await ActiveCountAsync(c, tx, teamId) >= FriendCapacity) return Rollback(tx, "이 친구팀은 정원이 찼어요.");
+                }
+                if (!TryRelation(relationKey, out _, out _)) return Rollback(tx, "관계를 골라 주세요.");
+
                 // 내 팀에 나 혼자이고 시상 기록이 없으면 다른 팀에 신청할 수 있다 (신청이 들어가는 순간 내 팀은 지운다).
                 // 시상 기록이 있는 팀은 지우면 재시상으로 이어지므로 관리자만 정리한다.
                 int myTeam = await MyTeamIdAsync(c, tx, userName);
@@ -501,7 +538,7 @@ ORDER BY r.CreatedAt;";
                 {
                     if (await ScalarAsync<int>(c, tx,
                             "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", myTeam)) > 1)
-                        return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                        return Rollback(tx, "이미 팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
                     if (await HasAwardRecordAsync(c, tx, myTeam))
                         return Rollback(tx, "시상 기록이 있는 팀은 없앨 수 없어요. 관리자에게 문의해 주세요.");
                 }
@@ -526,6 +563,7 @@ ORDER BY r.CreatedAt;";
                     await RemoveMemberAsync(c, tx, myTeam, userName, hardDeleteIfEmpty: true);
                     await InsertMemberAsync(c, tx, teamId, userName, invited!.RelationKey);
                     await ClearPendingOfAsync(c, tx, userName);
+                    await ClearPendingIfFullAsync(c, tx, teamId);
                     tx.Commit();
                     return FamilyTeamResult.Success("초대받은 팀에 들어왔어요. 내가 만든 팀은 삭제했어요.", teamId);
                 }
@@ -541,7 +579,7 @@ ORDER BY r.CreatedAt;";
                 if (myTeam != 0) await RemoveMemberAsync(c, tx, myTeam, userName, hardDeleteIfEmpty: true);
 
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyRequest (FamilyTeamId, Kind, TargetUserName, FromUserName, RelationKey, CreatedAt) VALUES (@t,'R',@u,@u,@k,@now);",
-                    ("@t", teamId), ("@u", userName), ("@k", relationKey), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
+                    ("@t", teamId), ("@u", userName), ("@k", relationKey!), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
                 tx.Commit();
                 return FamilyTeamResult.Success(myTeam != 0
                     ? "가입 신청을 보냈어요. 내가 만든 팀은 삭제했어요. 팀원이 수락하면 팀원이 돼요."
@@ -551,9 +589,8 @@ ORDER BY r.CreatedAt;";
         }
 
         // ── 초대 ─────────────────────────────────────────────────
-        public async Task<FamilyTeamResult> InviteAsync(string userName, string targetUserName, string relationKey)
+        public async Task<FamilyTeamResult> InviteAsync(string userName, string targetUserName, string? relationKey)
         {
-            if (!TryRelation(relationKey, out _, out _)) return FamilyTeamResult.Fail("관계를 골라 주세요.");
             if (string.Equals(userName, targetUserName, StringComparison.OrdinalIgnoreCase)) return FamilyTeamResult.Fail("본인은 초대할 수 없어요.");
 
             using var c = Conn();
@@ -561,9 +598,17 @@ ORDER BY r.CreatedAt;";
             try
             {
                 int teamId = await MyTeamIdAsync(c, tx, userName);
-                if (teamId == 0) return Rollback(tx, "먼저 가족팀에 들어가 있어야 초대할 수 있어요.");
+                if (teamId == 0) return Rollback(tx, "먼저 팀에 들어가 있어야 초대할 수 있어요.");
                 if (await UserExistsAsync(c, tx, targetUserName) == false) return Rollback(tx, "초대할 사람을 찾을 수 없어요.");
-                if (await HasActiveMembershipAsync(c, tx, targetUserName)) return Rollback(tx, "그분은 이미 다른 가족팀에 있어요.");
+                if (await HasActiveMembershipAsync(c, tx, targetUserName)) return Rollback(tx, "그분은 이미 다른 팀에 있어요.");
+
+                if (await TeamTypeOfAsync(c, tx, teamId) == TypeFriend)
+                {
+                    relationKey = FriendRelationKey;
+                    if (await ActiveCountAsync(c, tx, teamId) >= FriendCapacity) return Rollback(tx, "친구팀은 2명까지예요. 정원이 찼어요.");
+                    if (!await IsStudentAsync(c, tx, targetUserName)) return Rollback(tx, "친구팀에는 학생만 초대할 수 있어요.");
+                }
+                if (!TryRelation(relationKey, out _, out _)) return Rollback(tx, "관계를 골라 주세요.");
                 if (await PendingCountAsync(c, tx, userName) >= MaxPendingPerUser) return Rollback(tx, "보낸 신청과 초대가 너무 많아요. 일부를 취소한 뒤 다시 보내 주세요.");
 
                 // 그분이 우리 팀에 이미 신청해 둔 상태면 초대할 필요 없이 수락하면 된다
@@ -573,7 +618,7 @@ ORDER BY r.CreatedAt;";
                     return Rollback(tx, "이미 초대했어요.");
 
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyRequest (FamilyTeamId, Kind, TargetUserName, FromUserName, RelationKey, CreatedAt) VALUES (@t,'I',@u,@f,@k,@now);",
-                    ("@t", teamId), ("@u", targetUserName), ("@f", userName), ("@k", relationKey), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
+                    ("@t", teamId), ("@u", targetUserName), ("@f", userName), ("@k", relationKey!), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
                 tx.Commit();
                 return FamilyTeamResult.Success("초대를 보냈어요. 상대가 로그인해서 승인하면 팀원이 돼요.");
             }
@@ -605,12 +650,19 @@ ORDER BY r.CreatedAt;";
                 {
                     await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
                     tx.Commit();
-                    return FamilyTeamResult.Fail("그분은 그사이 다른 가족팀에 들어갔어요.");
+                    return FamilyTeamResult.Fail("그분은 그사이 다른 팀에 들어갔어요.");
+                }
+                if (await TeamTypeOfAsync(c, tx, r.TeamId) == TypeFriend && await ActiveCountAsync(c, tx, r.TeamId) >= FriendCapacity)
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("친구팀은 2명까지예요. 정원이 찼어요.");
                 }
 
                 await InsertMemberAsync(c, tx, r.TeamId, r.Target, r.RelationKey);
                 string teamName = await ScalarAsync<string>(c, tx, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", r.TeamId)) ?? "";
                 await ClearPendingOfAsync(c, tx, r.Target);
+                await ClearPendingIfFullAsync(c, tx, r.TeamId);
                 await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyNotice (UserName, FamilyTeamId, TeamName, Kind, CreatedAt) VALUES (@u,@t,@n,'JOINED',@now);",
                     ("@u", r.Target), ("@t", r.TeamId), ("@n", teamName), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
                 tx.Commit();
@@ -647,7 +699,13 @@ ORDER BY r.CreatedAt;";
                     return FamilyTeamResult.Fail("이 초대는 없어진 관계로 보낸 초대라 지웠어요. 다시 초대해 달라고 해 주세요.");
                 }
                 if (await HasActiveMembershipAsync(c, tx, userName))
-                    return Rollback(tx, "이미 가족팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                    return Rollback(tx, "이미 팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
+                if (await TeamTypeOfAsync(c, tx, r.TeamId) == TypeFriend && await ActiveCountAsync(c, tx, r.TeamId) >= FriendCapacity)
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("이 친구팀은 정원이 찼어요.");
+                }
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", r.TeamId)) == 0)
                     return Rollback(tx, "그 팀은 이제 없어요.");
                 if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", r.TeamId)) == 0)
@@ -655,6 +713,7 @@ ORDER BY r.CreatedAt;";
 
                 await InsertMemberAsync(c, tx, r.TeamId, userName, r.RelationKey);
                 await ClearPendingOfAsync(c, tx, userName);
+                await ClearPendingIfFullAsync(c, tx, r.TeamId);
                 tx.Commit();
                 return FamilyTeamResult.Success("팀에 들어왔어요.", r.TeamId);
             }
@@ -753,6 +812,7 @@ ORDER BY r.CreatedAt;";
             {
                 int teamId = await MyTeamIdAsync(c, tx, userName);
                 if (teamId == 0) return Rollback(tx, "가족팀에 들어 있지 않아요.");
+                if (await TeamTypeOfAsync(c, tx, teamId) == TypeFriend) return Rollback(tx, "친구팀은 관계를 정하지 않아요.");
                 if (await MyTeamIdAsync(c, tx, targetUserName) != teamId) return Rollback(tx, "같은 팀의 구성원만 바꿀 수 있어요.");
 
                 bool self = string.Equals(userName, targetUserName, StringComparison.OrdinalIgnoreCase);
@@ -854,10 +914,10 @@ ORDER BY r.CreatedAt;";
 DECLARE @r INT = 0;
 IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyTeam WITH (UPDLOCK, HOLDLOCK) WHERE TeamName = @n OR AwardKey = @n) SET @r = 1;
 IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
-    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'') SET @o = 1',
-         N'@p NVARCHAR(300), @o INT OUTPUT', @p = @pref, @o = @r OUTPUT;
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'' OR LEFT(Memo, LEN(@q) + 1) = @q + N'':'') SET @o = 1',
+         N'@p NVARCHAR(300), @q NVARCHAR(300), @o INT OUTPUT', @p = @pref, @q = @prefF, @o = @r OUTPUT;
 SELECT @r;";
-            return await ScalarAsync<int>(c, tx, sql, ("@n", name), ("@pref", "가족합산:" + name)) == 1;
+            return await ScalarAsync<int>(c, tx, sql, ("@n", name), ("@pref", "가족합산:" + name), ("@prefF", "친구합산:" + name)) == 1;
         }
 
         /// <summary>새 구성원을 넣는다. 예전에 숨겨진 줄(IsActive=0)이 이 사람의 표 전체 유일 칸(UserName)을 막으니 먼저 지운다</summary>
@@ -918,6 +978,34 @@ SELECT @r;";
             }
         }
 
+        private const string StudentRoleCode = "T1001";   // RoleCodeType.T1001 — StudentPointGiftService.IsStudentAsync 와 같은 기준
+
+        /// <summary>학생인가 — 선물 쪽과 같은 기준</summary>
+        public async Task<bool> IsStudentAsync(string userName)
+        {
+            using var c = Conn();
+            await c.OpenAsync();
+            return await IsStudentAsync(c, null, userName);
+        }
+
+        private static async Task<bool> IsStudentAsync(SqlConnection c, SqlTransaction? tx, string userName)
+            => string.Equals(userName, "test@gmail.com", StringComparison.OrdinalIgnoreCase)
+               || await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.view_UserCompositeInfo_2026 WHERE UserName=@u AND RoleCode=@r;", ("@u", userName), ("@r", StudentRoleCode)) > 0;
+
+        private static async Task<string> TeamTypeOfAsync(SqlConnection c, SqlTransaction? tx, int teamId)
+            => await ScalarAsync<string>(c, tx, "SELECT TeamType FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? TypeFamily;
+
+        private static async Task<int> ActiveCountAsync(SqlConnection c, SqlTransaction tx, int teamId)
+            => await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyMember WITH (UPDLOCK, HOLDLOCK) WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", teamId));
+
+        /// <summary>친구팀이 2명이 되면 대기 중인 신청 · 초대를 지운다</summary>
+        private static async Task ClearPendingIfFullAsync(SqlConnection c, SqlTransaction tx, int teamId)
+        {
+            if (await TeamTypeOfAsync(c, tx, teamId) != TypeFriend) return;
+            if (await ActiveCountAsync(c, tx, teamId) < FriendCapacity) return;
+            await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE FamilyTeamId=@t;", ("@t", teamId)).ExecuteNonQueryAsync();
+        }
+
         private static async Task<string> CreatorOfAsync(SqlConnection c, SqlTransaction? tx, int teamId)
             => await ScalarAsync<string>(c, tx, "SELECT ISNULL(CreatorUserName, N'') FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
 
@@ -929,10 +1017,10 @@ SELECT @r;";
 DECLARE @r INT = 0;
 IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyMilestoneHidden WHERE FamilyTeamId = @t) SET @r = 1;
 IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
-    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'') SET @o = 1',
-         N'@p NVARCHAR(300), @o INT OUTPUT', @p = @pref, @o = @r OUTPUT;
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'' OR LEFT(Memo, LEN(@q) + 1) = @q + N'':'') SET @o = 1',
+         N'@p NVARCHAR(300), @q NVARCHAR(300), @o INT OUTPUT', @p = @pref, @q = @prefF, @o = @r OUTPUT;
 SELECT @r;";
-            return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@pref", "가족합산:" + key)) == 1;
+            return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@pref", "가족합산:" + key), ("@prefF", "친구합산:" + key)) == 1;
         }
     }
 }

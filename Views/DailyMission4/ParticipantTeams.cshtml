@@ -19,7 +19,9 @@
     ══════════════════════════════════════════════════════════════ *@
 
 @{
-    ViewData["Title"] = "가족팀 참여자";
+    bool friendTab = (ViewBag.Kind as string) == "friend";
+    string teamWord = friendTab ? "친구팀" : "가족팀";
+    ViewData["Title"] = teamWord + " 참여자";
     Layout = null;
 
     var _user       = await AuthService.GetSignedUser(User);
@@ -216,12 +218,13 @@
 
         <div class="ptSeg">
             <a href="/DailyMission4/ParticipantPersons">개인</a>
-            <a class="on" href="/DailyMission4/ParticipantTeams">가족팀</a>
+            <a class="@(friendTab ? "" : "on")" href="/DailyMission4/ParticipantTeams">가족팀 @ViewBag.FamilyCount</a>
+            <a class="@(friendTab ? "on" : "")" href="/DailyMission4/ParticipantTeams?kind=friend">친구팀 @ViewBag.FriendCount</a>
         </div>
 
         <div class="ptTot">
             <div>
-                <div class="ptTotL">가족팀</div>
+                <div class="ptTotL">@teamWord</div>
                 <div class="ptTotN">@totalTeamCount<u>팀</u></div>
             </div>
             <div class="ptTotR">
@@ -231,10 +234,10 @@
         </div>
 
         <div class="ptSrch">
-            <input id="ptQ" type="search" placeholder="가족 · 이름 검색" autocomplete="off" />
+            <input id="ptQ" type="search" placeholder="@(friendTab ? "팀 · 이름 검색" : "가족 · 이름 검색")" autocomplete="off" />
             <select id="ptSort">
                 <option value="score">점수순</option>
-                <option value="name">가족 이름순</option>
+                <option value="name">@(friendTab ? "팀 이름순" : "가족 이름순")</option>
             </select>
         </div>
 
@@ -347,7 +350,7 @@
                                         <a class="ptOne @(IsMe(m.UserName) ? "isMe" : "")" href="@UserMonthlyUrl(m.UserName)">
                                             <img class="ptPh" src="@ProfileOrDefault(m.UserId)" alt="@m.FullName"
                                                  onerror="this.src='/images/icon/people/people_01.webp'" />
-                                            <div class="ptRole">@KidLabel(m)@(IsMe(m.UserName) ? " · 본인" : "")</div>
+                                            <div class="ptRole">@(friendTab ? "친구" : KidLabel(m))@(IsMe(m.UserName) ? " · 본인" : "")</div>
                                             <div class="ptName">@(!string.IsNullOrWhiteSpace(m.FullName) ? m.FullName : m.UserName)</div>
                                             <div class="ptVal @(m.YearPoint <= 0 ? "zero" : "")">@m.YearPoint.ToString("N0")</div>
                                             <div class="ptLast">@ShortLast(m.LastActionDate)</div>
@@ -389,7 +392,7 @@
             }
         </div>
 
-        <div class="ptNone" id="ptNone" hidden>찾는 가족이 없어요</div>
+        <div class="ptNone" id="ptNone" @(teams.Count > 0 ? "hidden" : "")>@(teams.Count > 0 ? (friendTab ? "찾는 팀이 없어요" : "찾는 가족이 없어요") : (friendTab ? "아직 친구팀이 없어요" : "아직 가족팀이 없어요"))</div>
     </div>
 </div>
 

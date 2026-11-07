@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -250,7 +250,9 @@ namespace BulletinBoard.Services.GiftAdmin
         private static string BuildPointContext(GiftKind kind, AdminPurchaseRowVM r)
         {
             if (kind == GiftKind.FamilyCombined)
-                return TeamNameFromMemo(r.Memo, "가족합산:");
+                return (r.Memo ?? "").StartsWith("친구합산:", StringComparison.Ordinal)
+                    ? "친구팀 " + TeamNameFromMemo(r.Memo, "친구합산:")
+                    : TeamNameFromMemo(r.Memo, "가족합산:");
             if (kind == GiftKind.FamilyTeam)
                 return TeamNameFromMemo(r.Memo, "가족팀:");
 

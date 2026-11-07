@@ -17,6 +17,11 @@
     // 한 번에 한 팀에만 신청할 수 있다 — 이미 신청한 팀이 있으면 다른 팀의 [가입 신청]은 누를 수 없다
     bool hasPendingApply = teams.Any(t => t.RequestId != 0);
     string relsJson = System.Text.Json.JsonSerializer.Serialize(rels.Select(r => new { k = r.Key, l = r.Label }));
+
+    // 이 화면은 가족팀 · 친구팀이 같이 쓴다. 친구팀은 관계를 고르지 않는다
+    string mode = (ViewBag.Mode as string) ?? FamilyTeamService.TypeFamily;
+    bool friend = mode == FamilyTeamService.TypeFriend;
+    string word = friend ? "친구팀" : "가족팀";
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -24,7 +29,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FFFFFF">
-    <title>가족팀 만들기 · 찾기</title>
+    <title>@word 만들기 · 찾기</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
@@ -33,11 +38,11 @@
 <body>
 <div class="ft">
     <div class="ft-top">
-        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <b>가족팀</b></span>
+        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <a href="/FamilyTeam/Index">팀 구성</a> › <b>@word</b></span>
     </div>
 
-    <h1 class="ft-h1">가족팀 만들기 · 찾기</h1>
-    <p class="ft-sub">가족과 함께 점수를 모으고 선물을 받아요. 한 사람은 한 팀에만 들어갈 수 있어요.</p>
+    <h1 class="ft-h1">@word 만들기 · 찾기</h1>
+    <p class="ft-sub">@(friend ? "학생 친구와 둘이서 함께해요." : "가족과 함께 점수를 모으고 선물을 받아요.") 한 사람은 한 팀에만 들어갈 수 있어요.</p>
 
     @if (!string.IsNullOrEmpty(msg))
     {
@@ -66,17 +71,20 @@
 
     @* ── 이름으로 찾기 : 가족이 이미 만든 팀에 합류 ── *@
     <div class="ft-sh"><span>이름으로 찾기</span></div>
-    <p class="ft-sub" style="margin-top:8px">가족 이름을 찾으면 그분이 속한 팀과 구성원을 보여 줘요. 그 팀에 바로 가입 신청할 수 있어요.</p>
-    <div id="ftSearch" data-invite="0" data-apply="1" data-solo="" data-blocked="@(hasPendingApply ? "1" : "0")" data-rels="@relsJson">
+    <p class="ft-sub" style="margin-top:8px">@(friend ? "친구 이름을 찾으면 그 친구가 속한 팀을 보여 줘요. 자리가 있으면 바로 가입 신청할 수 있어요." : "가족 이름을 찾으면 그분이 속한 팀과 구성원을 보여 줘요. 그 팀에 바로 가입 신청할 수 있어요.")</p>
+    <div id="ftSearch" data-mode="@mode" data-invite="0" data-apply="1" data-solo="" data-blocked="@(hasPendingApply ? "1" : "0")" data-rels="@relsJson">
         <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
         <div id="ftRes" class="ft-res" aria-live="polite"></div>
     </div>
 
     @* ── 내 팀 만들기 ── *@
-    <div class="ft-sh"><span>내 팀 만들기</span></div>
+    <div class="ft-sh"><span>내 @word 만들기</span></div>
     <form method="post" asp-action="Create">
         @Html.AntiForgeryToken()
-        <p class="ft-sub" style="margin-top:8px">팀 이름은 내 이름으로 정해져요. 예) 홍길동네 가족팀</p>
+        <input type="hidden" name="type" value="@mode" />
+        <p class="ft-sub" style="margin-top:8px">팀 이름은 내 이름으로 정해져요. 나중에 바꿀 수 있어요. 예) 홍길동네 @word</p>
+        @if (!friend)
+        {
         <div class="ft-q">나는 이 팀의…</div>
         <div class="ft-chips">
             @for (int i = 0; i < rels.Length; i++)
@@ -84,14 +92,15 @@
                 <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
             }
         </div>
-        <div style="margin-top:16px"><button class="ft-btn p w" type="submit">팀 만들기</button></div>
+        }
+        <div style="margin-top:16px"><button class="ft-btn p w" type="submit">@word 만들기</button></div>
     </form>
 
     @* ── 이미 만들어진 팀 ── *@
-    <div class="ft-sh"><span>이미 만들어진 팀</span><small>@teams.Count 개</small></div>
+    <div class="ft-sh"><span>@(friend ? "자리가 있는 친구팀" : "이미 만들어진 팀")</span><small>@teams.Count 개</small></div>
     @if (teams.Count == 0)
     {
-        <div class="ft-empty">아직 만들어진 팀이 없어요. 위에서 첫 팀을 만들어 보세요.</div>
+        <div class="ft-empty">@(friend ? "지금 자리가 있는 친구팀이 없어요. 위에서 만들어 보세요." : "아직 만들어진 팀이 없어요. 위에서 첫 팀을 만들어 보세요.")</div>
     }
     @foreach (var t in teams)
     {
@@ -111,6 +120,9 @@
                         <form class="box" method="post" asp-action="Apply">
                             @Html.AntiForgeryToken()
                             <input type="hidden" name="teamId" value="@t.Id" />
+                            <input type="hidden" name="type" value="@mode" />
+                            @if (!friend)
+                            {
                             <div class="ft-q" style="margin-top:0">나는 이 팀의…</div>
                             <div class="ft-chips">
                                 @for (int i = 0; i < rels.Length; i++)
@@ -118,20 +130,21 @@
                                     <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
                                 }
                             </div>
+                            }
                             <div style="margin-top:12px"><button class="ft-btn p w" type="submit">신청 보내기</button></div>
-                            <div class="ft-mem" style="margin-top:8px">팀원 한 명이 수락하면 바로 팀원이 돼요. 30일 안에 수락이 없으면 사라져요.</div>
+                            <div class="ft-mem" style="margin-top:8px">@(friend ? "방장이" : "팀원 한 명이") 수락하면 바로 팀원이 돼요. 30일 안에 수락이 없으면 사라져요.</div>
                         </form>
                     </details>
                 }
             </div>
             @if (t.RequestId != 0)
             {
-                <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@t.RequestId" /><button class="ft-btn g" type="submit">신청 보냄 · 취소</button></form>
+                <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="type" value="@mode" /><input type="hidden" name="requestId" value="@t.RequestId" /><button class="ft-btn g" type="submit">신청 보냄 · 취소</button></form>
             }
         </div>
     }
 
-    <div class="ft-lk" style="margin-top:26px"><a href="/DailyMission2/Welcome" style="flex:1">미션 시작 화면으로</a><i>›</i></div>
+    <div class="ft-lk" style="margin-top:26px"><a href="/FamilyTeam/Index" style="flex:1">팀 종류 다시 고르기</a><i>›</i></div>
 </div>
 <script src="/js/family-team-search.js" asp-append-version="true"></script>
 </body>
