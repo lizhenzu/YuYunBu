@@ -5,7 +5,8 @@
     매일성경 말씀 정리 — 2026-11-07 재구성 (달력형 · quiz-bright.css + jumanna-bright.css)
     · 한 달을 달력으로 본다: 초록 = 다 채움 · 주황 = 빠진 곳 있음 · 회색 = 말씀 없음.  날짜를 누르면 아래에 그날 내용과 바로가기가 열린다
     · 위 칩(주제 · 줄거리 · 요약 · 영상)을 누르면 그게 빠진 날만 달력에 표시한다
-    · 이 달 관리: 한 달 입력(MonthlyBulk) · 영상 구간 편집(SegmentEditor) · 플랫폼으로 보내기(말씀 → 영상 구간 차례로)
+    · 이 달 관리: 한 달 입력(MonthlyBulk) · 영상 구간 편집(SegmentEditor)
+    · 플랫폼 보내기: 말씀 보내기 · 영상 구간 보내기 두 버튼을 따로 누른다 (한 번에 하나씩)
     · 예전의 날짜별 목록 3가지 보기 · 영상 구간 목록은 이 화면으로 합쳤다 (옛 주소는 그대로 열림)
     · 이전 화면은 IndexGroupByYYYYMM.cshtml.bak_before_board
     ══════════════════════════════════════════════════════════════ *@
@@ -81,7 +82,7 @@
         .jb-pf .pf-d { margin-top: 4px; font-size: 12.5px; color: var(--dim2); line-height: 1.6; }
         .jb-pf .qb-btn { margin-top: 10px; }
         .jb-pf .sub { margin-top: 12px; font-size: 12px; font-weight: 800; color: var(--ink); }
-        .jb-pf[hidden], #pf-wrap[hidden] { display: none; }
+        .jb-pf[hidden], .jb-pf .sub[hidden] { display: none; }
     </style>
 </head>
 <body>
@@ -143,19 +144,18 @@
             <div class="pf-h">도전!!! 성경말씀 플랫폼</div>
             @if (platformReady)
             {
-                <div class="pf-d">이 달 말씀 @(pushItems.Count)일과 영상 구간을 차례로 보내요. 바로 공개되고, 이미 있는 날은 바뀌어요. 영상 구간은 그날 목록이 통째로 바뀌어요.</div>
-                <button type="button" class="qb-btn p w" id="pf-start" onclick="pushMonth()">플랫폼으로 보내기 (말씀 · 영상 구간)</button>
+                <div class="pf-d">이 달 @(pushItems.Count)일을 하루씩 차례로 보내요. 바로 공개되고, 이미 있는 날은 바뀌어요. 영상 구간은 그날 목록이 보낸 내용으로 통째로 바뀌어요.</div>
+                <div class="qb-btns">
+                    <button type="button" class="qb-btn p" id="pf-words" onclick="pushWords()">말씀 보내기</button>
+                    <button type="button" class="qb-btn p" id="pf-clips" onclick="pushClips()">영상 구간 보내기</button>
+                </div>
             }
             else
             {
                 <div class="pf-d">플랫폼 주소(QuizPlatform:BaseUrl)나 API 키(CONTENT_API_KEY)가 서버 설정에 없어서 보낼 수 없어요. 관리자에게 문의해 주세요.</div>
             }
-            <div id="pf-wrap" hidden>
-                <div class="sub">말씀</div>
-                <div id="pf-run1"></div>
-                <div class="sub">영상 구간</div>
-                <div id="pf-run2"></div>
-            </div>
+            <div class="sub" id="pf-sub" hidden></div>
+            <div id="pf-run"></div>
             <form id="pf-token" hidden>@Html.AntiForgeryToken()</form>
         </div>
     }
@@ -274,40 +274,31 @@
         render(selected);
     })();
 
-    // 이 달 말씀 → 영상 구간을 차례로 플랫폼에 보낸다 (wwwroot/js/content-push.js)
-    function pushMonth() {
+    // 이 달 말씀 또는 영상 구간을 플랫폼에 하루씩 차례로 보낸다 (wwwroot/js/content-push.js).  한 번에 하나만 보낸다
+    function runPush(isWords) {
         if (ContentPush.isBusy()) return;
         var n = BOARD.pushItems.length;
-        if (!confirm(BOARD.monthLabel + ' 말씀 ' + n + '일과 영상 구간을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.\n영상 구간은 그날 목록이 보낸 내용으로 통째로 바뀌어요.')) return;
+        var title = isWords ? '말씀' : '영상 구간';
+        var question = isWords
+            ? BOARD.monthLabel + ' 말씀 ' + n + '일을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.'
+            : BOARD.monthLabel + ' 영상 구간 ' + n + '일을 플랫폼에 보낼까요?\n그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.';
+        if (!confirm(question)) return;
 
-        var btn = document.getElementById('pf-start');
-        var token = document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value;
-        var run2 = document.getElementById('pf-run2');
-        document.getElementById('pf-wrap').hidden = false;
-        run2.innerHTML = '<div class="pf-d">말씀을 다 보낸 뒤에 시작해요.</div>';
-        btn.disabled = true;
+        var buttons = [document.getElementById('pf-words'), document.getElementById('pf-clips')];
+        var sub = document.getElementById('pf-sub');
+        sub.textContent = BOARD.monthLabel + ' ' + title + ' 보내기';
+        sub.hidden = false;
+        buttons.forEach(function (b) { b.disabled = true; });
 
         ContentPush.run({
-            panel: document.getElementById('pf-run1'),
-            url: '/JuManNa/PushWordToPlatform',
-            token: token,
+            panel: document.getElementById('pf-run'),
+            url: isWords ? '/JuManNa/PushWordToPlatform' : '/JuManNa/PushClipsToPlatform',
+            token: document.querySelector('#pf-token input[name="__RequestVerificationToken"]').value,
             items: BOARD.pushItems,
-            onDone: function (r) {
-                if (r.stopped) {
-                    run2.innerHTML = '<div class="pf-d">말씀 보내기가 멈춰서 영상 구간은 보내지 않았어요.</div>';
-                    btn.disabled = false;
-                    return;
-                }
-                ContentPush.run({
-                    panel: run2,
-                    url: '/JuManNa/PushClipsToPlatform',
-                    token: token,
-                    items: BOARD.pushItems,
-                    onDone: function () { btn.disabled = false; }
-                });
-            }
+            onDone: function () { buttons.forEach(function (b) { b.disabled = false; }); }
         });
     }
-</script>
+    function pushWords() { runPush(true); }
+    function pushClips() { runPush(false); }</script>
 </body>
 </html>
