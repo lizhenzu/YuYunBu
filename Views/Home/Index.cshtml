@@ -3309,7 +3309,16 @@
                   return (Name: CelName($"{u.LastName}{u.FirstName}"), Role: CelRole(u.RoleCode), Round: round, Gift: pk?.ProductName ?? "완독 선물 고르는 중", St: st);
               }).ToList();
 
-              bool celAny = celGiftRows.Count > 0 || celTeamRows.Count > 0 || celBibleRows.Count > 0;
+              // ②-1 친구팀 — 2명이 찼고 선물이 열린 팀. 실패해도 홈은 그대로 나온다
+              var celFriendRows = new List<BulletinBoard.Services.Abstract.FriendCelebrationVM>();
+              try
+              {
+                  if (Context.RequestServices.GetService(typeof(BulletinBoard.Services.Abstract.IStudentPointGiftService)) is BulletinBoard.Services.Abstract.IStudentPointGiftService celGiftSvc)
+                      celFriendRows = await celGiftSvc.GetFriendCelebrationsAsync(BulletinBoard.Helpers.DateHelper.GetKoreaNow().Year);
+              }
+              catch { }
+
+              bool celAny = celGiftRows.Count > 0 || celTeamRows.Count > 0 || celFriendRows.Count > 0 || celBibleRows.Count > 0;
           }
           @if (celAny)
           {
@@ -3383,10 +3392,18 @@
                   </div>
               }
 
-              @if (celTeamRows.Count > 0)
+              @if (celTeamRows.Count > 0 || celFriendRows.Count > 0)
               {
                   <div class="celG">
-                      <div class="celGh"><b><a href="/DailyMission2/Welcome" title="@ConstatsCommon.MainKeyTitle 으로 가기">가족팀 마일스톤</a><i>@(celTeamRows.Count)팀</i></b><button type="button" class="celMore" data-cel="celDetTeam" aria-expanded="false">자세히 ⌄</button></div>
+                      <div class="celGh"><b><a href="/DailyMission2/Welcome" title="@ConstatsCommon.MainKeyTitle 으로 가기">팀 마일스톤</a><i>@(celTeamRows.Count + celFriendRows.Count)팀</i></b><button type="button" class="celMore" data-cel="celDetTeam" aria-expanded="false">자세히 ⌄</button></div>
+                      @foreach (var fr in celFriendRows)
+                      {
+                          <div class="celR">
+                              <span class="celAv">팀</span>
+                              <span class="celNm">@fr.TeamName<i>친구팀</i></span>
+                              <span class="celW"><small>@(fr.Threshold.ToString("N0"))점</small>@(fr.PickedCount >= 2 ? "두 사람 모두 골랐어요" : "선물 고르는 중")</span>
+                          </div>
+                      }
                       @foreach (var r in celTeamRows)
                       {
                           <div class="celR">

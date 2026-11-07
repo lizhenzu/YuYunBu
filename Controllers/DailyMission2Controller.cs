@@ -164,7 +164,7 @@ namespace BulletinBoard.Controllers
             await Task.WhenAll(tTarget, tRows, tGift);
 
             int targetPoint = tTarget.Result;
-            var rows        = tRows.Result;
+            var rows        = tRows.Result.Where(r => r.TeamType != "FRIEND").ToList();   // 예전 화면은 가족팀만
 
             foreach (var r in rows)
             {

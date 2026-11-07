@@ -229,7 +229,7 @@ WHERE OrderId=@Id AND Status='HIDDEN';", conn);
                 WHERE o.UserName = @UserName
                   AND o.Status IN ('PURCHASED', 'HIDDEN')
                   AND ISNULL(o.Memo,'') NOT LIKE N'가족팀:%'
-                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%';", conn))
+                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(o.Memo,'') NOT LIKE N'친구합산:%';", conn))
             {
                 cmd.Parameters.AddWithValue("@UserName", userName);
                 using var reader = await cmd.ExecuteReaderAsync();
@@ -490,7 +490,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
                                                 JOIN dbo.AwardItem a WITH (NOLOCK) ON a.ProductID=o.ProductID
                                                 LEFT OUTER JOIN [dbo].[GiftPopupActionLog] c WITH (NOLOCK) ON c.Id =o.OrderId
                                                 WHERE o.UserName=@U AND o.Status='DRAFT' AND o.IsCurrentDraft=1
-                                                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%'
+                                                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(o.Memo,'') NOT LIKE N'친구합산:%'
                                                 ORDER BY o.OrderId DESC;", conn))
             {
                 cmd.Parameters.AddWithValue("@U", userName);
@@ -523,7 +523,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
                                             WHERE o.UserName=@U
                                               AND NOT (o.Status='DRAFT' AND o.IsCurrentDraft=1)
                                               AND ISNULL(o.Memo,'') NOT LIKE N'가족팀:%'
-                                              AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%'
+                                              AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(o.Memo,'') NOT LIKE N'친구합산:%'
                                             ORDER BY o.OrderId DESC;", conn))
             {
                 cmd.Parameters.AddWithValue("@U", userName);
@@ -589,7 +589,7 @@ WHERE ProductID=@P AND ISNULL(IsHidden,0)=0;", conn))
 DELETE FROM dbo.StudentPointGiftOrder
 WHERE UserName=@U
   AND ISNULL(Status,'') IN ('DRAFT','CANCELED_BY_RESELECT','CANCELED_BY_UPGRADE')
-  AND ISNULL(Memo,'') NOT LIKE N'가족합산:%';", conn2, tx))
+  AND ISNULL(Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(Memo,'') NOT LIKE N'친구합산:%';", conn2, tx))
             {
                 cmd.Parameters.AddWithValue("@U", userName);
 
@@ -910,7 +910,7 @@ SELECT DISTINCT
     ISNULL(m2.RelationCode, 9) AS RelationCode,
     ISNULL(m2.RelationLabel, '') AS RelationLabel
 FROM dbo.DM2_FamilyMember m1 WITH (NOLOCK)
-JOIN dbo.DM2_FamilyTeam t WITH (NOLOCK) ON t.FamilyTeamId = m1.FamilyTeamId AND t.IsActive = 1
+JOIN dbo.DM2_FamilyTeam t WITH (NOLOCK) ON t.FamilyTeamId = m1.FamilyTeamId AND t.IsActive = 1 AND t.TeamType = 'FAMILY'
 JOIN dbo.DM2_FamilyMember m2 WITH (NOLOCK) ON m2.FamilyTeamId = m1.FamilyTeamId AND m2.IsActive = 1
 JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = m2.UserName
 LEFT JOIN dbo.view_PersonMaster_2026 pm WITH (NOLOCK) ON pm.UserId = u.Id
@@ -1148,7 +1148,7 @@ FROM dbo.DM2_FamilyTeam t WITH (NOLOCK)
 JOIN dbo.DM2_FamilyMember m WITH (NOLOCK) ON m.FamilyTeamId = t.FamilyTeamId AND m.IsActive = 1
 JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = m.UserName
 LEFT JOIN dbo.view_PersonMaster_2026 pm WITH (NOLOCK) ON pm.UserId = u.Id
-WHERE t.IsActive = 1
+WHERE t.IsActive = 1 AND t.TeamType = 'FAMILY'
 ORDER BY t.FamilyTeamId, m.RelationCode;";
 
             var teamMemberMap = new Dictionary<int, (string TeamName, List<(string UserName, string FullName, string Photo, int RelationCode, string RelationLabel)> Members)>();
@@ -1396,7 +1396,7 @@ FROM dbo.DM2_FamilyTeam t WITH (NOLOCK)
 JOIN dbo.DM2_FamilyMember m WITH (NOLOCK) ON m.FamilyTeamId = t.FamilyTeamId AND m.IsActive = 1
 JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = m.UserName
 LEFT JOIN dbo.view_PersonMaster_2026 pm WITH (NOLOCK) ON pm.UserId = u.Id
-WHERE t.IsActive = 1
+WHERE t.IsActive = 1 AND t.TeamType = 'FAMILY'
 ORDER BY t.FamilyTeamId, m.RoleCode, m.RelationCode;";
 
             // RoleCode: 0=학생, 1=엄마, 2=아빠, 3=할머니, 4=할아버지, 기타=구성원
@@ -1716,6 +1716,188 @@ ORDER BY o.OrderId DESC;";
             await cmd.ExecuteNonQueryAsync();
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // 친구팀 선물 — 두 사람이 각각 받는다. 가족 합산 선물과 경로를 나눠서 가족 쪽 코드를 건드리지 않는다.
+        //   기록: StudentPointGiftOrder 한 사람 한 줄, UserName = 받는 사람, Memo = "친구합산:{팀 키}:{단계}"
+        //   조건: 친구팀이 2명 찼을 때만 열린다
+        // ═══════════════════════════════════════════════════════════
+        private const string FriendMemoPrefix = "친구합산:";
+        private static string FriendMemoKey(string awardKey, int threshold) => $"{FriendMemoPrefix}{awardKey}:{threshold}";
+
+        public async Task<FriendGiftBoardVM?> GetMyFriendGiftBoardAsync(string userName, int year)
+        {
+            if (string.IsNullOrWhiteSpace(userName)) return null;
+
+            const string sqlMembers = @"
+SELECT t.FamilyTeamId, t.TeamName, ISNULL(t.AwardKey, t.TeamName), m2.UserName, ISNULL(pm.FullName, m2.UserName)
+FROM dbo.DM2_FamilyMember m1 WITH (NOLOCK)
+JOIN dbo.DM2_FamilyTeam   t  WITH (NOLOCK) ON t.FamilyTeamId = m1.FamilyTeamId AND t.IsActive = 1 AND t.TeamType = 'FRIEND'
+JOIN dbo.DM2_FamilyMember m2 WITH (NOLOCK) ON m2.FamilyTeamId = m1.FamilyTeamId AND m2.IsActive = 1
+LEFT JOIN [Identity].[User] u WITH (NOLOCK) ON u.UserName = m2.UserName
+LEFT JOIN dbo.view_PersonMaster_2026 pm WITH (NOLOCK) ON pm.UserId = u.Id
+WHERE m1.UserName = @U AND m1.IsActive = 1
+ORDER BY m2.SortNo;";
+
+            FriendGiftBoardVM? board = null;
+            using (var conn = Conn())
+            using (var cmd = new SqlCommand(sqlMembers, conn))
+            {
+                cmd.Parameters.AddWithValue("@U", userName);
+                await conn.OpenAsync();
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    board ??= new FriendGiftBoardVM { TeamId = r.GetInt32(0), TeamName = r.GetString(1), AwardKey = r.GetString(2) };
+                    board.Members.Add(new FriendMemberVM { UserName = r.GetString(3), FullName = r.GetString(4) });
+                }
+            }
+            if (board == null) return null;
+
+            foreach (var m in board.Members)
+            {
+                try { m.Point = await GetBiblePointsThisYearAsync(m.UserName, year); } catch { }
+                board.Total += m.Point;
+            }
+
+            // 선물 단계
+            var thresholds = new List<int>();
+            using (var conn = Conn())
+            using (var cmd = new SqlCommand(@"
+SELECT PointThreshold FROM dbo.DM2_FamilyMilestoneConfig WITH (NOLOCK)
+WHERE Year = @Y AND IsActive = 1 AND MilestoneType = 'AWARD' ORDER BY PointThreshold;", conn))
+            {
+                cmd.Parameters.AddWithValue("@Y", year);
+                await conn.OpenAsync();
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync()) thresholds.Add(r.GetInt32(0));
+            }
+            if (thresholds.Count == 0) thresholds.Add(1000);
+            board.NextThreshold = thresholds.Where(t => t > board.Total).DefaultIfEmpty(0).Min();
+
+            // 2명이 찼을 때만 선물이 열린다
+            if (board.Members.Count < 2) return board;
+
+            var orders = new Dictionary<(string User, int Threshold), (string Status, int ProductId, string ProductName, DateTime Date)>();
+            string prefix = FriendMemoPrefix + board.AwardKey + ":";
+            using (var conn = Conn())
+            using (var cmd = new SqlCommand(@"
+SELECT o.UserName, o.Memo, o.Status, o.ProductID, ISNULL(a.ProductName, N''), ISNULL(o.PurchasedAt, o.CreatedAt)
+FROM dbo.StudentPointGiftOrder o WITH (NOLOCK)
+LEFT JOIN dbo.AwardItem a WITH (NOLOCK) ON a.ProductID = o.ProductID
+WHERE LEFT(o.Memo, LEN(@P)) = @P AND o.Status IN ('DRAFT','PURCHASED','HIDDEN')
+ORDER BY o.OrderId;", conn))
+            {
+                cmd.Parameters.AddWithValue("@P", prefix);
+                await conn.OpenAsync();
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    var memo = r.GetString(1);
+                    if (!int.TryParse(memo.Substring(prefix.Length), out int th)) continue;
+                    orders[(r.GetString(0).ToLowerInvariant(), th)] = (r.GetString(2), r.GetInt32(3), r.GetString(4), r.GetDateTime(5));
+                }
+            }
+
+            var partner = board.Members.FirstOrDefault(m => !string.Equals(m.UserName, userName, StringComparison.OrdinalIgnoreCase));
+            foreach (var th in thresholds.Where(t => t <= board.Total))
+            {
+                var step = new FriendGiftStepVM { Threshold = th, PartnerName = partner?.FullName ?? "" };
+                if (orders.TryGetValue((userName.ToLowerInvariant(), th), out var mine))
+                {
+                    step.MineStatus = mine.Status; step.MineProductId = mine.ProductId; step.MineProductName = mine.ProductName; step.MineDate = mine.Date;
+                }
+                if (partner != null && orders.TryGetValue((partner.UserName.ToLowerInvariant(), th), out var other))
+                {
+                    step.PartnerStatus = other.Status; step.PartnerProductName = other.ProductName;
+                }
+                board.Steps.Add(step);
+            }
+            return board;
+        }
+
+        /// <summary>내 선물을 고른다. 이미 준비 중이거나 받은 선물은 바꿀 수 없어 false</summary>
+        public async Task<bool> SelectFriendGiftAsync(string userName, int productId, int teamTotal, string awardKey, int threshold)
+        {
+            const string sql = @"
+IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WITH (UPDLOCK, HOLDLOCK) WHERE Memo = @Memo AND UserName = @U AND Status IN ('PURCHASED','HIDDEN'))
+    SELECT 0;
+ELSE
+BEGIN
+    DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND UserName = @U AND Status = 'DRAFT';
+    INSERT INTO dbo.StudentPointGiftOrder (UserName, ProductId, CreditCostSnapshot, Status, CreatedAt, IsCurrentDraft, Memo, MileStone)
+    VALUES (@U, @P, @Total, 'DRAFT', GETDATE(), 0, @Memo, @Th);
+    SELECT 1;
+END";
+            using var conn = Conn();
+            await conn.OpenAsync();
+            using var tx = conn.BeginTransaction();
+            using var cmd = new SqlCommand(sql, conn, tx);
+            cmd.Parameters.AddWithValue("@Memo", FriendMemoKey(awardKey, threshold));
+            cmd.Parameters.AddWithValue("@U", userName);
+            cmd.Parameters.AddWithValue("@P", productId);
+            cmd.Parameters.AddWithValue("@Total", teamTotal);
+            cmd.Parameters.AddWithValue("@Th", threshold);
+            bool ok = Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 1;
+            tx.Commit();
+            return ok;
+        }
+
+        public async Task CancelFriendGiftAsync(string userName, string awardKey, int threshold)
+        {
+            using var conn = Conn();
+            using var cmd = new SqlCommand("DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND UserName = @U AND Status = 'DRAFT';", conn);
+            cmd.Parameters.AddWithValue("@Memo", FriendMemoKey(awardKey, threshold));
+            cmd.Parameters.AddWithValue("@U", userName);
+            await conn.OpenAsync();
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        /// <summary>홈 축하 카드용 — 2명이 찼고 선물이 열린 친구팀. 두 사람 모두 받은 팀은 뺀다</summary>
+        public async Task<List<FriendCelebrationVM>> GetFriendCelebrationsAsync(int year)
+        {
+            var list = new List<FriendCelebrationVM>();
+            var from = new DateTime(year, 1, 1);
+            var to   = DateHelper.GetKoreaNow().Date;
+            if (to.Year != year) to = new DateTime(year, 12, 31);
+
+            const string sql = @"
+;WITH P AS (
+    SELECT t.FamilyTeamId, t.TeamName, ISNULL(t.AwardKey, t.TeamName) AS AwardKey,
+           (SELECT ISNULL(SUM(ISNULL(x.TotalPoint, 0)), 0) FROM dbo.ufn_DM2_GetUserDailyPoints(m.UserName, @F, @T) x) AS Pt
+    FROM dbo.DM2_FamilyTeam t WITH (NOLOCK)
+    JOIN dbo.DM2_FamilyMember m WITH (NOLOCK) ON m.FamilyTeamId = t.FamilyTeamId AND m.IsActive = 1
+    WHERE t.IsActive = 1 AND t.TeamType = 'FRIEND'
+),
+S AS (
+    SELECT FamilyTeamId, TeamName, AwardKey, SUM(Pt) AS Total, COUNT(*) AS Cnt FROM P GROUP BY FamilyTeamId, TeamName, AwardKey
+)
+SELECT s.TeamName, s.AwardKey, s.Total, th.PointThreshold,
+       (SELECT COUNT(*) FROM dbo.StudentPointGiftOrder o WITH (NOLOCK)
+         WHERE o.Memo = N'친구합산:' + s.AwardKey + N':' + CAST(th.PointThreshold AS NVARCHAR(10)) AND o.Status = 'HIDDEN') AS Given,
+       (SELECT COUNT(*) FROM dbo.StudentPointGiftOrder o WITH (NOLOCK)
+         WHERE o.Memo = N'친구합산:' + s.AwardKey + N':' + CAST(th.PointThreshold AS NVARCHAR(10)) AND o.Status IN ('DRAFT','PURCHASED')) AS Picked
+FROM S s
+CROSS APPLY (SELECT TOP 1 c.PointThreshold FROM dbo.DM2_FamilyMilestoneConfig c WITH (NOLOCK)
+             WHERE c.Year = @Y AND c.IsActive = 1 AND c.MilestoneType = 'AWARD' AND c.PointThreshold <= s.Total
+             ORDER BY c.PointThreshold DESC) th
+WHERE s.Cnt >= 2
+ORDER BY s.Total DESC;";
+            using var conn = Conn();
+            using var cmd = new SqlCommand(sql, conn) { CommandTimeout = 60 };
+            cmd.Parameters.Add(new SqlParameter("@F", SqlDbType.Date) { Value = from.Date });
+            cmd.Parameters.Add(new SqlParameter("@T", SqlDbType.Date) { Value = to.Date });
+            cmd.Parameters.AddWithValue("@Y", year);
+            await conn.OpenAsync();
+            using var r = await cmd.ExecuteReaderAsync();
+            while (await r.ReadAsync())
+            {
+                int given = r.GetInt32(4);
+                if (given >= 2) continue;   // 두 사람 모두 받았다
+                list.Add(new FriendCelebrationVM { TeamName = r.GetString(0), Total = r.GetInt32(2), Threshold = r.GetInt32(3), PickedCount = r.GetInt32(5) + given });
+            }
+            return list;
+        }
+
         public async Task<FamilyTreeVM?> GetMyFamilyTreeAsync(string userName, int year)
         {
             var from = new DateTime(year, 1, 1);
@@ -1731,7 +1913,8 @@ SELECT
     ISNULL(m2.RelationCode, 9)        AS RelationCode,
     t.FamilyTeamId,
     t.TeamName,
-    ISNULL(m2.RelationLabel, '')      AS RelationLabel
+    ISNULL(m2.RelationLabel, '')      AS RelationLabel,
+    t.TeamType
 FROM dbo.DM2_FamilyMember m1 WITH (NOLOCK)
 JOIN dbo.DM2_FamilyTeam   t  WITH (NOLOCK) ON t.FamilyTeamId = m1.FamilyTeamId AND t.IsActive = 1
 JOIN dbo.DM2_FamilyMember m2 WITH (NOLOCK) ON m2.FamilyTeamId = m1.FamilyTeamId AND m2.IsActive = 1
@@ -1744,6 +1927,7 @@ ORDER BY m2.RoleCode, m2.RelationCode;";
             var members = new List<FamilyTreeMemberVM>();
             int familyTeamId = 0;
             string teamName = "";
+            string teamType = "FAMILY";
 
             using (var conn = Conn())
             using (var cmd  = new SqlCommand(sqlMembers, conn))
@@ -1758,6 +1942,7 @@ ORDER BY m2.RoleCode, m2.RelationCode;";
                     {
                         familyTeamId = Convert.ToInt32(rd[5]);
                         teamName     = rd.IsDBNull(6) ? "" : rd.GetString(6);
+                        teamType     = rd.IsDBNull(8) ? "FAMILY" : rd.GetString(8);
                     }
                     var photo = rd.GetString(2);
                     members.Add(new FamilyTreeMemberVM
@@ -1828,6 +2013,9 @@ GROUP BY n.UserName;";
             {
                 if (m.IsMe) { m.RelLabel = "본인"; continue; }
 
+                // 친구팀에는 관계가 없다
+                if (teamType == "FRIEND") { m.RelLabel = "친구"; continue; }
+
                 // 그 밖의 가족(삼촌·이모 등)은 팀에 들어올 때 고른 글자를 그대로 쓴다
                 if (m.RoleCode > 4 && !string.IsNullOrWhiteSpace(m.RelationLabel)) { m.RelLabel = m.RelationLabel; continue; }
 
@@ -1872,6 +2060,7 @@ GROUP BY n.UserName;";
             {
                 FamilyTeamId = familyTeamId,
                 TeamName     = teamName,
+                TeamType     = teamType,
                 Members      = members,
             };
         }

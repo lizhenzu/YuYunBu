@@ -375,9 +375,25 @@ namespace BulletinBoard.Controllers
             page.Cards.Add(BuildPointCard(box, integrated, page.IsStudent));
             AddIfAny(page.Cards, BuildBibleCard(rounds));
             AddIfAny(page.Cards, BuildBirthCard(birth));
-            AddIfAny(page.Cards, BuildFamilyCard(fam, famTeam));
+            // 친구팀이면 가족 선물 대신 친구팀 선물 칸을 보여 준다
+            FriendGiftBoardVM? friendBoard = null;
+            try { friendBoard = await _gift.GetMyFriendGiftBoardAsync(this.UserName, now.Year); } catch { }
+            AddIfAny(page.Cards, friendBoard != null ? BuildFriendCard(friendBoard) : BuildFamilyCard(fam, famTeam));
 
             page.History = BuildGiftHistory(box, rounds, birth, fam);
+            if (friendBoard != null)
+            {
+                foreach (var s in friendBoard.Steps.Where(x => !string.IsNullOrWhiteSpace(x.MineStatus) && x.MineDate.HasValue))
+                    page.History.Add(new GiftHistoryRowVM
+                    {
+                        Date        = s.MineDate!.Value,
+                        ProductId   = s.MineProductId,
+                        ProductName = s.MineProductName ?? "",
+                        Source      = $"우리 친구팀 {Won(s.Threshold)}점",
+                        Status      = s.MineStatus == "HIDDEN" ? "받음" : s.MineStatus == "PURCHASED" ? "준비 중" : "선택 중"
+                    });
+                page.History = page.History.OrderByDescending(h => h.Date).ToList();
+            }
 
             ViewBag.Toast = TempData["GiftToast"]?.ToString()
                          ?? TempData["GiftErr"]?.ToString()
@@ -492,6 +508,26 @@ namespace BulletinBoard.Controllers
                         ["threshold"]         = m.PointThreshold.ToString(),
                         ["returnTo"]          = "hub"
                     };
+                    break;
+                }
+
+                case "friend":
+                {
+                    var board = await _gift.GetMyFriendGiftBoardAsync(this.UserName, now.Year);
+                    var step  = board?.Steps.FirstOrDefault(x => x.Threshold == threshold) ?? board?.Steps.FirstOrDefault();
+                    if (board == null || step == null) return RedirectToAction(nameof(MyGiftBox3));
+
+                    var opt = BulletinBoard.Common.ProductDisplayOptonHelper.FamilyTeamOption(step.Threshold);
+                    if (opt == null) return RedirectToAction(nameof(MyGiftBox3));
+
+                    vm.Kicker = "우리 친구팀 선물";
+                    vm.Title  = $"둘이서 {Won(step.Threshold)}점을 모았어요";
+                    vm.Why    = $"{board.TeamName} 합산 {Won(board.Total)}점이에요. 선물은 두 사람이 각자 골라요.";
+                    vm.Items  = await _giftCatalog.GetAsync(
+                        new BulletinBoard.Services.GiftCatalog.GiftCatalogQuery { Option = opt.Value });
+                    vm.PickedProductId = step.MineProductId;
+                    vm.PostAction = "/StudentPointDashboard4/FriendGiftSelectPost";
+                    vm.PostFields = new() { ["threshold"] = step.Threshold.ToString() };
                     break;
                 }
 
@@ -742,6 +778,53 @@ namespace BulletinBoard.Controllers
                     ["threshold"]         = target.PointThreshold.ToString(),
                     ["returnTo"]          = "hub"
                 };
+            }
+            return c;
+        }
+
+        /// <summary>
+        ///  04 우리 친구팀 선물 — 두 사람이 각자 자기 선물을 고른다.
+        ///  달성한 단계를 내가 전부 받았으면 null (지난 선물에만 남는다).
+        /// </summary>
+        private GiftBoxCardVM? BuildFriendCard(FriendGiftBoardVM board)
+        {
+            var c = new GiftBoxCardVM { Type = "family", Title = "우리 친구팀 선물", Reason = "둘이서 점수를 더해 단계마다 각자 받아요" };
+
+            if (board.Members.Count < 2)
+            {
+                c.IsOpen = false; c.RightLabel = "합산"; c.RightValue = Won(board.Total); c.RightUnit = "점";
+                c.LockHint = "친구가 들어오면 선물이 열려요. 합산 1,000점부터 두 사람이 각각 받아요.";
+                return c;
+            }
+
+            bool Delivered(FriendGiftStepVM s) => string.Equals(s.MineStatus, "HIDDEN", StringComparison.OrdinalIgnoreCase);
+            if (board.Steps.Count > 0 && board.Steps.All(Delivered)) return null;
+
+            var target = board.Steps.FirstOrDefault(s => string.IsNullOrWhiteSpace(s.MineStatus))
+                      ?? board.Steps.LastOrDefault(s => !Delivered(s));
+            if (target == null)
+            {
+                c.IsOpen = false; c.RightLabel = "합산"; c.RightValue = Won(board.Total); c.RightUnit = "점";
+                c.LockHint = $"{board.TeamName}의 지금 합산은 {Won(board.Total)}점이에요. 1,000점이 되면 선물을 고를 수 있어요.";
+                return c;
+            }
+
+            bool locked = string.Equals(target.MineStatus, "PURCHASED", StringComparison.OrdinalIgnoreCase);
+            c.Reason     = $"{board.TeamName} 합산 {Won(board.Total)}점 · 각자 받아요";
+            c.RightLabel = "달성 단계";
+            c.RightValue = Won(target.Threshold);
+            c.RightUnit  = "점";
+            c.IsOpen     = !locked;
+            c.SelectUrl  = Url.Action(nameof(GiftSelect), new { type = "friend", threshold = target.Threshold }) ?? "";
+
+            if (!string.IsNullOrWhiteSpace(target.MineStatus))
+            {
+                c.PickedProductId = target.MineProductId;
+                c.PickedName      = target.MineProductName ?? "";
+                c.PickedMeta      = locked ? "선물을 준비하고 있어요" : "선택 중";
+                c.CanChange       = !locked;
+                c.CancelAction    = "/StudentPointDashboard4/FriendGiftCancel";
+                c.CancelFields    = new() { ["threshold"] = target.Threshold.ToString(), ["returnTo"] = "hub" };
             }
             return c;
         }
@@ -1155,6 +1238,54 @@ namespace BulletinBoard.Controllers
                     new { teamName, topScorer = topScorerUserName, teamTotal, threshold });
 
             return RedirectToAction("Index", "Home");
+        }
+
+        /// <summary>친구팀 선물 고르기 (POST) — 내 선물만. 2명이 찼고 도달한 단계만</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FriendGiftSelectPost(int productId, int threshold)
+        {
+            if (await _authService.IsSignedIn(User)) await SetUserInfo();
+            if (string.IsNullOrWhiteSpace(this.UserName)) return Unauthorized();
+
+            var board = await _gift.GetMyFriendGiftBoardAsync(this.UserName, DateHelper.GetKoreaNow().Year);
+            var step  = board?.Steps.FirstOrDefault(s => s.Threshold == threshold);
+            var opt   = BulletinBoard.Common.ProductDisplayOptonHelper.FamilyTeamOption(threshold);
+            if (board == null || step == null || opt == null)
+            {
+                TempData["FamilyGiftMsg"] = "❌ 아직 고를 수 없는 선물이에요.";
+                return RedirectToAction(nameof(MyGiftBox3));
+            }
+
+            var allowed = await _giftCatalog.CanPickAsync(productId,
+                new BulletinBoard.Services.GiftCatalog.GiftCatalogQuery { Option = opt.Value });
+            if (!allowed)
+            {
+                TempData["FamilyGiftMsg"] = "❌ 이 단계에서 고를 수 없는 선물이에요. 목록에서 다시 골라 주세요.";
+                return RedirectToAction(nameof(MyGiftBox3));
+            }
+
+            bool ok = await _gift.SelectFriendGiftAsync(this.UserName, productId, board.Total, board.AwardKey, threshold);
+            TempData["FamilyGiftMsg"] = ok ? "✅ 친구팀 선물을 신청했어요! 관리자가 확인 후 처리합니다."
+                                           : "❌ 이미 준비 중이거나 받은 선물은 바꿀 수 없어요.";
+            return RedirectToAction(nameof(MyGiftBox3));
+        }
+
+        /// <summary>친구팀 선물 취소 (POST) — 내 선물만, 아직 준비 전일 때</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FriendGiftCancel(int threshold, string? returnTo = null)
+        {
+            if (await _authService.IsSignedIn(User)) await SetUserInfo();
+            if (string.IsNullOrWhiteSpace(this.UserName)) return Unauthorized();
+
+            var board = await _gift.GetMyFriendGiftBoardAsync(this.UserName, DateHelper.GetKoreaNow().Year);
+            if (board != null)
+            {
+                await _gift.CancelFriendGiftAsync(this.UserName, board.AwardKey, threshold);
+                TempData["FamilyGiftMsg"] = "🗑️ 친구팀 선물 신청을 취소했어요.";
+            }
+            return RedirectToAction(nameof(MyGiftBox3));
         }
 
         /// <summary>APPLAUSE 마일스톤 숨기기 (POST) — 팀 단위</summary>

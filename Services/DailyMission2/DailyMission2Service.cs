@@ -179,7 +179,8 @@ SELECT
     ci.ClassYear,
     ci.ClassBan,
     ISNULL(dm.YearPoint, 0)                   AS YearPoint,
-    dm.LastActionDate
+    dm.LastActionDate,
+    t.TeamType
 FROM dbo.DM2_FamilyMember m WITH (NOLOCK)
 JOIN dbo.DM2_FamilyTeam   t WITH (NOLOCK) ON t.FamilyTeamId = m.FamilyTeamId AND t.IsActive = 1
 JOIN [Identity].[User]    u WITH (NOLOCK) ON u.UserName = m.UserName
@@ -213,6 +214,7 @@ ORDER BY m.FamilyTeamId, m.RoleCode, m.RelationCode;";
                     RelationCode = rd.IsDBNull(3) ? 9 : Convert.ToInt32(rd.GetByte(3)),
                     SortNo       = rd.GetInt32(4),
                     UserName     = rd.IsDBNull(6) ? "" : rd.GetString(6).Trim(),
+                    TeamType     = rd.IsDBNull(13) ? "FAMILY" : rd.GetString(13),
                 };
                 var prow = new ParticipantCardRow
                 {
@@ -431,6 +433,7 @@ ORDER BY ISNULL(dm.YearPoint,0) DESC, ISNULL(pm.FullName,'') ASC;
                 familyCards.Add(new ParticipantCardRow
                 {
                     IsFamily = true,
+                    TeamType = g.First().map.TeamType,
                     FamilyTeamId = g.Key,
                     FamilyTeamName = teamName,
                     FamilyMembers = members,

@@ -1,0 +1,234 @@
+@model BulletinBoard.Services.FamilyTeamDetail
+@using BulletinBoard.Common
+@using BulletinBoard.Services
+@using BulletinBoard.Services.Abstract
+@*  ══════════════════════════════════════════════════════════════
+    우리 친구팀 (친구팀이 있을 때) — 2026-11-08
+    · 두 사람을 나란히 보여 준다 (트리 · 관계 없음). 최대 2명
+    · 선물은 2명이 찼을 때만 열리고 두 사람이 각자 고른다
+    · 방장 · 탈퇴 · 내보내기 · 시상 기록 잠금 · 이름 바꾸기는 가족팀과 같다
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    Layout = null;
+    string? msg = ViewBag.Msg as string;
+    bool msgOk  = ViewBag.MsgOk is bool b && b;
+    var board = ViewBag.FriendBoard as FriendGiftBoardVM;
+    bool isFull = Model.Members.Count >= FamilyTeamService.FriendCapacity;
+    bool isSolo = Model.Members.Count == 1 && !Model.HasAwardRecord;
+    int total = board?.Total ?? 0;
+    int PointOf(string userName) => board?.Members.FirstOrDefault(x => string.Equals(x.UserName, userName, StringComparison.OrdinalIgnoreCase))?.Point ?? 0;
+    var steps = board?.Steps ?? new List<FriendGiftStepVM>();
+    int next = board?.NextThreshold ?? 0;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>@Model.TeamName</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/family-team.css" asp-append-version="true">
+</head>
+<body>
+<div class="ft">
+    <div class="ft-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a> › <a href="/DailyMission2/Welcome">@ConstatsCommon.MainKeyTitle</a> › <b>친구팀</b></span>
+    </div>
+
+    <h1 class="ft-h1">@Model.TeamName<span class="ft-kind fr">친구팀</span></h1>
+    <p class="ft-sub">우리 친구팀 · @(Model.Members.Count)/@(FamilyTeamService.FriendCapacity)명</p>
+    <details class="ft-ap" style="margin-top:8px">
+        <summary><span class="ft-btn g">팀 이름 바꾸기</span></summary>
+        <form class="box" method="post" asp-action="Rename">
+            @Html.AntiForgeryToken()
+            <input class="ft-in" name="teamName" value="@Model.TeamName" maxlength="@FamilyTeamService.MaxTeamNameLength" aria-label="팀 이름" style="background:#fff" />
+            <div style="margin-top:10px"><button class="ft-btn p w" type="submit">이름 저장</button></div>
+            <div class="ft-mem" style="margin-top:8px">팀원 누구나 바꿀 수 있어요. 이름을 바꿔도 점수와 시상 기록은 그대로예요.</div>
+        </form>
+    </details>
+
+    @if (!string.IsNullOrEmpty(msg))
+    {
+        <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
+    }
+
+    @if (isFull)
+    {
+        <div class="ft-kv">
+            <div><small>합산 점수</small><b>@total.ToString("N0")</b></div>
+            <div><small>다음 선물까지</small><b>@(next > 0 ? (next - total).ToString("N0") : "–")</b></div>
+        </div>
+    }
+
+    @* ── 두 사람 나란히 ── *@
+    <div class="ft-pair">
+        @{ int idx = 0; }
+        @foreach (var m in Model.Members)
+        {
+            if (idx++ > 0) { <div class="plus" aria-hidden="true">+</div> }
+            <div class="one">
+                <div class="av"></div>
+                <div class="nm">@m.FullName</div>
+                <div class="pt">@PointOf(m.UserName).ToString("N0")점</div>
+                <small>@(string.Equals(m.UserName, Model.CreatorUserName, StringComparison.OrdinalIgnoreCase) ? "방장" : "친구")@(m.IsMe ? " · 나" : "")</small>
+            </div>
+        }
+        @if (!isFull)
+        {
+            <div class="plus" aria-hidden="true">+</div>
+            <div class="one empty">
+                <div class="av"></div>
+                <div class="nm">빈자리</div>
+                <small>친구를 초대해요</small>
+            </div>
+        }
+    </div>
+
+    @if (!isFull)
+    {
+        <div class="ft-msg warn">친구가 들어오면 선물이 열려요. 합산 1,000점부터 두 사람이 각각 선물을 받아요.</div>
+    }
+
+    @* ── 선물 : 각자 자기 것만 ── *@
+    @if (steps.Count > 0)
+    {
+        <div class="ft-sh"><span>선물</span><small>각자 골라요</small></div>
+        @foreach (var s in steps)
+        {
+            string StatusText(string? st, string? name)
+                => st == "HIDDEN" ? $"{name} · 받았어요" : st == "PURCHASED" ? $"{name} · 준비 중" : st == "DRAFT" ? $"{name} · 선택 중" : "아직 고르지 않았어요";
+            <div class="ft-gift">
+                <div class="h">@s.Threshold.ToString("N0")점 달성</div>
+                <div class="ft-row" style="border:0;padding:6px 0">
+                    <div class="l"><div class="ft-nm">나</div><div class="ft-mem">@StatusText(s.MineStatus, s.MineProductName)</div></div>
+                    @if (s.MineStatus == null || s.MineStatus == "DRAFT")
+                    {
+                        <a class="ft-btn p" href="/StudentPointDashboard4/GiftSelect?type=friend&threshold=@s.Threshold">@(s.MineStatus == null ? "선물 고르기" : "바꾸기")</a>
+                    }
+                </div>
+                <div class="ft-row" style="border:0;padding:6px 0">
+                    <div class="l"><div class="ft-nm">@s.PartnerName</div><div class="ft-mem">@StatusText(s.PartnerStatus, s.PartnerProductName)</div></div>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── 받은 가입 신청 ── *@
+    @if (Model.Requests.Count > 0)
+    {
+        <div class="ft-sh"><span>받은 가입 신청</span><small>@Model.Requests.Count 건</small></div>
+        @foreach (var r in Model.Requests)
+        {
+            <div class="ft-row">
+                <div class="l"><div class="ft-nm">@r.TargetFullName</div><div class="ft-mem">우리 친구팀에 들어오고 싶어 해요</div></div>
+                <div class="ft-acts">
+                    <form method="post" asp-action="DeclineRequest">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn g" type="submit">거절</button></form>
+                    <form method="post" asp-action="AcceptRequest">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn p" type="submit">수락</button></form>
+                </div>
+            </div>
+        }
+    }
+
+    @* ── 내보내기 : 방장만, 시상 기록이 있으면 불가 ── *@
+    @if (Model.IsCreator && Model.Members.Count > 1)
+    {
+        <div class="ft-sh"><span>구성원</span></div>
+        @foreach (var m in Model.Members.Where(x => !x.IsMe))
+        {
+            <div class="ft-row">
+                <div class="l"><div class="ft-nm">@m.FullName</div></div>
+                @if (Model.HasAwardRecord)
+                {
+                    <button class="ft-btn d" type="button" disabled aria-disabled="true" style="opacity:.5;cursor:not-allowed" title="시상 기록이 있는 팀은 구성원을 내보낼 수 없어요">내보내기</button>
+                }
+                else
+                {
+                    <form method="post" asp-action="Kick" data-confirm="@(m.FullName)님을 팀에서 내보낼까요?|내보내도 그분의 점수는 그대로예요.|내보내기">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="targetUserName" value="@m.UserName" />
+                        <button class="ft-btn d" type="submit">내보내기</button>
+                    </form>
+                }
+            </div>
+        }
+    }
+
+    @* ── 이름 조회 · 친구 초대 ── *@
+    @if (!isFull)
+    {
+        <div class="ft-sh"><span>이름 조회 · 친구 초대</span></div>
+        <p class="ft-sub" style="margin-top:8px">학생 친구를 이름으로 찾아 초대해요. 상대가 로그인해서 승인해야 팀에 들어와요.</p>
+        @if (isSolo)
+        {
+            <p class="ft-sub" style="margin-top:6px">이미 친구가 만든 팀에 들어가도 돼요. 신청하면 내가 만든 팀은 바로 삭제돼요.</p>
+        }
+        <form id="invForm" method="post" asp-action="Invite">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="targetUserName" id="invTarget" value="" />
+        </form>
+        <div id="ftSearch" data-mode="FRIEND" data-invite="1" data-apply="@(isSolo ? "1" : "0")" data-solo="@(isSolo ? Model.TeamName : "")" data-blocked="0" data-rels="[]">
+            <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
+            <div id="ftRes" class="ft-res" aria-live="polite"></div>
+        </div>
+    }
+
+    @if (Model.Invites.Count > 0)
+    {
+        <div class="ft-sh"><span>보낸 초대</span><small>@Model.Invites.Count 건</small></div>
+        @foreach (var r in Model.Invites)
+        {
+            <div class="ft-row">
+                <div class="l"><div class="ft-nm">@r.TargetFullName</div><div class="ft-mem">@r.FromFullName 님이 보냄 · 30일 뒤 사라져요</div></div>
+                <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="requestId" value="@r.Id" /><button class="ft-btn g" type="submit">취소</button></form>
+            </div>
+        }
+    }
+
+    @* ── 탈퇴 : 가족팀과 같은 규칙 ── *@
+    <div style="margin-top:32px;padding-top:18px;border-top:1px solid var(--line);text-align:center">
+        @if (Model.HasAwardRecord)
+        {
+            <button class="ft-btn g" type="button" disabled aria-disabled="true" style="opacity:.55;cursor:not-allowed">팀 탈퇴</button>
+            <div class="ft-mem" style="margin-top:8px">시상 기록이 있는 팀은 탈퇴와 내보내기를 할 수 없어요. 문의가 필요하면 관리자에게 알려 주세요.</div>
+        }
+        else if (Model.IsCreator && !isSolo)
+        {
+            <div class="ft-mem">방장은 팀에서 나갈 수 없어요. 팀 삭제는 관리자에게 문의해 주세요.</div>
+        }
+        else if (Model.IsCreator)
+        {
+            <form method="post" asp-action="Leave" data-confirm="팀에서 나갈까요?|혼자이고 시상 기록이 없어서 나갈 수 있어요. 나가면 팀이 삭제돼요.|탈퇴">
+                @Html.AntiForgeryToken()
+                <button class="ft-btn g" type="submit">팀 탈퇴 (팀 삭제)</button>
+            </form>
+        }
+        else
+        {
+            <form method="post" asp-action="Leave" data-confirm="팀에서 나갈까요?|나가도 내 점수는 그대로예요.|탈퇴">
+                @Html.AntiForgeryToken()
+                <button class="ft-btn g" type="submit">팀 탈퇴</button>
+            </form>
+        }
+    </div>
+</div>
+
+<script src="/js/qb-confirm.js" asp-append-version="true"></script>
+<script src="/js/family-team-search.js" asp-append-version="true"></script>
+<script>
+(function () {
+    // 내보내기 · 탈퇴는 한 번 더 묻는다  (data-confirm = "제목|설명|확인 버튼 글자")
+    document.addEventListener('submit', async function (e) {
+        var f = e.target.closest('form[data-confirm]');
+        if (!f || f.dataset.ok === '1') return;
+        e.preventDefault();
+        var p = f.dataset.confirm.split('|');
+        var r = await window.qbConfirm(true, [p[0], p[1] || ''], '', p[2] || '확인', '취소');
+        if (r === 'y') { f.dataset.ok = '1'; f.submit(); }
+    });
+})();
+</script>
+</body>
+</html>

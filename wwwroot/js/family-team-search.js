@@ -1,4 +1,4 @@
-﻿// wwwroot/js/family-team-search.js — 가족팀 이름 조회 (팀 있음 · 팀 없음 화면 공용)
+// wwwroot/js/family-team-search.js — 가족팀 이름 조회 (팀 있음 · 팀 없음 화면 공용)
 //   #ftSearch 의 data 값
 //     data-invite="1"  : 초대할 수 있다 (내가 팀원). 팀 없는 사람에게 [초대] 버튼
 //     data-apply="1"   : 다른 팀에 신청할 수 있다 (팀이 없거나, 내 팀에 나 혼자)
@@ -29,18 +29,22 @@
             '<form class="box" method="post" action="/FamilyTeam/Apply" id="' + name + '"' + conf + '>' +
             '<input type="hidden" name="__RequestVerificationToken" value="' + esc(tokenEl ? tokenEl.value : '') + '" />' +
             '<input type="hidden" name="teamId" value="' + esc(h.teamId) + '" />' +
-            '<div class="ft-q" style="margin-top:0">나는 이 팀의…</div><div class="ft-chips">' + chips + '</div>' + warn +
+            '<input type="hidden" name="type" value="' + esc(root.dataset.mode || 'FAMILY') + '" />' +
+            (h.teamType === 'FRIEND' ? '' : '<div class="ft-q" style="margin-top:0">나는 이 팀의…</div><div class="ft-chips">' + chips + '</div>') + warn +
             '<div style="margin-top:12px"><button class="ft-btn p w" type="submit">신청 보내기</button></div>' +
             '</form></details>';
     }
 
     function row(h) {
+        var mode = root.dataset.mode || 'FAMILY';
+        var friendMode = mode === 'FRIEND';
+        var kind = h.teamType === 'FRIEND' ? '친구팀' : '가족팀';
         var info = '', action = '';
         if (h.teamId) {
-            info = '<div class="ft-mem"><b>' + esc(h.teamName) + '</b></div>' +
+            info = '<div class="ft-mem"><b>' + esc(h.teamName) + '</b> · ' + kind + (h.isFull ? ' · 정원 찼음' : '') + '</div>' +
                    '<div class="ft-mem">구성원: ' + esc((h.members || []).join(' · ')) + '</div>';
         } else {
-            info = '<div class="ft-mem">소속 팀 없음</div>';
+            info = '<div class="ft-mem">소속 팀 없음' + (friendMode && !h.isStudent ? ' · 학생이 아니에요' : '') + '</div>';
         }
 
         if (h.state === 'mine') {
@@ -48,7 +52,11 @@
         } else if (h.state === 'invited') {
             action = '<span class="ft-btn g">초대 보냄</span>';
         } else if (h.state === 'ok') {
-            if (canInvite) action = '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '">초대</button>';
+            if (canInvite && (!friendMode || h.isStudent)) action = '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '">초대</button>';
+        } else if (h.teamType !== mode) {
+            action = '<span class="ft-btn g">다른 종류의 팀</span>';
+        } else if (h.isFull) {
+            action = '<span class="ft-btn g">정원 찼음</span>';
         } else if (h.requested) {
             info += '<div class="ft-mem" style="color:var(--blue);font-weight:700">이 팀에 가입 신청을 보냈어요</div>';
         } else if (canApply && blocked) {

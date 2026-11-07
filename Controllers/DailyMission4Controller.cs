@@ -150,7 +150,7 @@ namespace BulletinBoard.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> ParticipantTeams(int? year)
+        public async Task<IActionResult> ParticipantTeams(int? year, string? kind = null)
         {
             if (await _authService.IsSignedIn(User))
                 await SetUserInfo();
@@ -165,7 +165,12 @@ namespace BulletinBoard.Controllers
             await Task.WhenAll(tTarget, tRows, tGift);
 
             int targetPoint = tTarget.Result;
-            var rows        = tRows.Result;
+            // 가족팀 · 친구팀 탭 — 인원이 다른 팀끼리 점수를 견주지 않게 나눠 보여 준다
+            bool friendTab  = string.Equals(kind, "friend", StringComparison.OrdinalIgnoreCase);
+            ViewBag.Kind        = friendTab ? "friend" : "family";
+            ViewBag.FamilyCount = tRows.Result.Count(r => r.TeamType != "FRIEND");
+            ViewBag.FriendCount = tRows.Result.Count(r => r.TeamType == "FRIEND");
+            var rows        = tRows.Result.Where(r => (r.TeamType == "FRIEND") == friendTab).ToList();
 
             foreach (var r in rows)
             {
