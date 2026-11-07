@@ -10,6 +10,7 @@
 @{
     Layout = null;
     var roles = (List<CodeData>)ViewData["Roles"];
+    var pending = (HashSet<string>)ViewData["Pending"];
     var years = (List<int>)ViewData["Years"];
     var bans  = (List<int>)ViewData["Bans"];
 }
@@ -66,8 +67,9 @@
         {
             var m = Model[i];
             bool hasCls = m.ClassYear > 0 && m.ClassBan > 0;
+            bool isPending = pending.Contains(m.UserName ?? "");
             <div class="ua-row" data-uid="@m.UserId" data-name="@m.FullName" id="r@(i)">
-                <div class="ua-nm">@m.FullName<small>@m.UserName</small></div>
+                <div class="ua-nm">@m.FullName<small>@m.UserName</small>@if (isPending) { <small style="color:#9A5B00;background:#FFF4E0;border-radius:6px;padding:1px 6px">연결 요청 대기</small> }</div>
                 <div class="ua-sel">
                     <select id="r_@(i)" aria-label="역할" onchange="uaRole(@i)">
                         <option value="">역할 선택</option>
@@ -84,7 +86,7 @@
                         @foreach (var b in bans) { <option value="@b" selected="@(hasCls && b == m.ClassBan)">@(b)반</option> }
                     </select>
                 </div>
-                <div class="ua-ft"><span class="ua-err" id="e@(i)"></span><button type="button" class="ua-save" id="s@(i)" onclick="uaSave(@i)">저장</button></div>
+                <div class="ua-ft"><span class="ua-err" id="e@(i)"></span><button type="button" class="ua-save" id="s@(i)" onclick="uaSave(@i)" disabled="@isPending">저장</button></div>
             </div>
         }
     </div>

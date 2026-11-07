@@ -1,0 +1,118 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.DataAccessLayer;
+@model List<PersonLinkRequestRow>
+
+@*  ══════════════════════════════════════════════════════════════
+    연결 요청 확인 — 2026-11-08 시안 확정 (SuperAdmin 전용 · DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
+    · 가입한 분이 "이 사람이 저예요"를 눌러 보낸 요청을 승인하거나, "다른 사람이에요"로 새 기록을 만든다
+    · 처리: /PersonMatch/Decide (approve=true 연결 · false 새 기록)
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>연결 요청 확인</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .rq-sum { display: inline-block; min-width: 120px; background: #FFF4E0; color: #9A5B00; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin: 12px 0; }
+        .rq-sum b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; }
+        .rq-row { border-top: 1px solid #E8EBF0; padding: 12px 0; }
+        .rq-top { display: flex; justify-content: space-between; align-items: baseline; }
+        .rq-nm { font-size: 16px; font-weight: 700; }
+        .rq-nm small { font-weight: 400; color: #8A93A0; font-size: 12px; margin-left: 4px; }
+        .rq-dt { font-size: 12px; color: #8A93A0; }
+        .rq-box { margin-top: 8px; padding: 8px 10px; background: #F5F7FA; border-radius: 10px; font-size: 13px; }
+        .rq-box span { display: block; font-size: 12px; color: #6B7684; }
+        .rq-box b { font-weight: 700; }
+        .rq-warn { margin-top: 6px; font-size: 12px; color: #D13B3B; }
+        .rq-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .rq-btns button { flex: 1; height: 40px; border-radius: 10px; font-size: 14px; font-weight: 700; border: 1px solid #D9DEE6; background: #fff; color: #333; }
+        .rq-btns button.p { background: #2F7BF5; border-color: #2F7BF5; color: #fff; }
+        .rq-btns button[disabled] { opacity: .5; }
+        .rq-err { min-height: 16px; font-size: 13px; color: #D13B3B; margin-top: 4px; }
+        .rq-empty { display: none; padding: 28px 0; text-align: center; color: #8A93A0; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>연결 요청</span>
+        <span>SuperAdmin</span>
+    </div>
+
+    <div class="qb-k">APPROVE</div>
+    <h1 class="qb-h1">연결 요청 확인</h1>
+    <div class="qb-sub">가입한 분이 "이 사람이 저예요"를 눌렀어요. 맞는지 확인해 주세요.</div>
+
+    <div class="rq-sum">확인 대기<b id="rqCnt">@Model.Count</b></div>
+
+    <div id="rqList">
+        @foreach (var r in Model)
+        {
+            bool linked = !string.IsNullOrEmpty(r.TargetUserName);
+            string cls = r.ClassYear > 0 && r.ClassBan > 0 ? $"{r.ClassYear}학년 {r.ClassBan}반" : "반 정보 없음";
+            string bd = r.BMonth > 0 && r.BDay > 0 ? $"생일 {r.BMonth}월 {r.BDay}일" : "생일 정보 없음";
+            <div class="rq-row" id="rq@(r.RequestId)">
+                <div class="rq-top">
+                    <div class="rq-nm">@r.FullName<small>아이디 @r.UserName</small></div>
+                    <div class="rq-dt">@r.InsertDT.ToString("MM-dd") 요청</div>
+                </div>
+                <div class="rq-box">
+                    <span>연결하려는 기존 기록</span>
+                    <b>@r.TargetFullName · @cls</b>
+                    <span>@bd · @(linked ? "이미 다른 계정(" + r.TargetUserName + ")과 연결됨" : "계정 없음")</span>
+                </div>
+                @if (linked) { <div class="rq-warn">그 사이 다른 계정과 연결됐어요. "다른 사람이에요"로 처리해 주세요.</div> }
+                <div class="rq-btns">
+                    <button type="button" onclick="rqDecide(@r.RequestId, false)">다른 사람이에요 (새로 등록)</button>
+                    <button type="button" class="p" onclick="rqDecide(@r.RequestId, true)" disabled="@linked">승인</button>
+                </div>
+                <div class="rq-err" id="rqe@(r.RequestId)"></div>
+            </div>
+        }
+    </div>
+    <div class="rq-empty" id="rqEmpty">확인할 요청이 없어요.</div>
+
+    <div class="qb-ft">
+        <span>승인하면 그 기록에 가입 계정이 연결돼요</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    function rqCount() {
+        var n = document.querySelectorAll('#rqList .rq-row').length;
+        document.getElementById('rqCnt').textContent = n;
+        document.getElementById('rqEmpty').style.display = n ? 'none' : 'block';
+    }
+    function rqDecide(id, approve) {
+        var row = document.getElementById('rq' + id), err = document.getElementById('rqe' + id);
+        var btns = row.querySelectorAll('button');
+        err.textContent = '';
+        btns.forEach(function (b) { b.disabled = true; });
+        var fd = new FormData();
+        fd.append('requestId', id); fd.append('approve', approve ? 'true' : 'false');
+        fetch('/PersonMatch/Decide', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (x) {
+                var ct = x.headers.get('content-type') || '';
+                if (x.redirected || ct.indexOf('json') < 0) { throw new Error('응답 ' + x.status); }
+                return x.json();
+            })
+            .then(function (j) {
+                if (j.ok) { row.remove(); rqCount(); }
+                else { err.textContent = j.message || '처리하지 못했어요'; btns.forEach(function (b) { b.disabled = false; }); }
+            })
+            .catch(function (e) { err.textContent = '처리하지 못했어요 · ' + (e && e.message ? e.message : ''); btns.forEach(function (b) { b.disabled = false; }); });
+    }
+    rqCount();
+</script>
+</body>
+</html>

@@ -329,6 +329,19 @@ namespace BulletinBoard.DataAccessLayer
             }
         }
 
+        /// <summary>Identity.User 에서 UserId 로 로그인 아이디(UserName) 조회</summary>
+        private static async Task<string?> GetUserNameByUserIdAsync(SqlConnection conn, SqlTransaction? tx, string userId)
+        {
+            using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 [UserName] FROM [Identity].[User] WHERE [Id] = @UserId", conn, tx))
+            {
+                cmd.Parameters.AddWithValue("@UserId", userId);
+                object? result = await cmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value) return null;
+                var s = Convert.ToString(result);
+                return string.IsNullOrWhiteSpace(s) ? null : s;
+            }
+        }
+
         /// <summary>
         /// (필요 시) PersonMaster_2026 신규 생성용: FullName 기반 insert
         /// - 테이블 구조를 정확히 모르므로, "존재 가능성이 높은 컬럼들"만 사용
@@ -341,18 +354,21 @@ namespace BulletinBoard.DataAccessLayer
             string? phoneNumber,
             int bMonth,
             int bDay,
-            string? birthDay_PublishYN = null)
+            string? birthDay_PublishYN = null,
+            string? userName = null)
         {
             // birthDay_PublishYN 컬럼이 있다고 가정(뷰에도 존재)
             // 없으면 이 컬럼 라인을 제거해야 합니다.
+            // UserName: 회원 가입한 사람이면 계정 아이디를 함께 넣는다(뷰 view_PersonMaster_2026 이 이 값으로 계정과 잇는다)
             string sql = @$"
                 INSERT INTO [dbo].[PersonMaster_2026]
-                    ([fullName], [PhoneNumber], [bMonth], [bDay], [birthDay_PublishYN], [insertDT])
+                    ([fullName], [PhoneNumber], [bMonth], [bDay], [birthDay_PublishYN], [insertDT], [UserName])
                 VALUES
-                    (@fullName, @PhoneNumber, @bMonth, @bDay, @birthDay_PublishYN, @insertDT )";
+                    (@fullName, @PhoneNumber, @bMonth, @bDay, @birthDay_PublishYN, @insertDT, @UserName )";
 
             using (SqlCommand cmd = new SqlCommand(sql, conn, tx))
             {
+                cmd.Parameters.AddWithValue("@UserName", (object?)userName ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@fullName", fullName);
                 cmd.Parameters.AddWithValue("@PhoneNumber", (object?)phoneNumber ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@bMonth", bMonth);
@@ -389,7 +405,7 @@ namespace BulletinBoard.DataAccessLayer
                             string? fullName = await GetFullNameByUserIdAsync(conn, tx, UserId);
                             if (!string.IsNullOrWhiteSpace(fullName))
                             {
-                                await InsertPersonMaster2026Async(conn, tx, fullName!, PhoneNumber, bMonth, bDay);
+                                await InsertPersonMaster2026Async(conn, tx, fullName!, PhoneNumber, bMonth, bDay, userName: await GetUserNameByUserIdAsync(conn, tx, UserId));
                             }
 
                             // Insert 후 다시 매핑 시도
@@ -455,7 +471,7 @@ namespace BulletinBoard.DataAccessLayer
                             string? fullName = await GetFullNameByUserIdAsync(conn, tx, UserId);
                             if (!string.IsNullOrWhiteSpace(fullName))
                             {
-                                await InsertPersonMaster2026Async(conn, tx, fullName!, null, bMonth, bDay, birthDay_PublishYN);
+                                await InsertPersonMaster2026Async(conn, tx, fullName!, null, bMonth, bDay, birthDay_PublishYN, await GetUserNameByUserIdAsync(conn, tx, UserId));
                             }
 
                             // Insert 후 다시 매핑 시도
@@ -514,7 +530,7 @@ namespace BulletinBoard.DataAccessLayer
                             string? fullName = await GetFullNameByUserIdAsync(conn, tx, UserId);
                             if (!string.IsNullOrWhiteSpace(fullName))
                             {
-                                await InsertPersonMaster2026Async(conn, tx, fullName!, null, 0, 0);
+                                await InsertPersonMaster2026Async(conn, tx, fullName!, null, 0, 0, userName: await GetUserNameByUserIdAsync(conn, tx, UserId));
                             }
                             personId = await GetPersonIdByUserIdAsync(conn, tx, UserId);
                         }

@@ -115,6 +115,28 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
                     else
                     {
                         await _signInManager.SignInAsync(user, isPersistent: false);
+
+                        // 사람 명부(PersonMaster_2026) 연결: 같은 한글 이름이 없으면 자동으로 만들고(UserName 포함),
+                        // 있으면 "어느 쪽이 나인지" 묻는 화면으로 보낸다. 실패해도 가입 자체는 막지 않는다.
+                        try
+                        {
+                            var fullName = (Input.LastName + Input.FirstName).Trim();
+                            var match = new BulletinBoard.DataAccessLayer.ControlPersonMatch();
+                            var same = await match.FindByFullNameAsync(fullName);
+                            if (same.Count == 0)
+                            {
+                                await match.CreateAsync(fullName, user.UserName);
+                            }
+                            else
+                            {
+                                return LocalRedirect(Url.Content("~/PersonMatch/Index") + "?fullName=" + Uri.EscapeDataString(fullName) + "&returnUrl=" + Uri.EscapeDataString(returnUrl));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "가입 후 PersonMaster_2026 연결 실패");
+                        }
+
                         return LocalRedirect(returnUrl);
                     }
                 }
