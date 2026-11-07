@@ -3,7 +3,7 @@
 @*  ══════════════════════════════════════════════════════════════
     가족팀 알림 팝업 — 로그인한 사람이 들어올 때 (Welcome · 미션 홈에 붙인다)
       1) "팀원이 되었어요"   내가 낸 가입 신청이 수락된 뒤 처음 들어올 때 한 번만 (읽으면 지운다)
-      2) "○○님이 초대했어요" 받은 초대가 있으면 — 승인해야 팀에 들어간다. [나중에] 는 그 초대 한 건에 대해서만 12시간 동안 다시 안 보여 준다(취소 후 새 초대는 다시 보여 준다)
+      2) "○○님이 초대했어요" 받은 초대가 있으면 — 승인해야 팀에 들어간다. "다시 알려 주세요" [내일 · 3일 뒤 · 1주일 뒤] 를 고르면 그 초대 한 건에 대해서만 그 기간 동안 다시 안 보여 준다(취소 후 새 초대는 다시 보여 준다)
     · 표(DM2_FamilyRequest · DM2_FamilyNotice)를 아직 만들지 않았거나 DB 오류가 나도 화면은 그대로 나온다
     ══════════════════════════════════════════════════════════════ *@
 @{
@@ -52,13 +52,18 @@ else if (invite != null)
             <div class="ic" aria-hidden="true">&#9993;</div>
             <h2 id="ftpIT">@invite.FromFullName 님이 초대했어요</h2>
             <p>"@invite.TeamName"@if (invite.TeamType != FamilyTeamService.TypeFriend) {<text>의 <b>@invite.RelLabel</b>(으)로</text>} else {<text>에서</text>} 함께하고 싶대요.<small>구성원: @string.Join(" · ", invite.MemberNames)</small></p>
-            <div class="bar">
-                <button class="ft-btn g" type="button" id="ftpILater">나중에</button>
+            <div class="bar one">
                 <form method="post" action="/FamilyTeam/AcceptInvite">
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="requestId" value="@invite.Id" />
                     <button class="ft-btn p" type="submit">팀에 들어가기</button>
                 </form>
+            </div>
+            <div class="later-k">지금은 말고, 다시 알려 주세요</div>
+            <div class="later">
+                <button class="ft-btn g" type="button" data-later-days="1">내일</button>
+                <button class="ft-btn g" type="button" data-later-days="3">3일 뒤</button>
+                <button class="ft-btn g" type="button" data-later-days="7">1주일 뒤</button>
             </div>
             <div class="bar one" style="margin-top:8px">
                 <form method="post" action="/FamilyTeam/DeclineInvite">
@@ -77,9 +82,13 @@ else if (invite != null)
             var later = false;
             try { later = (document.cookie || '').split(/;\s*/).indexOf(key + '=1') >= 0; } catch (e) { }
             if (!later) ov.classList.add('on');
-            document.getElementById('ftpILater').addEventListener('click', function () {
-                try { document.cookie = key + '=1; max-age=' + (12 * 3600) + '; path=/; SameSite=Lax'; } catch (e) { }
-                ov.classList.remove('on');
+            /* 고른 기간(1 · 3 · 7일) 동안 이 초대 팝업을 다시 띄우지 않는다 */
+            ov.querySelectorAll('[data-later-days]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var days = parseInt(b.getAttribute('data-later-days'), 10) || 1;
+                    try { document.cookie = key + '=1; max-age=' + (days * 86400) + '; path=/; SameSite=Lax'; } catch (e) { }
+                    ov.classList.remove('on');
+                });
             });
         })();
     </script>
