@@ -50,6 +50,24 @@
         .calendar .day.has-event { background: #EAF2FD; color: #2F80ED; font-weight: 800; }
         .calendar .day.selected { background: #fff; box-shadow: 0 0 0 2px #2F80ED; }
         .calendar .day.picked { background: #2F80ED; color: #fff; }
+        .calendar .day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+        .calendar .day.dim { opacity: .28; }
+        .calendar .day.hit { box-shadow: 0 0 0 2px #B45309; }
+        .qd-dots { display: flex; gap: 3px; }
+        .qd-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .qd-dot.no { background: transparent; box-shadow: inset 0 0 0 1.2px currentColor; opacity: .7; }
+        .calendar .day:not(.has-event) .qd-dot.no { opacity: .45; }
+        .qd-fl { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+        .qd-fl:empty { display: none; }
+        .qd-fl .t { font-size: 12px; color: #6B7280; margin-right: 2px; }
+        .qd-fl .fc { border: 0; font: inherit; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 5px 11px; background: #FFF4E5; color: #B45309; cursor: pointer; }
+        .qd-fl .fc.z { background: #EAF7EF; color: #15803D; cursor: default; }
+        .qd-fl .fc.on { background: #B45309; color: #fff; }
+        .legend b.qd-dot { vertical-align: 0; margin-right: 2px; color: #111827; }
+        .qd-st { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+        .qd-st .s { display: flex; align-items: center; gap: 6px; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; font-weight: 800; background: #EAF7EF; color: #15803D; }
+        .qd-st .s.no { background: #FFF4E5; color: #B45309; }
+        .qd-st .s b { font-size: 14px; line-height: 1; }
         #event-details { margin-top: 16px; padding: 14px; border-radius: 14px; background: #F4F6F9; font-size: 13.5px; line-height: 1.7; color: #374151; }
         #event-details .dt { font-size: 12px; font-weight: 800; color: #2F80ED; }
         #event-details .qb-scr { margin-top: 8px; }
@@ -112,7 +130,9 @@
         <button type="button" onclick="goToToday('@ViewBag.NowDateTime')">오늘</button>
         <button type="button" onclick="nextMonth('@ViewBag.NextDateTime')">다음달</button>
     </div>
+    <div class="qd-fl" id="filters"></div>
     <div class="legend"><span><i class="ev"></i>퀴즈 있음</span><span><i></i>퀴즈 없음</span></div>
+    <div class="legend"><span><b class="qd-dot"></b> 입력</span><span><b class="qd-dot no"></b> 없음</span><span>점 순서: 말씀 · 배경 · 정답 · 힌트</span></div>
 
     <div class="wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
     <div class="calendar" id="calendar"></div>
@@ -202,12 +222,81 @@
 
     const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
     let currentDate = new Date(@Model.CurrentDate.Year, @Model.CurrentDate.Month - 1, @Model.CurrentDate.Day);
-    let events = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(@Model.Events));
+    let events = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(Model.Events, new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
     // 날짜별 그날 말씀 — 제목에 태그 글자가 있어도 스크립트가 끊기지 않게 HTML 문자를 이스케이프한다
     const monthWords = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject((object)ViewBag.MonthWords, new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
     // AI 프람프트 틀 — 날짜를 누르면 그날 구절 · 날짜를 채운다
     const quizAiPromptTemplate = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject((string)ViewBag.QuizAiTemplate, new Newtonsoft.Json.JsonSerializerSettings { StringEscapeHandling = Newtonsoft.Json.StringEscapeHandling.EscapeHtml }));
     let pickedCell = null;
+    const dayInfo = {};          // 날짜 → { hasQuiz, miss[] }
+    let qFilter = '';            // 칩으로 고른 빠진 곳
+    const KINDS = ['말씀', '배경', '정답', '힌트'];
+
+    // 정답 입력 여부 — 객관식은 보기 4개와 정답 번호(1~4), O/X 는 o · x, 주관식은 정답 글자
+    function answerOk(q) {
+        const t = String(q.QuestionType || '').toLowerCase();
+        const ans = String(q.CorrectAnswer == null ? '' : q.CorrectAnswer).trim();
+        if (t === 'o') {
+            for (let n = 1; n <= 4; n++) { if (!String(q['Question' + n] == null ? '' : q['Question' + n]).trim()) return false; }
+            return ['1', '2', '3', '4'].indexOf(ans) >= 0;
+        }
+        if (t === 'a') return ans.toLowerCase() === 'o' || ans.toLowerCase() === 'x';
+        return ans.length > 0;
+    }
+
+    // 빠진 곳 — 말씀 · 배경 · 정답 · 힌트 (q 가 null 이면 그날 퀴즈가 없는 것: 말씀만 따진다)
+    function quizMissing(key, q) {
+        const miss = [];
+        if (!(monthWords && monthWords[key])) miss.push('말씀');
+        if (!q) { miss.push('배경', '정답', '힌트'); return miss; }
+        if (!filledText(q.QuestionBackground, 'blank')) miss.push('배경');
+        if (!answerOk(q)) miss.push('정답');
+        if (!filledText(q.AnswerGuide, '...')) miss.push('힌트');
+        return miss;
+    }
+
+    function statusHtml(miss) {
+        return '<div class="qd-st">' + KINDS.map(function (k) {
+            const no = miss.indexOf(k) >= 0;
+            return '<div class="s' + (no ? ' no' : '') + '"><b>' + (no ? '✕' : '✓') + '</b>' + k + '</div>';
+        }).join('') + '</div>';
+    }
+
+    // 위 칩 — 퀴즈가 있는 날 가운데 그게 빠진 날 수
+    function buildFilters() {
+        const box = document.getElementById('filters');
+        const counts = {}; let total = 0;
+        KINDS.forEach(function (k) { counts[k] = 0; });
+        Object.keys(dayInfo).forEach(function (key) {
+            const d = dayInfo[key];
+            if (!d.hasQuiz) return;
+            total++;
+            d.miss.forEach(function (k) { counts[k]++; });
+        });
+        if (total === 0) { box.innerHTML = ''; return; }
+        box.innerHTML = '<span class="t">빠진 곳</span>' + KINDS.map(function (k) {
+            return counts[k] === 0
+                ? '<span class="fc z">' + k + ' 없음 0</span>'
+                : '<button type="button" class="fc' + (qFilter === k ? ' on' : '') + '" data-k="' + k + '">' + k + ' 없음 ' + counts[k] + '</button>';
+        }).join('');
+    }
+
+    function paintFilter() {
+        document.querySelectorAll('#calendar .day').forEach(function (c) {
+            const info = dayInfo[c.dataset.d];
+            const hit = !!(qFilter && info && info.hasQuiz && info.miss.indexOf(qFilter) >= 0);
+            c.classList.toggle('hit', hit);
+            c.classList.toggle('dim', !!qFilter && !hit);
+        });
+    }
+
+    document.getElementById('filters').addEventListener('click', function (e) {
+        const b = e.target.closest('button.fc');
+        if (!b) return;
+        qFilter = qFilter === b.dataset.k ? '' : b.dataset.k;
+        buildFilters();
+        paintFilter();
+    });
 
     function renderCalendar(date) {
         const year = date.getFullYear();
@@ -227,10 +316,16 @@
 
         for (let i = 1; i <= lastDateOfMonth; i++) {
             const dayCell = document.createElement("div");
-            dayCell.textContent = i;
             dayCell.className = "day";
             const cellDate = new Date(year, month, i);
             const event = events.find(e => new Date(e.Date).toDateString() === cellDate.toDateString());
+            const key = toYmdLocal(cellDate);
+            const miss = quizMissing(key, event ? (event.QuestionData || {}) : null);
+            dayInfo[key] = { hasQuiz: !!event, miss: miss };
+            dayCell.dataset.d = key;
+            dayCell.innerHTML = '<span>' + i + '</span><span class="qd-dots">'
+                + KINDS.map(function (k) { return '<i class="qd-dot' + (miss.indexOf(k) >= 0 ? ' no' : '') + '"></i>'; }).join('') + '</span>';
+            dayCell.setAttribute('aria-label', (month + 1) + '월 ' + i + '일' + (event && miss.length ? ', 빠진 곳 ' + miss.join(' ') : ''));
             dayCell.onclick = () => {
                 // 칸의 원본 날짜를 지키려고 복사본을 쓴다
                 selectedDate = new Date(cellDate);
@@ -250,6 +345,8 @@
             }
             calendar.appendChild(dayCell);
         }
+        buildFilters();
+        paintFilter();
     }
 
     // 비었거나 자리 채움 값(blank · ...)이면 빈 글자를 돌려준다 — 그때는 칸을 그리지 않는다
@@ -276,6 +373,7 @@
         const t = String(q.QuestionType || '').toLowerCase();
         const typeName = t === 'o' ? '객관식' : (t === 'a' ? 'O/X' : '주관식');
         let html = '<div class="dt">' + esc(toKorDate(selectedDate)) + ' · ' + typeName + '</div>';
+        html += statusHtml(quizMissing(toYmdLocal(selectedDate), q));
         html += wordCardHtml(selectedDate);
         const background = filledText(q.QuestionBackground, 'blank');
         if (background) {
