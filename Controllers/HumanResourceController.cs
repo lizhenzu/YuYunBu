@@ -50,10 +50,8 @@ namespace BulletinBoard.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> ViewMainBirthDay()
         {
-
-            ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
-            List<CodeData> codeDatas = manageDeptInfo.getCodeData("D001");
-            return View(codeDatas);
+            // 유년부 전용 사이트: 부서를 고르는 화면 없이 바로 생일 목록으로 간다
+            return RedirectToAction(nameof(addressBookDetailBirthDay), new { DeptCode = ConstatsCommon.FixedDeptCode, RankQueryOptionData = "None", ClassYear = 0, ClassBan = 0 });
         }
 
 
@@ -313,33 +311,12 @@ namespace BulletinBoard.Controllers
             return View("ChangeUserInfo", model);
         }
 
-        public async Task<IActionResult> ChangeUserDeptInfoIntro(string UserId)
-        {
-            ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-            ViewData["userInfo"] = userInfo[0];
-            return View();
-        }
-
-
-        public async Task<IActionResult> ChangeUserDeptInfoMain(string UserId)
-        {
-            ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-            ViewData["userInfo"] = userInfo[0];
-
-            ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
-            List<CodeData> codeDatas = manageDeptInfo.getCodeData("D001");
-            return View(codeDatas);
-        }
-
-        public async Task<IActionResult> ChangeUseRoleMain(string UserId, string DeptCode,string DeptNM)
+        // 유년부 전용 사이트: 부서는 고르지 않는다. 역할 선택 → (학생·교사면) 학년·반 → 저장
+        public async Task<IActionResult> ChangeUseRoleMain(string UserId)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0,string.Empty, string.Empty, RankQueryOption.None);
             ViewData["userInfo"] = userInfo[0];
-            ViewData["DeptCode"] = DeptCode;
-            ViewData["DeptNM"] = DeptNM;
 
             ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
 
@@ -356,8 +333,6 @@ namespace BulletinBoard.Controllers
                 List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
                                 userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
                 
-                ViewData["DeptCode"] = model.DeptCode;
-                ViewData["DeptNM"] = model.DeptNM;
                 ViewData["RoleCode"] = model.RoleCode;
                 ViewData["RoleNM"] = model.RoleNM;
                 return View("ChangeUserClassInfo", userInfo[0]);
@@ -368,8 +343,8 @@ namespace BulletinBoard.Controllers
 
                 await controlHumanResource.DeleteClassInfoAsync(model.UserId);
                 await controlHumanResource.DeleteDeptRoleUserAssocAsync(model.UserId);
-                await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, model.DeptCode, model.RoleCode);
-              
+                await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, ConstatsCommon.FixedDeptCode, model.RoleCode);
+
                 List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
                 userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
 
@@ -404,7 +379,6 @@ namespace BulletinBoard.Controllers
                                 .ToList();
 
             ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
-            ViewData["Depts"] = manageDeptInfo.getCodeData("D001");
             ViewData["Roles"] = manageDeptInfo.getCodeData("T001");
 
             var years = new SortedSet<int>();
@@ -425,10 +399,10 @@ namespace BulletinBoard.Controllers
 
         [HttpPost]
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
-        public async Task<IActionResult> UnassignedMembersSave(string UserId, string DeptCode, string RoleCode, int ClassYear, int ClassBan)
+        public async Task<IActionResult> UnassignedMembersSave(string UserId, string RoleCode, int ClassYear, int ClassBan)
         {
-            if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(DeptCode) || string.IsNullOrWhiteSpace(RoleCode))
-                return Json(new { ok = false, message = "부서와 역할을 골라 주세요." });
+            if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(RoleCode))
+                return Json(new { ok = false, message = "역할을 골라 주세요." });
 
             bool needClass = RoleCode == "T1001" || RoleCode == "T1002";
             if (needClass && (ClassYear <= 0 || ClassBan <= 0))
@@ -441,7 +415,7 @@ namespace BulletinBoard.Controllers
                 await controlHumanResource.DeleteDeptRoleUserAssocAsync(UserId);
                 if (needClass)
                     await controlHumanResource.SaveClassInfoAsync(UserId, ClassYear, ClassBan);
-                await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, DeptCode, RoleCode);
+                await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, ConstatsCommon.FixedDeptCode, RoleCode);
 
                 return Json(new { ok = true });
             }
@@ -468,7 +442,7 @@ namespace BulletinBoard.Controllers
             await controlHumanResource.DeleteDeptRoleUserAssocAsync(model.UserId);
 
             await controlHumanResource.SaveClassInfoAsync(model.UserId, model.ClassYear, model.ClassBan);
-            await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, model.DeptCode, model.RoleCode);
+            await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, ConstatsCommon.FixedDeptCode, model.RoleCode);
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);

@@ -9,7 +9,6 @@
 
 @{
     Layout = null;
-    var depts = (List<CodeData>)ViewData["Depts"];
     var roles = (List<CodeData>)ViewData["Roles"];
     var years = (List<int>)ViewData["Years"];
     var bans  = (List<int>)ViewData["Bans"];
@@ -53,7 +52,7 @@
 
     <div class="qb-k">ASSIGN</div>
     <h1 class="qb-h1">미배정 회원 배정</h1>
-    <div class="qb-sub">가입은 했지만 부서 · 역할 · 학년반이 비어 있는 분들이에요.</div>
+    <div class="qb-sub">가입은 했지만 역할 · 학년반이 비어 있는 분들이에요.</div>
 
     <div class="ua-sum">
         <div class="w">미배정<b id="uaCnt">@Model.Count</b></div>
@@ -70,10 +69,6 @@
             <div class="ua-row" data-uid="@m.UserId" data-name="@m.FullName" id="r@(i)">
                 <div class="ua-nm">@m.FullName<small>@m.UserName</small></div>
                 <div class="ua-sel">
-                    <select id="d@(i)" aria-label="부서">
-                        <option value="">부서 선택</option>
-                        @foreach (var d in depts) { <option value="@d.MinorCD" selected="@(d.MinorCD == m.DeptCode)">@d.MinorNM</option> }
-                    </select>
                     <select id="r_@(i)" aria-label="역할" onchange="uaRole(@i)">
                         <option value="">역할 선택</option>
                         @foreach (var r in roles) { <option value="@r.MinorCD" selected="@(r.MinorCD == m.RoleCode)">@r.MinorNM</option> }
@@ -121,15 +116,14 @@
     }
     function uaSave(i) {
         var row = document.getElementById('r' + i), err = document.getElementById('e' + i), btn = document.getElementById('s' + i);
-        var d = document.getElementById('d' + i).value, r = document.getElementById('r_' + i).value;
+        var r = document.getElementById('r_' + i).value;
         var y = document.getElementById('y' + i).value, b = document.getElementById('b' + i).value;
         err.textContent = '';
-        if (!d) { err.textContent = '부서를 골라 주세요'; return; }
         if (!r) { err.textContent = '역할을 골라 주세요'; return; }
         if (uaNeedClass(r) && (!y || !b)) { err.textContent = '학년과 반을 골라 주세요'; return; }
         btn.disabled = true;
         var fd = new FormData();
-        fd.append('UserId', row.dataset.uid); fd.append('DeptCode', d); fd.append('RoleCode', r);
+        fd.append('UserId', row.dataset.uid); fd.append('RoleCode', r);
         fd.append('ClassYear', uaNeedClass(r) ? y : 0); fd.append('ClassBan', uaNeedClass(r) ? b : 0);
         fetch('/HumanResource/UnassignedMembersSave', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (x) {
