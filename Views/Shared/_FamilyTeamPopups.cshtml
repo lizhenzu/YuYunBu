@@ -3,7 +3,7 @@
 @*  ══════════════════════════════════════════════════════════════
     가족팀 알림 팝업 — 로그인한 사람이 들어올 때 (Welcome · 미션 홈에 붙인다)
       1) "팀원이 되었어요"   내가 낸 가입 신청이 수락된 뒤 처음 들어올 때 한 번만 (읽으면 지운다)
-      2) "○○님이 초대했어요" 받은 초대가 있으면 — 승인해야 팀에 들어간다. [나중에] 는 12시간 동안 다시 안 보여 준다
+      2) "○○님이 초대했어요" 받은 초대가 있으면 — 승인해야 팀에 들어간다. [나중에] 는 그 초대 한 건에 대해서만 12시간 동안 다시 안 보여 준다(취소 후 새 초대는 다시 보여 준다)
     · 표(DM2_FamilyRequest · DM2_FamilyNotice)를 아직 만들지 않았거나 DB 오류가 나도 화면은 그대로 나온다
     ══════════════════════════════════════════════════════════════ *@
 @{
@@ -72,9 +72,10 @@ else if (invite != null)
     <script>
         (function () {
             var ov = document.getElementById('ftpInvite');
-            var key = 'ftInviteLater';
+            /* "나중에" 표시는 초대 한 건(요청 번호)마다 따로 남긴다 — 초대가 취소되고 새로 오면 번호가 달라 팝업이 다시 뜬다 */
+            var key = 'ftInviteLater_@invite.Id';
             var later = false;
-            try { later = (document.cookie || '').indexOf(key + '=1') >= 0; } catch (e) { }
+            try { later = (document.cookie || '').split(/;\s*/).indexOf(key + '=1') >= 0; } catch (e) { }
             if (!later) ov.classList.add('on');
             document.getElementById('ftpILater').addEventListener('click', function () {
                 try { document.cookie = key + '=1; max-age=' + (12 * 3600) + '; path=/; SameSite=Lax'; } catch (e) { }
