@@ -4,7 +4,9 @@
 @*  ══════════════════════════════════════════════════════════════
     매일성경 말씀 정리 — 2026-11-07 재구성 (달력형 · quiz-bright.css + jumanna-bright.css)
     · 한 달을 달력으로 본다: 초록 = 다 채움 · 주황 = 빠진 곳 있음 · 회색 = 말씀 없음.  날짜를 누르면 아래에 그날 내용과 바로가기가 열린다
-    · 위 칩(주제 · 줄거리 · 요약 · 영상)을 누르면 그게 빠진 날만 달력에 표시한다
+    · 날짜마다 입력 여부 네 가지를 점으로 보여 준다 (순서: 키워드 · 줄거리 · 말씀 구간 · 영상 구간 / 채움 = 입력, 빈 동그라미 = 없음)
+      키워드 = 주제 · 줄거리 = Synopsis · 말씀 구간 = 성경 이름과 시작 · 끝 장절 · 영상 구간 = 시작 또는 종료 시점을 지정함
+    · 위 칩(키워드 · 줄거리 · 말씀 구간 · 영상 구간 없음)을 누르면 그게 빠진 날만 달력에 표시한다
     · 이 달 관리: 한 달 입력(MonthlyBulk) · 영상 구간 편집(SegmentEditor)
     · 플랫폼 보내기: 말씀 보내기 · 영상 구간 보내기 두 버튼을 따로 누른다 (한 번에 하나씩)
     · 예전의 날짜별 목록 3가지 보기 · 영상 구간 목록은 이 화면으로 합쳤다 (옛 주소는 그대로 열림)
@@ -61,7 +63,16 @@
         .jb-wk div:first-child { color: #B4531F; }
         .jb-cal { margin-top: 4px; }
         .jb-cal > div, .jb-cd { aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; font-size: 13px; }
-        .jb-cd { border: 0; font-family: inherit; cursor: pointer; background: var(--grey); color: var(--dim); }
+        .jb-cd { border: 0; font-family: inherit; cursor: pointer; background: var(--grey); color: var(--dim); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 0; }
+        .jb-dots { display: flex; gap: 3px; }
+        .jb-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+        .jb-dot.no { background: transparent; box-shadow: inset 0 0 0 1.2px currentColor; opacity: .7; }
+        .jb-cd.empty .jb-dot { opacity: .45; }
+        .jb-leg b.jb-dot { vertical-align: 0; margin-right: 2px; color: var(--ink); }
+        .jb-st { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+        .jb-st .s { display: flex; align-items: center; gap: 6px; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; font-weight: 800; background: var(--okbg); color: var(--ok); }
+        .jb-st .s.no { background: var(--warnbg); color: var(--warn); }
+        .jb-st .s b { font-size: 14px; line-height: 1; }
         .jb-cd.ok { background: var(--okbg); color: var(--ok); font-weight: 800; }
         .jb-cd.w { background: var(--warnbg); color: var(--warn); font-weight: 800; }
         .jb-cd.sun { text-decoration: underline; text-decoration-color: #F0B28E; text-underline-offset: 3px; }
@@ -110,7 +121,7 @@
     {
         <div class="jb-fl" id="filters">
             <span class="t">빠진 곳</span>
-            @foreach (var kind in new[] { "주제", "줄거리", "요약", "영상" })
+            @foreach (var kind in new[] { "키워드", "줄거리", "말씀 구간", "영상 구간" })
             {
                 int n = Miss(kind);
                 if (n == 0)
@@ -126,6 +137,7 @@
     }
 
     <div class="jb-leg"><span><i></i>모두 채움</span><span><i class="w"></i>빠진 곳 있음</span><span><i class="n"></i>말씀 없음</span></div>
+    <div class="jb-leg"><span><b class="jb-dot"></b> 입력</span><span><b class="jb-dot no"></b> 없음</span><span>점 순서: 키워드 · 줄거리 · 말씀 구간 · 영상 구간</span></div>
 
     <div class="jb-wk"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
     <div class="jb-cal" id="cal"></div>
@@ -185,6 +197,7 @@
         var parts = BOARD.ym.split('-');
         var year = parseInt(parts[0], 10), month = parseInt(parts[1], 10);
         var WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+        var KINDS = ['키워드', '줄거리', '말씀 구간', '영상 구간'];
         var filter = '';
         var selected = BOARD.selected;
 
@@ -204,7 +217,8 @@
                 var item = byDate[key];
                 var cls = !item ? '' : (item.Missing.length === 0 ? 'ok' : 'w');
                 var sun = new Date(year, month - 1, d).getDay() === 0 ? ' sun' : '';
-                html += '<button type="button" class="jb-cd ' + cls + sun + '" data-d="' + key + '" aria-label="' + month + '월 ' + d + '일">' + d + '</button>';
+                var dots = KINDS.map(function (k) { return '<i class="jb-dot' + (!item || item.Missing.indexOf(k) >= 0 ? ' no' : '') + '"></i>'; }).join('');
+                html += '<button type="button" class="jb-cd ' + cls + sun + (item ? '' : ' empty') + '" data-d="' + key + '" aria-label="' + month + '월 ' + d + '일' + (item && item.Missing.length ? ', 빠진 곳 ' + item.Missing.join(' ') : '') + '">' + d + '<span class="jb-dots">' + dots + '</span></button>';
             }
             cal.innerHTML = html;
             paint();
@@ -226,6 +240,14 @@
             return '<div class="kv"><b>' + label + '</b><div>' + esc(value) + '</div></div>';
         }
 
+        // 입력 여부 네 칸 (초록 = 입력, 주황 = 없음)
+        function status(d) {
+            return '<div class="jb-st">' + KINDS.map(function (k) {
+                var no = d.Missing.indexOf(k) >= 0;
+                return '<div class="s' + (no ? ' no' : '') + '"><b>' + (no ? '✕' : '✓') + '</b>' + k + '</div>';
+            }).join('') + '</div>';
+        }
+
         // 고른 날짜 내용
         function render(key) {
             var p = key.split('-');
@@ -238,11 +260,12 @@
                 return;
             }
             pn.innerHTML =
-                '<div class="h"><span>' + head + '</span>' + (d.Missing.length ? '<span class="jm-miss">빠진 곳 ' + esc(d.Missing.join(' · ')) + '</span>' : '') + '</div>' +
+                '<div class="h"><span>' + head + '</span></div>' +
                 '<div class="rf">' + esc(d.Ref) + '</div>' +
-                field('주제', d.Subject) +
+                status(d) +
+                field('키워드 (주제)', d.Subject) +
                 field('줄거리', d.Synopsis) +
-                field('말씀 요약', d.Summary) +
+                (d.Summary ? field('말씀 요약', d.Summary) : '') +
                 field('영상 구간', d.Clips.length ? d.Clips.join('  ·  ') : '') +
                 '<div class="ac">' +
                 '<a class="jm-pill p" href="/JuManNa/ModifyJuManNa?Id=' + d.Id + '">수정</a>' +
