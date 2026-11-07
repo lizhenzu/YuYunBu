@@ -131,13 +131,17 @@
         var fd = new FormData();
         fd.append('UserId', row.dataset.uid); fd.append('DeptCode', d); fd.append('RoleCode', r);
         fd.append('ClassYear', uaNeedClass(r) ? y : 0); fd.append('ClassBan', uaNeedClass(r) ? b : 0);
-        fetch('/HumanResource/UnassignedMembersSave', { method: 'POST', body: fd })
-            .then(function (x) { return x.json(); })
+        fetch('/HumanResource/UnassignedMembersSave', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (x) {
+                var ct = x.headers.get('content-type') || '';
+                if (x.redirected || ct.indexOf('json') < 0) { throw new Error('응답 ' + x.status + (x.redirected ? ' (로그인·권한 화면으로 이동됨)' : '')); }
+                return x.json();
+            })
             .then(function (j) {
                 if (j.ok) { row.remove(); uaDone++; uaCount(); }
                 else { err.textContent = j.message || '저장하지 못했어요'; btn.disabled = false; }
             })
-            .catch(function () { err.textContent = '저장하지 못했어요. 다시 눌러 주세요'; btn.disabled = false; });
+            .catch(function (e) { err.textContent = '저장하지 못했어요 · ' + (e && e.message ? e.message : ''); btn.disabled = false; });
     }
     document.querySelectorAll('#uaList .ua-row').forEach(function (_, i) { uaRole(i); });
     uaCount();

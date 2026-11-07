@@ -434,14 +434,22 @@ namespace BulletinBoard.Controllers
             if (needClass && (ClassYear <= 0 || ClassBan <= 0))
                 return Json(new { ok = false, message = "학년과 반을 골라 주세요." });
 
-            ControlHumanResource controlHumanResource = new ControlHumanResource();
-            await controlHumanResource.DeleteClassInfoAsync(UserId);
-            await controlHumanResource.DeleteDeptRoleUserAssocAsync(UserId);
-            if (needClass)
-                await controlHumanResource.SaveClassInfoAsync(UserId, ClassYear, ClassBan);
-            await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, DeptCode, RoleCode);
+            try
+            {
+                ControlHumanResource controlHumanResource = new ControlHumanResource();
+                await controlHumanResource.DeleteClassInfoAsync(UserId);
+                await controlHumanResource.DeleteDeptRoleUserAssocAsync(UserId);
+                if (needClass)
+                    await controlHumanResource.SaveClassInfoAsync(UserId, ClassYear, ClassBan);
+                await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, DeptCode, RoleCode);
 
-            return Json(new { ok = true });
+                return Json(new { ok = true });
+            }
+            catch (Exception ex)
+            {
+                // SuperAdmin 전용 화면이라 원인 문구를 그대로 보여 준다
+                return Json(new { ok = false, message = "저장 오류: " + ex.Message });
+            }
         }
 
         public async Task<IActionResult> ChangeUserClassInfo(string UserId)
