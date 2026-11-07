@@ -1,0 +1,119 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.DataAccessLayer;
+@using System.Collections.Generic;
+@using System.Linq;
+@model List<WithdrawRequestRow>
+
+@*  ══════════════════════════════════════════════════════════════
+    탈퇴 요청 확인 — 2026-11-08 시안 확정 (SuperAdmin 전용 · DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
+    · 사유와 삭제될 정보 건수를 보고 승인(삭제) 또는 반려한다. 삭제는 승인할 때만 실행된다.
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var previews = (Dictionary<int, List<WithdrawGroup>>)ViewData["Previews"];
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>탈퇴 요청 확인</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .wr-sum { display: inline-block; min-width: 120px; background: #FFF4E0; color: #9A5B00; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin: 12px 0; }
+        .wr-sum b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; }
+        .wr-row { border-top: 1px solid #E8EBF0; padding: 12px 0; }
+        .wr-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .wr-nm { font-size: 16px; font-weight: 700; }
+        .wr-nm small { font-weight: 400; color: #8A93A0; font-size: 12px; margin-left: 4px; }
+        .wr-dt { font-size: 12px; color: #8A93A0; white-space: nowrap; }
+        .wr-why { margin-top: 2px; font-size: 12.5px; color: #6B7684; }
+        .wr-box { margin-top: 8px; padding: 8px 10px; background: #F5F7FA; border-radius: 10px; font-size: 12.5px; color: #333; }
+        .wr-box span { display: block; font-size: 12px; color: #6B7684; margin-bottom: 2px; }
+        .wr-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .wr-btns button { flex: 1; height: 40px; border-radius: 10px; font-size: 14px; font-weight: 700; border: 1px solid #D9DEE6; background: #fff; color: #333; }
+        .wr-btns button.d { background: #D13B3B; border-color: #D13B3B; color: #fff; }
+        .wr-btns button[disabled] { opacity: .5; }
+        .wr-err { min-height: 16px; font-size: 13px; color: #D13B3B; margin-top: 4px; }
+        .wr-empty { display: none; padding: 28px 0; text-align: center; color: #8A93A0; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>탈퇴 요청</span>
+        <span>SuperAdmin</span>
+    </div>
+
+    <div class="qb-k">APPROVE</div>
+    <h1 class="qb-h1">탈퇴 요청 확인</h1>
+    <div class="qb-sub">승인하면 이 사람과 관련된 정보가 모두 삭제되고 되돌릴 수 없어요.</div>
+
+    <div class="wr-sum">확인 대기<b id="wrCnt">@Model.Count</b></div>
+
+    <div id="wrList">
+        @foreach (var r in Model)
+        {
+            var groups = previews.ContainsKey(r.Id) ? previews[r.Id] : new List<WithdrawGroup>();
+            <div class="wr-row" id="wr@(r.Id)" data-name="@r.FullName">
+                <div class="wr-top">
+                    <div class="wr-nm">@r.FullName<small>아이디 @r.UserName</small></div>
+                    <div class="wr-dt">@r.InsertDT.ToString("MM-dd") 요청</div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(r.Reason)) { <div class="wr-why">사유: @r.Reason</div> }
+                <div class="wr-box">
+                    <span>삭제될 정보</span>
+                    @if (groups.Count == 0) { <text>목록을 불러오지 못했어요</text> }
+                    else { @string.Join(" · ", groups.Where(g => g.Count > 0).Select(g => g.Title + " " + g.Count.ToString("N0") + "건")) }
+                </div>
+                <div class="wr-btns">
+                    <button type="button" onclick="wrDecide(@r.Id, false)">반려</button>
+                    <button type="button" class="d" onclick="wrDecide(@r.Id, true)">승인 (삭제)</button>
+                </div>
+                <div class="wr-err" id="wre@(r.Id)"></div>
+            </div>
+        }
+    </div>
+    <div class="wr-empty" id="wrEmpty">확인할 요청이 없어요.</div>
+
+    <div class="qb-ft">
+        <span>승인할 때만 삭제돼요</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    function wrCount() {
+        var n = document.querySelectorAll('#wrList .wr-row').length;
+        document.getElementById('wrCnt').textContent = n;
+        document.getElementById('wrEmpty').style.display = n ? 'none' : 'block';
+    }
+    function wrDecide(id, approve) {
+        var row = document.getElementById('wr' + id), err = document.getElementById('wre' + id);
+        var name = row.dataset.name || '';
+        if (approve && !confirm(name + ' 님의 모든 정보를 삭제할까요?\n되돌릴 수 없어요.')) return;
+        var btns = row.querySelectorAll('button');
+        err.textContent = '';
+        btns.forEach(function (b) { b.disabled = true; });
+        var fd = new FormData();
+        fd.append('requestId', id); fd.append('approve', approve ? 'true' : 'false');
+        fetch('/Withdraw/Decide', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (x) {
+                var ct = x.headers.get('content-type') || '';
+                if (x.redirected || ct.indexOf('json') < 0) { throw new Error('응답 ' + x.status); }
+                return x.json();
+            })
+            .then(function (j) {
+                if (j.ok) { row.remove(); wrCount(); }
+                else { err.textContent = j.message || '처리하지 못했어요'; btns.forEach(function (b) { b.disabled = false; }); }
+            })
+            .catch(function (e) { err.textContent = '처리하지 못했어요 · ' + (e && e.message ? e.message : ''); btns.forEach(function (b) { b.disabled = false; }); });
+    }
+    wrCount();
+</script>
+</body>
+</html>
