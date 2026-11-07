@@ -1,4 +1,4 @@
-// wwwroot/js/family-team-search.js — 가족팀 이름 조회 (팀 있음 · 팀 없음 화면 공용)
+﻿// wwwroot/js/family-team-search.js — 가족팀 이름 조회 (팀 있음 · 팀 없음 화면 공용)
 //   #ftSearch 의 data 값
 //     data-invite="1"  : 초대할 수 있다 (내가 팀원). 팀 없는 사람에게 [초대] 버튼
 //     data-apply="1"   : 다른 팀에 신청할 수 있다 (팀이 없거나, 내 팀에 나 혼자)
@@ -21,7 +21,7 @@
     function applyForm(h) {
         var name = 'ftRel' + (++formNo);
         var chips = rels.map(function (r, i) {
-            return '<label><input type="radio" name="relation" value="' + esc(r.k) + '"' + (i === 0 ? ' checked' : '') + ' /><span>' + esc(r.l) + '</span></label>';
+            return '<label><input type="radio" name="relation" value="' + esc(r.k) + '" required /><span>' + esc(r.l) + '</span></label>';
         }).join('');
         var warn = solo ? '<div class="ft-mem" style="margin-top:8px;color:var(--red)">신청하면 내가 만든 "' + esc(solo) + '"은 바로 삭제돼요.</div>' : '';
         var conf = solo ? ' data-confirm="' + esc(h.teamName + '에 가입 신청할까요?|내가 만든 "' + solo + '"은 바로 삭제돼요.|신청') + '"' : '';
@@ -84,6 +84,7 @@
         if (!b) return;
         var form = document.getElementById('invForm'), tgt = document.getElementById('invTarget');
         if (!form || !tgt) return;
+        if (!form.reportValidity()) return;   // 관계를 먼저 고른다
         tgt.value = b.getAttribute('data-u');
         b.disabled = true;
         form.submit();
