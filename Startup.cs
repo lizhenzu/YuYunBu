@@ -92,6 +92,9 @@ namespace BulletinBoard
                 // 브라우저 닫아도 쿠키 유지 (모든 로그인에 일괄 적용)
                 options.Events = new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationEvents
                 {
+                    // 계정이 지워졌거나(탈퇴 승인) 보안 정보가 바뀌면 남아 있는 로그인 쿠키를 끊는다.
+                    // Events 를 새로 만들면 Identity 기본 검사가 빠지므로 여기서 다시 연결한다.
+                    OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync,
                     OnSigningIn = ctx =>
                     {
                         ctx.Properties.IsPersistent = true;
@@ -100,6 +103,9 @@ namespace BulletinBoard
                     }
                 };
             });
+
+            // 로그인 쿠키의 계정 확인 주기 — 탈퇴로 지워진 계정은 길어야 1분 안에 로그아웃된다
+            services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.FromMinutes(1));
 
             // 메모리 캐시
             services.AddDistributedMemoryCache();
