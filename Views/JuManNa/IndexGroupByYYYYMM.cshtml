@@ -179,6 +179,7 @@
 </div>
 
 <script src="/js/content-push.js" asp-append-version="true"></script>
+<script src="/js/qb-confirm.js" asp-append-version="true"></script>
 <script>
     const BOARD = {
         ym: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ym)),
@@ -298,14 +299,14 @@
     })();
 
     // 이 달 말씀 또는 영상 구간을 플랫폼에 하루씩 차례로 보낸다 (wwwroot/js/content-push.js).  한 번에 하나만 보낸다
-    function runPush(isWords) {
+    async function runPush(isWords) {
         if (ContentPush.isBusy()) return;
         var n = BOARD.pushItems.length;
         var title = isWords ? '말씀' : '영상 구간';
         var question = isWords
             ? BOARD.monthLabel + ' 말씀 ' + n + '일을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.'
             : BOARD.monthLabel + ' 영상 구간 ' + n + '일을 플랫폼에 보낼까요?\n그날 구간 목록은 보낸 내용으로 통째로 바뀌어요.';
-        if (!confirm(question)) return;
+        if ((await qbConfirm(true, question.split('\n'), null, '보내기')) !== 'y') return;
 
         var buttons = [document.getElementById('pf-words'), document.getElementById('pf-clips')];
         var sub = document.getElementById('pf-sub');

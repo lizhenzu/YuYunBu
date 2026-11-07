@@ -162,13 +162,14 @@
 @if (pushItems.Count > 0 && platformReady)
 {
     <script src="/js/content-push.js" asp-append-version="true"></script>
+    <script src="/js/qb-confirm.js" asp-append-version="true"></script>
     <script>
         // 이 달 말씀을 플랫폼으로 하루씩 차례로 보낸다 (wwwroot/js/content-push.js)
         const pushItems = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(pushItems));
-        function pushWordMonth() {
+        async function pushWordMonth() {
             if (ContentPush.isBusy()) return;
             const monthLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(monthLabel));
-            if (!confirm(monthLabel + ' 말씀 ' + pushItems.length + '일을 플랫폼에 보낼까요?\n바로 공개되고, 이미 있는 날은 바뀌어요.')) return;
+            if ((await qbConfirm(true, [monthLabel + ' 말씀 ' + pushItems.length + '일을 플랫폼에 보낼까요?', '바로 공개되고, 이미 있는 날은 바뀌어요.'], null, '보내기')) !== 'y') return;
             const startBtn = document.getElementById('pf-start');
             startBtn.disabled = true;
             ContentPush.run({
