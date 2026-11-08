@@ -83,18 +83,29 @@
         <button type="button" class="on" data-f="all">전체</button>
         <button type="button" data-f="s">학생</button>
         <button type="button" data-f="t">교사</button>
+        <button type="button" data-f="p">학부모</button>
     </div>
 
     <div id="lhList">
         @foreach (var item in list)
         {
             no++;
-            bool isStudent = item.ClassYear > 0 && item.ClassBan > 0;
-            <div class="lh-row" data-kind="@(isStudent ? "s" : "t")" data-name="@($"{item.FullName} {item.UserName}".ToLowerInvariant())">
+            // 역할은 역할 코드로 정한다 (학부모 = 역할 코드 없음). 반 정보만으로 "교사" 라고 하면 학부모가 교사로 보인다
+            string rc = (item.RoleCode ?? "").Trim();
+            bool hasClass = item.ClassYear > 0 && item.ClassBan > 0;
+            bool isStudent = rc == "T1001" || (rc.Length == 0 && hasClass);
+            bool isParent = rc.Length == 0 && !hasClass;
+            string kind = isStudent ? "s" : isParent ? "p" : "t";
+            string tagText = isStudent
+                ? (hasClass ? $"{item.ClassYear}학년 {item.ClassBan}반" : "학생")
+                : isParent ? "학부모"
+                : rc == "T1002" || rc == "T1003" ? "교사"
+                : (string.IsNullOrWhiteSpace(item.RoleNM) ? "교사" : item.RoleNM.Trim());
+            <div class="lh-row" data-kind="@kind" data-name="@($"{item.FullName} {item.UserName}".ToLowerInvariant())">
                 <span class="n">@no.ToString("00")</span>
                 <div class="av"><img src="@item.ProfilePicturePath" alt="" loading="lazy" onerror="this.style.display='none'" /></div>
                 <div class="t">
-                    <b>@item.FullName</b><span class="lh-tg@(isStudent ? "" : " tc")">@(isStudent ? $"{item.ClassYear}학년 {item.ClassBan}반" : "교사")</span>
+                    <b>@item.FullName</b><span class="lh-tg@(isStudent ? "" : " tc")">@tagText</span>
                     <small>@item.UserName</small>
                     <div class="lh-when">최근 접속 <em>@Ago(item.maxInsertDT)</em> · @item.maxInsertDT.ToString("yyyy-MM-dd HH:mm")</div>
                     <div class="lh-ac">
