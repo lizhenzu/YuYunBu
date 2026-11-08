@@ -34,6 +34,20 @@
     string KindCls(UserRoleKind k) => k switch { UserRoleKind.Student => "st", UserRoleKind.Teacher => "te", UserRoleKind.Officer => "of", UserRoleKind.Etc => "et", _ => "pa" };
     string RoleCls(string r) => r switch { "SuperAdmin" => "s", "Admin" => "a", "Moderator" => "m", "Basic" => "b", _ => "" };
     int no = 0;
+
+    // 최종 접속 — 오늘 · 어제는 시각까지, 일주일 안은 "N일 전", 그 밖은 날짜
+    var kToday = BulletinBoard.Helpers.DateHelper.GetKoreaNow().Date;
+    string LastText(DateTime? at)
+    {
+        if (!at.HasValue) return "접속 기록 없음";
+        var d = at.Value;
+        int days = (kToday - d.Date).Days;
+        if (days <= 0) return $"오늘 {d:HH:mm}";
+        if (days == 1) return $"어제 {d:HH:mm}";
+        if (days < 7) return $"{days}일 전";
+        return d.ToString("yyyy-MM-dd");
+    }
+    string LastCls(DateTime? at) => !at.HasValue ? "none" : (kToday - at.Value.Date).Days <= 1 ? "now" : (kToday - at.Value.Date).Days < 30 ? "" : "old";
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -82,6 +96,10 @@
         .ur-af.of { background: #F3EEFF; color: #7048C8; }
         .ur-af.pa { background: var(--warnbg); color: var(--warn); }
         .ur-af.et { background: var(--grey); color: var(--dim2); }
+        /* 최종 접속 — 오늘·어제는 파랑, 30일 넘으면 흐리게 */
+        .ur-hd .t small.ur-ll { margin-top: 3px; font-size: 11.5px; color: var(--dim2); }
+        .ur-hd .t small.ur-ll.now { color: var(--blue); font-weight: 700; }
+        .ur-hd .t small.ur-ll.old, .ur-hd .t small.ur-ll.none { color: #B0B6C0; }
         /* 소속 없음 — 연한 노란 배경 + 왼쪽 띠 */
         .ur-row.noaff { background: #FFF8E6; box-shadow: inset 3px 0 0 #F2B544; }
         .ur-row.noaff .ur-hd { padding-left: 10px; padding-right: 10px; }
@@ -187,6 +205,7 @@
                     <span class="t">
                         <b>@name</b>@if (dc > 1) {<span class="ur-dup">같은 이름 @dc</span>}
                         <small><span class="ur-af @KindOf(user)">@AffText(user)</span>@user.Email</small>
+                        <small class="ur-ll @LastCls(user.LastAccessAt)" title="@(user.LastAccessAt?.ToString("yyyy-MM-dd HH:mm") ?? "")">최종 접속 · @LastText(user.LastAccessAt)</small>
                     </span>
                     <span class="rl">
                         @if (roles.Count == 0)
