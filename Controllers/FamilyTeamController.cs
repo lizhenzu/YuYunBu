@@ -1,7 +1,12 @@
-﻿using BulletinBoard.Helpers;
+﻿using BulletinBoard.BusinessLayer;
+using BulletinBoard.Common;
+using BulletinBoard.Helpers;
+using BulletinBoard.Models;
 using BulletinBoard.Services;
 using BulletinBoard.Services.Abstract;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BulletinBoard.Controllers
@@ -16,13 +21,37 @@ namespace BulletinBoard.Controllers
         private readonly FamilyTeamService _svc;
         private readonly IStudentPointGiftService _gift;
 
-        public FamilyTeamController(FamilyTeamService svc, IStudentPointGiftService gift)
+        private readonly UserManager<ApplicationUser> _userManager;
+
+        public FamilyTeamController(FamilyTeamService svc, IStudentPointGiftService gift, UserManager<ApplicationUser> userManager)
         {
             _svc = svc;
             _gift = gift;
+            _userManager = userManager;
         }
 
         private string Me => User.Identity?.Name ?? "";
+
+        /// <summary>화면 맨 위 인사 — "안녕하세요 / ○○님 / 유년부에 오심을 환영해요" (홈 · 미션 허브와 같은 문구)</summary>
+        private async Task SetGreetingAsync()
+        {
+            try
+            {
+                var me = await _userManager.GetUserAsync(User);
+                ViewBag.HiName = me == null ? "" : ((me.LastName ?? "") + (me.FirstName ?? "")).Trim();
+
+                var key = CommonMetaDataCategory.DepartmentName.ToString();
+                var dept = HttpContext.Session.GetString(key);
+                if (string.IsNullOrEmpty(dept))
+                {
+                    foreach (var m in new ManageeCommon().getCommonMetaData())
+                        HttpContext.Session.SetString(m.Kind.ToString(), m.KindDesc);
+                    dept = HttpContext.Session.GetString(key);
+                }
+                ViewBag.HiDept = dept ?? "";
+            }
+            catch { ViewBag.HiName = ""; ViewBag.HiDept = ""; }
+        }
 
         // GET: /FamilyTeam  — 팀이 있으면 우리 가족팀, 없으면 팀 만들기 · 찾기
         [HttpGet]
@@ -31,6 +60,7 @@ namespace BulletinBoard.Controllers
             ViewBag.Msg = TempData["FamilyMsg"] as string;
             ViewBag.MsgOk = TempData["FamilyMsgOk"] is bool b && b;
             ViewBag.Relations = FamilyTeamService.Relations;
+            await SetGreetingAsync();
 
             try
             {
