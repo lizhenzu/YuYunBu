@@ -98,7 +98,11 @@
                 .catch(function () { if (my === seq) res.innerHTML = '<div class="ft-empty">조회하지 못했어요. 잠시 후 다시 해 주세요.</div>'; });
         }, 250);
     });
-    q.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });
+    // 검색 버튼(#ftGo) · 엔터 → 입력할 때와 같은 찾기를 다시 돌린다 (2026-11-08, 홈 "말씀 찾기" 모양 검색창)
+    function rerun() { q.dispatchEvent(new Event('input')); q.focus(); }
+    var go = document.getElementById('ftGo');
+    if (go) go.addEventListener('click', rerun);
+    q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); rerun(); } });
 
     // [초대] — 화면의 초대 폼(관계 칩이 있는 곳)으로 보낸다
     res.addEventListener('click', function (e) {
