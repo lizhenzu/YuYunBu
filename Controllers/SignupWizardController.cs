@@ -96,7 +96,7 @@ namespace BulletinBoard.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Submit(string role, int personId, int classYear, int classBan, int bMonth, int bDay,
-                                                string? sex, string? school, string? phone, string[]? kidName, int[]? kidYear, int[]? kidBan, string? returnUrl, bool change = false)
+                                                string? sex, string? school, string? phone, string? returnUrl, bool change = false)
         {
             var me = await _userManager.GetUserAsync(User);
             if (me == null) return Challenge();
@@ -109,7 +109,9 @@ namespace BulletinBoard.Controllers
 
             role = (role ?? "").Trim().ToUpperInvariant();
             if (role != "S" && role != "T" && role != "P") return Back("역할을 골라 주세요.");
-            if (string.IsNullOrWhiteSpace(phone)) return Back("연락처를 적어 주세요.");
+            // 학부모는 고르면 끝 — 연락처 · 자녀 정보를 받지 않는다
+            if (role != "P" && string.IsNullOrWhiteSpace(phone)) return Back("연락처를 적어 주세요.");
+            if (role == "P") phone = "";
 
             var a = new SignupApplication
             {
@@ -143,21 +145,6 @@ namespace BulletinBoard.Controllers
                 if (a.ClassYear == 0 || a.ClassBan == 0) { a.ClassYear = 0; a.ClassBan = 0; }   // 하나라도 모르면 관리자가 정한다
                 a.BMonth = bMonth; a.BDay = bDay; a.Sex = sex;
                 a.School = (school ?? "").Trim();
-            }
-            else if (role == "P")
-            {
-                var kids = new List<string>();
-                for (int i = 0; kidName != null && i < kidName.Length; i++)
-                {
-                    var n = (kidName[i] ?? "").Trim();
-                    if (n.Length == 0) continue;
-                    int y = kidYear != null && i < kidYear.Length ? kidYear[i] : 0;
-                    int b = kidBan != null && i < kidBan.Length ? kidBan[i] : 0;
-                    kids.Add(n + (y > 0 && b > 0 ? $" {y}학년 {b}반" : " (반 모름)"));
-                }
-                if (kids.Count == 0) return Back("자녀 이름을 한 명 이상 적어 주세요.");
-                a.Kids = string.Join(", ", kids);
-                if (a.Kids.Length > 1000) a.Kids = a.Kids.Substring(0, 1000);
             }
 
             if (!await _db.CreateAsync(a)) return Back("이미 승인을 요청했어요.");

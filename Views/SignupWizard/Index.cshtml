@@ -7,7 +7,7 @@
     · 역할(학생 · 교사 · 학부모) → 필요한 것만 차례로 → 확인 → 관리자 승인 요청
       학생: (같은 이름 확인) → 학년·반 → 생일·성별 → 학교·부모님 연락처
       교사: (같은 이름 확인) → 연락처
-      학부모: 자녀 이름·학년·반(여러 명) + 연락처
+      학부모: 고르면 끝 — 더 입력받지 않고 바로 확인 (2026-11-08 변경)
     · 단계는 화면 안에서만 넘어가고, 마지막에 한 번에 보낸다 (/SignupWizard/Submit)
     ══════════════════════════════════════════════════════════════ *@
 
@@ -55,10 +55,6 @@
         .sw-sex { display: flex; gap: 8px; }
         .sw-sex button { flex: 1; height: 44px; border-radius: 10px; border: 1px solid #D9DEE6; background: #fff; font: inherit; font-size: 15px; }
         .sw-sex button.on { border: 2px solid #2F7BF5; background: #EAF2FD; color: #2F7BF5; font-weight: 700; }
-        .sw-kid { display: flex; gap: 6px; margin-bottom: 6px; }
-        .sw-kid input { flex: 1.4; }
-        .sw-kid select { flex: 1; }
-        .sw-add { width: 100%; height: 40px; border: 1px dashed #B9C2CF; border-radius: 10px; background: #fff; color: #6B7684; font: inherit; font-size: 13.5px; margin-bottom: 12px; }
         .sw-sum { padding: 12px 14px; background: #F5F7FA; border-radius: 12px; font-size: 14px; line-height: 1.8; margin-bottom: 8px; }
         .sw-note { font-size: 12.5px; color: #6B7684; }
         .sw-err { min-height: 18px; font-size: 13px; color: #D13B3B; margin: 6px 0; }
@@ -97,7 +93,7 @@
             }
             else if (latest.RoleKind == "P")
             {
-                <text>자녀 @latest.Kids</text><br /><text>연락처 @latest.Phone</text>
+                <text>더 입력한 정보는 없어요.</text>
             }
             else
             {
@@ -201,15 +197,7 @@
                 <div class="sw-f"><label>연락처</label><input name="phone" id="fPhoneT" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
             </div>
 
-            @* 학부모: 자녀 + 연락처 *@
-            <div class="sw-step" data-k="kids">
-                <div class="qb-k">학부모</div>
-                <h1 class="qb-h1">자녀를 알려 주세요</h1>
-                <div class="sw-dots"></div>
-                <div class="sw-f"><label>자녀 이름 · 학년 · 반</label><div id="kidList"></div></div>
-                <button type="button" class="sw-add" id="kidAdd">+ 자녀 더 추가</button>
-                <div class="sw-f"><label>연락처</label><input name="phone" id="fPhoneP" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
-            </div>
+            @* 학부모는 고르면 끝 — 더 입력받지 않고 바로 확인으로 (2026-11-08 결정) *@
 
             @* 마지막: 확인 *@
             <div class="sw-step" data-k="sum">
@@ -227,13 +215,6 @@
             </div>
         </form>
 
-        <template id="kidTpl">
-            <div class="sw-kid">
-                <input name="kidName" maxlength="30" placeholder="자녀 이름" />
-                <select name="kidYear"><option value="0">학년</option>@foreach (var y in years) { <option value="@y">@(y)학년</option> }</select>
-                <select name="kidBan"><option value="0">반</option>@foreach (var b in bans) { <option value="@b">@(b)반</option> }</select>
-            </div>
-        </template>
     }
 
     <div class="qb-ft">
@@ -256,7 +237,7 @@
     function flow() {
         if (role === 'S') return ['role'].concat(hasSame ? ['same'] : []).concat(['cls', 'birth', 'etc', 'sum']);
         if (role === 'T') return ['role'].concat(hasSame ? ['same'] : []).concat(['tel', 'sum']);
-        if (role === 'P') return ['role', 'kids', 'sum'];
+        if (role === 'P') return ['role', 'sum'];
         return ['role'];
     }
     function show() {
@@ -279,13 +260,7 @@
                 + '<br>' + (txt('fSchool') ? esc(txt('fSchool')) + ' · ' : '') + '부모님 ' + esc(txt('fPhoneS'));
         }
         if (role === 'T') return '<b>교사</b><br>연락처 ' + esc(txt('fPhoneT'));
-        var kids = [];
-        $('kidList').querySelectorAll('.sw-kid').forEach(function (r) {
-            var n = r.querySelector('input').value.trim(); if (!n) return;
-            var y = r.querySelectorAll('select')[0], b = r.querySelectorAll('select')[1];
-            kids.push(esc(n) + (y.value !== '0' && b.value !== '0' ? ' ' + y.options[y.selectedIndex].text + ' ' + b.options[b.selectedIndex].text : ' (반 모름)'));
-        });
-        return '<b>학부모</b><br>자녀 ' + kids.join(', ') + '<br>연락처 ' + esc(txt('fPhoneP'));
+        return '<b>학부모</b><br>더 입력할 것은 없어요.';
     }
     function check(k) {
         if (k === 'role' && !role) return '역할을 골라 주세요';
@@ -295,18 +270,12 @@
         if (k === 'birth' && !$('fSex').value) return '성별을 골라 주세요';
         if (k === 'etc' && !txt('fPhoneS')) return '부모님 연락처를 적어 주세요';
         if (k === 'tel' && !txt('fPhoneT')) return '연락처를 적어 주세요';
-        if (k === 'kids') {
-            var any = false; $('kidList').querySelectorAll('input').forEach(function (i) { if (i.value.trim()) any = true; });
-            if (!any) return '자녀 이름을 한 명 이상 적어 주세요';
-            if (!txt('fPhoneP')) return '연락처를 적어 주세요';
-        }
         return '';
     }
     function send() {
         // 고른 역할의 연락처 칸만 보낸다
-        ['fPhoneS', 'fPhoneT', 'fPhoneP'].forEach(function (id) { $(id).disabled = !((role === 'S' && id === 'fPhoneS') || (role === 'T' && id === 'fPhoneT') || (role === 'P' && id === 'fPhoneP')); });
+        ['fPhoneS', 'fPhoneT'].forEach(function (id) { $(id).disabled = !((role === 'S' && id === 'fPhoneS') || (role === 'T' && id === 'fPhoneT')); });
         if (role !== 'S') { ['fYear', 'fBan', 'fMonth', 'fDay'].forEach(function (id) { $(id).value = '0'; }); }
-        if (role !== 'P') { $('kidList').innerHTML = ''; }
         if (role === 'P') $('fPerson').value = '0';
         $('swNext').disabled = true;
         form.onsubmit = null; form.submit();
@@ -333,9 +302,6 @@
             form.querySelectorAll('[data-sex]').forEach(function (x) { x.classList.toggle('on', x === b); });
         });
     });
-    function addKid() { $('kidList').appendChild($('kidTpl').content.cloneNode(true)); }
-    $('kidAdd').addEventListener('click', addKid);
-    addKid();
 
     $('swPrev').addEventListener('click', function () { if (idx > 0) { idx--; show(); } });
     $('swNext').addEventListener('click', function () {
