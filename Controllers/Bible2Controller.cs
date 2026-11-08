@@ -162,6 +162,7 @@ public class Bible2Controller : Controller
 
             ViewBag.CommunityUsers = users;
             ViewBag.LastReadBooks  = lastReadDict;
+            ViewBag.Aff            = UserAffiliation.LoadAll();   // 인별 소속 (2026-11-08)
 
             // 완독자 명단 (UserBibleProgressCompleted 기반)
             try
@@ -184,8 +185,35 @@ public class Bible2Controller : Controller
             ViewBag.CompletedUsers = new List<BBM.BibleLastReadRateByUserCompleted>();
         }
 
+        ViewBag.CanDeleteRecord = CanDeleteRecord();
         return View();
     }
+
+    // ── /Bible2/DeleteRecord POST — 참여자 현황의 "기록 삭제" (2026-11-08) ──
+    //   그 사람의 읽은 기록(UserBibleProgress)을 모두 지운다 → 참여자 목록에서 빠진다.
+    //   완독 횟수 · 완독 날짜(명예의 전당)는 건드리지 않는다. 관리자(SuperAdmin 역할 · Basic 계정)만.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteRecord(string userId)
+    {
+        if (!CanDeleteRecord() || string.IsNullOrWhiteSpace(userId)) return Forbid();
+        try
+        {
+            int n = await _db.Database.ExecuteSqlRawAsync(
+                "DELETE FROM [dbo].[UserBibleProgress] WHERE UserId = {0}", userId);
+            _ = DbLogger.LogDebugAsync($"Bible2 DeleteRecord by {User.Identity?.Name} → {userId} ({n}줄)");
+            TempData["B2Msg"] = $"읽은 기록 {n:N0}줄을 지웠어요.";
+        }
+        catch
+        {
+            TempData["B2Msg"] = "기록을 지우지 못했어요. 잠시 후 다시 해 주세요.";
+        }
+        return RedirectToAction(nameof(Participants));
+    }
+
+    private bool CanDeleteRecord()
+        => User.IsInRole("SuperAdmin")
+           || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IActionResult> Index()
     {

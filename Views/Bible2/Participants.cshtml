@@ -23,6 +23,9 @@
                          ?? new Dictionary<string, BulletinBoard.Models.BibleLastReadInfo>();
     var completedUsers = ViewBag.CompletedUsers as List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>
                          ?? new List<BulletinBoard.Models.BibleLastReadRateByUserCompleted>();
+    var aff = ViewBag.Aff as Dictionary<string, UserAffiliationInfo> ?? new Dictionary<string, UserAffiliationInfo>();
+    bool canDelete = ViewBag.CanDeleteRecord is bool cd && cd;
+    string? b2Msg = TempData["B2Msg"] as string;
     var kstNow = DateHelper.GetKoreaNow();
 
     const double RING = 2 * Math.PI * 29;   // 카드 링 둘레 (r=29)
@@ -83,6 +86,26 @@
     .b2p .card.dn .pc { color: var(--b2-acc); }
     .b2p .card .tag { position: absolute; left: 0; top: 0; background: var(--b2-acc); color: #fff; font-size: 10px; padding: 2px 7px; }
 
+    /* 소속 꼬리표 (2026-11-08) — 역할은 Common/UserRole 기준 */
+    .b2p .card .role.st { color: #2F6FD0; border-color: #C9DBF5; }
+    .b2p .card .role.te { color: #2E7D4F; border-color: #C5E3D0; }
+    .b2p .card .role.of { color: #7048C8; border-color: #DCD0F3; }
+    .b2p .card .role.pa { color: #A86A12; border-color: #EBD9B8; }
+    .b2p .card .role.et { color: var(--b2-dim2); }
+
+    /* 기록 삭제 (관리자) */
+    .b2p .card .del { margin: 8px auto 0; font-family: inherit; font-size: 10.5px; color: #B42318; background: transparent; border: 1px solid #F0C9C5; padding: 3px 9px; cursor: pointer; }
+    .b2p .card .del:hover { background: #FDECEC; }
+    .b2p .msg { margin-top: 14px; padding: 10px 12px; font-size: 13px; background: var(--b2-card); border-left: 3px solid var(--b2-acc); }
+    .b2pop { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(17,24,39,.45); padding: 16px; }
+    .b2pop.on { display: flex; }
+    .b2pop .box { width: 100%; max-width: 340px; background: #fff; color: #111827; border-radius: 14px; padding: 20px 18px 16px; }
+    .b2pop h3 { margin: 0 0 8px; font-size: 16px; }
+    .b2pop p { margin: 0; font-size: 13.5px; line-height: 1.6; color: #374151; }
+    .b2pop .bt { display: flex; gap: 8px; margin-top: 16px; }
+    .b2pop .bt button { flex: 1; border: 0; border-radius: 10px; padding: 11px 0; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; background: #F4F6F9; color: #374151; }
+    .b2pop .bt button.d { background: #D9534F; color: #fff; }
+
     .b2p .empty { text-align: center; padding: 40px 0; font-family: "Noto Serif KR", serif; color: var(--b2-dim); }
     .b2p .foot { text-align: center; font-family: "Noto Serif KR", serif; font-size: 12.5px; color: var(--b2-acc); margin-top: 26px; }
 </style>
@@ -90,6 +113,7 @@
 <div class="b2p">
     <div class="k">함께 읽는 말씀</div>
     <h1 class="T">참여자 현황</h1>
+    @if (!string.IsNullOrEmpty(b2Msg)) { <div class="msg" role="status">@b2Msg</div> }
 
     @if (communityUsers.Any())
     {
@@ -149,15 +173,12 @@
                 int days = (int)(kstNow.Date - u.ReadDate.Date).TotalDays;
                 string when = days <= 0 ? "오늘" : days == 1 ? "어제" : $"{days}일 전";
 
-                string role;
-                var rc = u.RoleCode ?? "";
-                if (!string.IsNullOrEmpty(rc) && rc != "T1001") role = "교사";
-                else if (u.ClassYear > 0 && u.ClassBan > 0)   role = $"{u.ClassYear}학년 {u.ClassBan}반";
-                else if (u.ClassYear > 0)                      role = $"{u.ClassYear}학년";
-                else                                           role = "기타";
+                // 소속 — Common/UserAffiliation (역할은 UserRole 기준, /UserRoles 와 같다)
+                if (!aff.TryGetValue(u.UserId ?? "", out var a)) a = new UserAffiliationInfo();
+                string role = a.Label;
 
                 <div class="card @(done ? "dn" : "")"
-                     data-name="@(nm) @(u.UserName)"
+                     data-name="@(nm) @(u.UserName) @role"
                      data-rawprogress="@((long)Math.Round(Math.Max((double)u.TotalProgressRate, 0)))"
                      data-date="@u.ReadDate.Ticks">
                     @if (done) { <span class="tag">@(u.readBibleAllCount)독</span> }
@@ -175,8 +196,12 @@
                     <b>@nm</b>
                     @if (isSuperAdmin) { <span class="uid">@u.UserName</span> }
                     <div class="pc">@rate.ToString("F2")<small>%</small></div>
-                    <div><span class="role">@role</span></div>
+                    <div><span class="role @a.Css">@role</span></div>
                     <div class="m">@(string.IsNullOrEmpty(lastBook) ? "" : lastBook + " · ")@when</div>
+                    @if (canDelete)
+                    {
+                        <div><button type="button" class="del" data-del="@u.UserId" data-name="@nm">기록 삭제</button></div>
+                    }
                     <div class="bar"><i data-w="@((int)Math.Round(rate))"></i></div>
                 </div>
             }
@@ -189,6 +214,24 @@
 
     <div class="foot">말씀을 읽는 것이 복입니다 — 요한계시록 1:3</div>
 </div>
+
+@if (canDelete)
+{
+    <form id="b2DelForm" method="post" action="/Bible2/DeleteRecord" style="display:none">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="userId" id="b2DelId" />
+    </form>
+    <div class="b2pop" id="b2Pop" role="dialog" aria-modal="true">
+        <div class="box">
+            <h3>기록을 지울까요?</h3>
+            <p><b id="b2DelNm"></b> 님의 읽은 기록을 모두 지워요.<br>참여자 목록에서 빠지고, 되돌릴 수 없어요.<br><small style="color:#6B7280">완독 횟수 · 명예의 전당은 그대로예요.</small></p>
+            <div class="bt">
+                <button type="button" id="b2DelN">취소</button>
+                <button type="button" class="d" id="b2DelY">지우기</button>
+            </div>
+        </div>
+    </div>
+}
 
 @section Scripts {
 <script>
@@ -221,6 +264,19 @@
 
     var grid = document.getElementById('commGrid');
     if (!grid) return;
+
+    /* 기록 삭제 (관리자) — 화면 안 확인창 */
+    var pop = document.getElementById('b2Pop');
+    if (pop) {
+        grid.addEventListener('click', function (e) {
+            var d = e.target.closest('[data-del]'); if (!d) return;
+            document.getElementById('b2DelNm').textContent = d.dataset.name;
+            document.getElementById('b2DelId').value = d.dataset.del;
+            pop.classList.add('on');
+        });
+        document.getElementById('b2DelN').onclick = function () { pop.classList.remove('on'); };
+        document.getElementById('b2DelY').onclick = function () { this.disabled = true; document.getElementById('b2DelForm').submit(); };
+    }
 
     function sortBy(type) {
         var cards = Array.from(grid.children);
