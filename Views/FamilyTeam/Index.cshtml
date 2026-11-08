@@ -22,6 +22,16 @@
     string mode = (ViewBag.Mode as string) ?? FamilyTeamService.TypeFamily;
     bool friend = mode == FamilyTeamService.TypeFriend;
     string word = friend ? "친구팀" : "가족팀";
+
+    // 먼저 이름으로 찾고, 없으면 내가 만든다 (2026-11-08)
+    //   기본 = 1단계(찾기) · ?create=1 = 2단계(만들기)
+    bool create = ViewBag.Create is bool cr && cr;
+    bool isStudent = ViewBag.IsStudent is bool st && st;
+    string modeLower = friend ? "friend" : "family";
+    string createUrl = $"/FamilyTeam/Index?type={modeLower}&create=1";
+    string findUrl = $"/FamilyTeam/Index?type={modeLower}";
+    string? pendingTeamName = teams.FirstOrDefault(t => t.RequestId != 0)?.Name;   // 가입 신청을 보내 둔 팀
+    string myName = (ViewBag.HiName as string) ?? "";
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -29,7 +39,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FFFFFF">
-    <title>@word 만들기 · 찾기</title>
+    <title>@(create ? $"내 {word} 만들기" : $"{word}에 들어가기")</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800&display=swap" rel="stylesheet">
@@ -42,16 +52,36 @@
     </div>
 
     @await Html.PartialAsync("_FamilyGreeting")
-    <h1 class="ft-h1">@word 만들기 · 찾기</h1>
-    <p class="ft-sub">@(friend ? "학생 친구와 둘이서 함께해요." : "가족과 함께 점수를 모으고 선물을 받아요.") 한 사람은 한 팀에만 들어갈 수 있어요.</p>
+    <h1 class="ft-h1">@(create ? $"내 {word} 만들기" : $"{word}에 들어가기")</h1>
+    <p class="ft-sub">
+        @if (create)
+        {
+            <text>내가 방장이 되고, 나중에 @(friend ? "친구를" : "가족을") 초대할 수 있어요.</text>
+        }
+        else
+        {
+            <text>@(friend ? "친구" : "가족") 중 한 명의 이름을 찾으면, 그분이 속한 팀을 보여 줘요.</text>
+        }
+    </p>
+
+    @if (isStudent)
+    {
+        <div class="ft-msg warn"><b>학생은 가족팀과 친구팀 중 한 곳에만</b> 들어갈 수 있어요. 한 팀에 들어가면 다른 팀에는 들어갈 수 없어요.</div>
+    }
+
+    @* 1단계 · 2단계 안내 *@
+    <div class="ft-steps">
+        <div class="@(create ? "" : "on")"><b>STEP 1</b>이름으로 팀 찾기</div>
+        <div class="@(create ? "on" : "")"><b>STEP 2</b>없으면 내가 만들기</div>
+    </div>
 
     @if (!string.IsNullOrEmpty(msg))
     {
         <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
     }
 
-    @* ── 받은 초대 ── *@
-    @if (invites.Count > 0)
+    @* ── 받은 초대 (1단계에서만) ── *@
+    @if (!create && invites.Count > 0)
     {
         <div class="ft-sh"><span>받은 초대</span><small>@invites.Count 건</small></div>
         @foreach (var inv in invites)
@@ -70,38 +100,26 @@
         }
     }
 
-    @* ── 이름으로 찾기 : 가족이 이미 만든 팀에 합류 ── *@
-    <div class="ft-sh"><span>이름으로 찾기</span></div>
-    <p class="ft-sub" style="margin-top:8px">@(friend ? "친구 이름을 찾으면 그 친구가 속한 팀을 보여 줘요. 자리가 있으면 바로 가입 신청할 수 있어요." : "가족 이름을 찾으면 그분이 속한 팀과 구성원을 보여 줘요. 그 팀에 바로 가입 신청할 수 있어요.")</p>
-    <div id="ftSearch" data-mode="@mode" data-invite="0" data-apply="1" data-solo="" data-blocked="@(hasPendingApply ? "1" : "0")" data-rels="@relsJson">
-        <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
+    @if (!create)
+    {
+    @* ══ 1단계: 팀에 있는 사람 이름으로 찾기 (팀 이름이 아니라 사람 이름) ══ *@
+    @if (pendingTeamName != null)
+    {
+        <div class="ft-msg info"><b>@pendingTeamName</b>에 가입 신청 중이에요. 팀원이 수락하면 들어가요. 신청을 취소하면 다른 팀을 찾거나 새로 만들 수 있어요.</div>
+    }
+
+    <div class="ft-sh"><span>팀에 있는 사람 이름으로 찾기</span></div>
+    <p class="ft-sub" style="margin-top:8px">팀 이름이 아니라 @(friend ? "친구" : "가족") 이름을 두 글자 이상 입력해요. 그분이 속한 팀과 구성원을 보여 줘요.</p>
+    <div id="ftSearch" data-mode="@mode" data-invite="0" data-apply="1" data-solo="" data-blocked="@(hasPendingApply ? "1" : "0")" data-rels="@relsJson" data-create-url="@createUrl">
+        <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="@(friend ? "친구" : "가족") 이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>
         <div id="ftRes" class="ft-res" aria-live="polite"></div>
     </div>
 
-    @* ── 내 팀 만들기 ── *@
-    <div class="ft-sh"><span>내 @word 만들기</span></div>
-    <form method="post" asp-action="Create">
-        @Html.AntiForgeryToken()
-        <input type="hidden" name="type" value="@mode" />
-        <p class="ft-sub" style="margin-top:8px">팀 이름은 내 이름으로 정해져요. 나중에 바꿀 수 있어요. 예) 홍길동네 @word</p>
-        @if (!friend)
-        {
-        <div class="ft-q">나는 이 팀의…</div>
-        <div class="ft-chips">
-            @for (int i = 0; i < rels.Length; i++)
-            {
-                <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
-            }
-        </div>
-        }
-        <div style="margin-top:16px"><button class="ft-btn p w" type="submit">@word 만들기</button></div>
-    </form>
-
-    @* ── 이미 만들어진 팀 ── *@
+    @* ── 이미 만들어진 팀 (둘러보기) ── *@
     <div class="ft-sh"><span>@(friend ? "자리가 있는 친구팀" : "이미 만들어진 팀")</span><small>@teams.Count 개</small></div>
     @if (teams.Count == 0)
     {
-        <div class="ft-empty">@(friend ? "지금 자리가 있는 친구팀이 없어요. 위에서 만들어 보세요." : "아직 만들어진 팀이 없어요. 위에서 첫 팀을 만들어 보세요.")</div>
+        <div class="ft-empty">@(friend ? "지금 자리가 있는 친구팀이 없어요." : "아직 만들어진 팀이 없어요.")</div>
     }
     @foreach (var t in teams)
     {
@@ -143,6 +161,54 @@
                 <form method="post" asp-action="Cancel">@Html.AntiForgeryToken()<input type="hidden" name="type" value="@mode" /><input type="hidden" name="requestId" value="@t.RequestId" /><button class="ft-btn g" type="submit">신청 보냄 · 취소</button></form>
             }
         </div>
+    }
+
+    @* 찾는 사람이 없으면 → 2단계(내 팀 만들기). 다른 팀에 가입 신청 중이면 막는다 *@
+    <div class="ft-mk @(hasPendingApply ? "dis" : "")">
+        <b>@(friend ? "찾는 친구가 없나요?" : "찾는 가족이 없나요?")</b>
+        <span>@(friend ? "친구가" : "가족이") 아직 팀을 만들지 않았다면 내가 먼저 만들 수 있어요.</span>
+        @if (hasPendingApply)
+        {
+            <span class="ft-btn g w" style="margin-top:12px;opacity:.6">가입 신청을 취소하면 만들 수 있어요</span>
+        }
+        else
+        {
+            <a class="ft-btn p w" href="@createUrl" style="margin-top:12px">내 @word 만들기</a>
+        }
+    </div>
+    }
+    else
+    {
+    @* ══ 2단계: 내 팀 만들기 — 팀 이름은 방장(나) 이름으로 자동, 나중에 팀 화면에서 바꿀 수 있다 ══ *@
+    @if (hasPendingApply)
+    {
+        <div class="ft-msg info"><b>@pendingTeamName</b>에 가입 신청 중이라 지금은 팀을 만들 수 없어요. 신청을 취소한 뒤 만들어 주세요.</div>
+        <div style="margin-top:12px"><a class="ft-btn g w" href="@findUrl">신청 확인하러 가기</a></div>
+    }
+    else
+    {
+        <form method="post" asp-action="Create" class="ft-box">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="type" value="@mode" />
+            <div class="ft-nmp">
+                <small>팀 이름 (방장 이름으로 자동)</small>
+                <b>@(myName.Length > 0 ? myName : "내 이름")네 @word</b>
+                <small>만든 뒤 팀 화면에서 언제든 바꿀 수 있어요. 같은 이름이 있으면 숫자가 붙어요.</small>
+            </div>
+            @if (!friend)
+            {
+            <div class="ft-q">나는 이 팀의…</div>
+            <div class="ft-chips">
+                @for (int i = 0; i < rels.Length; i++)
+                {
+                    <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
+                }
+            </div>
+            }
+            <div style="margin-top:16px"><button class="ft-btn p w" type="submit">@word 만들기</button></div>
+        </form>
+        <a class="ft-back" href="@findUrl">@(friend ? "친구가" : "가족이") 만든 팀이 있는지 먼저 찾아볼래요</a>
+    }
     }
 
     <div class="ft-lk" style="margin-top:26px"><a href="/FamilyTeam/Index" style="flex:1">팀 종류 다시 고르기</a><i>›</i></div>
