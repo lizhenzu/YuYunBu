@@ -66,6 +66,21 @@ namespace BulletinBoard.BusinessLayer
             };
         }
 
+        public const int LibraryTitleMax = 200;
+
+        /// <summary>프람프트 모음 한 개를 고친다. 문제가 있으면 안내 글을, 잘 되면 null 을 돌려준다</summary>
+        public string? SaveLibrary(int id, string? title, string? promptText)
+        {
+            string t = (title ?? "").Trim();
+            string text = (promptText ?? "").Replace("\r\n", "\n").TrimEnd();
+            if (t.Length == 0) return "제목을 적어 주세요.";
+            if (t.Length > LibraryTitleMax) return $"제목은 {LibraryTitleMax}자까지 쓸 수 있어요.";
+            if (text.Trim().Length == 0) return "내용을 적어 주세요.";
+
+            int n = new ControlQuizAiPrompt().updateLibrary(id, t, text, DateHelper.GetKoreaNow());
+            return n > 0 ? null : "고칠 프람프트를 찾지 못했어요. 화면을 새로 고친 뒤 다시 해 주세요.";
+        }
+
         public string GetTemplate() => Get().PromptText;
 
         public void Save(string promptText, string updatedBy)
