@@ -57,6 +57,20 @@ namespace BulletinBoard.Controllers
                 vm.Kind = a.Kind; vm.RoleNM = a.RoleNM; vm.ClassYear = a.ClassYear; vm.ClassBan = a.ClassBan;
                 vm.TeachClasses = a.TeachClasses; vm.Pending = a.Pending; vm.AffLabel = a.Label;
             }
+
+            // 인별 최종 접속 — dbo.loginHistory (사용자별 마지막 기록 1건, 시각은 한국 시간으로 저장됨)
+            var lastAccess = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var ds = DataAccessModule.commonQuery("select UserName, max(InsertDT) LastAt from [dbo].[loginHistory] group by UserName");
+                if (ds.Tables.Count > 0)
+                    foreach (System.Data.DataRow row in ds.Tables[0].Rows)
+                        if (row["UserName"] is string un && row["LastAt"] is DateTime at) lastAccess[un.Trim()] = at;
+            }
+            catch { /* 접속 기록은 부가 정보 — 못 읽어도 화면은 그대로 */ }
+            foreach (var vm in userRolesViewModel)
+                if (lastAccess.TryGetValue((vm.UserName ?? "").Trim(), out var at)) vm.LastAccessAt = at;
+
             return View(userRolesViewModel);
         }
 

@@ -26,5 +26,6 @@ namespace BulletinBoard.Models
         public List<string> TeachClasses { get; set; } = new();   // 교사 담당 반 "1학년 2반 담임"
         public bool Pending { get; set; }                // 역할 코드 없고 가입 승인 대기 중
         public string AffLabel { get; set; } = "";       // 화면에 보이는 소속 한 줄
+        public DateTime? LastAccessAt { get; set; }      // 최종 접속 (dbo.loginHistory — 사용자별 마지막 기록 1건)
     }
 }
