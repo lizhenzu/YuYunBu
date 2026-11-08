@@ -41,6 +41,13 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
         [BindProperty]
         public InputModel Input { get; set; }
 
+        // ── 관리자로 로그인 (2026-11-08 시안 확정) ──
+        //   화면에는 아이디를 넣지 않는다 — "관리자 모드" 표시만 오고, 아이디는 서버에서 채운다 (페이지 소스에 관리자 아이디가 보이지 않게)
+        private const string AdminUserName = "superadmin";
+
+        [BindProperty]
+        public bool AdminMode { get; set; }
+
         public IList<AuthenticationScheme> ExternalLogins { get; set; }
 
         public string ReturnUrl { get; set; }
@@ -93,6 +100,14 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
         {
             returnUrl = returnUrl ?? Url.Content("~/");
 
+            if (AdminMode)
+            {
+                // 관리자 모드 — 아이디 칸은 비어서 온다. 서버에서 채우고 그 칸의 "필수" 오류를 지운다
+                Input ??= new InputModel();
+                Input.Email = AdminUserName;
+                ModelState.Remove("Input.Email");
+            }
+
             if (ModelState.IsValid)
             {
                 // This doesn't count login failures towards account lockout
@@ -100,7 +115,17 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
                 var userName = Input.Email;
                 var userID = string.Empty;
                 var userFullName = string.Empty;
-                if (IsValidEmail(Input.Email))
+                if (AdminMode)
+                {
+                    var admin = await _userManager.FindByNameAsync(AdminUserName);
+                    if (admin != null)
+                    {
+                        userName = admin.UserName;
+                        userID = admin.Id;
+                        userFullName = $"{admin.LastName}{admin.FirstName}";
+                    }
+                }
+                else if (IsValidEmail(Input.Email))
                 {
                     var user = await _userManager.FindByEmailAsync(Input.Email);
                     if (user != null)
@@ -133,7 +158,16 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
                 }
                 else
                 {
-                    ModelState.AddModelError(string.Empty, "이메일 또는 비밀번호 오류");
+                    if (AdminMode)
+                    {
+                        Input.Email = "";   // 다시 그린 화면에 관리자 아이디가 실리지 않게
+                        ModelState.Remove("Input.Email");
+                        ModelState.AddModelError(string.Empty, "관리자 비밀번호가 맞지 않아요");
+                    }
+                    else
+                    {
+                        ModelState.AddModelError(string.Empty, "이메일 또는 비밀번호 오류");
+                    }
                     return Page();
                 }
             }
