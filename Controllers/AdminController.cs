@@ -29,7 +29,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> Index()
         {
             // 2026-10-04 — 관리 메뉴를 "정보 관리" 한 화면으로 모았다. 옛 주소는 그 화면의 콘텐츠 묶음으로 보낸다.
-            return Redirect("/HumanResource/ManageUserInfo#g4");
+            return Redirect("/HumanResource/ManageUserInfo#quiz");
         }
         // GET: JobCategory
         public async Task<IActionResult> LifeGuide()
