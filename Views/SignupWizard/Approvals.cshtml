@@ -75,19 +75,22 @@
                     <div style="margin-top:4px;font-size:12.5px;color:#2F7BF5;font-weight:700">역할 변경 · @(string.IsNullOrEmpty(a.PrevRole) ? "?" : a.PrevRole) → @a.RoleLabel</div>
                 }
                 <div class="ap-box">
-                    @if (a.RoleKind == "S")
-                    {
-                        @(a.ClassYear > 0 ? $"{a.ClassYear}학년 {a.ClassBan}반" : "반: 잘 모르겠어요")<text> · @($"{a.BMonth}월 {a.BDay}일") · @(a.Sex == "M" ? "남" : "여")</text><br />
-                        @(string.IsNullOrEmpty(a.School) ? "" : a.School + " · ")<text>부모님 @a.Phone</text>
+                    @{
+                        // 비어 있는 값은 빼고 보여 준다 (역할만 정한 신청이면 "더 입력한 정보 없음")
+                        var parts = new List<string>();
+                        if (a.RoleKind == "S")
+                        {
+                            parts.Add(a.ClassYear > 0 && a.ClassBan > 0 ? $"{a.ClassYear}학년 {a.ClassBan}반" : "반 미정");
+                            if (a.BMonth > 0 && a.BDay > 0) parts.Add($"{a.BMonth}월 {a.BDay}일");
+                            if (a.Sex == "M" || a.Sex == "F") parts.Add(a.Sex == "M" ? "남" : "여");
+                            if (!string.IsNullOrEmpty(a.School)) parts.Add(a.School);
+                            if (!string.IsNullOrEmpty(a.Phone)) parts.Add("부모님 " + a.Phone);
+                            if (parts.Count == 1 && a.ClassYear == 0) parts[0] = "역할만 정함 — 반 미정 · 더 입력한 정보 없음";
+                        }
+                        else if (a.RoleKind == "T" && !string.IsNullOrEmpty(a.Phone)) parts.Add("연락처 " + a.Phone);
+                        if (parts.Count == 0) parts.Add("더 입력한 정보 없음");
                     }
-                    else if (a.RoleKind == "P")
-                    {
-                        <text>자녀 @a.Kids</text><br /><text>연락처 @a.Phone</text>
-                    }
-                    else
-                    {
-                        <text>연락처 @a.Phone</text>
-                    }
+                    @string.Join(" · ", parts)
                     @if (hasTarget)
                     {
                         <br /><span class="ap-warn">같은 이름 기존 기록을 "이 사람이 저예요"로 골랐어요 — @a.TargetFullName · @(a.TargetClassYear > 0 ? $"{a.TargetClassYear}학년 {a.TargetClassBan}반" : "반 정보 없음") · @(targetTaken ? "지금은 다른 계정(" + a.TargetUserName + ")과 연결됨" : "계정 없음")</span>
