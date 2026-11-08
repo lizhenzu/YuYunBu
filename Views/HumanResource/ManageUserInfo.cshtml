@@ -46,49 +46,62 @@
     var X = new List<(string, string)>();
     var menu = new List<(string Group, string Title, string Desc, string Url, string Roles, (string L, string U)[] Extras)>
     {
-        // ① 내 정보
-        ("g1", "사진 정보 수정",   "프로필 사진 바꾸기",           $"/HumanResource/ModifyHRPhoto?UserId={uid}", "all", new (string,string)[0]),
-        ("g1", "나의 정보 수정",   "이름 · 연락처 · 생일",         "/Profile/Edit",                              "all", new (string,string)[0]),
-        ("g1", "탈퇴 요청",       "삭제될 정보를 보고 요청하기",     "/Withdraw/Request",                          "own", new (string,string)[0]),
+        // 2026-11-08 다시 묶음 — 하는 일(누구를 · 무엇을)이 같은 것끼리. 권한 글자는 예전과 같다.
 
+        // ① 내 계정 — 누구나 (역할 변경 · 탈퇴 요청은 본인 화면에서만)
+        // "내 계정"은 누가 어떤 화면을 열어도 로그인한 본인 것만 고친다 (2026-11-08 결정)
+        ("me",   "사진 정보 수정",   "프로필 사진 바꾸기",                   $"/HumanResource/ModifyHRPhoto?UserId={user?.Id}", "all", new (string,string)[0]),
+        ("me",   "나의 정보 수정",   "이름 · 연락처 · 생일",                 "/Profile/Edit",                              "all", new (string,string)[0]),
+        ("me",   "나의 역할 변경",   "학생 · 교사 · 학부모 바꾸기 (관리자 승인 필요)", "/SignupWizard?change=true",        "own", new (string,string)[0]),
+        ("me",   "탈퇴 요청",       "삭제될 정보를 보고 요청하기",           "/Withdraw/Request",                          "own", new (string,string)[0]),
 
-        // ③ 선물
-        ("g3", "통합 선물 관리",   "완독 선물 선택 · 구매 · 전달",  "/StudentPointDashboard4/AdminPurchaseList?kind=Bible", "AS", new (string,string)[0]),
-        ("g3", "생일자 선물 관리", "다가오는 생일자 선물",          "/Present/AdminUpcomingBirthdays",            "AS", new (string,string)[0]),
-        ("g3", "선물 아이템 관리", "등록 · 수정 · 삭제",            "/Present/AwardItemAdmin",                    "AS", new (string,string)[0]),
+        // ② 가입 · 탈퇴 처리 — 회원이 들어오고 나갈 때 관리자가 승인하는 곳
+        ("join", "가입 승인",       "가입 · 역할 변경 신청 승인 · 반려",      "/SignupWizard/Approvals",                    "SB", new (string,string)[0]),
+        ("join", "미배정 회원 배정", "역할 · 학년반이 빈 회원 정하기 · 삭제",  "/HumanResource/UnassignedMembers",           "S", new (string,string)[0]),
+        ("join", "탈퇴 요청 확인",   "탈퇴 요청 승인(삭제) · 반려",           "/Withdraw/Requests",                         "S", new (string,string)[0]),
+        ("join", "연결 요청 확인",   "예전 방식 — 남은 같은 이름 연결 요청",   "/PersonMatch/Requests",                      "S", new (string,string)[0]),
 
-        // ④ 콘텐츠 만들기
-        ("g4", "퀴즈 작성",         "퀴즈 쓰기 · 수정",             "/Question/QuestionDetailList",               "AS", new (string,string)[0]),
-        ("g4", "AI 프람프트 관리",  "AI 버튼 출제 문구 수정",        "/QuizAiPrompt/Index",                        "SB", new (string,string)[0]),
-        ("g4", "기도문 작성",       "",                            "/PrayPhrase/PrayPhraseDetailList",           "S", new (string,string)[0]),
-        ("g4", "공과 작성",         "",                            "/WeeklyWordToRead/WeeklyWordToReadDetailList", "S", new (string,string)[0]),
-        ("g4", "SQL 직접 실행",     "",                            "/BibleBulk/EnrollBulkQuiz",                  "S", new (string,string)[0]),
-        ("g4", "퀴즈 답변 정정",    "맞지 않는 답변 기록 바로잡기",  "/CheckPoint/MismatchClickHistoryForQuestion", "S", new (string,string)[0]),
-        ("g4", "말씀 정리",         "달력으로 한눈에 정리",             "/JuManNa/IndexGroupByYYYYMM",                "S", new (string,string)[0]),
-        ("g4", "명구 관리",         "명구 등록 · 정리",             "/OneLineFamousWord/Index",                   "S", new (string,string)[0]),
+        // ③ 회원 · 팀 관리 — 이미 들어온 사람을 고치고 팀을 묶는 곳
+        ("ppl",  "다른 사람 역할 변경", "사람을 골라 역할 · 반을 바로 바꾸기 (승인 없음)", "/HumanResource/RoleChange",       "SB", new (string,string)[0]),
+        ("ppl",  "팀 구성",         "도전 성경 가족팀 · 친구팀",              "/DailyMission2FamilyAdmin",                  "S", new (string,string)[0]),
 
-        // ⑤ 사람 · 권한
-        ("g5", "이 사람 역할 · 반 수정", "",                        $"/HumanResource/ChangeUseRoleMain?UserId={uid}", "S", new (string,string)[0]),
-        ("g5", "미배정 회원 배정", "가입 후 역할 · 학년반 정하기", "/HumanResource/UnassignedMembers",                  "S", new (string,string)[0]),
-        ("g5", "연결 요청 확인", "가입 후 같은 이름 기록 연결", "/PersonMatch/Requests", "S", new (string,string)[0]),
-        ("g5", "탈퇴 요청 확인", "탈퇴 요청 승인 · 반려",       "/Withdraw/Requests", "S", new (string,string)[0]),
-        ("g5", "팀 구성",        "도전성경 팀 구성",             "/DailyMission2FamilyAdmin",                  "S", new (string,string)[0]),
-        ("g5", "Role 관리",         "Role 만들기 · 정리",           "/RoleManager/Index",                         "S", new (string,string)[0]),
-        ("g5", "사용자별 Role 설정", "사람마다 Role 지정",          "/UserRoles/Index",                           "S", new (string,string)[0]),
+        // ④ 퀴즈 출제 · 채점
+        ("quiz", "퀴즈 작성",       "퀴즈 쓰기 · 수정",                     "/Question/QuestionDetailList",               "AS", new (string,string)[0]),
+        ("quiz", "AI 프람프트 관리", "AI 버튼 출제 문구 수정",                "/QuizAiPrompt/Index",                        "SB", new (string,string)[0]),
+        ("quiz", "퀴즈 답변 정정",   "맞지 않는 답변 기록 바로잡기",          "/CheckPoint/MismatchClickHistoryForQuestion", "S", new (string,string)[0]),
 
-        // ⑥ 운영 · 점검
-        ("g6", "이상 징후",         "이상 데이터 관리",             "/SuperAdminAnomaly/Index",                   "S", new (string,string)[0]),
-        ("g6", "사용자 접속 정보",   "접속 · 로그인 기록",           "/LoginHistMgmt/Index",                       "AS", new (string,string)[0]),
-        ("g6", "방문자 통계",         "홈 하루 · 누적 방문자 수",     "/SiteVisit/Index",                           "SB", new (string,string)[0]),
+        // ⑤ 말씀 · 기도 콘텐츠
+        ("word", "공과 작성",       "주간 공과 쓰기 · 수정",                 "/WeeklyWordToRead/WeeklyWordToReadDetailList", "S", new (string,string)[0]),
+        ("word", "기도문 작성",     "오늘의 기도 쓰기 · 수정",               "/PrayPhrase/PrayPhraseDetailList",           "S", new (string,string)[0]),
+        ("word", "말씀 정리",       "달력으로 한눈에 정리",                  "/JuManNa/IndexGroupByYYYYMM",                "S", new (string,string)[0]),
+        ("word", "명구 관리",       "명구 등록 · 정리",                     "/OneLineFamousWord/Index",                   "S", new (string,string)[0]),
+
+        // ⑥ 선물 · 도토리
+        ("gift", "통합 선물 관리",   "완독 선물 선택 · 구매 · 전달",          "/StudentPointDashboard4/AdminPurchaseList?kind=Bible", "AS", new (string,string)[0]),
+        ("gift", "생일자 선물 관리", "다가오는 생일자 선물",                  "/Present/AdminUpcomingBirthdays",            "AS", new (string,string)[0]),
+        ("gift", "선물 아이템 관리", "등록 · 수정 · 삭제",                    "/Present/AwardItemAdmin",                    "AS", new (string,string)[0]),
+
+        // ⑦ 접근 권한(Role) — 로그인 계정의 관리 권한
+        ("role", "Role 관리",       "Role 만들기 · 정리",                   "/RoleManager/Index",                         "S", new (string,string)[0]),
+        ("role", "사용자별 Role 설정", "사람마다 Role 지정",                 "/UserRoles/Index",                           "S", new (string,string)[0]),
+
+        // ⑧ 사이트 운영 · 점검
+        ("ops",  "방문자 통계",     "홈 하루 · 누적 방문자 수",              "/SiteVisit/Index",                           "SB", new (string,string)[0]),
+        ("ops",  "사용자 접속 정보", "접속 · 로그인 기록",                    "/LoginHistMgmt/Index",                       "AS", new (string,string)[0]),
+        ("ops",  "이상 징후",       "이상 데이터 관리",                     "/SuperAdminAnomaly/Index",                   "S", new (string,string)[0]),
+        ("ops",  "SQL 직접 실행",   "DB 에 직접 실행 (주의)",                "/BibleBulk/EnrollBulkQuiz",                  "S", new (string,string)[0]),
     };
 
     var groups = new[]
     {
-        (Id: "g1", Name: "내 정보",        Roles: "all", Chip: "내 정보"),
-        (Id: "g3", Name: "선물",           Roles: "AS",  Chip: "선물"),
-        (Id: "g4", Name: "콘텐츠 만들기",   Roles: "AS",  Chip: "콘텐츠"),
-        (Id: "g5", Name: "사람 · 권한",     Roles: "S",   Chip: "사람·권한"),
-        (Id: "g6", Name: "운영 · 점검",     Roles: "AS",  Chip: "운영"),
+        (Id: "me",   Name: "내 계정",           Roles: "all", Chip: "내 계정"),
+        (Id: "join", Name: "가입 · 탈퇴 처리",   Roles: "SB",  Chip: "가입·탈퇴"),
+        (Id: "ppl",  Name: "회원 · 팀 관리",     Roles: "S",   Chip: "회원·팀"),
+        (Id: "quiz", Name: "퀴즈 출제 · 채점",   Roles: "AS",  Chip: "퀴즈"),
+        (Id: "word", Name: "말씀 · 기도 콘텐츠", Roles: "S",   Chip: "말씀·기도"),
+        (Id: "gift", Name: "선물 · 도토리",      Roles: "AS",  Chip: "선물"),
+        (Id: "role", Name: "접근 권한(Role)",    Roles: "S",   Chip: "권한"),
+        (Id: "ops",  Name: "사이트 운영 · 점검", Roles: "AS",  Chip: "운영"),
     };
 
     // 이 사람에게 보이는 묶음만

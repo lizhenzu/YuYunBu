@@ -257,9 +257,19 @@ namespace BulletinBoard.Controllers
 
         public async Task<IActionResult> ModifyHRPhoto(string UserId)
         {
+            // "내 계정" 메뉴 — 본인 사진만. 다른 사람 사진은 SuperAdmin 만 고칠 수 있다.
+            // (UserId 가 비면 조건 없이 조회돼 목록 첫 사람이 열리던 것도 막는다)
+            var myId = _userManager.GetUserId(User) ?? "";
+            if (string.IsNullOrEmpty(UserId) || (UserId != myId && !User.IsInRole(nameof(Roles.SuperAdmin))))
+                UserId = myId;
+            if (string.IsNullOrEmpty(UserId))
+                return Redirect("/Identity/Account/Login");
+
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            if (userInfo.Count == 0)
+                return Content("사용자 정보를 찾을 수 없어요.");
 
             return View(userInfo[0]);
         }
@@ -393,7 +403,10 @@ namespace BulletinBoard.Controllers
             ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
             ViewData["Roles"] = manageDeptInfo.getCodeData("T001");
             // 가입 직후 "이 사람이 저예요" 연결 요청을 보내 확인을 기다리는 회원
-            ViewData["Pending"] = await new ControlPersonMatch().GetPendingUserNamesAsync();
+            var pendingNames = await new ControlPersonMatch().GetPendingUserNamesAsync();
+            // 가입 마법사로 승인을 요청한 회원도 가입 승인 화면에서 처리한다
+            try { pendingNames.UnionWith(await new ControlSignup().GetPendingUserNamesAsync()); } catch { }
+            ViewData["Pending"] = pendingNames;
 
             var years = new SortedSet<int>();
             var bans = new SortedSet<int>();
@@ -426,6 +439,8 @@ namespace BulletinBoard.Controllers
             {
                 if (await new ControlPersonMatch().HasPendingByUserIdAsync(UserId))
                     return Json(new { ok = false, message = "연결 요청 대기 중이에요. 연결 요청 확인에서 먼저 처리해 주세요." });
+                if ((await new ControlSignup().GetLatestOfAsync(UserId))?.Status == "PENDING")
+                    return Json(new { ok = false, message = "가입 승인 대기 중이에요. 가입 승인 화면에서 처리해 주세요." });
 
                 ControlHumanResource controlHumanResource = new ControlHumanResource();
                 await controlHumanResource.DeleteClassInfoAsync(UserId);
@@ -439,6 +454,73 @@ namespace BulletinBoard.Controllers
             catch (Exception ex)
             {
                 // SuperAdmin 전용 화면이라 원인 문구를 그대로 보여 준다
+                return Json(new { ok = false, message = "저장 오류: " + ex.Message });
+            }
+        }
+
+        // ── 다른 사람 역할 변경 (관리자 · 승인 없음) ────────────────────
+        // 사람 목록에서 고른 뒤 역할(학생 · 교사 · 임원 · 학부모)을 바로 바꾼다. 내 역할 변경은 /SignupWizard?change=true (승인 필요)
+        private bool IsRoleAdmin()
+            => User.IsInRole(nameof(Roles.SuperAdmin))
+               || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
+
+        public async Task<IActionResult> RoleChange()
+        {
+            if (!IsRoleAdmin()) return Forbid();
+
+            ManageHumanResource manageHumanResource = new ManageHumanResource();
+            var all = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            var people = all.Where(u => !string.IsNullOrWhiteSpace(u.UserId))
+                            .GroupBy(u => u.UserId).Select(g => g.First())
+                            .OrderBy(u => u.FullName).ToList();
+
+            ViewData["Roles"] = new ManageDeptInfo().getCodeData("T001");
+            var years = new SortedSet<int>();
+            var bans = new SortedSet<int>();
+            var ds = new ControlHumanResource().fetchClassOptions();
+            foreach (System.Data.DataRow r in ds.Tables[0].Rows)
+            {
+                years.Add(Convert.ToInt32(r["ClassYear"]));
+                bans.Add(Convert.ToInt32(r["ClassBan"]));
+            }
+            if (years.Count == 0) for (int i = 1; i <= 6; i++) years.Add(i);
+            if (bans.Count == 0) for (int i = 1; i <= 8; i++) bans.Add(i);
+            ViewData["Years"] = years.ToList();
+            ViewData["Bans"] = bans.ToList();
+            return View(people);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RoleChangeSave(string UserId, string? RoleCode, int ClassYear, int ClassBan)
+        {
+            if (!IsRoleAdmin()) return Json(new { ok = false, message = "권한이 없어요." });
+            try
+            {
+                var user = await _userManager.FindByIdAsync(UserId ?? "");
+                if (user == null) return Json(new { ok = false, message = "회원을 찾을 수 없어요." });
+
+                RoleCode = (RoleCode ?? "").Trim();
+                string roleName = "학부모(역할 없음)";
+                if (RoleCode.Length > 0)
+                {
+                    var code = new ManageDeptInfo().getCodeData("T001").FirstOrDefault(c => c.MinorCD == RoleCode);
+                    if (code == null) return Json(new { ok = false, message = "역할을 다시 골라 주세요." });
+                    roleName = code.MinorNM;
+                }
+                if (RoleCode == "T1001" && (ClassYear > 0) != (ClassBan > 0))
+                    return Json(new { ok = false, message = "학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요." });
+
+                var fullName = ((user.LastName ?? "") + (user.FirstName ?? "")).Trim();
+                await new ControlSignup().ChangeRoleDirectAsync(user.Id, user.UserName ?? "", fullName, RoleCode,
+                                                                RoleCode == "T1001" ? ClassYear : 0, RoleCode == "T1001" ? ClassBan : 0);
+
+                // 바뀐 사람에게 쪽지는 보내지 않는다 (2026-11-08 결정)
+                string cls = RoleCode == "T1001" && ClassYear > 0 ? $" {ClassYear}학년 {ClassBan}반" : "";
+
+                return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P" });
+            }
+            catch (Exception ex)
+            {
                 return Json(new { ok = false, message = "저장 오류: " + ex.Message });
             }
         }
@@ -559,8 +641,16 @@ namespace BulletinBoard.Controllers
                 return Json(new { success = false, message = "No image data provided." });
             }
 
+            // 본인 사진만 올릴 수 있다 (SuperAdmin 은 예외). 실제 있는 계정 번호인지도 확인한다 — 파일 이름으로 쓰이므로
+            var myId = _userManager.GetUserId(User) ?? "";
+            if (string.IsNullOrEmpty(model.UserId)) model.UserId = myId;
+            if (model.UserId != myId && !User.IsInRole(nameof(Roles.SuperAdmin)))
+                return Json(new { success = false, message = "본인 사진만 바꿀 수 있어요." });
+            if (await _userManager.FindByIdAsync(model.UserId) == null)
+                return Json(new { success = false, message = "사용자를 찾을 수 없어요." });
+
             // Convert base64 string to byte array
-            byte[] imageBytes = Convert.FromBase64String(model.ProfilePicture);          
+            byte[] imageBytes = Convert.FromBase64String(model.ProfilePicture);
 
             try
             {

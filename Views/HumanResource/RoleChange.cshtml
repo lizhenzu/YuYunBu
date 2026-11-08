@@ -1,0 +1,188 @@
+@using BulletinBoard.Common;
+@model List<UserInfo>
+
+@*  ══════════════════════════════════════════════════════════════
+    다른 사람 역할 변경 — 2026-11-08 (관리자 = SuperAdmin 역할 + Basic 계정 · 승인 없음 · DailyMission4 밝은 흰색)
+    · 사람 목록(찾기 · 학생/교사·임원/역할 없음 거르기) → 사람을 누르면 그 줄 아래에 역할 바꾸기가 펼쳐진다
+    · 저장: /HumanResource/RoleChangeSave → 바로 반영 (바뀐 사람에게 쪽지는 보내지 않는다)
+    · 정리 규칙(역할 변경 승인과 같음): 학생→교사 · 임원이면 학생 반 삭제, 학부모(역할 없음)면 역할 · 반 삭제
+    · 내 역할 변경은 정보 관리 › 내 계정 › 나의 역할 변경 (관리자 승인 필요)
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var roles = (List<CodeData>)ViewData["Roles"];
+    var years = (List<int>)ViewData["Years"];
+    var bans = (List<int>)ViewData["Bans"];
+    string KindOf(string? rc) => rc == "T1001" ? "S" : string.IsNullOrWhiteSpace(rc) ? "P" : "T";
+    string LabelOf(UserInfo u) => u.RoleCode == "T1001"
+        ? "학생" + (u.ClassYear > 0 && u.ClassBan > 0 ? $" {u.ClassYear}학년 {u.ClassBan}반" : " · 반 없음")
+        : string.IsNullOrWhiteSpace(u.RoleCode) ? "역할 없음" : (string.IsNullOrWhiteSpace(u.RoleNM) ? u.RoleCode : u.RoleNM);
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>다른 사람 역할 변경</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .rc-find { width: 100%; box-sizing: border-box; height: 42px; border: 1px solid #D9DEE6; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 15px; margin-top: 12px; }
+        .rc-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
+        .rc-chips button { font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 1px solid #E1E5EB; background: #fff; color: #6B7684; }
+        .rc-chips button.on { background: #EAF2FD; border-color: #2F7BF5; color: #2F7BF5; }
+        .rc-cnt { font-size: 12px; color: #8A93A0; margin: 6px 0; }
+        .rc-row { border-top: 1px solid #EEF0F3; }
+        .rc-head { display: flex; align-items: center; gap: 10px; padding: 12px 2px; cursor: pointer; }
+        .rc-head .t { flex: 1; min-width: 0; }
+        .rc-head b { display: block; font-size: 15.5px; font-weight: 700; color: #111827; }
+        .rc-head small { display: block; font-size: 12px; color: #8A93A0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rc-tag { flex: none; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #F4F6F9; color: #6B7684; }
+        .rc-tag.S { background: #EAF2FD; color: #2F7BF5; }
+        .rc-tag.T { background: #E8F6EC; color: #1E7A3C; }
+        .rc-ed { display: none; padding: 4px 2px 14px; }
+        .rc-row.open .rc-ed { display: block; }
+        .rc-row.open .rc-head b { color: #2F7BF5; }
+        .rc-lab { font-size: 12px; color: #6B7684; margin: 6px 0 4px; }
+        .rc-sel { display: flex; gap: 6px; }
+        .rc-sel select { flex: 1; min-width: 0; height: 42px; border: 1px solid #D9DEE6; border-radius: 10px; padding: 0 8px; background: #fff; font: inherit; font-size: 14.5px; }
+        .rc-cls { display: none; margin-top: 6px; }
+        .rc-msg { min-height: 18px; font-size: 13px; margin: 6px 0; }
+        .rc-msg.err { color: #D13B3B; }
+        .rc-msg.ok { color: #1E7A3C; }
+        .rc-save { width: 100%; height: 44px; border: 0; border-radius: 12px; background: #2F7BF5; color: #fff; font: inherit; font-size: 15px; font-weight: 800; }
+        .rc-save[disabled] { opacity: .5; }
+        .rc-none { display: none; padding: 24px 0; text-align: center; color: #8A93A0; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo#ppl">정보 관리</a><span class="sep">›</span>다른 사람 역할 변경</span>
+        <span>ADMIN</span>
+    </div>
+
+    <div class="qb-k">ROLE</div>
+    <h1 class="qb-h1">다른 사람 역할 변경</h1>
+    <div class="qb-sub">사람을 누르면 역할을 바로 바꿀 수 있어요. 승인은 필요 없어요.</div>
+
+    <input class="rc-find" id="rcQ" placeholder="이름 · 아이디로 찾기" autocomplete="off" />
+    <div class="rc-chips" id="rcChips">
+        <button type="button" data-f="" class="on">전체</button>
+        <button type="button" data-f="S">학생</button>
+        <button type="button" data-f="T">교사 · 임원</button>
+        <button type="button" data-f="P">역할 없음</button>
+    </div>
+    <div class="rc-cnt" id="rcCnt"></div>
+
+    <div id="rcList">
+        @foreach (var u in Model)
+        {
+            string kind = KindOf(u.RoleCode);
+            <div class="rc-row" data-uid="@u.UserId" data-kind="@kind" data-q="@((u.FullName + " " + u.UserName).ToLowerInvariant())">
+                <div class="rc-head">
+                    <div class="t"><b>@u.FullName</b><small>@u.UserName</small></div>
+                    <span class="rc-tag @kind">@LabelOf(u)</span>
+                </div>
+                <div class="rc-ed">
+                    <div class="rc-lab">바꿀 역할</div>
+                    <div class="rc-sel">
+                        <select class="rc-role">
+                            @foreach (var r in roles) { <option value="@r.MinorCD" selected="@(r.MinorCD == u.RoleCode)">@r.MinorNM</option> }
+                            <option value="" selected="@(string.IsNullOrWhiteSpace(u.RoleCode))">학부모 (역할 없음)</option>
+                        </select>
+                    </div>
+                    <div class="rc-cls">
+                        <div class="rc-lab">학년 · 반</div>
+                        <div class="rc-sel">
+                            <select class="rc-y"><option value="0">학년 미정</option>@foreach (var y in years) { <option value="@y" selected="@(u.RoleCode == "T1001" && y == u.ClassYear)">@(y)학년</option> }</select>
+                            <select class="rc-b"><option value="0">반 미정</option>@foreach (var b in bans) { <option value="@b" selected="@(u.RoleCode == "T1001" && b == u.ClassBan)">@(b)반</option> }</select>
+                        </div>
+                    </div>
+                    <div class="rc-msg"></div>
+                    <button type="button" class="rc-save">저장</button>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="rc-none" id="rcNone">찾는 사람이 없어요.</div>
+
+    <div class="qb-ft">
+        <span>바로 반영돼요</span>
+        <span><a href="/HumanResource/ManageUserInfo#ppl">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+(function () {
+    var list = document.getElementById('rcList'), q = document.getElementById('rcQ'), f = '';
+    var rows = Array.prototype.slice.call(list.querySelectorAll('.rc-row'));
+
+    function filter() {
+        var s = q.value.trim().toLowerCase(), n = 0;
+        rows.forEach(function (r) {
+            var ok = (!f || r.dataset.kind === f) && (!s || r.dataset.q.indexOf(s) > -1);
+            r.style.display = ok ? '' : 'none';
+            if (ok) n++;
+        });
+        document.getElementById('rcCnt').textContent = n + '명';
+        document.getElementById('rcNone').style.display = n ? 'none' : 'block';
+    }
+    q.addEventListener('input', filter);
+    document.querySelectorAll('#rcChips button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            f = b.dataset.f;
+            document.querySelectorAll('#rcChips button').forEach(function (x) { x.classList.toggle('on', x === b); });
+            filter();
+        });
+    });
+
+    function syncCls(row) {
+        row.querySelector('.rc-cls').style.display = row.querySelector('.rc-role').value === 'T1001' ? 'block' : 'none';
+    }
+
+    rows.forEach(function (row) {
+        row.querySelector('.rc-head').addEventListener('click', function () {
+            var open = row.classList.contains('open');
+            rows.forEach(function (x) { x.classList.remove('open'); });
+            if (!open) { row.classList.add('open'); syncCls(row); }
+        });
+        row.querySelector('.rc-role').addEventListener('change', function () { syncCls(row); });
+        row.querySelector('.rc-save').addEventListener('click', function () {
+            var btn = this, msg = row.querySelector('.rc-msg');
+            var role = row.querySelector('.rc-role').value;
+            var y = row.querySelector('.rc-y').value, b = row.querySelector('.rc-b').value;
+            msg.className = 'rc-msg'; msg.textContent = '';
+            if (role === 'T1001' && ((y === '0') !== (b === '0'))) { msg.className = 'rc-msg err'; msg.textContent = '학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요'; return; }
+            var name = row.querySelector('.rc-head b').textContent;
+            var roleText = row.querySelector('.rc-role').selectedOptions[0].text;
+            if (!confirm(name + ' 님의 역할을 "' + roleText + '"(으)로 바꿀까요?')) return;
+            var fd = new FormData();
+            fd.append('UserId', row.dataset.uid); fd.append('RoleCode', role);
+            fd.append('ClassYear', role === 'T1001' ? y : '0'); fd.append('ClassBan', role === 'T1001' ? b : '0');
+            btn.disabled = true;
+            fetch('/HumanResource/RoleChangeSave', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function (x) {
+                    var ct = x.headers.get('content-type') || '';
+                    if (x.redirected || ct.indexOf('json') < 0) { throw new Error('응답 ' + x.status); }
+                    return x.json();
+                })
+                .then(function (j) {
+                    btn.disabled = false;
+                    if (!j.ok) { msg.className = 'rc-msg err'; msg.textContent = j.message || '저장하지 못했어요'; return; }
+                    var tag = row.querySelector('.rc-tag');
+                    tag.textContent = j.label; tag.className = 'rc-tag ' + j.kind;
+                    row.dataset.kind = j.kind;
+                    msg.className = 'rc-msg ok'; msg.textContent = '바꿨어요.';
+                })
+                .catch(function (e) { btn.disabled = false; msg.className = 'rc-msg err'; msg.textContent = '저장하지 못했어요 · ' + (e && e.message ? e.message : ''); });
+        });
+    });
+    filter();
+})();
+</script>
+</body>
+</html>
