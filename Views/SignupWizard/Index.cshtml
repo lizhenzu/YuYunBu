@@ -78,7 +78,30 @@
         .sw-nav { display: flex; gap: 8px; }
         .sw-nav button { flex: 1; height: 46px; border-radius: 12px; border: 1px solid #D9DEE6; background: #fff; font: inherit; font-size: 15px; font-weight: 700; }
         .sw-nav button.p { flex: 1.6; background: #2F7BF5; border-color: #2F7BF5; color: #fff; }
-        .sw-wait { margin: 12px 0; padding: 14px; border-radius: 12px; background: #FFF4E0; color: #9A5B00; font-size: 14px; line-height: 1.7; }
+        /* 승인 대기 화면 (A안) */
+        .sw-wtop { font-size: 13px; font-weight: 700; color: #374151; padding-bottom: 12px; border-bottom: 1px solid #EEF0F3; }
+        .sw-wic { width: 72px; height: 72px; border-radius: 50%; background: #FFF4E0; display: flex; align-items: center; justify-content: center; font-size: 34px; margin: 26px auto 0; }
+        .sw-wh { margin: 14px 0 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; text-align: center; color: #111827; }
+        .sw-wsub { margin-top: 6px; text-align: center; font-size: 14px; color: #6B7280; line-height: 1.6; }
+        .sw-chg { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; font-size: 14px; color: #6B7280; }
+        .sw-chg .pill { padding: 5px 12px; border-radius: 999px; background: #F4F6F9; color: #6B7280; font-weight: 700; }
+        .sw-chg .pill.n { background: #EAF2FD; color: #2F7BF5; }
+        .sw-steps { display: flex; margin: 24px 4px 0; }
+        .sw-steps .st { flex: 1; text-align: center; font-size: 12.5px; color: #9AA3AF; position: relative; }
+        .sw-steps .st i { display: block; width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 6px; background: #E5E8EE; color: #fff; font-style: normal; font-weight: 800; line-height: 26px; font-size: 13px; position: relative; z-index: 1; }
+        .sw-steps .st::before { content: ""; position: absolute; top: 12px; left: -50%; width: 100%; height: 3px; background: #E5E8EE; }
+        .sw-steps .st:first-child::before { display: none; }
+        .sw-steps .st.done { color: #2F7BF5; font-weight: 700; }
+        .sw-steps .st.done i, .sw-steps .st.done::before, .sw-steps .st.now::before { background: #2F7BF5; }
+        .sw-steps .st.now { color: #8A5300; font-weight: 700; }
+        .sw-steps .st.now i { background: #F59E0B; }
+        .sw-card { margin-top: 22px; background: #F5F7FA; border-radius: 16px; padding: 12px 16px; }
+        .sw-card .row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 14px; }
+        .sw-card .row + .row { border-top: 1px solid #E8EBF0; }
+        .sw-card .row span { color: #8A93A0; white-space: nowrap; }
+        .sw-card .row b { font-weight: 700; text-align: right; word-break: keep-all; }
+        .sw-wnote { margin-top: 14px; text-align: center; font-size: 13px; color: #6B7280; }
+        .sw-home { display: block; width: 100%; box-sizing: border-box; margin-top: 18px; padding: 16px 0; border-radius: 16px; background: #2F7BF5; color: #fff; text-align: center; font-size: 17px; font-weight: 800; text-decoration: none; }
         .sw-rej { margin: 12px 0; padding: 12px 14px; border-radius: 12px; background: #FDEEEE; color: #B03030; font-size: 13.5px; }
         .sw-msg { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: #EAF2FD; color: #2F7BF5; font-size: 13px; }
     </style>
@@ -86,28 +109,41 @@
 <body>
 <div class="qb">
 
-    <div class="qb-top">
-        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>가입 마무리</span>
-        <span>WELCOME</span>
-    </div>
-
     @if (pending)
     {
-        <div class="qb-k">WAITING</div>
-        <h1 class="qb-h1">@(latest!.IsChange ? "역할 변경을 요청했어요" : "승인을 요청했어요")</h1>
-        @if (latest.IsChange && !string.IsNullOrEmpty(latest.PrevRole)) { <div class="qb-sub">@latest.PrevRole → @latest.RoleLabel</div> }
-        <div class="sw-wait">
-            관리자 확인을 기다리는 중이에요 (@latest!.InsertDT.ToString("M월 d일")).<br />
-            그 전에도 미션은 바로 할 수 있어요. 승인되면 쪽지로 알려 드려요.
+        @* 승인 대기 화면 — 2026-11-08 A안: 가운데 정렬 · 진행 3단계 · 요약 카드 · "홈으로"는 아래 큰 버튼 하나만 *@
+        string prevPill = string.IsNullOrEmpty(latest!.PrevRole) ? "" : (latest.PrevRole.StartsWith("역할 없음") ? "학부모" : latest.PrevRole);
+        <div class="sw-wtop">@(latest.IsChange ? "역할 변경" : "가입 마무리")</div>
+        <div class="sw-wic" aria-hidden="true">&#9203;</div>
+        <h1 class="sw-wh">@(latest.IsChange ? "역할 변경을 요청했어요" : "승인을 요청했어요")</h1>
+        <div class="sw-wsub">관리자가 확인하면 @(latest.IsChange ? "바뀌어요" : "역할이 정해져요").<br />그 전에도 미션은 바로 할 수 있어요.</div>
+        <div class="sw-chg">
+            @if (latest.IsChange && prevPill.Length > 0) { <span class="pill">@prevPill</span><span>→</span> }
+            else if (!latest.IsChange) { <span class="pill">새 가입</span><span>→</span> }
+            <span class="pill n">@latest.RoleLabel</span>
         </div>
-        <div class="sw-sum">
-            <b>@latest.RoleLabel</b> · @latest.FullName<br />
-            @SignupDetailText(latest)
+
+        <div class="sw-steps">
+            <div class="st done"><i>&#10003;</i>요청 보냄</div>
+            <div class="st now"><i>2</i>관리자 확인</div>
+            <div class="st"><i>3</i>완료</div>
         </div>
-        <div class="qb-btns"><a class="qb-btn p" href="@returnUrl">@ConstatsCommon.ToHome</a></div>
+
+        <div class="sw-card">
+            <div class="row"><span>이름</span><b>@latest.FullName</b></div>
+            <div class="row"><span>요청 날짜</span><b>@latest.InsertDT.ToString("M월 d일")</b></div>
+            <div class="row"><span>입력한 정보</span><b>@(SignupDetailText(latest) == "더 입력한 정보는 없어요." ? "없음 (역할만)" : SignupDetailText(latest))</b></div>
+        </div>
+        <div class="sw-wnote">승인되면 쪽지로 알려 드려요.</div>
+        <a class="sw-home" href="@returnUrl">@ConstatsCommon.ToHome</a>
     }
     else
     {
+        <div class="qb-top">
+            <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>@(change ? "역할 변경" : "가입 마무리")</span>
+            <span>WELCOME</span>
+        </div>
+
         @if (rejected) { <div class="sw-rej">@(latest!.IsChange ? "역할 변경" : "가입 승인") 요청이 반려됐어요.@if (!string.IsNullOrEmpty(latest!.RejectReason)) { <br /><b>사유: @latest.RejectReason</b> }<br />내용을 고쳐서 다시 보내 주세요.</div> }
         @if (!string.IsNullOrEmpty(msg)) { <div class="sw-msg">@msg</div> }
 
@@ -230,12 +266,11 @@
             </div>
         </form>
 
+        <div class="qb-ft">
+            <span>@(change ? "역할 변경" : "가입 마무리")</span>
+            <span><a href="/">@ConstatsCommon.ToHome</a></span>
+        </div>
     }
-
-    <div class="qb-ft">
-        <span>가입 마무리</span>
-        <span><a href="/">@ConstatsCommon.ToHome</a></span>
-    </div>
 </div>
 
 @if (!pending)
