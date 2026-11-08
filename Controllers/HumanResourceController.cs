@@ -511,13 +511,16 @@ namespace BulletinBoard.Controllers
                     return Json(new { ok = false, message = "학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요." });
 
                 var fullName = ((user.LastName ?? "") + (user.FirstName ?? "")).Trim();
-                await new ControlSignup().ChangeRoleDirectAsync(user.Id, user.UserName ?? "", fullName, RoleCode,
-                                                                RoleCode == "T1001" ? ClassYear : 0, RoleCode == "T1001" ? ClassBan : 0);
+                // 역할 기준 (2026-11-08) — 새 역할에 맞지 않는 팀에서는 같은 트랜잭션에서 빠진다 (그때만 본인에게 쪽지)
+                string? leftTeam = await new ControlSignup().ChangeRoleDirectAsync(user.Id, user.UserName ?? "", fullName, RoleCode,
+                                                                RoleCode == "T1001" ? ClassYear : 0, RoleCode == "T1001" ? ClassBan : 0,
+                                                                User.Identity?.Name ?? "");
 
-                // 바뀐 사람에게 쪽지는 보내지 않는다 (2026-11-08 결정)
+                // 역할이 바뀌었다는 쪽지는 보내지 않는다 (2026-11-08 결정)
                 string cls = RoleCode == "T1001" && ClassYear > 0 ? $" {ClassYear}학년 {ClassBan}반" : "";
 
-                return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P" });
+                return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P",
+                                  message = leftTeam != null ? $"새 역할에 맞지 않아 \"{leftTeam}\"에서 뺐어요." : "" });
             }
             catch (Exception ex)
             {

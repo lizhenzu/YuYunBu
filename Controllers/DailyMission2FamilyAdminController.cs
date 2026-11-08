@@ -83,6 +83,10 @@ namespace BulletinBoard.Controllers
             {
                 TempData["Error"] = "저장 실패: " + FriendlySqlError(ex);
             }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = "저장 실패: " + ex.Message;   // 역할 기준에 맞지 않음
+            }
 
             return RedirectToAction(nameof(Index), new { teamId });
         }
@@ -102,6 +106,10 @@ namespace BulletinBoard.Controllers
             catch (SqlException ex)
             {
                 TempData["Error"] = "저장 실패: " + FriendlySqlError(ex);
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = "저장 실패: " + ex.Message;   // 역할 기준에 맞지 않음
             }
 
             return RedirectToAction(nameof(Index), new { teamId });

@@ -16,7 +16,11 @@
     int sum  = tree?.Members.Sum(m => m.YearPoint) ?? 0;
     // 내 팀에 나 혼자이고 시상 기록이 없으면 다른 팀에 신청할 수 있다 (신청하면 내 팀은 지워진다)
     bool isSolo = Model.Members.Count == 1 && !Model.HasAwardRecord;
-    string relsJson = System.Text.Json.JsonSerializer.Serialize(rels.Select(r => new { k = r.Key, l = r.Label }));
+    // 역할 기준 (2026-11-08) — 관계는 그 사람의 역할이 정한다. 학생 = 학생만, 학부모 = 엄마 · 아빠 · 할머니 · 할아버지
+    var meInfo = Model.Members.FirstOrDefault(x => x.IsMe);
+    var myRels = FamilyTeamService.RelationsFor(meInfo?.RoleKind ?? UserRoleKind.Parent);   // 내가 다른 팀에 신청할 때
+    var parentRels = FamilyTeamService.RelationsFor(UserRoleKind.Parent);                   // 학부모를 초대할 때
+    string relsJson = System.Text.Json.JsonSerializer.Serialize(myRels.Select(r => new { k = r.Key, l = r.Label }));
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -95,7 +99,12 @@
         <div class="ft-row" style="align-items:flex-start">
             <div class="l">
                 <div class="ft-nm">@m.FullName@if (m.IsMe) {<i style="font-style:normal;font-size:11px;color:var(--blue);margin-left:6px">나</i>}@if (string.Equals(m.UserName, Model.CreatorUserName, StringComparison.OrdinalIgnoreCase)) {<i style="font-style:normal;font-size:11px;color:var(--dim2);margin-left:6px">방장</i>}</div>
-                @{ bool canChange = m.IsMe || Model.IsCreator; }
+                @{
+                    // 이 사람이 고를 수 있는 관계 — 하나뿐이고 지금 관계와 같으면(학생) 바꿀 것이 없다
+                    var mRels = FamilyTeamService.RelationsFor(m.RoleKind);
+                    bool relFits = mRels.Any(x => x.Key == m.RelKey);
+                    bool canChange = (m.IsMe || Model.IsCreator) && mRels.Length > 0 && (mRels.Length > 1 || !relFits);
+                }
                 @if (canChange && !Model.HasAwardRecord)
                 {
                     @* 관계 칩을 누르면 이 줄 아래로 펼쳐진다 (본인 · 방장) *@
@@ -106,7 +115,7 @@
                             <input type="hidden" name="targetUserName" value="@m.UserName" />
                             <div class="ft-q" style="margin-top:0">@(m.IsMe ? "나는" : m.FullName + "님은") 우리 가족의…</div>
                             <div class="ft-chips">
-                                @foreach (var r2 in rels)
+                                @foreach (var r2 in mRels)
                                 {
                                     <label><input type="radio" name="relation" value="@r2.Key" checked="@(r2.Key == m.RelKey)" required /><span>@r2.Label</span></label>
                                 }
@@ -151,13 +160,15 @@
     <form id="invForm" method="post" asp-action="Invite">
         @Html.AntiForgeryToken()
         <input type="hidden" name="targetUserName" id="invTarget" value="" />
-        <div class="ft-q">초대받는 분은 우리 팀의…</div>
+        <input type="hidden" id="invRel" value="child" />
+        <div class="ft-q">학부모를 초대할 때 — 초대받는 분은 우리 팀의…</div>
         <div class="ft-chips">
-            @for (int i = 0; i < rels.Length; i++)
+            @for (int i = 0; i < parentRels.Length; i++)
             {
-                <label><input type="radio" name="relation" value="@rels[i].Key" required /><span>@rels[i].Label</span></label>
+                <label><input type="radio" name="relation" value="@parentRels[i].Key" required /><span>@parentRels[i].Label</span></label>
             }
         </div>
+        <p class="ft-sub" style="margin-top:6px">학생은 고르지 않아도 '학생'으로 초대돼요. 교사 · 임원은 초대할 수 없어요.</p>
     </form>
     <div id="ftSearch" data-mode="FAMILY" data-invite="1" data-apply="@(isSolo ? "1" : "0")" data-solo="@(isSolo ? Model.TeamName : "")" data-blocked="0" data-rels="@relsJson">
         <div style="margin-top:12px"><input id="ftQ" class="ft-in" type="search" placeholder="이름을 두 글자 이상 입력" autocomplete="off" aria-label="찾을 사람 이름" /></div>

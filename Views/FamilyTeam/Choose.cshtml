@@ -12,6 +12,7 @@
     bool isStudent = ViewBag.IsStudent is bool s && s;
     string? msg = ViewBag.Msg as string;
     bool msgOk  = ViewBag.MsgOk is bool b && b;
+    string? roleBlocked = ViewBag.RoleBlocked as string;   // 교사 · 임원이면 그 역할 이름 — 팀에 못 들어간다
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -32,6 +33,20 @@
     </div>
 
     @await Html.PartialAsync("_FamilyGreeting")
+    @if (!string.IsNullOrEmpty(roleBlocked))
+    {
+        @* 역할 기준 — 교사 · 임원은 가족팀 · 친구팀에 들어가지 않는다 *@
+        <div class="ft-none">
+            <b>@roleBlocked 역할은 팀에 들어가지 않아요</b>
+            <span>가족팀은 학생과 학부모가, 친구팀은 학생끼리 만들어요.<br />역할이 바뀌었다면 정보 관리의 "역할 변경"에서 요청해 주세요.</span>
+        </div>
+        @if (!string.IsNullOrEmpty(msg))
+        {
+            <div class="ft-msg @(msgOk ? "ok" : "")" role="status">@msg</div>
+        }
+    }
+    else
+    {
     <div class="ft-none">
         <b>아직 소속된 팀이 없어요</b>
         <span>미션을 함께 하려면 팀이 필요해요.<br />이미 있는 팀에 참가하거나, 새 팀을 만들어 주세요.</span>
@@ -64,6 +79,7 @@
     else
     {
         <p class="ft-sub">한 사람은 한 팀에만 들어갈 수 있어요.</p>
+    }
     }
 
     <div class="ft-lk" style="margin-top:26px"><a href="/DailyMission2/Welcome" style="flex:1">미션 시작 화면으로</a><i>›</i></div>
