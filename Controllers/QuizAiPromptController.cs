@@ -1,4 +1,4 @@
-using BulletinBoard.BusinessLayer;
+﻿using BulletinBoard.BusinessLayer;
 using BulletinBoard.Helpers;
 using BulletinBoard.Models;
 using BulletinBoard.Services.Abstract;
@@ -37,7 +37,9 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> Index()
         {
             if (!await IsStaffAsync()) return Forbid();
-            return View(new ManageQuizAiPrompt().Get());
+            var manage = new ManageQuizAiPrompt();
+            ViewBag.PromptLibrary = manage.GetLibrary();
+            return View(manage.Get());
         }
 
         [HttpPost]
@@ -71,8 +73,9 @@ namespace BulletinBoard.Controllers
         }
 
         // 저장하지 못했을 때 입력한 글을 그대로 둔다
-        private static QuizAiPromptInfo WithText(ManageQuizAiPrompt manage, string text)
+        private QuizAiPromptInfo WithText(ManageQuizAiPrompt manage, string text)
         {
+            ViewBag.PromptLibrary = manage.GetLibrary();
             var info = manage.Get();
             info.PromptText = text;
             return info;

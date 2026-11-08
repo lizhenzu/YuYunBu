@@ -1,4 +1,4 @@
-@model BulletinBoard.BusinessLayer.QuizAiPromptInfo
+﻿@model BulletinBoard.BusinessLayer.QuizAiPromptInfo
 @using BulletinBoard.Common;
 @using BulletinBoard.Helpers;
 
@@ -13,6 +13,7 @@
     string? error = ViewBag.PromptError as string;
     string? saved = TempData["PromptSaved"] as string;
     string today = DateHelper.GetKoreaNow().ToString("yyyy-MM-dd");
+    var library = ViewBag.PromptLibrary as List<BulletinBoard.BusinessLayer.AiPromptLibraryItem> ?? new List<BulletinBoard.BusinessLayer.AiPromptLibraryItem>();
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -35,8 +36,24 @@
         .ap-tk { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--dim2); }
         .ap-tk code { padding: 2px 8px; border-radius: 99px; background: var(--soft); color: var(--blue); font-size: 11.5px; }
         .ap-at { margin-top: 8px; font-size: 12px; color: var(--dim2); }
-    </style>
-</head>
+        /* 프람프트 모음 — 보고 복사만 한다 (dbo.AiPromptLibrary) */
+        .pl-row { padding: 12px 0; border-bottom: 1px solid var(--line); }
+        .pl-hd { display: flex; align-items: center; gap: 10px; }
+        .pl-no { flex: none; width: 24px; font-size: 13px; font-weight: 800; color: #7FA3DB; }
+        .pl-t { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; color: var(--ink); word-break: keep-all; }
+        .pl-copy { flex: none; display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: 999px; padding: 7px 13px; background: var(--soft); color: var(--blue);
+                   font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .pl-copy .ic { font-size: 16px; line-height: 1; }
+        .pl-copy.done { background: #EAF7EF; color: #15803D; }
+        .pl-row details { margin: 6px 0 0 34px; }
+        .pl-row summary { cursor: pointer; font-size: 12.5px; color: var(--dim2); list-style: none; }
+        .pl-row summary::-webkit-details-marker { display: none; }
+        .pl-row summary::before { content: "▸ "; }
+        .pl-row details[open] summary::before { content: "▾ "; }
+        .pl-pre { margin: 8px 0 0; padding: 12px 14px; border-radius: 14px; background: var(--grey); max-height: 320px; overflow: auto;
+                  font-family: ui-monospace, "Cascadia Mono", Consolas, "Malgun Gothic", monospace; font-size: 12px; line-height: 1.7; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+        .pl-empty { padding: 14px 0; font-size: 13px; color: var(--dim); }
+    </style></head>
 <body>
 <div class="qb">
     <div class="qb-top">
@@ -79,8 +96,29 @@
         </div>
     </form>
 
-    <div class="qb-ft">
-        <span>AI 프람프트</span>
+    @* ── 프람프트 모음 : 보고 복사만 한다 (dbo.AiPromptLibrary) ── *@
+    <div class="qb-sec" style="margin-top:28px">프람프트 모음 <small>@library.Count 개</small></div>
+    @if (library.Count == 0)
+    {
+        <div class="pl-empty">아직 등록된 프람프트가 없어요. SQL/CreateAiPromptLibrary_20261108.sql 을 실행했는지 확인해 주세요.</div>
+    }
+    @for (int i = 0; i < library.Count; i++)
+    {
+        var item = library[i];
+        <div class="pl-row">
+            <div class="pl-hd">
+                <span class="pl-no">@((i + 1).ToString("00"))</span>
+                <span class="pl-t">@item.Title</span>
+                <button type="button" class="pl-copy" data-copy="pl@(item.Id)" aria-label="@item.Title 복사"><span class="ic" aria-hidden="true">📋</span><span class="tx">복사</span></button>
+            </div>
+            <details>
+                <summary>내용 보기 · @item.PromptText.Length.ToString("N0")자</summary>
+                <pre class="pl-pre" id="pl@(item.Id)">@item.PromptText</pre>
+            </details>
+        </div>
+    }
+
+    <div class="qb-ft">        <span>AI 프람프트</span>
         <span><a href="/Question/Index">퀴즈 달력</a><a href="/HumanResource/ManageUserInfo">정보 관리</a><a href="/">@ConstatsCommon.ToHome</a></span>
     </div>
 </div>
@@ -101,6 +139,35 @@
             btn.textContent = on ? '수정으로 돌아가기' : '예시로 보기';
         });
     })();
-</script>
-</body>
+    // 프람프트 모음 — [📋 복사] 를 누르면 그 글 전체를 복사한다 (줄바꿈 그대로)
+    (function () {
+        function fallback(text) {
+            var ta = document.createElement('textarea');
+            ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
+            document.body.appendChild(ta); ta.select();
+            var ok = false; try { ok = document.execCommand('copy'); } catch (e) { }
+            document.body.removeChild(ta);
+            return ok;
+        }
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest('.pl-copy');
+            if (!b) return;
+            var src = document.getElementById(b.dataset.copy);
+            if (!src) return;
+            var text = src.textContent;
+            var tx = b.querySelector('.tx'), ic = b.querySelector('.ic');
+            function done(ok) {
+                b.classList.toggle('done', ok);
+                tx.textContent = ok ? '복사했어요' : '복사 실패';
+                ic.textContent = ok ? '✅' : '⚠️';
+                setTimeout(function () { b.classList.remove('done'); tx.textContent = '복사'; ic.textContent = '📋'; }, 1800);
+            }
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallback(text)); });
+            } else {
+                done(fallback(text));
+            }
+        });
+    })();
+</script></body>
 </html>

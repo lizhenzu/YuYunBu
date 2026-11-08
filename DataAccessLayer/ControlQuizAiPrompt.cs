@@ -1,4 +1,4 @@
-using BulletinBoard.Common;
+﻿using BulletinBoard.Common;
 using Microsoft.Data.SqlClient;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,12 @@ namespace BulletinBoard.DataAccessLayer
         public DataSet fetchPrompt()
         {
             return DataAccessModule.commonQuery("select PromptText, UpdatedAt, UpdatedBy from [dbo].[QuizAiPrompt] where Id = 1");
+        }
+
+        /// <summary>프람프트 모음 (dbo.AiPromptLibrary) — 표가 없으면 표 없는 DataSet 이 온다</summary>
+        public DataSet fetchLibrary()
+        {
+            return DataAccessModule.commonQuery("select Id, Title, PromptText from [dbo].[AiPromptLibrary] order by SortNo, Id");
         }
 
         public void savePrompt(string promptText, DateTime updatedAt, string updatedBy)
