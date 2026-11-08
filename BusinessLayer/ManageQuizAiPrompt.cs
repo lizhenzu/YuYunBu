@@ -1,6 +1,7 @@
-using BulletinBoard.DataAccessLayer;
+﻿using BulletinBoard.DataAccessLayer;
 using BulletinBoard.Helpers;
 using System;
+using System.Collections.Generic;
 using System.Data;
 
 namespace BulletinBoard.BusinessLayer
@@ -15,8 +16,35 @@ namespace BulletinBoard.BusinessLayer
         public bool FromDb { get; set; }
     }
 
+    /// <summary>화면에서 보고 복사만 하는 프람프트 한 개 (dbo.AiPromptLibrary)</summary>
+    public class AiPromptLibraryItem
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string PromptText { get; set; } = "";
+    }
+
     public class ManageQuizAiPrompt
     {
+        /// <summary>프람프트 모음을 읽는다. 표가 없거나 오류면 빈 목록</summary>
+        public List<AiPromptLibraryItem> GetLibrary()
+        {
+            var list = new List<AiPromptLibraryItem>();
+            DataSet ds = new ControlQuizAiPrompt().fetchLibrary();
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new AiPromptLibraryItem
+                {
+                    Id = Convert.ToInt32(row["Id"]),
+                    Title = row["Title"] as string ?? "",
+                    PromptText = (row["PromptText"] as string ?? "").Replace("\r\n", "\n"),
+                });
+            }
+            return list;
+        }
+
         /// <summary>DB 문구를 읽는다. 표가 없거나 연결 오류 · 빈 값이면 코드의 기본 문구를 돌려준다</summary>
         public QuizAiPromptInfo Get()
         {
