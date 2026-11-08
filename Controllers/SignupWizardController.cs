@@ -65,11 +65,15 @@ namespace BulletinBoard.Controllers
             var latest = await _db.GetLatestOfAsync(me.Id);
             if (latest != null && latest.Status == "APPROVED" && !change)
                 return LocalRedirect(SafeUrl(returnUrl));
+            // 역할 변경 신청을 취소한 뒤에는 가입 마법사를 다시 띄우지 않는다 (이미 가입한 회원이다)
+            if (latest != null && latest.Status == "CANCELED" && latest.IsChange && !change)
+                return LocalRedirect(SafeUrl(returnUrl));
             // 반려된 신청이 역할 변경이었으면 다시 입력도 역할 변경으로
             if (latest != null && latest.Status == "REJECTED" && latest.IsChange) change = true;
 
             var fullName = FullNameOf(me);
             ViewData["FullName"] = fullName;
+            ViewData["MyId"] = me.Id;             // 대기 화면 "나의 정보" 버튼 주소에 쓴다
             ViewData["Change"] = change;
             ViewData["Current"] = change ? await _db.GetCurrentRoleAsync(me.UserName ?? "") : null;
             ViewData["ReturnUrl"] = SafeUrl(returnUrl);
@@ -168,6 +172,35 @@ namespace BulletinBoard.Controllers
             catch { /* 쪽지가 실패해도 신청은 저장됐다 */ }
 
             return RedirectToAction(nameof(Index), new { returnUrl, change });
+        }
+
+        // ── 회원: 내 신청 취소 (승인 대기 화면의 "요청 취소") ─────────────────
+        //   가입 신청을 취소하면 마법사 첫 화면으로, 역할 변경 신청을 취소하면 홈으로 돌아간다.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Cancel(int id, string? returnUrl)
+        {
+            var me = await _userManager.GetUserAsync(User);
+            if (me == null) return Challenge();
+
+            var latest = await _db.GetLatestOfAsync(me.Id);
+            bool wasChange = latest != null && latest.Id == id && latest.IsChange;
+
+            bool ok = await _db.CancelAsync(id, me.Id);
+            if (!ok)
+            {
+                TempData["SignupMsg"] = "이미 처리된 요청이에요.";
+                return RedirectToAction(nameof(Index), new { returnUrl, change = wasChange });
+            }
+
+            // 관리자의 승인 대기 목록에서는 상태가 바뀌어 저절로 사라진다. 쪽지는 보내지 않는다.
+            if (wasChange)
+            {
+                TempData["SignupMsg"] = "역할 변경 요청을 취소했어요.";
+                return LocalRedirect(SafeUrl(returnUrl));
+            }
+            TempData["SignupMsg"] = "승인 요청을 취소했어요. 다시 골라 주세요.";
+            return RedirectToAction(nameof(Index), new { returnUrl });
         }
 
         // ── 관리자: 승인 목록 — 가입 승인과 역할 변경 승인은 메뉴도 화면도 따로 ──────────
