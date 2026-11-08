@@ -256,6 +256,7 @@
                 <button type="button" class="sw-opt @(Tag("S").Length > 0 ? "cur" : "")" data-role="S" disabled="@(Tag("S").Length > 0)"><span class="t"><b>학생</b><small>@(Tag("S").Length > 0 ? "이미 이 역할이에요" : "유년부 어린이")</small></span>@if (Tag("S").Length > 0) { <span class="tagnow">지금</span> }</button>
                 <button type="button" class="sw-opt @(Tag("T").Length > 0 ? "cur" : "")" data-role="T" disabled="@(Tag("T").Length > 0)"><span class="t"><b>교사</b><small>@(Tag("T").Length > 0 ? "이미 이 역할이에요" : "선생님")</small></span>@if (Tag("T").Length > 0) { <span class="tagnow">지금</span> }</button>
                 <button type="button" class="sw-opt @(Tag("P").Length > 0 ? "cur" : "")" data-role="P" disabled="@(Tag("P").Length > 0)"><span class="t"><b>학부모</b><small>@(Tag("P").Length > 0 ? "이미 이 역할이에요" : "어린이의 부모님")</small></span>@if (Tag("P").Length > 0) { <span class="tagnow">지금</span> }</button>
+                <button type="button" class="sw-opt @(Tag("E").Length > 0 ? "cur" : "")" data-role="E" disabled="@(Tag("E").Length > 0)"><span class="t"><b>기타</b><small>@(Tag("E").Length > 0 ? "이미 이 역할이에요" : "학생 · 교사 · 학부모가 아닌 분")</small></span>@if (Tag("E").Length > 0) { <span class="tagnow">지금</span> }</button>
                 @if (change)
                 {
                     <div class="sw-foot">관리자가 승인하면 바뀌어요. 그 전에는 지금 역할 그대로예요.</div>
@@ -381,7 +382,7 @@
         var head = ['role'].concat(hasSame ? ['same'] : []).concat(['more']);
         if (role === 'S') return head.concat(detail ? ['cls', 'birth', 'etc'] : []).concat(['sum']);
         if (role === 'T') return head.concat(detail ? ['tel'] : []).concat(['sum']);
-        if (role === 'P') return ['role', 'sum'];
+        if (role === 'P' || role === 'E') return ['role', 'sum'];   // 학부모 · 기타는 역할만 정하고 끝
         return ['role'];
     }
     function show() {
@@ -403,8 +404,8 @@
     function selText(id) { var e = $(id); return e && e.selectedIndex >= 0 ? e.options[e.selectedIndex].text : ''; }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function summary() {
-        var label = role === 'S' ? '학생' : role === 'T' ? '교사' : '학부모';
-        if (role === 'P' || !detail) return '<b>' + label + '</b><br>역할만 정해요. 더 입력할 것은 없어요.';
+        var label = role === 'S' ? '학생' : role === 'T' ? '교사' : role === 'E' ? '기타' : '학부모';
+        if (role === 'P' || role === 'E' || !detail) return '<b>' + label + '</b><br>역할만 정해요. 더 입력할 것은 없어요.';
         var parts = [];
         if (role === 'S') {
             parts.push(($('fYear').value === '0' || $('fBan').value === '0') ? '반은 관리자가 정해요' : selText('fYear') + ' ' + selText('fBan'));
@@ -436,7 +437,7 @@
             $('fSex').value = ''; $('fSchool').value = '';
         }
         $('fDetail').value = detail ? 'true' : 'false';
-        if (role === 'P') $('fPerson').value = '0';
+        if (role === 'P' || role === 'E') $('fPerson').value = '0';
         $('swNext').disabled = true;
         form.onsubmit = null; form.submit();
     }
