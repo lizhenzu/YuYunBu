@@ -141,12 +141,12 @@ ORDER BY cy, cb;";
             }
             if (string.Equals(user.Id, _userManager.GetUserId(User), StringComparison.Ordinal))
             {
-                TempData["UrMsg"] = "내 계정은 삭제할 수 없어요.";
+                TempData["UrMsg"] = "내 계정은 탈퇴 처리할 수 없어요.";
                 return RedirectToAction(nameof(Index));
             }
             if (await _userManager.IsInRoleAsync(user, nameof(Roles.SuperAdmin)))
             {
-                TempData["UrMsg"] = "SuperAdmin 계정은 삭제할 수 없어요.";
+                TempData["UrMsg"] = "SuperAdmin 계정은 탈퇴 처리할 수 없어요.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -161,7 +161,7 @@ ORDER BY cy, cb;";
                 var result = await _userManager.DeleteAsync(user);
                 if (!result.Succeeded)
                 {
-                    TempData["UrMsg"] = "기록은 지웠지만 계정을 지우지 못했어요: " + string.Join(", ", result.Errors.Select(e => e.Description));
+                    TempData["UrMsg"] = "기록은 지웠지만 로그인 계정을 지우지 못해 탈퇴가 끝나지 않았어요: " + string.Join(", ", result.Errors.Select(e => e.Description));
                     return RedirectToAction(nameof(Index));
                 }
                 if (pendingReq != null)
@@ -169,11 +169,11 @@ ORDER BY cy, cb;";
                     try { await wd.SetStatusAsync(pendingReq.Id, "APPROVED", User.Identity?.Name); } catch { }
                 }
                 _ = BulletinBoard.Helpers.DbLogger.LogDebugAsync($"UserRoles Delete by {User.Identity?.Name} → {user.UserName}");
-                TempData["UrMsg"] = $"{name} 님의 계정과 기록을 모두 지웠어요.";
+                TempData["UrMsg"] = $"{name} 님을 탈퇴 처리했어요. 계정과 기록을 모두 지웠어요.";
             }
             catch (Exception ex)
             {
-                TempData["UrMsg"] = "삭제하지 못했어요: " + ex.Message;
+                TempData["UrMsg"] = "탈퇴 처리하지 못했어요: " + ex.Message;
             }
             return RedirectToAction(nameof(Index));
         }
