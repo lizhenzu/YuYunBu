@@ -28,6 +28,9 @@
     string KindOf(UserRolesViewModel u) => NoAff(u) ? "no" : KindCls(u.Kind);
     int KCnt(UserRoleKind k) => users.Count(u => u.Kind == k && !NoAff(u));
     int noAffCnt = users.Count(NoAff);
+    // 반 없는 학생 (2026-11-08) — 학생인데 반 배정(ClassInfo_2026)이 없는 사람
+    bool NoClass(UserRolesViewModel u) => u.Kind == UserRoleKind.Student && u.ClassYear <= 0;
+    int noClassCnt = users.Count(NoClass);
     string KindCls(UserRoleKind k) => k switch { UserRoleKind.Student => "st", UserRoleKind.Teacher => "te", UserRoleKind.Officer => "of", UserRoleKind.Etc => "et", _ => "pa" };
     string RoleCls(string r) => r switch { "SuperAdmin" => "s", "Admin" => "a", "Moderator" => "m", "Basic" => "b", _ => "" };
     int no = 0;
@@ -87,6 +90,13 @@
         .ur-af.no { background: #fff; color: #A86A12; box-shadow: inset 0 0 0 1px #F2C879; }
         .ur-chips button.na { background: #FFF1D6; color: #A86A12; }
         .ur-chips button.na.on { background: #E59A1A; color: #fff; }
+        /* 반 없는 학생 — 연한 하늘 배경 + 왼쪽 파란 띠 */
+        .ur-row.nocls { background: #EEF5FF; box-shadow: inset 3px 0 0 #7FA3DB; }
+        .ur-row.nocls .ur-hd { padding-left: 10px; padding-right: 10px; }
+        .ur-row.nocls .ur-bd { padding-right: 10px; }
+        .ur-row.nocls .ur-af.st { background: #fff; box-shadow: inset 0 0 0 1px #B9D0F2; }
+        .ur-chips button.nc { background: #E3EEFC; color: #2F6FD0; }
+        .ur-chips button.nc.on { background: #2F6FD0; color: #fff; }
         .ur-dup { margin-left: 6px; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 1px 7px; background: var(--warnbg); color: var(--warn); vertical-align: 2px; }
 
         .ur-bd { display: none; padding: 0 0 14px 40px; }
@@ -147,6 +157,7 @@
             @if (KCnt(UserRoleKind.Parent) > 0) { <button type="button" data-f="k:pa">학부모<b>@KCnt(UserRoleKind.Parent)</b></button> }
             <button type="button" data-f="k:et">기타<b>@KCnt(UserRoleKind.Etc)</b></button>
             <button type="button" class="na" data-f="k:no">소속 없음<b>@noAffCnt</b></button>
+            <button type="button" class="nc" data-f="nc">반 없는 학생<b>@noClassCnt</b></button>
             <span class="gap"></span>
             <button type="button" class="on" data-s="name">이름순</button>
             <button type="button" data-s="date">최근 가입순</button>
@@ -163,7 +174,8 @@
             var filter = $"{name} {user.LastName} {user.FirstName} {user.Email} {user.PhoneNumber} {string.Join(" ", roles)} {AffText(user)}".ToLowerInvariant();
             var sortDate = user.InsertDT?.ToString("yyyy-MM-dd") ?? "0000-00-00";
 
-            <div class="ur-row @(NoAff(user) ? "noaff" : "")"
+            <div class="ur-row @(NoAff(user) ? "noaff" : "") @(NoClass(user) ? "nocls" : "")"
+                 data-nc="@(NoClass(user) ? "1" : "0")"
                  data-filter="@filter"
                  data-roles="|@string.Join("|", roles)|"
                  data-dup="@(dc > 1 ? "1" : "0")"
@@ -251,6 +263,7 @@
                 let ok = !q || r.dataset.filter.includes(q);
                 if (ok && f === 'none') ok = r.dataset.roles === '||';
                 else if (ok && f === 'dup') ok = r.dataset.dup === '1';
+                else if (ok && f === 'nc') ok = r.dataset.nc === '1';
                 else if (ok && f.startsWith('k:')) ok = r.dataset.kind === f.slice(2);
                 else if (ok && f !== 'all') ok = r.dataset.roles.includes('|' + f + '|');
                 r.hidden = !ok;
