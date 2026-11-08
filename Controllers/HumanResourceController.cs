@@ -257,9 +257,19 @@ namespace BulletinBoard.Controllers
 
         public async Task<IActionResult> ModifyHRPhoto(string UserId)
         {
+            // "내 계정" 메뉴 — 본인 사진만. 다른 사람 사진은 SuperAdmin 만 고칠 수 있다.
+            // (UserId 가 비면 조건 없이 조회돼 목록 첫 사람이 열리던 것도 막는다)
+            var myId = _userManager.GetUserId(User) ?? "";
+            if (string.IsNullOrEmpty(UserId) || (UserId != myId && !User.IsInRole(nameof(Roles.SuperAdmin))))
+                UserId = myId;
+            if (string.IsNullOrEmpty(UserId))
+                return Redirect("/Identity/Account/Login");
+
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            if (userInfo.Count == 0)
+                return Content("사용자 정보를 찾을 수 없어요.");
 
             return View(userInfo[0]);
         }
@@ -504,13 +514,8 @@ namespace BulletinBoard.Controllers
                 await new ControlSignup().ChangeRoleDirectAsync(user.Id, user.UserName ?? "", fullName, RoleCode,
                                                                 RoleCode == "T1001" ? ClassYear : 0, RoleCode == "T1001" ? ClassBan : 0);
 
+                // 바뀐 사람에게 쪽지는 보내지 않는다 (2026-11-08 결정)
                 string cls = RoleCode == "T1001" && ClassYear > 0 ? $" {ClassYear}학년 {ClassBan}반" : "";
-                try
-                {
-                    await new ControlWithdraw().SendMessageAsync(user.UserName ?? "", User.Identity?.Name ?? "",
-                        $"관리자가 역할을 {roleName}{cls}(으)로 바꿨어요.");
-                }
-                catch { }
 
                 return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P" });
             }
@@ -636,8 +641,16 @@ namespace BulletinBoard.Controllers
                 return Json(new { success = false, message = "No image data provided." });
             }
 
+            // 본인 사진만 올릴 수 있다 (SuperAdmin 은 예외). 실제 있는 계정 번호인지도 확인한다 — 파일 이름으로 쓰이므로
+            var myId = _userManager.GetUserId(User) ?? "";
+            if (string.IsNullOrEmpty(model.UserId)) model.UserId = myId;
+            if (model.UserId != myId && !User.IsInRole(nameof(Roles.SuperAdmin)))
+                return Json(new { success = false, message = "본인 사진만 바꿀 수 있어요." });
+            if (await _userManager.FindByIdAsync(model.UserId) == null)
+                return Json(new { success = false, message = "사용자를 찾을 수 없어요." });
+
             // Convert base64 string to byte array
-            byte[] imageBytes = Convert.FromBase64String(model.ProfilePicture);          
+            byte[] imageBytes = Convert.FromBase64String(model.ProfilePicture);
 
             try
             {
