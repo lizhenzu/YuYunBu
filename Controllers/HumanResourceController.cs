@@ -448,6 +448,78 @@ namespace BulletinBoard.Controllers
             }
         }
 
+        // ── 다른 사람 역할 변경 (관리자 · 승인 없음) ────────────────────
+        // 사람 목록에서 고른 뒤 역할(학생 · 교사 · 임원 · 학부모)을 바로 바꾼다. 내 역할 변경은 /SignupWizard?change=true (승인 필요)
+        private bool IsRoleAdmin()
+            => User.IsInRole(nameof(Roles.SuperAdmin))
+               || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase);
+
+        public async Task<IActionResult> RoleChange()
+        {
+            if (!IsRoleAdmin()) return Forbid();
+
+            ManageHumanResource manageHumanResource = new ManageHumanResource();
+            var all = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            var people = all.Where(u => !string.IsNullOrWhiteSpace(u.UserId))
+                            .GroupBy(u => u.UserId).Select(g => g.First())
+                            .OrderBy(u => u.FullName).ToList();
+
+            ViewData["Roles"] = new ManageDeptInfo().getCodeData("T001");
+            var years = new SortedSet<int>();
+            var bans = new SortedSet<int>();
+            var ds = new ControlHumanResource().fetchClassOptions();
+            foreach (System.Data.DataRow r in ds.Tables[0].Rows)
+            {
+                years.Add(Convert.ToInt32(r["ClassYear"]));
+                bans.Add(Convert.ToInt32(r["ClassBan"]));
+            }
+            if (years.Count == 0) for (int i = 1; i <= 6; i++) years.Add(i);
+            if (bans.Count == 0) for (int i = 1; i <= 8; i++) bans.Add(i);
+            ViewData["Years"] = years.ToList();
+            ViewData["Bans"] = bans.ToList();
+            return View(people);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RoleChangeSave(string UserId, string? RoleCode, int ClassYear, int ClassBan)
+        {
+            if (!IsRoleAdmin()) return Json(new { ok = false, message = "권한이 없어요." });
+            try
+            {
+                var user = await _userManager.FindByIdAsync(UserId ?? "");
+                if (user == null) return Json(new { ok = false, message = "회원을 찾을 수 없어요." });
+
+                RoleCode = (RoleCode ?? "").Trim();
+                string roleName = "학부모(역할 없음)";
+                if (RoleCode.Length > 0)
+                {
+                    var code = new ManageDeptInfo().getCodeData("T001").FirstOrDefault(c => c.MinorCD == RoleCode);
+                    if (code == null) return Json(new { ok = false, message = "역할을 다시 골라 주세요." });
+                    roleName = code.MinorNM;
+                }
+                if (RoleCode == "T1001" && (ClassYear > 0) != (ClassBan > 0))
+                    return Json(new { ok = false, message = "학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요." });
+
+                var fullName = ((user.LastName ?? "") + (user.FirstName ?? "")).Trim();
+                await new ControlSignup().ChangeRoleDirectAsync(user.Id, user.UserName ?? "", fullName, RoleCode,
+                                                                RoleCode == "T1001" ? ClassYear : 0, RoleCode == "T1001" ? ClassBan : 0);
+
+                string cls = RoleCode == "T1001" && ClassYear > 0 ? $" {ClassYear}학년 {ClassBan}반" : "";
+                try
+                {
+                    await new ControlWithdraw().SendMessageAsync(user.UserName ?? "", User.Identity?.Name ?? "",
+                        $"관리자가 역할을 {roleName}{cls}(으)로 바꿨어요.");
+                }
+                catch { }
+
+                return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { ok = false, message = "저장 오류: " + ex.Message });
+            }
+        }
+
         /// <summary>미배정 회원 한 명 삭제 — PersonMaster_2026(+반·역할·연결 요청) 과 [Identity].[User] 를 지운다. 되돌릴 수 없다.</summary>
         [HttpPost]
         [Authorize(Roles = nameof(Roles.SuperAdmin))]

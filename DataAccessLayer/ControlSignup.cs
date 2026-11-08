@@ -353,6 +353,70 @@ namespace BulletinBoard.DataAccessLayer
             }
         }
 
+        /// <summary>
+        /// 관리자가 다른 사람의 역할을 바로 바꾼다(승인 없음).
+        /// roleCode: T001 코드(T1001 학생 · T1002 교사 · …) · 빈 값 = 학부모(역할 없음).
+        /// 학생이면 classYear/classBan(0 = 미정). 정리 규칙은 역할 변경 승인과 같다.
+        /// </summary>
+        public async Task ChangeRoleDirectAsync(string userId, string userName, string fullName, string roleCode, int classYear, int classBan)
+        {
+            using (var conn = Conn())
+            {
+                await conn.OpenAsync();
+                var now = SharedComm.GetKoreaNow();
+                using (var tx = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        // 사람 명부가 없으면 만든다 (반을 넣으려면 PersonId 가 필요)
+                        int pid = await ScalarIntAsync(conn, tx, "SELECT TOP 1 [PersonId] FROM [dbo].[PersonMaster_2026] WHERE [UserName] = @u ORDER BY [PersonId]", ("@u", userName));
+                        if (pid == 0)
+                        {
+                            pid = await ScalarIntAsync(conn, tx, @"
+                                INSERT INTO [dbo].[PersonMaster_2026] ([fullName],[UserName],[bMonth],[bDay],[insertDT])
+                                VALUES (@n, @u, 0, 0, @now);
+                                SELECT CAST(SCOPE_IDENTITY() AS INT);", ("@n", fullName), ("@u", userName), ("@now", now));
+                        }
+
+                        string prevRole = await ScalarStringAsync(conn, tx, "SELECT TOP 1 [RoleCode] FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i", ("@i", userId));
+                        const string clearClass = "DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @p;";
+                        roleCode = (roleCode ?? "").Trim();
+
+                        if (roleCode == "T1001")
+                        {
+                            if (classYear > 0 && classBan > 0)
+                                await ExecAsync(conn, tx, clearClass + " INSERT INTO [dbo].[ClassInfo_2026] ([ClassYear],[ClassBan],[PersonID]) VALUES (@y,@b,@p);",
+                                    ("@p", pid), ("@y", classYear), ("@b", classBan));
+                            else if (prevRole != "T1001")
+                                await ExecAsync(conn, tx, clearClass, ("@p", pid));
+                        }
+                        else if (roleCode.Length > 0)
+                        {
+                            // 학생이었다가 교사 · 임원이 되면 학생 반 배정을 지운다
+                            if (prevRole == "T1001") await ExecAsync(conn, tx, clearClass, ("@p", pid));
+                        }
+                        else
+                        {
+                            // 학부모(역할 없음)
+                            await ExecAsync(conn, tx, clearClass, ("@p", pid));
+                        }
+
+                        await ExecAsync(conn, tx, "DELETE FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i;", ("@i", userId));
+                        if (roleCode.Length > 0)
+                            await ExecAsync(conn, tx, "INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[DeptCode],[RoleCode]) VALUES (@i,@d,@r);",
+                                ("@i", userId), ("@d", ConstatsCommon.FixedDeptCode), ("@r", roleCode));
+
+                        tx.Commit();
+                    }
+                    catch
+                    {
+                        try { tx.Rollback(); } catch { }
+                        throw;
+                    }
+                }
+            }
+        }
+
         /// <summary>지금 역할 — 역할 변경 화면 · 신청서의 "이전 역할" 표시용</summary>
         public async Task<CurrentRole> GetCurrentRoleAsync(string userName)
         {
