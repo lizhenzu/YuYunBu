@@ -14,6 +14,11 @@
     Layout = null;
     var years = (List<int>)ViewData["Years"];
     var bans = (List<int>)ViewData["Bans"];
+    // 같은 화면을 두 메뉴로 나눠 쓴다: 가입 승인(JOIN) · 역할 변경 승인(CHANGE)
+    bool isChangeList = (ViewData["ReqType"] as string) == "CHANGE";
+    string pageTitle = isChangeList ? "역할 변경 승인" : "가입 승인";
+    string otherTitle = isChangeList ? "가입 승인" : "역할 변경 승인";
+    string otherUrl = isChangeList ? "/SignupWizard/Approvals" : "/SignupWizard/RoleChangeApprovals";
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -21,7 +26,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#FFFFFF">
-    <title>가입 승인</title>
+    <title>@pageTitle</title>
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <style>
         body { margin: 0; background: #FFFFFF; }
@@ -50,13 +55,21 @@
 <div class="qb">
 
     <div class="qb-top">
-        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>가입 승인</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>@pageTitle</span>
         <span>ADMIN</span>
     </div>
 
     <div class="qb-k">APPROVE</div>
-    <h1 class="qb-h1">가입 승인</h1>
-    <div class="qb-sub">가입 직후 신청과 역할 변경 신청이 함께 나와요. 승인하면 역할 · 반 · 사람 명부가 반영되고, 이전 역할의 반 배정은 정리돼요.</div>
+    <h1 class="qb-h1">@pageTitle</h1>
+    @if (isChangeList)
+    {
+        <div class="qb-sub">이미 가입한 회원이 "나의 역할 변경"으로 낸 신청이에요. 승인하면 새 역할이 반영되고, 이전 역할의 반 배정은 정리돼요.</div>
+    }
+    else
+    {
+        <div class="qb-sub">방금 가입한 회원이 가입 마법사로 낸 신청이에요. 승인하면 역할 · 반 · 사람 명부가 반영돼요.</div>
+    }
+    <div style="margin:2px 0 4px;font-size:13px"><a href="@otherUrl" style="color:#2F7BF5;font-weight:700">@otherTitle 보러 가기 ›</a></div>
 
     <div class="ap-sum">확인 대기<b id="apCnt">@Model.Count</b></div>
 
@@ -135,7 +148,7 @@
             </div>
         }
     </div>
-    <div class="ap-empty" id="apEmpty">확인할 신청이 없어요.</div>
+    <div class="ap-empty" id="apEmpty">확인할 @(isChangeList ? "역할 변경" : "가입") 신청이 없어요.</div>
 
     <div class="qb-ft">
         <span>승인하면 역할 · 반이 반영돼요</span>
