@@ -13,7 +13,7 @@ namespace BulletinBoard.DataAccessLayer
         public string UserId { get; set; } = "";
         public string UserName { get; set; } = "";
         public string FullName { get; set; } = "";
-        public string RoleKind { get; set; } = "";     // S 학생 · T 교사 · P 학부모
+        public string RoleKind { get; set; } = "";     // S 학생 · T 교사 · P 학부모 · E 기타(T1099)
         public int PersonId { get; set; }               // 같은 이름 기록 중 "이 사람이 저예요" 로 고른 것 (0 = 새로 등록 / 해당 없음)
         public int ClassYear { get; set; }              // 0 = 잘 모르겠어요
         public int ClassBan { get; set; }
@@ -35,7 +35,7 @@ namespace BulletinBoard.DataAccessLayer
         public int TargetClassYear { get; set; }
         public int TargetClassBan { get; set; }
 
-        public string RoleLabel => RoleKind == "S" ? "학생" : RoleKind == "T" ? "교사" : RoleKind == "P" ? "학부모" : "";
+        public string RoleLabel => RoleKind == "S" ? "학생" : RoleKind == "T" ? "교사" : RoleKind == "P" ? "학부모" : RoleKind == "E" ? "기타" : "";
         public bool IsChange => ReqType == "CHANGE";
     }
 
@@ -46,7 +46,7 @@ namespace BulletinBoard.DataAccessLayer
         public string RoleNM { get; set; } = "";
         public int ClassYear { get; set; }
         public int ClassBan { get; set; }
-        public string Kind => RoleCode == "T1001" ? "S" : RoleCode == "T1002" || RoleCode == "T1003" ? "T" : RoleCode.Length > 0 ? "X" : "";
+        public string Kind => RoleCode == "T1001" ? "S" : RoleCode == "T1002" || RoleCode == "T1003" ? "T" : RoleCode == UserRole.EtcCode ? "E" : RoleCode.Length > 0 ? "X" : "";
         public string Label =>
             RoleCode == "T1001" ? "학생" + (ClassYear > 0 && ClassBan > 0 ? $" {ClassYear}학년 {ClassBan}반" : "")
             : RoleCode.Length > 0 ? (string.IsNullOrWhiteSpace(RoleNM) ? RoleCode : RoleNM)
@@ -362,6 +362,12 @@ namespace BulletinBoard.DataAccessLayer
                             role = teacherRoleCode == "T1003" ? "T1003" : "T1002";
                             // 학생이었다가 교사가 되면 학생 반 배정을 지운다 (교사였으면 담임 반은 그대로)
                             if (prevRole == "T1001") await ExecAsync(conn, tx, clearClass, ("@p", pid));
+                        }
+                        else if (a.RoleKind == "E")
+                        {
+                            // 기타(T1099) — 학생 · 교사 · 학부모가 아닌 사람. 학생 반 배정은 지운다
+                            role = UserRole.EtcCode;
+                            await ExecAsync(conn, tx, clearClass, ("@p", pid));
                         }
                         else
                         {

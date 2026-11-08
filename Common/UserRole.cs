@@ -20,6 +20,7 @@ namespace BulletinBoard.Common
         Student = 1,   // 학생 T1001
         Teacher = 2,   // 교사 T1002 · 교사(S) T1003
         Officer = 3,   // 임원 등 그 밖의 코드
+        Etc = 4,       // 기타 T1099 — 학생 · 교사 · 학부모가 아닌 모든 사람 (2026-11-08). 가족팀은 학부모와 같은 관계로 들어갈 수 있다
     }
 
     public static class UserRole
@@ -27,6 +28,7 @@ namespace BulletinBoard.Common
         public const string StudentCode = "T1001";
         public const string TeacherCode = "T1002";
         public const string TeacherSCode = "T1003";
+        public const string EtcCode = "T1099";
 
         /// <summary>가족팀 관계 번호 (DM2_FamilyMember.RoleCode) — 0 학생 · 1 엄마 · 2 아빠 · 3 할머니 · 4 할아버지</summary>
         public const int RelStudent = 0;
@@ -37,6 +39,7 @@ namespace BulletinBoard.Common
             if (rc.Length == 0) return UserRoleKind.Parent;
             if (rc == StudentCode) return UserRoleKind.Student;
             if (rc == TeacherCode || rc == TeacherSCode) return UserRoleKind.Teacher;
+            if (rc == EtcCode) return UserRoleKind.Etc;
             return UserRoleKind.Officer;
         }
 
@@ -45,6 +48,7 @@ namespace BulletinBoard.Common
             UserRoleKind.Student => "학생",
             UserRoleKind.Teacher => "교사",
             UserRoleKind.Officer => "임원",
+            UserRoleKind.Etc => "기타",
             _ => "학부모",
         };
 
@@ -85,13 +89,14 @@ SELECT ISNULL(@rc, N''), ISNULL(@pk, N'');";
             {
                 if (pending == "S") return UserRoleKind.Student;
                 if (pending == "T") return UserRoleKind.Teacher;
+                if (pending == "E") return UserRoleKind.Etc;
             }
             return KindOf(rc);
         }
 
         // ── 팀 규칙 ─────────────────────────────────────────────
 
-        public static bool CanJoinFamily(UserRoleKind k) => k == UserRoleKind.Student || k == UserRoleKind.Parent;
+        public static bool CanJoinFamily(UserRoleKind k) => k == UserRoleKind.Student || k == UserRoleKind.Parent || k == UserRoleKind.Etc;
 
         public static bool CanJoinFriend(UserRoleKind k) => k == UserRoleKind.Student;
 
@@ -99,7 +104,7 @@ SELECT ISNULL(@rc, N''), ISNULL(@pk, N'');";
         public static bool RelationAllowed(UserRoleKind k, int relRole) => k switch
         {
             UserRoleKind.Student => relRole == RelStudent,
-            UserRoleKind.Parent => relRole >= 1 && relRole <= 4,
+            UserRoleKind.Parent or UserRoleKind.Etc => relRole >= 1 && relRole <= 4,
             _ => false,
         };
 
@@ -114,7 +119,8 @@ SELECT ISNULL(@rc, N''), ISNULL(@pk, N'');";
             if (RelationAllowed(k, relRole)) return null;
             if (k == UserRoleKind.Student)
                 return self ? "학생은 관계를 '학생'으로만 정할 수 있어요." : "그분은 학생이라 관계를 '학생'으로만 정할 수 있어요.";
-            return self ? "학부모는 엄마 · 아빠 · 할머니 · 할아버지 중에서 골라 주세요." : "그분은 학부모라 엄마 · 아빠 · 할머니 · 할아버지 중에서 골라 주세요.";
+            string who = LabelOf(k);   // 학부모 · 기타
+            return self ? $"{who}는 엄마 · 아빠 · 할머니 · 할아버지 중에서 골라 주세요." : $"그분은 {who}라 엄마 · 아빠 · 할머니 · 할아버지 중에서 골라 주세요.";
         }
     }
 }
