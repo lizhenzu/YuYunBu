@@ -393,7 +393,10 @@ namespace BulletinBoard.Controllers
             ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
             ViewData["Roles"] = manageDeptInfo.getCodeData("T001");
             // 가입 직후 "이 사람이 저예요" 연결 요청을 보내 확인을 기다리는 회원
-            ViewData["Pending"] = await new ControlPersonMatch().GetPendingUserNamesAsync();
+            var pendingNames = await new ControlPersonMatch().GetPendingUserNamesAsync();
+            // 가입 마법사로 승인을 요청한 회원도 가입 승인 화면에서 처리한다
+            try { pendingNames.UnionWith(await new ControlSignup().GetPendingUserNamesAsync()); } catch { }
+            ViewData["Pending"] = pendingNames;
 
             var years = new SortedSet<int>();
             var bans = new SortedSet<int>();
@@ -426,6 +429,8 @@ namespace BulletinBoard.Controllers
             {
                 if (await new ControlPersonMatch().HasPendingByUserIdAsync(UserId))
                     return Json(new { ok = false, message = "연결 요청 대기 중이에요. 연결 요청 확인에서 먼저 처리해 주세요." });
+                if ((await new ControlSignup().GetLatestOfAsync(UserId))?.Status == "PENDING")
+                    return Json(new { ok = false, message = "가입 승인 대기 중이에요. 가입 승인 화면에서 처리해 주세요." });
 
                 ControlHumanResource controlHumanResource = new ControlHumanResource();
                 await controlHumanResource.DeleteClassInfoAsync(UserId);

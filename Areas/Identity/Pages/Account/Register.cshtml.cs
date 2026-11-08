@@ -116,28 +116,23 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
                     {
                         await _signInManager.SignInAsync(user, isPersistent: false);
 
-                        // 사람 명부(PersonMaster_2026) 연결: 같은 한글 이름이 없으면 자동으로 만들고(UserName 포함),
-                        // 있으면 "어느 쪽이 나인지" 묻는 화면으로 보낸다. 실패해도 가입 자체는 막지 않는다.
+                        // 사람 명부(PersonMaster_2026): 같은 한글 이름이 없으면 자동으로 만든다(UserName 포함).
+                        // 같은 이름이 있으면 가입 마법사에서 "나인지" 고르게 하고, 관리자 승인 때 연결한다. 실패해도 가입은 막지 않는다.
                         try
                         {
                             var fullName = (Input.LastName + Input.FirstName).Trim();
                             var match = new BulletinBoard.DataAccessLayer.ControlPersonMatch();
                             var same = await match.FindByFullNameAsync(fullName);
                             if (same.Count == 0)
-                            {
                                 await match.CreateAsync(fullName, user.UserName);
-                            }
-                            else
-                            {
-                                return LocalRedirect(Url.Content("~/PersonMatch/Index") + "?fullName=" + Uri.EscapeDataString(fullName) + "&returnUrl=" + Uri.EscapeDataString(returnUrl));
-                            }
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "가입 후 PersonMaster_2026 연결 실패");
+                            _logger.LogError(ex, "가입 후 PersonMaster_2026 생성 실패");
                         }
 
-                        return LocalRedirect(returnUrl);
+                        // 가입 마법사 — 역할(학생 · 교사 · 학부모)과 나머지 정보 입력 → 관리자 승인 요청
+                        return LocalRedirect(Url.Content("~/SignupWizard") + "?returnUrl=" + Uri.EscapeDataString(returnUrl));
                     }
                 }
                 foreach (var error in result.Errors)

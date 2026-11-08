@@ -143,6 +143,7 @@ namespace BulletinBoard.DataAccessLayer
             One(G_Account, "DeptRoleUserAssoc", "UserId", 'I'),
             One(G_Account, "DeptInfo", "UserId", 'I'),
             One(G_Account, "PersonLinkRequest", "UserName", 'U'),
+            One(G_Account, "SignupApplication", "UserId", 'I'),   // 가입 마법사 신청(연락처 · 학교 · 자녀 정보)
 
             // 사람 명부는 마지막에
             One(G_Basic, "PersonMaster_2026", "UserName", 'U'),

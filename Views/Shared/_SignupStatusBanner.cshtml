@@ -1,0 +1,45 @@
+@using BulletinBoard.DataAccessLayer
+@using Microsoft.AspNetCore.Identity
+@using BulletinBoard.Models
+@inject UserManager<ApplicationUser> SignupUserManager
+@*  ══════════════════════════════════════════════════════════════
+    가입 승인 상태 알림 — 홈 아래쪽에 떠 있는 작은 카드 (2026-11-08)
+      · 승인 대기 중   → "가입 승인 대기 중이에요" (닫을 수 있음)
+      · 반려됨         → "가입 요청이 반려됐어요" + [다시 입력하기] (가입 마법사로)
+    · 마법사로 신청한 적이 없는 사람(기존 회원)에게는 아무것도 안 나온다. 오류가 나도 홈은 그대로.
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    SignupApplication? sgLatest = null;
+    try
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            var uid = SignupUserManager.GetUserId(User);
+            if (!string.IsNullOrEmpty(uid))
+                sgLatest = await new ControlSignup().GetLatestOfAsync(uid);
+        }
+    }
+    catch { sgLatest = null; }
+    bool sgPending = sgLatest?.Status == "PENDING";
+    bool sgRejected = sgLatest?.Status == "REJECTED";
+}
+@if (sgPending || sgRejected)
+{
+    <div id="sgBanner" role="status" style="position:fixed;left:12px;right:12px;bottom:14px;z-index:2147481000;max-width:420px;margin:0 auto;padding:12px 14px;border-radius:14px;box-shadow:0 6px 20px rgba(17,24,39,.18);font-family:'Noto Sans KR','Malgun Gothic',system-ui,sans-serif;font-size:14px;line-height:1.5;display:flex;align-items:center;gap:10px;@(sgRejected ? "background:#FDEEEE;color:#B03030;" : "background:#FFF4E0;color:#8A5300;")">
+        <div style="flex:1;min-width:0">
+            @if (sgRejected)
+            {
+                <b>가입 요청이 반려됐어요</b><br /><span style="font-size:12.5px">내용을 고쳐서 다시 보내 주세요.</span>
+            }
+            else
+            {
+                <b>가입 승인 대기 중이에요</b><br /><span style="font-size:12.5px">관리자가 확인하면 쪽지로 알려 드려요.</span>
+            }
+        </div>
+        @if (sgRejected)
+        {
+            <a href="/SignupWizard" style="flex:none;padding:9px 12px;border-radius:10px;background:#D13B3B;color:#fff;font-weight:700;text-decoration:none;white-space:nowrap">다시 입력하기</a>
+        }
+        <button type="button" aria-label="닫기" onclick="document.getElementById('sgBanner').remove()" style="flex:none;border:0;background:none;font-size:18px;line-height:1;color:inherit;cursor:pointer">&#10005;</button>
+    </div>
+}

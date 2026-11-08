@@ -1,0 +1,181 @@
+@using BulletinBoard.Common;
+@using BulletinBoard.DataAccessLayer;
+@using System.Collections.Generic;
+@model List<SignupApplication>
+
+@*  ══════════════════════════════════════════════════════════════
+    가입 승인 — 2026-11-08 시안 확정 (SuperAdmin 역할 + Basic 계정 · DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
+    · 마법사로 낸 신청을 보고, 학생은 학년·반을, 교사는 교사/교사(S)를 고쳐서 승인한다
+    · 같은 이름 기록을 고른 신청은 "기존 기록에 연결 / 새로 등록" 중 고른다
+    · 반려는 사유가 필요하다 → 회원에게 쪽지, 다음 접속 때 마법사가 다시 나온다
+    ══════════════════════════════════════════════════════════════ *@
+
+@{
+    Layout = null;
+    var years = (List<int>)ViewData["Years"];
+    var bans = (List<int>)ViewData["Bans"];
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#FFFFFF">
+    <title>가입 승인</title>
+    <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
+    <style>
+        body { margin: 0; background: #FFFFFF; }
+        .ap-sum { display: inline-block; min-width: 120px; background: #FFF4E0; color: #9A5B00; border-radius: 10px; padding: 10px 12px; font-size: 12px; margin: 12px 0; }
+        .ap-sum b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; }
+        .ap-row { border-top: 1px solid #E8EBF0; padding: 14px 0; }
+        .ap-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .ap-nm { font-size: 16px; font-weight: 700; }
+        .ap-nm small { font-weight: 400; color: #8A93A0; font-size: 12px; margin-left: 4px; }
+        .ap-dt { font-size: 12px; color: #8A93A0; white-space: nowrap; }
+        .ap-box { margin-top: 8px; padding: 9px 11px; background: #F5F7FA; border-radius: 10px; font-size: 13px; line-height: 1.75; }
+        .ap-warn { color: #9A5B00; }
+        .ap-sel { display: flex; gap: 6px; margin-top: 8px; }
+        .ap-sel select, .ap-in { flex: 1; min-width: 0; height: 40px; border: 1px solid #D9DEE6; border-radius: 10px; padding: 0 8px; background: #fff; font: inherit; font-size: 14px; box-sizing: border-box; }
+        .ap-in { width: 100%; margin-top: 6px; }
+        .ap-lab { font-size: 12px; color: #6B7684; margin-top: 8px; }
+        .ap-btns { display: flex; gap: 8px; margin-top: 8px; }
+        .ap-btns button { flex: 1; height: 40px; border-radius: 10px; font-size: 14px; font-weight: 700; border: 1px solid #D9DEE6; background: #fff; color: #333; }
+        .ap-btns button.p { background: #2F7BF5; border-color: #2F7BF5; color: #fff; }
+        .ap-btns button[disabled] { opacity: .5; }
+        .ap-err { min-height: 16px; font-size: 13px; color: #D13B3B; margin-top: 4px; }
+        .ap-empty { display: none; padding: 28px 0; text-align: center; color: #8A93A0; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="qb">
+
+    <div class="qb-top">
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo">정보 관리</a><span class="sep">›</span>가입 승인</span>
+        <span>ADMIN</span>
+    </div>
+
+    <div class="qb-k">APPROVE</div>
+    <h1 class="qb-h1">가입 승인</h1>
+    <div class="qb-sub">입력한 내용을 보고 승인해 주세요. 승인하면 역할 · 반 · 사람 명부가 반영돼요.</div>
+
+    <div class="ap-sum">확인 대기<b id="apCnt">@Model.Count</b></div>
+
+    <div id="apList">
+        @foreach (var a in Model)
+        {
+            bool hasTarget = a.PersonId > 0;
+            bool targetTaken = hasTarget && !string.IsNullOrEmpty(a.TargetUserName);
+            <div class="ap-row" id="ap@(a.Id)" data-name="@a.FullName" data-role="@a.RoleKind">
+                <div class="ap-top">
+                    <div class="ap-nm">@a.FullName<small>@a.RoleLabel · @a.UserName</small></div>
+                    <div class="ap-dt">@a.InsertDT.ToString("MM-dd")</div>
+                </div>
+                <div class="ap-box">
+                    @if (a.RoleKind == "S")
+                    {
+                        @(a.ClassYear > 0 ? $"{a.ClassYear}학년 {a.ClassBan}반" : "반: 잘 모르겠어요")<text> · @($"{a.BMonth}월 {a.BDay}일") · @(a.Sex == "M" ? "남" : "여")</text><br />
+                        @(string.IsNullOrEmpty(a.School) ? "" : a.School + " · ")<text>부모님 @a.Phone</text>
+                    }
+                    else if (a.RoleKind == "P")
+                    {
+                        <text>자녀 @a.Kids</text><br /><text>연락처 @a.Phone</text>
+                    }
+                    else
+                    {
+                        <text>연락처 @a.Phone</text>
+                    }
+                    @if (hasTarget)
+                    {
+                        <br /><span class="ap-warn">같은 이름 기존 기록을 "이 사람이 저예요"로 골랐어요 — @a.TargetFullName · @(a.TargetClassYear > 0 ? $"{a.TargetClassYear}학년 {a.TargetClassBan}반" : "반 정보 없음") · @(targetTaken ? "지금은 다른 계정(" + a.TargetUserName + ")과 연결됨" : "계정 없음")</span>
+                    }
+                </div>
+
+                @if (hasTarget)
+                {
+                    <div class="ap-lab">사람 명부</div>
+                    <div class="ap-sel">
+                        <select class="ap-link">
+                            <option value="true" disabled="@targetTaken" selected="@(!targetTaken)">기존 기록에 연결</option>
+                            <option value="false" selected="@targetTaken">새로 등록 (동명이인)</option>
+                        </select>
+                    </div>
+                }
+
+                @if (a.RoleKind == "S")
+                {
+                    int y0 = a.ClassYear > 0 ? a.ClassYear : a.TargetClassYear;
+                    int b0 = a.ClassBan > 0 ? a.ClassBan : a.TargetClassBan;
+                    <div class="ap-lab">학년 · 반 (고쳐서 승인할 수 있어요)</div>
+                    <div class="ap-sel">
+                        <select class="ap-y"><option value="0">학년 미정</option>@foreach (var y in years) { <option value="@y" selected="@(y == y0)">@(y)학년</option> }</select>
+                        <select class="ap-b"><option value="0">반 미정</option>@foreach (var b in bans) { <option value="@b" selected="@(b == b0)">@(b)반</option> }</select>
+                    </div>
+                }
+                else if (a.RoleKind == "T")
+                {
+                    <div class="ap-lab">교사 구분</div>
+                    <div class="ap-sel">
+                        <select class="ap-t"><option value="T1002">교사</option><option value="T1003">교사(S)</option></select>
+                    </div>
+                }
+
+                <input class="ap-in ap-why" maxlength="300" placeholder="반려 사유 (반려할 때만)" />
+                <div class="ap-btns">
+                    <button type="button" onclick="apDecide(@a.Id, false)">반려</button>
+                    <button type="button" class="p" onclick="apDecide(@a.Id, true)">승인</button>
+                </div>
+                <div class="ap-err" id="ape@(a.Id)"></div>
+            </div>
+        }
+    </div>
+    <div class="ap-empty" id="apEmpty">확인할 신청이 없어요.</div>
+
+    <div class="qb-ft">
+        <span>승인하면 역할 · 반이 반영돼요</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a></span>
+    </div>
+</div>
+
+<script>
+    function apCount() {
+        var n = document.querySelectorAll('#apList .ap-row').length;
+        document.getElementById('apCnt').textContent = n;
+        document.getElementById('apEmpty').style.display = n ? 'none' : 'block';
+    }
+    function apDecide(id, approve) {
+        var row = document.getElementById('ap' + id), err = document.getElementById('ape' + id);
+        var why = row.querySelector('.ap-why').value.trim();
+        err.textContent = '';
+        if (!approve && !why) { err.textContent = '반려 사유를 적어 주세요'; return; }
+        if (approve && row.dataset.role === 'S') {
+            var y = row.querySelector('.ap-y').value, b = row.querySelector('.ap-b').value;
+            if ((y === '0') !== (b === '0')) { err.textContent = '학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요'; return; }
+        }
+        var fd = new FormData();
+        fd.append('id', id);
+        fd.append('approve', approve ? 'true' : 'false');
+        var link = row.querySelector('.ap-link');
+        fd.append('linkExisting', link ? link.value : 'false');
+        var ys = row.querySelector('.ap-y'), bs = row.querySelector('.ap-b'), ts = row.querySelector('.ap-t');
+        fd.append('classYear', ys ? ys.value : '0');
+        fd.append('classBan', bs ? bs.value : '0');
+        fd.append('teacherRole', ts ? ts.value : '');
+        fd.append('reason', why);
+        var btns = row.querySelectorAll('button');
+        btns.forEach(function (x) { x.disabled = true; });
+        fetch('/SignupWizard/Decide', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (x) {
+                var ct = x.headers.get('content-type') || '';
+                if (x.redirected || ct.indexOf('json') < 0) { throw new Error('응답 ' + x.status); }
+                return x.json();
+            })
+            .then(function (j) {
+                if (j.ok) { row.remove(); apCount(); }
+                else { err.textContent = j.message || '처리하지 못했어요'; btns.forEach(function (x) { x.disabled = false; }); }
+            })
+            .catch(function (e) { err.textContent = '처리하지 못했어요 · ' + (e && e.message ? e.message : ''); btns.forEach(function (x) { x.disabled = false; }); });
+    }
+    apCount();
+</script>
+</body>
+</html>
