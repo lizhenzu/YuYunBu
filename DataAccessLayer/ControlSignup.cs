@@ -240,6 +240,27 @@ namespace BulletinBoard.DataAccessLayer
             return list;
         }
 
+        // ── 취소 (신청한 본인) ───────────────────────────────────────────
+        /// <summary>대기 중인 내 신청을 취소한다. 본인 것만, 대기 중일 때만. 취소됐으면 true</summary>
+        public async Task<bool> CancelAsync(int id, string userId)
+        {
+            using (var conn = Conn())
+            {
+                await conn.OpenAsync();
+                await EnsureTableAsync(conn);
+                using (var cmd = new SqlCommand(@"UPDATE [dbo].[SignupApplication]
+                        SET [Status] = N'CANCELED', [DecidedDT] = @Now, [DecidedBy] = @By
+                        WHERE [Id] = @Id AND [UserId] = @UserId AND [Status] = N'PENDING'", conn))
+                {
+                    cmd.Parameters.AddWithValue("@Now", SharedComm.GetKoreaNow());
+                    cmd.Parameters.AddWithValue("@By", userId);
+                    cmd.Parameters.AddWithValue("@Id", id);
+                    cmd.Parameters.AddWithValue("@UserId", userId);
+                    return await cmd.ExecuteNonQueryAsync() > 0;
+                }
+            }
+        }
+
         // ── 반려 ──────────────────────────────────────────────────────
         public async Task<SignupApplication?> RejectAsync(int id, string reason, string decidedBy)
         {
