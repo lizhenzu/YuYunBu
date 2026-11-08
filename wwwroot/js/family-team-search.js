@@ -69,6 +69,16 @@
         return '<div class="ft-row" style="align-items:flex-start"><div class="l"><div class="ft-nm">' + esc(h.fullName) + '</div>' + info + '</div>' + action + '</div>';
     }
 
+    // 찾은 사람이 없을 때 — 팀 만들기로 이어 준다 (data-create-url 이 있고, 다른 팀에 신청 중이 아닐 때)
+    function emptyBox(v) {
+        var url = root.dataset.createUrl || '';
+        if (!url) return '<div class="ft-empty">찾은 사람이 없어요.</div>';   // 팀이 있는 화면(초대 찾기) — 만들기로 이어 주지 않는다
+        var word = (root.dataset.mode === 'FRIEND') ? '친구팀' : '가족팀';
+        var who = (root.dataset.mode === 'FRIEND') ? '친구가' : '가족이';
+        var btn = (url && !blocked) ? '<a class="ft-btn p w" href="' + esc(url) + '" style="margin-top:14px">내 ' + word + ' 만들기</a>' : '';
+        return '<div class="ft-empty">"' + esc(v) + '" 님이 속한 팀이 없어요.' + (url ? '<br>' + who + ' 아직 팀을 만들지 않았나 봐요.' : '') + btn + '</div>';
+    }
+
     q.addEventListener('input', function () {
         clearTimeout(timer);
         var v = q.value.trim();
@@ -79,7 +89,7 @@
                 .then(function (r) { if (!r.ok) throw new Error('search'); return r.json(); })
                 .then(function (list) {
                     if (my !== seq) return;
-                    res.innerHTML = list.length ? list.map(row).join('') : '<div class="ft-empty">찾은 사람이 없어요.</div>';
+                    res.innerHTML = list.length ? list.map(row).join('') : emptyBox(v);
                 })
                 .catch(function () { if (my === seq) res.innerHTML = '<div class="ft-empty">조회하지 못했어요. 잠시 후 다시 해 주세요.</div>'; });
         }, 250);

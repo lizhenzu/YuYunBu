@@ -491,6 +491,9 @@ ORDER BY r.CreatedAt;";
                 if (await UserExistsAsync(c, tx, userName) == false) return Rollback(tx, "로그인 정보를 찾을 수 없어요.");
                 if (await HasActiveMembershipAsync(c, tx, userName)) return Rollback(tx, "이미 팀에 들어 있어요. 한 사람은 한 팀에만 들어갈 수 있어요.");
                 if (friend && !await IsStudentAsync(c, tx, userName)) return Rollback(tx, "친구팀은 학생만 만들 수 있어요.");
+                // 다른 팀에 가입 신청을 보내 둔 동안에는 새 팀을 만들 수 없다 (신청이 수락되면 팀이 둘이 되므로) — 신청을 취소하면 만들 수 있다
+                if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE Kind='R' AND TargetUserName=@u;", ("@u", userName)) > 0)
+                    return Rollback(tx, "다른 팀에 가입 신청 중이에요. 신청을 취소한 뒤 팀을 만들어 주세요.");
 
                 string full = await ScalarAsync<string>(c, tx,
                     @"SELECT TOP 1 ISNULL(pm.FullName, u.UserName) FROM [Identity].[User] u
