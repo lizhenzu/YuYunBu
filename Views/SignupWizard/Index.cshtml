@@ -62,6 +62,13 @@
     <link rel="stylesheet" href="/css/quiz-bright.css" asp-append-version="true">
     <style>
         body { margin: 0; background: #FFFFFF; }
+        /* 맨 위 인사 (family-team.css 의 .ft-hi 와 같은 모양) */
+        .sw-hi { margin: 18px 0 6px; }
+        .sw-hi small { display: block; font-size: 13px; font-weight: 600; color: #6B7686; }
+        .sw-hi h2 { margin: 2px 0 0; font-size: 32px; font-weight: 800; line-height: 1.25; letter-spacing: -.02em; color: #111; word-break: keep-all; }
+        .sw-hi h2 u { text-decoration: none; margin-left: 3px; font-size: 16px; font-weight: 600; color: #6B7686; }
+        .sw-hi p { margin: 8px 0 0; font-size: 16px; font-weight: 800; color: #111; word-break: keep-all; }
+        .sw-hi p em { font-style: normal; font-size: 1.25em; font-weight: 900; color: #D9730D; padding: 0 2px; border-radius: 4px; background: linear-gradient(transparent 62%, #FFE7CC 62%); }
         .sw-step { display: none; }
         .sw-step.on { display: block; }
         .sw-dots { display: flex; gap: 4px; margin: 10px 0 14px; }
@@ -202,6 +209,17 @@
             <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>@(change ? "역할 변경" : "가입 마무리")</span>
             <span>WELCOME</span>
         </div>
+
+        @* 맨 위 인사 — 홈 · 가족팀 화면과 같은 문구와 모양 *@
+        @if (!string.IsNullOrWhiteSpace(Convert.ToString(ViewData["FullName"])))
+        {
+            string hiDept = Convert.ToString(ViewData["HiDept"]) ?? "";
+            <div class="sw-hi">
+                <small>안녕하세요</small>
+                <h2>@ViewData["FullName"]<u>님</u></h2>
+                <p>@if (hiDept.Length > 0) { <em>@hiDept</em><text>에 오심을 환영해요</text> } else { <text>오심을 환영해요</text> }</p>
+            </div>
+        }
 
         @if (rejected) { <div class="sw-rej">@(latest!.IsChange ? "역할 변경" : "가입 승인") 요청이 반려됐어요.@if (!string.IsNullOrEmpty(latest!.RejectReason)) { <br /><b>사유: @latest.RejectReason</b> }<br />내용을 고쳐서 다시 보내 주세요.</div> }
         @if (!string.IsNullOrEmpty(msg)) { <div class="sw-msg">@msg</div> }
