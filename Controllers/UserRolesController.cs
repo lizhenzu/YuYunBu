@@ -71,6 +71,55 @@ namespace BulletinBoard.Controllers
             foreach (var vm in userRolesViewModel)
                 if (lastAccess.TryGetValue((vm.UserName ?? "").Trim(), out var at)) vm.LastAccessAt = at;
 
+            // 도전 성경말씀 가족팀 · 친구팀 — 활동 중인 팀의 활동 중인 구성원만
+            try
+            {
+                var ds = DataAccessModule.commonQuery(@"
+select m.UserName, ft.FamilyTeamId, ft.TeamName, isnull(ft.TeamType, N'FAMILY') TeamType, isnull(ft.CreatorUserName, N'') CreatorUserName, m.RoleCode
+from dbo.DM2_FamilyMember m
+join dbo.DM2_FamilyTeam ft on ft.FamilyTeamId = m.FamilyTeamId and ft.IsActive = 1
+where m.IsActive = 1
+order by ft.FamilyTeamId, m.RoleCode, m.RelationCode, m.SortNo");
+                if (ds.Tables.Count > 0)
+                {
+                    var byUser = userRolesViewModel.Where(v => !string.IsNullOrWhiteSpace(v.UserName))
+                        .GroupBy(v => v.UserName.Trim(), StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+                    var rows = ds.Tables[0].Rows.Cast<System.Data.DataRow>().Select(r => new
+                    {
+                        UserName = Convert.ToString(r["UserName"])?.Trim() ?? "",
+                        TeamId   = Convert.ToInt32(r["FamilyTeamId"]),
+                        TeamName = Convert.ToString(r["TeamName"]) ?? "",
+                        TeamType = Convert.ToString(r["TeamType"]) ?? "FAMILY",
+                        Creator  = Convert.ToString(r["CreatorUserName"]) ?? "",
+                        Rel      = BulletinBoard.Services.FamilyTeamService.TypeFriend == (Convert.ToString(r["TeamType"]) ?? "")
+                                   ? "친구"
+                                   : BulletinBoard.Services.FamilyTeamService.LabelOf(
+                                         BulletinBoard.Services.FamilyTeamService.KeyOfRole(Convert.ToInt32(r["RoleCode"]))),
+                    }).ToList();
+
+                    foreach (var team in rows.GroupBy(r => r.TeamId))
+                    {
+                        foreach (var me in team)
+                        {
+                            if (!byUser.TryGetValue(me.UserName, out var vm) || vm.TeamName.Length > 0) continue;
+                            vm.TeamName = me.TeamName;
+                            vm.TeamType = me.TeamType;
+                            vm.TeamRelation = me.Rel;
+                            vm.TeamIsOwner = string.Equals(me.Creator, me.UserName, StringComparison.OrdinalIgnoreCase);
+                            vm.TeamMates = team.Where(o => !string.Equals(o.UserName, me.UserName, StringComparison.OrdinalIgnoreCase))
+                                .Select(o =>
+                                {
+                                    string nm = byUser.TryGetValue(o.UserName, out var ov) ? $"{ov.LastName}{ov.FirstName}".Trim() : "";
+                                    if (nm.Length == 0) nm = o.UserName;
+                                    return $"{nm}({o.Rel})";
+                                }).ToList();
+                        }
+                    }
+                }
+            }
+            catch { /* 팀 정보는 부가 정보 — 못 읽어도 화면은 그대로 */ }
+
             return View(userRolesViewModel);
         }
 
