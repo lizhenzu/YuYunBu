@@ -186,7 +186,8 @@ namespace BulletinBoard.Controllers
             ViewData["Years"] = years;
             ViewData["Bans"] = bans;
             ViewData["ReqType"] = reqType;
-            return View("Approvals", await _db.GetPendingAsync(reqType));
+            // 화면도 따로: 가입 승인 = Approvals.cshtml · 역할 변경 승인 = RoleChangeApprovals.cshtml
+            return View(reqType == "CHANGE" ? "RoleChangeApprovals" : "Approvals", await _db.GetPendingAsync(reqType));
         }
 
         [HttpPost]
