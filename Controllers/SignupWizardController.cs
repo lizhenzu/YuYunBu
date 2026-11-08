@@ -73,6 +73,7 @@ namespace BulletinBoard.Controllers
 
             var fullName = FullNameOf(me);
             ViewData["FullName"] = fullName;
+            ViewData["MyId"] = me.Id;             // 대기 화면 "나의 정보" 버튼 주소에 쓴다
             ViewData["Change"] = change;
             ViewData["Current"] = change ? await _db.GetCurrentRoleAsync(me.UserName ?? "") : null;
             ViewData["ReturnUrl"] = SafeUrl(returnUrl);
