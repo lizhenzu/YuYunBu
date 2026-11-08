@@ -22,6 +22,8 @@
     int noneCnt = users.Count(u => !(u.Roles ?? new List<string>()).Any());
     int dupCnt = users.Count(u => nameCounts[Norm(FullName(u))] > 1);
 
+    int KCnt(UserRoleKind k) => users.Count(u => u.Kind == k);
+    string KindCls(UserRoleKind k) => k switch { UserRoleKind.Student => "st", UserRoleKind.Teacher => "te", UserRoleKind.Officer => "of", UserRoleKind.Etc => "et", _ => "pa" };
     string RoleCls(string r) => r switch { "SuperAdmin" => "s", "Admin" => "a", "Moderator" => "m", "Basic" => "b", _ => "" };
     int no = 0;
 }
@@ -65,6 +67,13 @@
         .ur-tg.m { background: var(--okbg); color: var(--ok); }
         .ur-tg.b { background: var(--warnbg); color: var(--warn); }
         .ur-tg.none { background: #fff; box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); }
+        /* 소속 (2026-11-08) */
+        .ur-af { display: inline-block; margin-right: 6px; font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 7px; vertical-align: 1px; }
+        .ur-af.st { background: var(--soft); color: var(--blue); }
+        .ur-af.te { background: var(--okbg); color: var(--ok); }
+        .ur-af.of { background: #F3EEFF; color: #7048C8; }
+        .ur-af.pa { background: var(--warnbg); color: var(--warn); }
+        .ur-af.et { background: var(--grey); color: var(--dim2); }
         .ur-dup { margin-left: 6px; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 1px 7px; background: var(--warnbg); color: var(--warn); vertical-align: 2px; }
 
         .ur-bd { display: none; padding: 0 0 14px 40px; }
@@ -115,6 +124,12 @@
             <button type="button" data-f="none">Role 없음<b>@noneCnt</b></button>
             <button type="button" data-f="dup">같은 이름<b>@dupCnt</b></button>
             <span class="gap"></span>
+            <button type="button" data-f="k:st">학생<b>@KCnt(UserRoleKind.Student)</b></button>
+            <button type="button" data-f="k:te">교사<b>@KCnt(UserRoleKind.Teacher)</b></button>
+            <button type="button" data-f="k:of">임원<b>@KCnt(UserRoleKind.Officer)</b></button>
+            <button type="button" data-f="k:pa">학부모<b>@KCnt(UserRoleKind.Parent)</b></button>
+            <button type="button" data-f="k:et">기타<b>@KCnt(UserRoleKind.Etc)</b></button>
+            <span class="gap"></span>
             <button type="button" class="on" data-s="name">이름순</button>
             <button type="button" data-s="date">최근 가입순</button>
         </div>
@@ -127,20 +142,21 @@
             var roles = (user.Roles ?? new List<string>()).ToList();
             var name = FullName(user);
             var dc = nameCounts[Norm(name)];
-            var filter = $"{name} {user.LastName} {user.FirstName} {user.Email} {user.PhoneNumber} {string.Join(" ", roles)}".ToLowerInvariant();
+            var filter = $"{name} {user.LastName} {user.FirstName} {user.Email} {user.PhoneNumber} {string.Join(" ", roles)} {user.AffLabel}".ToLowerInvariant();
             var sortDate = user.InsertDT?.ToString("yyyy-MM-dd") ?? "0000-00-00";
 
             <div class="ur-row"
                  data-filter="@filter"
                  data-roles="|@string.Join("|", roles)|"
                  data-dup="@(dc > 1 ? "1" : "0")"
+                 data-kind="@KindCls(user.Kind)"
                  data-name="@Norm(name)"
                  data-date="@sortDate">
                 <button type="button" class="ur-hd">
                     <span class="n">@no.ToString("00")</span>
                     <span class="t">
                         <b>@name</b>@if (dc > 1) {<span class="ur-dup">같은 이름 @dc</span>}
-                        <small>@user.Email</small>
+                        <small><span class="ur-af @KindCls(user.Kind)">@user.AffLabel</span>@user.Email</small>
                     </span>
                     <span class="rl">
                         @if (roles.Count == 0)
@@ -159,6 +175,7 @@
                 </button>
                 <div class="ur-bd">
                     <dl class="ur-meta">
+                        <dt>소속</dt><dd>@user.AffLabel</dd>
                         <dt>이메일</dt><dd>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</dd>
                         <dt>연락처</dt><dd>@(string.IsNullOrWhiteSpace(user.PhoneNumber) ? "-" : user.PhoneNumber)</dd>
                         <dt>가입일</dt><dd>@(user.InsertDT?.ToString("yyyy. MM. dd") ?? "-")</dd>
@@ -210,6 +227,7 @@
                 let ok = !q || r.dataset.filter.includes(q);
                 if (ok && f === 'none') ok = r.dataset.roles === '||';
                 else if (ok && f === 'dup') ok = r.dataset.dup === '1';
+                else if (ok && f.startsWith('k:')) ok = r.dataset.kind === f.slice(2);
                 else if (ok && f !== 'all') ok = r.dataset.roles.includes('|' + f + '|');
                 r.hidden = !ok;
                 wrap.insertBefore(r, empty);

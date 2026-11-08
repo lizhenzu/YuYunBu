@@ -44,8 +44,83 @@ namespace BulletinBoard.Controllers
                 userRolesViewModel.Add(thisViewModel);
                 thisViewModel.InsertDT = user.InsertDT;   // ✅ 추가
                 thisViewModel.PhoneNumber = user.PhoneNumber;   // ✅ 추가
+                thisViewModel.UserName = user.UserName;
             }
+            FillAffiliation(userRolesViewModel);
             return View(userRolesViewModel);
+        }
+
+        // ── 인별 소속 (2026-11-08) — 역할은 Common/UserRole.RoleCodeSql 한 곳 기준 ──
+        //   학생: 몇 학년 몇 반 · 교사: 담당 반(담임 · 부담임) · 임원: 직분 이름 · 기타 · 학부모
+        private static void FillAffiliation(List<UserRolesViewModel> list)
+        {
+            var byId = list.Where(x => !string.IsNullOrEmpty(x.UserId)).ToDictionary(x => x.UserId);
+            try
+            {
+                string sql = $@"
+SELECT u.[Id] AS uid, x.rc,
+       ISNULL((SELECT TOP 1 cd.[MinorNM] FROM [dbo].[CodeData] cd WHERE cd.[MajorCD] = 'T001' AND cd.[MinorCD] = x.rc), N'') AS rnm,
+       ISNULL(s.[ClassYear], 0) AS cy, ISNULL(s.[ClassBan], 0) AS cb,
+       CASE WHEN x.rc = N'' AND EXISTS (SELECT 1 FROM [dbo].[SignupApplication] sa WHERE sa.[UserName] = u.[UserName] AND sa.[Status] = N'PENDING' AND sa.[ReqType] = N'JOIN')
+            THEN (SELECT TOP 1 sa.[RoleKind] FROM [dbo].[SignupApplication] sa WHERE sa.[UserName] = u.[UserName] AND sa.[Status] = N'PENDING' AND sa.[ReqType] = N'JOIN' ORDER BY sa.[Id] DESC)
+            ELSE N'' END AS pk
+FROM [Identity].[User] u
+CROSS APPLY (SELECT {UserRole.RoleCodeSql("u.[Id]")} AS rc) x
+OUTER APPLY (SELECT TOP 1 c.[ClassYear], c.[ClassBan] FROM [dbo].[view_UserCompositeInfo_2026] c
+             WHERE c.[UserName] = u.[UserName] AND ISNULL(c.[ClassYear], 0) > 0 ORDER BY c.[ClassYear], c.[ClassBan]) s;
+
+SELECT DISTINCT ap.[userid] AS uid, m.[ClassYear] AS cy, m.[ClassBan] AS cb,
+       CASE WHEN m.[TeacherPersonId] = ap.[personid] THEN 0 ELSE 1 END AS sub
+FROM [dbo].[ClassTeacherMap_2026] m
+JOIN [dbo].[view_All_Person_2026] ap ON ap.[personid] IN (m.[TeacherPersonId], m.[SubTeacherPersonId])
+WHERE ISNULL(m.[IsActive], 0) = 1 AND ISNULL(ap.[personid], 0) <> 0 AND ap.[userid] IS NOT NULL
+ORDER BY cy, cb;";
+                var ds = DataAccessModule.commonQuery(sql);
+                if (ds != null && ds.Tables.Count > 0)
+                {
+                    foreach (System.Data.DataRow r in ds.Tables[0].Rows)
+                    {
+                        if (!byId.TryGetValue(Convert.ToString(r["uid"]) ?? "", out var vm)) continue;
+                        string rc = Convert.ToString(r["rc"]) ?? "";
+                        string pk = (Convert.ToString(r["pk"]) ?? "").Trim();
+                        vm.Kind = UserRole.KindOf(rc);
+                        if (rc.Trim().Length == 0 && pk.Length > 0)
+                        {
+                            vm.Pending = true;
+                            vm.Kind = pk switch { "S" => UserRoleKind.Student, "T" => UserRoleKind.Teacher, "E" => UserRoleKind.Etc, _ => UserRoleKind.Parent };
+                        }
+                        vm.RoleNM = Convert.ToString(r["rnm"]) ?? "";
+                        vm.ClassYear = Convert.ToInt32(r["cy"]);
+                        vm.ClassBan = Convert.ToInt32(r["cb"]);
+                    }
+                }
+                if (ds != null && ds.Tables.Count > 1)
+                {
+                    foreach (System.Data.DataRow r in ds.Tables[1].Rows)
+                    {
+                        if (!byId.TryGetValue(Convert.ToString(r["uid"]) ?? "", out var vm)) continue;
+                        string t = $"{Convert.ToInt32(r["cy"])}학년 {Convert.ToInt32(r["cb"])}반 {(Convert.ToInt32(r["sub"]) == 1 ? "부담임" : "담임")}";
+                        if (!vm.TeachClasses.Contains(t)) vm.TeachClasses.Add(t);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                BulletinBoard.Helpers.DbLogger.LogDebugAsync("UserRoles 소속 조회 실패: " + ex.Message);
+            }
+
+            foreach (var vm in list)
+            {
+                string lbl = vm.Kind switch
+                {
+                    UserRoleKind.Student => vm.ClassYear > 0 ? $"학생 · {vm.ClassYear}학년 {vm.ClassBan}반" : "학생 · 반 없음",
+                    UserRoleKind.Teacher => vm.TeachClasses.Count > 0 ? $"교사 · {string.Join(", ", vm.TeachClasses)}" : "교사",
+                    UserRoleKind.Officer => (string.IsNullOrWhiteSpace(vm.RoleNM) ? "임원" : $"임원 · {vm.RoleNM}")
+                                            + (vm.TeachClasses.Count > 0 ? $" · {string.Join(", ", vm.TeachClasses)}" : ""),
+                    _ => UserRole.LabelOf(vm.Kind),
+                };
+                vm.AffLabel = vm.Pending ? lbl + " (승인 대기)" : lbl;
+            }
         }
 
         public async Task<IActionResult> Delete(string userId)
