@@ -22,7 +22,12 @@
     int noneCnt = users.Count(u => !(u.Roles ?? new List<string>()).Any());
     int dupCnt = users.Count(u => nameCounts[Norm(FullName(u))] > 1);
 
-    int KCnt(UserRoleKind k) => users.Count(u => u.Kind == k);
+    // 소속 없음 (2026-11-08 시안 확정) — 반 배정 · 교사 배정 · 승인된 역할이 하나도 없는 사람 (가입 승인 대기는 제외)
+    bool NoAff(UserRolesViewModel u) => u.Kind == UserRoleKind.Parent && !u.Pending;
+    string AffText(UserRolesViewModel u) => NoAff(u) ? "소속 없음" : u.AffLabel;
+    string KindOf(UserRolesViewModel u) => NoAff(u) ? "no" : KindCls(u.Kind);
+    int KCnt(UserRoleKind k) => users.Count(u => u.Kind == k && !NoAff(u));
+    int noAffCnt = users.Count(NoAff);
     string KindCls(UserRoleKind k) => k switch { UserRoleKind.Student => "st", UserRoleKind.Teacher => "te", UserRoleKind.Officer => "of", UserRoleKind.Etc => "et", _ => "pa" };
     string RoleCls(string r) => r switch { "SuperAdmin" => "s", "Admin" => "a", "Moderator" => "m", "Basic" => "b", _ => "" };
     int no = 0;
@@ -74,6 +79,14 @@
         .ur-af.of { background: #F3EEFF; color: #7048C8; }
         .ur-af.pa { background: var(--warnbg); color: var(--warn); }
         .ur-af.et { background: var(--grey); color: var(--dim2); }
+        /* 소속 없음 — 연한 노란 배경 + 왼쪽 띠 */
+        .ur-row.noaff { background: #FFF8E6; box-shadow: inset 3px 0 0 #F2B544; }
+        .ur-row.noaff .ur-hd { padding-left: 10px; padding-right: 10px; }
+        .ur-row.noaff .ur-hd .n { color: #C9922B; }
+        .ur-row.noaff .ur-bd { padding-right: 10px; }
+        .ur-af.no { background: #fff; color: #A86A12; box-shadow: inset 0 0 0 1px #F2C879; }
+        .ur-chips button.na { background: #FFF1D6; color: #A86A12; }
+        .ur-chips button.na.on { background: #E59A1A; color: #fff; }
         .ur-dup { margin-left: 6px; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 1px 7px; background: var(--warnbg); color: var(--warn); vertical-align: 2px; }
 
         .ur-bd { display: none; padding: 0 0 14px 40px; }
@@ -131,8 +144,9 @@
             <button type="button" data-f="k:st">학생<b>@KCnt(UserRoleKind.Student)</b></button>
             <button type="button" data-f="k:te">교사<b>@KCnt(UserRoleKind.Teacher)</b></button>
             <button type="button" data-f="k:of">임원<b>@KCnt(UserRoleKind.Officer)</b></button>
-            <button type="button" data-f="k:pa">학부모<b>@KCnt(UserRoleKind.Parent)</b></button>
+            @if (KCnt(UserRoleKind.Parent) > 0) { <button type="button" data-f="k:pa">학부모<b>@KCnt(UserRoleKind.Parent)</b></button> }
             <button type="button" data-f="k:et">기타<b>@KCnt(UserRoleKind.Etc)</b></button>
+            <button type="button" class="na" data-f="k:no">소속 없음<b>@noAffCnt</b></button>
             <span class="gap"></span>
             <button type="button" class="on" data-s="name">이름순</button>
             <button type="button" data-s="date">최근 가입순</button>
@@ -146,21 +160,21 @@
             var roles = (user.Roles ?? new List<string>()).ToList();
             var name = FullName(user);
             var dc = nameCounts[Norm(name)];
-            var filter = $"{name} {user.LastName} {user.FirstName} {user.Email} {user.PhoneNumber} {string.Join(" ", roles)} {user.AffLabel}".ToLowerInvariant();
+            var filter = $"{name} {user.LastName} {user.FirstName} {user.Email} {user.PhoneNumber} {string.Join(" ", roles)} {AffText(user)}".ToLowerInvariant();
             var sortDate = user.InsertDT?.ToString("yyyy-MM-dd") ?? "0000-00-00";
 
-            <div class="ur-row"
+            <div class="ur-row @(NoAff(user) ? "noaff" : "")"
                  data-filter="@filter"
                  data-roles="|@string.Join("|", roles)|"
                  data-dup="@(dc > 1 ? "1" : "0")"
-                 data-kind="@KindCls(user.Kind)"
+                 data-kind="@KindOf(user)"
                  data-name="@Norm(name)"
                  data-date="@sortDate">
                 <button type="button" class="ur-hd">
                     <span class="n">@no.ToString("00")</span>
                     <span class="t">
                         <b>@name</b>@if (dc > 1) {<span class="ur-dup">같은 이름 @dc</span>}
-                        <small><span class="ur-af @KindCls(user.Kind)">@user.AffLabel</span>@user.Email</small>
+                        <small><span class="ur-af @KindOf(user)">@AffText(user)</span>@user.Email</small>
                     </span>
                     <span class="rl">
                         @if (roles.Count == 0)
@@ -179,7 +193,7 @@
                 </button>
                 <div class="ur-bd">
                     <dl class="ur-meta">
-                        <dt>소속</dt><dd>@user.AffLabel</dd>
+                        <dt>소속</dt><dd>@(NoAff(user) ? "소속 없음 — 반 배정 · 교사 배정 · 승인된 역할이 없어요" : user.AffLabel)</dd>
                         <dt>이메일</dt><dd>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</dd>
                         <dt>연락처</dt><dd>@(string.IsNullOrWhiteSpace(user.PhoneNumber) ? "-" : user.PhoneNumber)</dd>
                         <dt>가입일</dt><dd>@(user.InsertDT?.ToString("yyyy. MM. dd") ?? "-")</dd>
