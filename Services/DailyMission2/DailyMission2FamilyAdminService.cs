@@ -111,6 +111,47 @@ ORDER BY m.IsActive DESC, m.SortNo ASC, m.RoleCode ASC, m.UserName ASC;";
             return list;
         }
 
+        /// <summary>이 팀의 대기 중인 가입 신청(R) · 초대(I) — 표가 아직 없으면 빈 목록</summary>
+        public async Task<List<FamilyRequestRow2>> GetRequestsAsync(int teamId)
+        {
+            const string sql = @"
+SELECT r.Id, r.Kind, r.TargetUserName, ISNULL(tp.FullName, r.TargetUserName),
+       r.FromUserName, ISNULL(fp.FullName, r.FromUserName), r.RelationKey, r.CreatedAt
+FROM dbo.DM2_FamilyRequest r WITH (NOLOCK)
+LEFT JOIN [Identity].[User]          tu WITH (NOLOCK) ON tu.UserName = r.TargetUserName
+LEFT JOIN dbo.view_PersonMaster_2026 tp WITH (NOLOCK) ON tp.UserId   = tu.Id
+LEFT JOIN [Identity].[User]          fu WITH (NOLOCK) ON fu.UserName = r.FromUserName
+LEFT JOIN dbo.view_PersonMaster_2026 fp WITH (NOLOCK) ON fp.UserId   = fu.Id
+WHERE r.FamilyTeamId = @id
+ORDER BY r.Kind DESC, r.CreatedAt;";
+
+            var list = new List<FamilyRequestRow2>();
+            try
+            {
+                using var conn = Conn();
+                using var cmd = new SqlCommand(sql, conn);
+                cmd.Parameters.AddWithValue("@id", teamId);
+                await conn.OpenAsync();
+                using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    list.Add(new FamilyRequestRow2
+                    {
+                        Id = r.GetInt32(0),
+                        Kind = r.GetString(1).Trim(),
+                        TargetUserName = r.GetString(2).Trim(),
+                        TargetFullName = r.GetString(3).Trim(),
+                        FromUserName = r.GetString(4).Trim(),
+                        FromFullName = r.GetString(5).Trim(),
+                        RelationKey = r.GetString(6).Trim(),
+                        CreatedAt = r.GetDateTime(7),
+                    });
+                }
+            }
+            catch (SqlException) { /* 신청 표(DM2_FamilyRequest)를 아직 만들지 않았다 */ }
+            return list;
+        }
+
         public async Task<int> CreateTeamAsync(string teamName, string? memo = null)
         {
             const string sql = @"

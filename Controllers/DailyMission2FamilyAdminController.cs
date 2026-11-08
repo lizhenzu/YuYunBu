@@ -10,10 +10,12 @@ namespace BulletinBoard.Controllers
     public class DailyMission2FamilyAdminController : Controller
     {
         private readonly DailyMission2FamilyAdminService _svc;
+        private readonly FamilyTeamService _teamSvc;
 
-        public DailyMission2FamilyAdminController(DailyMission2FamilyAdminService svc)
+        public DailyMission2FamilyAdminController(DailyMission2FamilyAdminService svc, FamilyTeamService teamSvc)
         {
             _svc = svc;
+            _teamSvc = teamSvc;
         }
 
         // GET: /DailyMission2FamilyAdmin
@@ -27,7 +29,10 @@ namespace BulletinBoard.Controllers
                 vm.SelectedTeamId = teamId.Value;
                 vm.SelectedTeam = await _svc.GetTeamAsync(teamId.Value);
                 if (vm.SelectedTeam != null)
+                {
                     vm.Members = await _svc.GetMembersAsync(teamId.Value);
+                    vm.Requests = await _svc.GetRequestsAsync(teamId.Value);   // 대기 중인 가입 신청 · 초대
+                }
             }
 
             ViewBag.Error = TempData["Error"] as string;
@@ -112,6 +117,33 @@ namespace BulletinBoard.Controllers
 
             BulletinBoard.Helpers.HomeCacheHelper.InvalidateFamilyMilestones(HttpContext); // 홈 가족 마일스톤 캐시 즉시 비움
             TempData["Info"] = "비활성 처리되었습니다.";
+            return RedirectToAction(nameof(Index), new { teamId });
+        }
+
+        // 가입 신청 수락 — 팀원 대신 관리자가 받아 준다 (초대는 초대받은 본인이 수락해야 해서 지우기만 가능)
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> AcceptRequest(int teamId, int requestId)
+        {
+            if (teamId <= 0) return RedirectToAction(nameof(Index));
+
+            var res = await _teamSvc.AdminAcceptRequestAsync(teamId, requestId);
+            if (res.Ok)
+            {
+                BulletinBoard.Helpers.HomeCacheHelper.InvalidateFamilyMilestones(HttpContext);
+                TempData["Info"] = res.Message;
+            }
+            else TempData["Error"] = res.Message;
+            return RedirectToAction(nameof(Index), new { teamId });
+        }
+
+        // 가입 신청 거절 · 초대 취소 — 신청(초대) 한 건을 지운다
+        [HttpPost, ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveRequest(int teamId, int requestId)
+        {
+            if (teamId <= 0) return RedirectToAction(nameof(Index));
+
+            if (await _teamSvc.AdminRemoveRequestAsync(teamId, requestId)) TempData["Info"] = "신청을 지웠어요.";
+            else TempData["Error"] = "이미 처리됐거나 사라진 신청이에요.";
             return RedirectToAction(nameof(Index), new { teamId });
         }
 
