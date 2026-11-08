@@ -56,17 +56,22 @@ namespace BulletinBoard.Controllers
 
         // ── 회원: 마법사 ──────────────────────────────────────────────
         [HttpGet]
-        public async Task<IActionResult> Index(string? returnUrl)
+        /// <param name="change">true = 정보 관리의 "역할 변경"으로 들어옴 (승인된 뒤에도 다시 신청할 수 있다)</param>
+        public async Task<IActionResult> Index(string? returnUrl, bool change = false)
         {
             var me = await _userManager.GetUserAsync(User);
             if (me == null) return Challenge();
 
             var latest = await _db.GetLatestOfAsync(me.Id);
-            if (latest != null && latest.Status == "APPROVED")
+            if (latest != null && latest.Status == "APPROVED" && !change)
                 return LocalRedirect(SafeUrl(returnUrl));
+            // 반려된 신청이 역할 변경이었으면 다시 입력도 역할 변경으로
+            if (latest != null && latest.Status == "REJECTED" && latest.IsChange) change = true;
 
             var fullName = FullNameOf(me);
             ViewData["FullName"] = fullName;
+            ViewData["Change"] = change;
+            ViewData["Current"] = change ? await _db.GetCurrentRoleAsync(me.UserName ?? "") : null;
             ViewData["ReturnUrl"] = SafeUrl(returnUrl);
             ViewData["Latest"] = latest;          // PENDING 이면 대기 화면, REJECTED 면 사유를 보여 주고 다시 입력
             ViewData["Msg"] = TempData["SignupMsg"] as string;
@@ -91,7 +96,7 @@ namespace BulletinBoard.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Submit(string role, int personId, int classYear, int classBan, int bMonth, int bDay,
-                                                string? sex, string? school, string? phone, string[]? kidName, int[]? kidYear, int[]? kidBan, string? returnUrl)
+                                                string? sex, string? school, string? phone, string[]? kidName, int[]? kidYear, int[]? kidBan, string? returnUrl, bool change = false)
         {
             var me = await _userManager.GetUserAsync(User);
             if (me == null) return Challenge();
@@ -99,7 +104,7 @@ namespace BulletinBoard.Controllers
             IActionResult Back(string m)
             {
                 TempData["SignupMsg"] = m;
-                return RedirectToAction(nameof(Index), new { returnUrl });
+                return RedirectToAction(nameof(Index), new { returnUrl, change });
             }
 
             role = (role ?? "").Trim().ToUpperInvariant();
@@ -112,8 +117,10 @@ namespace BulletinBoard.Controllers
                 UserName = me.UserName ?? "",
                 FullName = FullNameOf(me),
                 RoleKind = role,
-                Phone = phone.Trim()
+                Phone = phone.Trim(),
+                ReqType = change ? "CHANGE" : "JOIN"
             };
+            try { a.PrevRole = (await _db.GetCurrentRoleAsync(a.UserName)).Label; } catch { }
 
             if (role == "S" || role == "T")
             {
@@ -166,11 +173,13 @@ namespace BulletinBoard.Controllers
 
                 var msg = new ControlWithdraw();
                 foreach (var name in to)
-                    await msg.SendMessageAsync(name, a.UserName, $"{a.FullName}({a.UserName}) 님이 {a.RoleLabel}(으)로 가입 승인을 요청했어요. 정보 관리 › 가입 승인에서 확인해 주세요.");
+                    await msg.SendMessageAsync(name, a.UserName, change
+                        ? $"{a.FullName}({a.UserName}) 님이 역할 변경을 요청했어요 ({a.PrevRole} → {a.RoleLabel}). 정보 관리 › 가입 승인에서 확인해 주세요."
+                        : $"{a.FullName}({a.UserName}) 님이 {a.RoleLabel}(으)로 가입 승인을 요청했어요. 정보 관리 › 가입 승인에서 확인해 주세요.");
             }
             catch { /* 쪽지가 실패해도 신청은 저장됐다 */ }
 
-            return RedirectToAction(nameof(Index), new { returnUrl });
+            return RedirectToAction(nameof(Index), new { returnUrl, change });
         }
 
         // ── 관리자: 승인 목록 ────────────────────────────────────────
@@ -197,14 +206,14 @@ namespace BulletinBoard.Controllers
                     if (string.IsNullOrWhiteSpace(reason)) return Json(new { ok = false, message = "반려 사유를 적어 주세요." });
                     var app = await _db.RejectAsync(id, reason.Trim(), admin);
                     if (app == null) return Json(new { ok = false, message = "이미 처리된 신청이에요." });
-                    try { await notify.SendMessageAsync(app.UserName, admin, $"가입 승인 요청이 반려됐어요. 사유: {reason.Trim()} — 다시 접속하면 입력 화면이 나와요."); } catch { }
+                    try { await notify.SendMessageAsync(app.UserName, admin, $"{(app.IsChange ? "역할 변경" : "가입 승인")} 요청이 반려됐어요. 사유: {reason.Trim()} — 홈에서 다시 입력할 수 있어요."); } catch { }
                     return Json(new { ok = true, message = "반려했어요." });
                 }
 
                 var (ok, message, a) = await _db.ApproveAsync(id, admin, linkExisting, classYear, classBan, teacherRole);
                 if (ok && a != null)
                 {
-                    try { await notify.SendMessageAsync(a.UserName, admin, "가입이 승인됐어요. 이제 모든 기능을 쓸 수 있어요."); } catch { }
+                    try { await notify.SendMessageAsync(a.UserName, admin, a.IsChange ? $"역할 변경이 승인됐어요. 이제 {a.RoleLabel}(으)로 이용하실 수 있어요." : "가입이 승인됐어요. 이제 모든 기능을 쓸 수 있어요."); } catch { }
                 }
                 return Json(new { ok, message });
             }

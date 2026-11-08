@@ -23,6 +23,8 @@ namespace BulletinBoard.DataAccessLayer
         public string School { get; set; } = "";
         public string Phone { get; set; } = "";         // 학생: 부모님 연락처 · 교사/학부모: 본인 연락처
         public string Kids { get; set; } = "";          // 학부모: "김하늘 2학년 3반, …" (참고용)
+        public string ReqType { get; set; } = "JOIN";   // JOIN 가입 직후 · CHANGE 역할 변경
+        public string PrevRole { get; set; } = "";      // 신청 당시 역할(표시용) — "학생 2학년 3반", "교사", "역할 없음"
         public string Status { get; set; } = "";        // PENDING · APPROVED · REJECTED
         public string RejectReason { get; set; } = "";
         public DateTime InsertDT { get; set; }
@@ -34,6 +36,21 @@ namespace BulletinBoard.DataAccessLayer
         public int TargetClassBan { get; set; }
 
         public string RoleLabel => RoleKind == "S" ? "학생" : RoleKind == "T" ? "교사" : RoleKind == "P" ? "학부모" : "";
+        public bool IsChange => ReqType == "CHANGE";
+    }
+
+    /// <summary>지금 역할 (view_UserCompositeInfo_2026 기준)</summary>
+    public class CurrentRole
+    {
+        public string RoleCode { get; set; } = "";
+        public string RoleNM { get; set; } = "";
+        public int ClassYear { get; set; }
+        public int ClassBan { get; set; }
+        public string Kind => RoleCode == "T1001" ? "S" : RoleCode == "T1002" || RoleCode == "T1003" ? "T" : RoleCode.Length > 0 ? "X" : "";
+        public string Label =>
+            RoleCode == "T1001" ? "학생" + (ClassYear > 0 && ClassBan > 0 ? $" {ClassYear}학년 {ClassBan}반" : "")
+            : RoleCode.Length > 0 ? (string.IsNullOrWhiteSpace(RoleNM) ? RoleCode : RoleNM)
+            : "역할 없음(학부모)";
     }
 
     /// <summary>
@@ -62,6 +79,8 @@ namespace BulletinBoard.DataAccessLayer
                     [School]       NVARCHAR(200) NULL,
                     [Phone]        NVARCHAR(50) NULL,
                     [Kids]         NVARCHAR(1000) NULL,
+                    [ReqType]      NVARCHAR(10) NOT NULL,
+                    [PrevRole]     NVARCHAR(100) NULL,
                     [Status]       NVARCHAR(10) NOT NULL,
                     [RejectReason] NVARCHAR(300) NULL,
                     [InsertDT]     DATETIME NOT NULL,
@@ -87,9 +106,9 @@ namespace BulletinBoard.DataAccessLayer
                     ELSE
                     BEGIN
                         INSERT INTO [dbo].[SignupApplication]
-                            ([UserId],[UserName],[FullName],[RoleKind],[PersonId],[ClassYear],[ClassBan],[BMonth],[BDay],[Sex],[School],[Phone],[Kids],[Status],[InsertDT])
+                            ([UserId],[UserName],[FullName],[RoleKind],[PersonId],[ClassYear],[ClassBan],[BMonth],[BDay],[Sex],[School],[Phone],[Kids],[ReqType],[PrevRole],[Status],[InsertDT])
                         VALUES
-                            (@UserId,@UserName,@FullName,@RoleKind,@PersonId,@ClassYear,@ClassBan,@BMonth,@BDay,@Sex,@School,@Phone,@Kids,N'PENDING',@Now);
+                            (@UserId,@UserName,@FullName,@RoleKind,@PersonId,@ClassYear,@ClassBan,@BMonth,@BDay,@Sex,@School,@Phone,@Kids,@ReqType,@PrevRole,N'PENDING',@Now);
                         SELECT 1;
                     END";
                 using (var cmd = new SqlCommand(sql, conn))
@@ -107,6 +126,8 @@ namespace BulletinBoard.DataAccessLayer
                     cmd.Parameters.AddWithValue("@School", Db(a.School));
                     cmd.Parameters.AddWithValue("@Phone", Db(a.Phone));
                     cmd.Parameters.AddWithValue("@Kids", Db(a.Kids));
+                    cmd.Parameters.AddWithValue("@ReqType", a.ReqType == "CHANGE" ? "CHANGE" : "JOIN");
+                    cmd.Parameters.AddWithValue("@PrevRole", Db(a.PrevRole));
                     cmd.Parameters.AddWithValue("@Now", SharedComm.GetKoreaNow());
                     return Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 1;
                 }
@@ -151,7 +172,8 @@ namespace BulletinBoard.DataAccessLayer
             string sql = $@"
                 SELECT {top} a.[Id],a.[UserId],a.[UserName],a.[FullName],a.[RoleKind],a.[PersonId],a.[ClassYear],a.[ClassBan],a.[BMonth],a.[BDay],
                        ISNULL(a.[Sex],N''),ISNULL(a.[School],N''),ISNULL(a.[Phone],N''),ISNULL(a.[Kids],N''),a.[Status],ISNULL(a.[RejectReason],N''),a.[InsertDT],
-                       ISNULL(pm.[fullName],N''),ISNULL(pm.[UserName],N''),ISNULL(ci.[ClassYear],0),ISNULL(ci.[ClassBan],0)
+                       ISNULL(pm.[fullName],N''),ISNULL(pm.[UserName],N''),ISNULL(ci.[ClassYear],0),ISNULL(ci.[ClassBan],0),
+                       a.[ReqType],ISNULL(a.[PrevRole],N'')
                 FROM [dbo].[SignupApplication] a
                 LEFT JOIN [dbo].[PersonMaster_2026] pm ON pm.[PersonId] = a.[PersonId] AND a.[PersonId] > 0
                 LEFT JOIN [dbo].[ClassInfo_2026] ci ON ci.[PersonID] = pm.[PersonId]
@@ -186,7 +208,9 @@ namespace BulletinBoard.DataAccessLayer
                             TargetFullName = rd.GetString(17),
                             TargetUserName = rd.GetString(18),
                             TargetClassYear = Convert.ToInt32(rd[19]),
-                            TargetClassBan = Convert.ToInt32(rd[20])
+                            TargetClassBan = Convert.ToInt32(rd[20]),
+                            ReqType = rd.GetString(21),
+                            PrevRole = rd.GetString(22)
                         });
                     }
                 }
@@ -270,22 +294,36 @@ namespace BulletinBoard.DataAccessLayer
                             WHERE [PersonId] = @p",
                             ("@bm", a.BMonth), ("@bd", a.BDay), ("@sex", Db(a.Sex)), ("@school", Db(a.School)), ("@phone", Db(a.Phone)), ("@now", now), ("@p", pid));
 
-                        // 2) 반 · 역할
+                        // 2) 반 · 역할 — 역할 변경이면 이전 역할의 흔적도 정리한다
+                        string prevRole = await ScalarStringAsync(conn, tx, "SELECT TOP 1 [RoleCode] FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i", ("@i", a.UserId));
+                        const string clearClass = "DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @p;";
+
                         string? role = null;
                         if (a.RoleKind == "S")
                         {
                             role = "T1001";
                             if (classYear > 0 && classBan > 0)
                             {
-                                await ExecAsync(conn, tx, @"
-                                    DELETE FROM [dbo].[ClassInfo_2026] WHERE [PersonID] = @p;
+                                await ExecAsync(conn, tx, clearClass + @"
                                     INSERT INTO [dbo].[ClassInfo_2026] ([ClassYear],[ClassBan],[PersonID]) VALUES (@y,@b,@p);",
                                     ("@p", pid), ("@y", classYear), ("@b", classBan));
+                            }
+                            else if (prevRole != "T1001")
+                            {
+                                // 교사 · 학부모였다가 학생이 됐는데 반을 모르면, 예전 반(담임 반 등)을 학생 반으로 남기지 않는다
+                                await ExecAsync(conn, tx, clearClass, ("@p", pid));
                             }
                         }
                         else if (a.RoleKind == "T")
                         {
                             role = teacherRoleCode == "T1003" ? "T1003" : "T1002";
+                            // 학생이었다가 교사가 되면 학생 반 배정을 지운다 (교사였으면 담임 반은 그대로)
+                            if (prevRole == "T1001") await ExecAsync(conn, tx, clearClass, ("@p", pid));
+                        }
+                        else
+                        {
+                            // 학부모 — 역할 코드가 없다. 예전 역할 · 반은 지운다
+                            await ExecAsync(conn, tx, clearClass + " DELETE FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i;", ("@p", pid), ("@i", a.UserId));
                         }
 
                         if (role != null)
@@ -312,6 +350,42 @@ namespace BulletinBoard.DataAccessLayer
                         throw;
                     }
                 }
+            }
+        }
+
+        /// <summary>지금 역할 — 역할 변경 화면 · 신청서의 "이전 역할" 표시용</summary>
+        public async Task<CurrentRole> GetCurrentRoleAsync(string userName)
+        {
+            var r = new CurrentRole();
+            using (var conn = Conn())
+            {
+                await conn.OpenAsync();
+                using (var cmd = new SqlCommand(@"SELECT TOP 1 ISNULL([RoleCode],N''), ISNULL([RoleNM],N''), ISNULL([ClassYear],0), ISNULL([ClassBan],0)
+                                                  FROM [dbo].[view_UserCompositeInfo_2026] WHERE [UserName] = @u", conn))
+                {
+                    cmd.Parameters.AddWithValue("@u", userName);
+                    using (var rd = await cmd.ExecuteReaderAsync())
+                    {
+                        if (await rd.ReadAsync())
+                        {
+                            r.RoleCode = Convert.ToString(rd[0])?.Trim() ?? "";
+                            r.RoleNM = Convert.ToString(rd[1])?.Trim() ?? "";
+                            r.ClassYear = Convert.ToInt32(rd[2]);
+                            r.ClassBan = Convert.ToInt32(rd[3]);
+                        }
+                    }
+                }
+            }
+            return r;
+        }
+
+        private static async Task<string> ScalarStringAsync(SqlConnection c, SqlTransaction tx, string sql, params (string, object)[] ps)
+        {
+            using (var cmd = new SqlCommand(sql, c, tx))
+            {
+                foreach (var p in ps) cmd.Parameters.AddWithValue(p.Item1, p.Item2);
+                var r = await cmd.ExecuteScalarAsync();
+                return r == null || r == DBNull.Value ? "" : (Convert.ToString(r) ?? "").Trim();
             }
         }
 
