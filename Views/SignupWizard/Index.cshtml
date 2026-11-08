@@ -132,7 +132,28 @@
         <div class="sw-card">
             <div class="row"><span>이름</span><b>@latest.FullName</b></div>
             <div class="row"><span>요청 날짜</span><b>@latest.InsertDT.ToString("M월 d일")</b></div>
-            <div class="row"><span>입력한 정보</span><b>@(SignupDetailText(latest) == "더 입력한 정보는 없어요." ? "없음 (역할만)" : SignupDetailText(latest))</b></div>
+            @* 입력한 값은 항목마다 한 줄씩 (학생: 반 · 생일 · 성별 · 학교 · 부모님 연락처 / 교사: 연락처). 비어 있으면 "없음 (역할만)" *@
+            @{
+                bool anyDetail = false;
+            }
+            @if (latest.RoleKind == "S")
+            {
+                if (latest.ClassYear > 0 && latest.ClassBan > 0) { anyDetail = true; <div class="row"><span>학년 · 반</span><b>@($"{latest.ClassYear}학년 {latest.ClassBan}반")</b></div> }
+                else if (latest.BMonth > 0) { <div class="row"><span>학년 · 반</span><b>관리자가 정해요</b></div> }
+                if (latest.BMonth > 0 && latest.BDay > 0) { anyDetail = true; <div class="row"><span>생일</span><b>@($"{latest.BMonth}월 {latest.BDay}일")</b></div> }
+                if (latest.Sex == "M" || latest.Sex == "F") { anyDetail = true; <div class="row"><span>성별</span><b>@(latest.Sex == "M" ? "남" : "여")</b></div> }
+                if (!string.IsNullOrEmpty(latest.School)) { anyDetail = true; <div class="row"><span>학교</span><b>@latest.School</b></div> }
+                if (!string.IsNullOrEmpty(latest.Phone)) { anyDetail = true; <div class="row"><span>부모님 연락처</span><b>@latest.Phone</b></div> }
+            }
+            else if (latest.RoleKind == "T" && !string.IsNullOrEmpty(latest.Phone))
+            {
+                anyDetail = true;
+                <div class="row"><span>연락처</span><b>@latest.Phone</b></div>
+            }
+            @if (!anyDetail)
+            {
+                <div class="row"><span>입력한 정보</span><b>없음 (역할만)</b></div>
+            }
         </div>
         <div class="sw-wnote">승인되면 쪽지로 알려 드려요.</div>
         <a class="sw-home" href="@returnUrl">@ConstatsCommon.ToHome</a>
