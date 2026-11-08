@@ -39,7 +39,24 @@ namespace BulletinBoard.Controllers
             if (!await IsStaffAsync()) return Forbid();
             var manage = new ManageQuizAiPrompt();
             ViewBag.PromptLibrary = manage.GetLibrary();
+            ViewBag.PromptError ??= TempData["PromptError"] as string;
             return View(manage.Get());
+        }
+
+        /// <summary>프람프트 모음 한 개 저장 — 고친 줄로 돌아간다</summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveLibrary(int id, string? title, string? promptText)
+        {
+            if (!await IsStaffAsync()) return Forbid();
+
+            string? err;
+            try { err = new ManageQuizAiPrompt().SaveLibrary(id, title, promptText); }
+            catch (SqlException ex) { err = $"저장하지 못했어요. 표(dbo.AiPromptLibrary)를 만들었는지 확인해 주세요. ({ex.Message})"; }
+
+            if (err != null) TempData["PromptError"] = err;
+            else TempData["PromptSaved"] = "프람프트 모음을 저장했어요.";
+            return Redirect((Url.Action(nameof(Index)) ?? "/QuizAiPrompt/Index") + "#plr" + id);
         }
 
         [HttpPost]
