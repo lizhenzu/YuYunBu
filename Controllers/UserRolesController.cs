@@ -19,15 +19,18 @@ namespace BulletinBoard.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
 
         public UserRolesController(
             UserManager<ApplicationUser> userManager,
             RoleManager<IdentityRole> roleManager,
-            SignInManager<ApplicationUser> signInManager)
+            SignInManager<ApplicationUser> signInManager,
+            Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
         {
             _roleManager   = roleManager;
             _userManager   = userManager;
             _signInManager = signInManager;
+            _env           = env;
         }
         public async Task<IActionResult> Index()
         {
@@ -57,26 +60,56 @@ namespace BulletinBoard.Controllers
             return View(userRolesViewModel);
         }
 
+        // ── 계정 삭제 (2026-11-08) — 탈퇴 승인(/Withdraw/Decide)과 같은 범위로 지운다 ──
+        //   ① 기록(한 트랜잭션, ControlWithdraw.DeleteDataAsync — 가족팀 방장 이어받기 포함) → ② 프로필 사진 → ③ 로그인 계정
+        //   중간에 실패하면 계정이 남아 다시 지울 수 있다. 내 계정 · SuperAdmin 계정은 못 지운다.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(string userId)
         {
-            ViewBag.userId = userId;
-            var user = await _userManager.FindByIdAsync(userId);
+            var user = await _userManager.FindByIdAsync(userId ?? "");
             if (user == null)
             {
-                ViewBag.ErrorMessage = $"User with Id = {userId} cannot be found";
-                return View("NotFound");
+                TempData["UrMsg"] = "그 계정을 찾지 못했어요.";
+                return RedirectToAction(nameof(Index));
+            }
+            if (string.Equals(user.Id, _userManager.GetUserId(User), StringComparison.Ordinal))
+            {
+                TempData["UrMsg"] = "내 계정은 탈퇴 처리할 수 없어요.";
+                return RedirectToAction(nameof(Index));
+            }
+            if (await _userManager.IsInRoleAsync(user, nameof(Roles.SuperAdmin)))
+            {
+                TempData["UrMsg"] = "SuperAdmin 계정은 탈퇴 처리할 수 없어요.";
+                return RedirectToAction(nameof(Index));
             }
 
-            var result = await _userManager.DeleteAsync(user);
+            string name = $"{user.LastName}{user.FirstName}".Trim();
+            try
+            {
+                var wd = new BulletinBoard.DataAccessLayer.ControlWithdraw();
+                var pendingReq = await wd.GetPendingOfAsync(user.Id);   // 탈퇴 요청이 걸려 있으면 같이 처리 표시
+                await wd.DeleteDataAsync(user.Id, user.UserName ?? "");
+                BulletinBoard.DataAccessLayer.ControlWithdraw.DeleteProfileFiles(_env.WebRootPath, user.Id);
 
-            if (result.Succeeded)
-            {
-                return Redirect("/UserRoles/Index");
+                var result = await _userManager.DeleteAsync(user);
+                if (!result.Succeeded)
+                {
+                    TempData["UrMsg"] = "기록은 지웠지만 로그인 계정을 지우지 못해 탈퇴가 끝나지 않았어요: " + string.Join(", ", result.Errors.Select(e => e.Description));
+                    return RedirectToAction(nameof(Index));
+                }
+                if (pendingReq != null)
+                {
+                    try { await wd.SetStatusAsync(pendingReq.Id, "APPROVED", User.Identity?.Name); } catch { }
+                }
+                _ = BulletinBoard.Helpers.DbLogger.LogDebugAsync($"UserRoles Delete by {User.Identity?.Name} → {user.UserName}");
+                TempData["UrMsg"] = $"{name} 님을 탈퇴 처리했어요. 계정과 기록을 모두 지웠어요.";
             }
-            else
+            catch (Exception ex)
             {
-                return BadRequest(ModelState);
+                TempData["UrMsg"] = "탈퇴 처리하지 못했어요: " + ex.Message;
             }
+            return RedirectToAction(nameof(Index));
         }
         public async Task<IActionResult> ImpersonateUser(string userId)
         {

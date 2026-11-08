@@ -172,16 +172,6 @@ namespace BulletinBoard.Controllers
         }
 
         // wwwroot/images/profile/{userId}.{확장자}
-        private void DeleteProfileFiles(string userId)
-        {
-            try
-            {
-                var dir = Path.Combine(_env.WebRootPath, "images", "profile");
-                if (!Directory.Exists(dir) || string.IsNullOrWhiteSpace(userId)) return;
-                foreach (var f in Directory.GetFiles(dir, userId + ".*"))
-                    System.IO.File.Delete(f);
-            }
-            catch { /* 파일 삭제 실패는 탈퇴 자체를 막지 않는다 */ }
-        }
+        private void DeleteProfileFiles(string userId) => ControlWithdraw.DeleteProfileFiles(_env.WebRootPath, userId);
     }
 }

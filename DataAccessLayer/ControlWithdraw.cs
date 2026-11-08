@@ -352,6 +352,19 @@ namespace BulletinBoard.DataAccessLayer
         /// 이 사람의 모든 정보를 한 트랜잭션으로 지운다. [Identity].[User] 와 프로필 사진 파일은 호출한 쪽이 지운다.
         /// 가족팀: 방장이면 남은 구성원 중 먼저 들어온 사람이 이어받고, 아무도 안 남으면 팀을 숨긴다(재시상 방지를 위해 팀 키는 남김).
         /// </summary>
+        /// <summary>프로필 사진 파일 지우기 — wwwroot/images/profile/{userId}.{확장자}. 실패해도 삭제를 막지 않는다</summary>
+        public static void DeleteProfileFiles(string webRootPath, string userId)
+        {
+            try
+            {
+                var dir = System.IO.Path.Combine(webRootPath, "images", "profile");
+                if (!System.IO.Directory.Exists(dir) || string.IsNullOrWhiteSpace(userId)) return;
+                foreach (var f in System.IO.Directory.GetFiles(dir, userId + ".*"))
+                    System.IO.File.Delete(f);
+            }
+            catch { }
+        }
+
         public async Task DeleteDataAsync(string userId, string userName)
         {
             using (var conn = new SqlConnection(DataAccessModule.connectionString_Server))

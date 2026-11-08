@@ -110,6 +110,10 @@
     <div class="qb-k">USER ROLES · S</div>
     <h1 class="qb-h1">사용자 권한<small id="urCount">@(users.Count)명</small></h1>
     <div class="qb-sub">사람을 누르면 연락처와 버튼이 펼쳐져요</div>
+    @if (TempData["UrMsg"] is string urMsg && urMsg.Length > 0)
+    {
+        <div role="status" style="margin-top:12px;padding:11px 14px;border-radius:12px;background:var(--soft);color:var(--blue);font-size:13.5px;font-weight:700">@urMsg</div>
+    }
 
     <div class="ur-tools">
         <label class="ur-srch">
@@ -183,7 +187,7 @@
                     <div class="ur-acts">
                         <a class="ur-btn p" href="/UserRoles/Manage?userId=@user.UserId">권한 관리</a>
                         <button type="button" class="ur-btn" data-imp="@user.UserId" data-name="@name">이 사람으로 보기</button>
-                        <button type="button" class="ur-btn d" data-del="@user.UserId" data-name="@name">계정 삭제</button>
+                        <button type="button" class="ur-btn d" data-del="@user.UserId" data-name="@name">탈퇴</button>
                     </div>
                 </div>
             </div>
@@ -196,6 +200,12 @@
         <span><a href="/HumanResource/ManageUserInfo#role">정보 관리</a><a href="#" onclick="history.back(); return false;">뒤로</a><a href="/">@ConstatsCommon.ToHome</a></span>
     </div>
 </div>
+
+<!-- 탈퇴는 POST (탈퇴 승인과 같은 범위로 지운다) -->
+<form id="urDelForm" method="post" action="/UserRoles/Delete" style="display:none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="userId" id="urDelId" />
+</form>
 
 <!-- 화면 안 확인창 -->
 <div class="qb-pop" id="urPop">
@@ -255,7 +265,7 @@
                 $('urPop').style.display = 'none';
                 $('waitText').textContent = waitText;
                 $('loadingOverlay').classList.add('on');
-                location.href = url;
+                if (typeof url === 'function') url(); else location.href = url;
             };
         }
         $('urPopN').onclick = () => $('urPop').style.display = 'none';
@@ -265,8 +275,11 @@
             if (hd) { hd.parentElement.classList.toggle('open'); return; }
             const del = e.target.closest('[data-del]');
             if (del) {
-                ask('계정을 삭제할까요?', '<b>' + esc(del.dataset.name) + '</b> 님의 계정을 지워요.<br>지운 계정은 되돌릴 수 없어요.', '삭제', '삭제하는 중이에요',
-                    '/UserRoles/Delete?userId=' + encodeURIComponent(del.dataset.del));
+                ask('탈퇴 처리할까요?',
+                    '<b>' + esc(del.dataset.name) + '</b> 님의 계정과 기록을 모두 지워요.<br>' +
+                    '반 · 출석 · 미션 · 성경 읽기 · 선물 · 가족팀 · 접속 기록 · 프로필 사진까지 탈퇴와 같이 지워져요.<br>' +
+                    '되돌릴 수 없어요.', '탈퇴', '탈퇴 처리하는 중이에요',
+                    function () { $('urDelId').value = del.dataset.del; $('urDelForm').submit(); });
                 return;
             }
             const imp = e.target.closest('[data-imp]');
