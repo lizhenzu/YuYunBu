@@ -29,7 +29,7 @@
             '<form class="box" method="post" action="/FamilyTeam/Apply" id="' + name + '"' + conf + '>' +
             '<input type="hidden" name="__RequestVerificationToken" value="' + esc(tokenEl ? tokenEl.value : '') + '" />' +
             '<input type="hidden" name="teamId" value="' + esc(h.teamId) + '" />' +
-            '<input type="hidden" name="type" value="' + esc(root.dataset.mode || 'FAMILY') + '" />' +
+            '<input type="hidden" name="type" value="' + esc(root.dataset.mode === 'ALL' ? (h.teamType || 'FAMILY') : (root.dataset.mode || 'FAMILY')) + '" />' +
             (h.teamType === 'FRIEND' ? '' : '<div class="ft-q" style="margin-top:0">나는 이 팀의…</div><div class="ft-chips">' + chips + '</div>') + warn +
             '<div style="margin-top:12px"><button class="ft-btn p w" type="submit">신청 보내기</button></div>' +
             '</form></details>';
@@ -37,6 +37,7 @@
 
     function row(h) {
         var mode = root.dataset.mode || 'FAMILY';
+        if (mode === 'ALL') mode = h.teamType || 'ALL';   // 참가 화면 — 가족팀 · 친구팀 모두 찾는다
         var friendMode = mode === 'FRIEND';
         var kind = h.teamType === 'FRIEND' ? '친구팀' : '가족팀';
         var info = '', action = '';
@@ -73,9 +74,10 @@
     function emptyBox(v) {
         var url = root.dataset.createUrl || '';
         if (!url) return '<div class="ft-empty">찾은 사람이 없어요.</div>';   // 팀이 있는 화면(초대 찾기) — 만들기로 이어 주지 않는다
-        var word = (root.dataset.mode === 'FRIEND') ? '친구팀' : '가족팀';
-        var who = (root.dataset.mode === 'FRIEND') ? '친구가' : '가족이';
-        var btn = (url && !blocked) ? '<a class="ft-btn p w" href="' + esc(url) + '" style="margin-top:14px">내 ' + word + ' 만들기</a>' : '';
+        var all = root.dataset.mode === 'ALL';
+        var word = all ? '팀' : (root.dataset.mode === 'FRIEND') ? '친구팀' : '가족팀';
+        var who = all ? '찾는 사람이' : (root.dataset.mode === 'FRIEND') ? '친구가' : '가족이';
+        var btn = (url && !blocked) ? '<a class="ft-btn p w" href="' + esc(url) + '" style="margin-top:14px">새 ' + word + ' 만들기</a>' : '';
         return '<div class="ft-empty">"' + esc(v) + '" 님이 속한 팀이 없어요.' + (url ? '<br>' + who + ' 아직 팀을 만들지 않았나 봐요.' : '') + btn + '</div>';
     }
 
