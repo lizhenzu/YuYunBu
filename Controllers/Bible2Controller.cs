@@ -933,7 +933,7 @@ public class Bible2Controller : Controller
         var myId = GetCurrentUserId();
 
         // 본인만 접근 가능
-        if (string.IsNullOrWhiteSpace(userId) || myId != userId)
+        if (!CanResetFor(myId, userId))
             return Forbid();
 
         // 이름 조회
@@ -958,6 +958,7 @@ public class Bible2Controller : Controller
         int totalVerses = await _db.EBibles.CountAsync();
 
         ViewBag.UserId      = userId;
+        ViewBag.ByAdmin     = myId != userId;   // 관리자가 대신 처리하는 중
         ViewBag.UserName    = userName;
         ViewBag.FullName    = fullName;
         ViewBag.ReadCount   = readCount;
@@ -973,7 +974,7 @@ public class Bible2Controller : Controller
     public async Task<IActionResult> ResetProgress(string userId, [FromForm] string dummy = "")
     {
         var myId = GetCurrentUserId();
-        if (string.IsNullOrWhiteSpace(userId) || myId != userId)
+        if (!CanResetFor(myId, userId))
             return Forbid();
 
         // UserName 조회
@@ -1061,6 +1062,13 @@ public class Bible2Controller : Controller
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error() =>
         View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+
+    /// <summary>완독 처리(홈 "숨기기") — 본인, 또는 관리자(SuperAdmin 역할 · Basic 계정)가 대신 할 수 있다</summary>
+    private bool CanResetFor(string myId, string userId)
+        => !string.IsNullOrWhiteSpace(userId)
+           && (myId == userId
+               || User.IsInRole("SuperAdmin")
+               || string.Equals(User.Identity?.Name, "Basic", StringComparison.OrdinalIgnoreCase));
 
     private string GetCurrentUserId()
     {
