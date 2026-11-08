@@ -55,9 +55,12 @@ namespace BulletinBoard.Controllers
 
         // GET: /FamilyTeam  — 팀이 있으면 우리 가족팀, 없으면 팀 만들기 · 찾기
         [HttpGet]
-        public async Task<IActionResult> Index(string? type = null, bool create = false)
+        public async Task<IActionResult> Index(string? type = null, string? create = null)
         {
-            ViewBag.Create = create;   // true = "내 팀 만들기" 단계 (먼저 이름으로 찾고, 없으면 여기로)
+            // "내 팀 만들기" 단계 (먼저 이름으로 찾고, 없으면 여기로). ?create=1 · true 둘 다 받는다 —
+            // bool 로 받으면 "1" 을 못 읽어 눌러도 같은 화면이 다시 떴다.
+            ViewBag.Create = string.Equals(create, "1", StringComparison.Ordinal)
+                          || string.Equals(create, "true", StringComparison.OrdinalIgnoreCase);
             ViewBag.Msg = TempData["FamilyMsg"] as string;
             ViewBag.MsgOk = TempData["FamilyMsgOk"] is bool b && b;
             ViewBag.Relations = FamilyTeamService.Relations;
