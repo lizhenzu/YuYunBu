@@ -84,22 +84,48 @@
         .join a { color: var(--blue); font-weight: 800; margin-left: 4px; }
         .foot { margin-top: auto; padding-top: 28px; text-align: center; font-size: 11.5px; color: var(--dim2); }
         :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+        /* 관리자로 로그인 (2026-11-08 시안 확정) */
+        :root { --adm: #334155; --admDk: #1E293B; --admSoft: #EEF1F5; }
+        .admRow { text-align: center; }
+        .admBtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 12px; font-weight: 700; color: var(--dim); cursor: pointer; }
+        .admBtn:hover { color: var(--adm); border-color: #CBD5E1; }
+        .admBtn svg, .who svg { width: 14px; height: 14px; flex: 0 0 auto; }
+        .who { display: none; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--admSoft); font-size: 13px; color: var(--adm); font-weight: 700; }
+        .who svg { width: 18px; height: 18px; }
+        .admBack { display: none; margin-top: 14px; text-align: center; font-size: 13px; }
+        .admBack button { border: 0; background: none; color: var(--blue); font-weight: 800; cursor: pointer; padding: 4px 8px; }
+        .mark .lock { display: none; }
+        /* 관리자 모드 — 아이디 칸 · 구경하기 · 회원가입 · 관리자 버튼을 숨기고 비밀번호만 */
+        body.adm .mark { background: var(--admSoft); }
+        body.adm .mark .cross { display: none; }
+        body.adm .mark .lock { display: block; }
+        body.adm .kk { color: var(--adm); }
+        body.adm .idBox, body.adm .or, body.adm .guestBtn, body.adm .join, body.adm .admRow, body.adm .nrm { display: none; }
+        body.adm .who { display: flex; }
+        body.adm .admBack { display: block; }
+        body.adm .btn.pri { background: var(--adm); }
+        body.adm .btn.pri:hover { background: var(--admDk); }
+        body.adm .in:focus { box-shadow: inset 0 0 0 2px var(--adm); }
+        .admOnly { display: none; }
+        body.adm .admOnly { display: inline; }
     </style>
 </head>
-<body>
+<body class="@(Model.AdminMode ? "adm" : "")">
 <div class="pz">
 
     <div class="bar">
-        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span>로그인</span>
+        <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><span class="nrm">로그인</span><span class="admOnly">관리자 로그인</span></span>
     </div>
     <div class="prog"></div>
 
     <div class="mark" aria-hidden="true">
-        <svg viewBox="0 0 28 28" fill="none" stroke="#2F80ED" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v20M7 11h14" /></svg>
+        <svg class="cross" viewBox="0 0 28 28" fill="none" stroke="#2F80ED" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v20M7 11h14" /></svg>
+        <svg class="lock" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
     </div>
-    <div class="kk">@church</div>
-    <h1 class="h1">반가워요, 로그인해 주세요</h1>
-    <div class="sub">로그인하면 출석, 미션, 기도 기록을 이어서 볼 수 있어요.</div>
+    <div class="kk"><span class="nrm">@church</span><span class="admOnly">관리자</span></div>
+    <h1 class="h1"><span class="nrm">반가워요, 로그인해 주세요</span><span class="admOnly">관리자 비밀번호를 넣어 주세요</span></h1>
+    <div class="sub"><span class="nrm">로그인하면 출석, 미션, 기도 기록을 이어서 볼 수 있어요.</span><span class="admOnly">아이디는 넣지 않아도 돼요.</span></div>
 
     <form id="account" method="post" class="fm" autocomplete="off">
         @if (Request.Query["stale"] == "1")
@@ -109,7 +135,14 @@
         @* 입력 오류가 어떤 것이든 말없이 지나가지 않도록 전체 오류를 보여 준다 *@
         <div asp-validation-summary="All" class="errBox" role="alert"></div>
 
-        <div>
+        @* 관리자 모드 표시 — 아이디는 서버가 채운다 *@
+        <input type="hidden" name="AdminMode" id="AdminMode" value="@(Model.AdminMode ? "true" : "false")" />
+        <div class="who">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
+            관리자 계정으로 로그인해요
+        </div>
+
+        <div class="idBox">
             @* 아이디(예: Basic)로도 로그인하므로 type="email" 을 쓰지 않는다 — 브라우저가 아이디 입력을 막는다 *@
             <label class="l" for="Input_Email">이메일 또는 아이디</label>
             @* 처음 열면 빈 칸으로 시작한다 — 브라우저가 저장해 둔 로그인 정보를 미리 채우지 않도록 autocomplete 를 끈다 (2026-10-11) *@
@@ -129,24 +162,48 @@
         @* 로그인 정보 기억 칸은 두지 않는다 — 서버가 항상 "기억함"으로 로그인하고(RememberMe 값을 쓰지 않음),
            숨은 칸이 빈 값("")으로 가면 참/거짓 변환 오류로 로그인이 조용히 막힌다 (2026-10-11 수정) *@
 
-        <button type="submit" class="btn pri">로그인</button>
+        <button type="submit" class="btn pri"><span class="nrm">로그인</span><span class="admOnly">관리자로 로그인</span></button>
 
         <div class="or">또는</div>
 
-        <button type="button" class="btn soft" onclick="goGuest()">
+        <button type="button" class="btn soft guestBtn" onclick="goGuest()">
             <span>구경하기<small>회원 정보 없이 둘러보기</small></span>
         </button>
     </form>
 
     <div class="join">아직 회원이 아니신가요?<a href="./Register">회원가입</a></div>
 
+    <div class="admRow">
+        <button type="button" class="admBtn" onclick="setAdmin(true)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+            관리자로 로그인
+        </button>
+    </div>
+    <div class="admBack"><button type="button" onclick="setAdmin(false)">← 일반 로그인으로</button></div>
+
     <div class="foot">@church</div>
 
 </div>
 
 <script>
+    // 관리자로 로그인 — 같은 화면에서 비밀번호 칸만 남긴다. 아이디는 서버가 채운다 (화면 소스에 관리자 아이디가 없다)
+    function setAdmin(on) {
+        document.body.classList.toggle('adm', on);
+        document.getElementById('AdminMode').value = on ? 'true' : 'false';
+        var p = document.getElementById('Input_Password');
+        p.value = '';
+        p.placeholder = on ? '관리자 비밀번호' : '비밀번호';
+        var err = document.querySelector('.errBox');
+        if (err) err.classList.add('validation-summary-valid');   // 바꿀 때 이전 오류 안내는 지운다
+        p.focus();
+    }
+    (function () {   // 관리자 비밀번호가 틀려 다시 그린 화면도 관리자 모드로
+        if (document.body.classList.contains('adm')) document.getElementById('Input_Password').placeholder = '관리자 비밀번호';
+    })();
+
     // 구경하기 — 이전과 같은 guest 계정으로 로그인
     function goGuest() {
+        document.getElementById('AdminMode').value = 'false';
         document.querySelector('input[name="Input.Email"]').value = "guest@gmail.com";
         document.querySelector('input[name="Input.Password"]').value = "1234";
         document.getElementById('account').submit();
