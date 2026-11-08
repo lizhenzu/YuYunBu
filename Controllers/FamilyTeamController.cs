@@ -55,10 +55,14 @@ namespace BulletinBoard.Controllers
 
         // GET: /FamilyTeam  — 팀이 있으면 우리 가족팀, 없으면 팀 만들기 · 찾기
         [HttpGet]
-        public async Task<IActionResult> Index(string? type = null, string? create = null)
+        public async Task<IActionResult> Index(string? type = null, string? create = null, string? step = null)
         {
-            // "내 팀 만들기" 단계 (먼저 이름으로 찾고, 없으면 여기로). ?create=1 · true 둘 다 받는다 —
-            // bool 로 받으면 "1" 을 못 읽어 눌러도 같은 화면이 다시 떴다.
+            // 팀이 없을 때의 흐름 (2026-11-08)
+            //   1단계 (주소에 아무것도 없음) : 아직 소속된 팀이 없어요 → [기존 팀에 참가] / [새 팀 만들기]
+            //   ?step=join                   : 이름으로 팀 찾기 (가족팀 · 친구팀 같이) → 가입 신청
+            //   ?step=make                   : 어떤 팀을 만들까요? (가족팀 / 친구팀)
+            //   ?type=family&create=true     : 관계 고르고 팀 만들기
+            // ?create=1 · true 둘 다 받는다 — bool 로 받으면 "1" 을 못 읽어 눌러도 같은 화면이 다시 떴다.
             ViewBag.Create = string.Equals(create, "1", StringComparison.Ordinal)
                           || string.Equals(create, "true", StringComparison.OrdinalIgnoreCase);
             ViewBag.Msg = TempData["FamilyMsg"] as string;
@@ -87,14 +91,35 @@ namespace BulletinBoard.Controllers
                 ViewBag.IsStudent = isStudent;
                 ViewBag.Invites = await _svc.GetIncomingInvitesAsync(Me);
 
-                // 팀이 없으면 먼저 종류를 고른다. 친구팀은 학생만
+                // 친구팀은 학생만
                 string? mode = NormalizeType(type);
-                if (mode == null || (mode == FamilyTeamService.TypeFriend && !isStudent))
-                    return View("Choose");
+                if (mode == FamilyTeamService.TypeFriend && !isStudent) mode = null;
+                bool wantCreate = ViewBag.Create is bool cr && cr;
+                string st = (step ?? "").Trim().ToLowerInvariant();
 
-                ViewBag.Mode = mode;
-                ViewBag.Teams = await _svc.ListOpenTeamsAsync(Me, mode);
-                return View("Index");
+                // 만들기 — 종류를 정했으면 관계 고르고 만들기, 아직이면 종류부터
+                if (st == "make" || wantCreate)
+                {
+                    if (wantCreate && mode != null)
+                    {
+                        ViewBag.Mode = mode;
+                        ViewBag.PendingTeam = (await _svc.ListOpenTeamsAsync(Me, mode)).FirstOrDefault(t => t.RequestId != 0)?.Name;
+                        return View("Index");
+                    }
+                    return View("MakeType");
+                }
+
+                // 참가 — 이름으로 찾기 (옛 주소 ?type=… 도 여기로)
+                if (st == "join" || mode != null)
+                {
+                    ViewBag.TeamsFamily = await _svc.ListOpenTeamsAsync(Me, FamilyTeamService.TypeFamily);
+                    ViewBag.TeamsFriend = isStudent
+                        ? await _svc.ListOpenTeamsAsync(Me, FamilyTeamService.TypeFriend)
+                        : new List<FamilyTeamBrief>();
+                    return View("Join");
+                }
+
+                return View("Choose");
             }
             catch (Microsoft.Data.SqlClient.SqlException)
             {
