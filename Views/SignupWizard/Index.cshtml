@@ -28,6 +28,14 @@
     string curKind = current?.Kind ?? "";                         // S · T · X(임원 등) · ""(역할 없음 = 학부모)
     string Tag(string k) => change && (curKind == k || (k == "P" && curKind == "")) ? "지금 역할" : "";
 
+    // 역할 변경 첫 화면의 "지금 내 역할" 큰 카드 — 큰 글씨(역할) + 작은 글씨(반 · 설명)
+    string curBig = curKind == "S" ? "학생"
+                  : curKind == "" ? "학부모"
+                  : (string.IsNullOrWhiteSpace(current?.RoleNM) ? (current?.RoleCode ?? "") : current!.RoleNM);
+    string curSub = curKind == "S" ? (current != null && current.ClassYear > 0 && current.ClassBan > 0 ? $"{current.ClassYear}학년 {current.ClassBan}반" : "반 정보 없음")
+                  : curKind == "" ? "역할 없음"
+                  : "";
+
     // 신청 내용 한 줄 — 비어 있는 값은 빼고 보여 준다 (역할만 정한 신청이면 "더 입력한 정보 없음")
     string SignupDetailText(SignupApplication a)
     {
@@ -59,9 +67,22 @@
         .sw-dots { display: flex; gap: 4px; margin: 10px 0 14px; }
         .sw-dots i { flex: 1; height: 4px; border-radius: 2px; background: #E5E8EE; }
         .sw-dots i.on { background: #2F7BF5; }
-        .sw-opt { display: block; width: 100%; text-align: left; padding: 14px 16px; margin-bottom: 8px; border: 1px solid #E1E5EB; border-radius: 12px; background: #fff; font: inherit; cursor: pointer; }
+        .sw-opt { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 14px 16px; margin-bottom: 8px; border: 1px solid #E1E5EB; border-radius: 12px; background: #fff; font: inherit; cursor: pointer; }
+        .sw-opt .t { flex: 1; min-width: 0; }
         .sw-opt b { font-size: 16px; }
         .sw-opt small { margin-left: 6px; color: #8A93A0; font-size: 12.5px; }
+        .sw-opt .t small { display: block; margin: 2px 0 0; }
+        .sw-opt.cur { background: #F5F9FF; border: 1.5px dashed #9CC0F7; }
+        .tagnow { flex: none; padding: 4px 11px; border-radius: 999px; background: #2F7BF5; color: #fff; font-size: 12px; font-weight: 800; }
+        /* 역할 변경 첫 화면: 지금 내 역할 큰 카드 */
+        .sw-now { margin-top: 16px; border-radius: 18px; padding: 18px 20px; background: #2F7BF5; color: #fff; }
+        .sw-now.gray { background: #6B7686; }
+        .sw-now small { display: block; margin: 0; font-size: 13px; font-weight: 700; opacity: .9; color: #fff; letter-spacing: .02em; }
+        .sw-now b { display: block; margin-top: 4px; font-size: 28px; font-weight: 800; letter-spacing: -.02em; }
+        .sw-now em { display: block; margin-top: 2px; font-style: normal; font-size: 14.5px; opacity: .95; }
+        .sw-lab { margin: 18px 2px 8px; font-size: 14px; font-weight: 800; color: #374151; }
+        .sw-foot { margin: 6px 0 12px; font-size: 12.5px; color: #8A93A0; text-align: center; line-height: 1.6; }
+        .sw-quit { display: block; margin-top: 12px; padding: 14px 0; border: 1px solid #E5E8EE; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; color: #6B7280; text-decoration: none; background: #fff; }
         .sw-opt.on { border: 2px solid #2F7BF5; background: #EAF2FD; }
         .sw-opt.off { opacity: .5; cursor: not-allowed; }
         .sw-f { margin-bottom: 12px; }
@@ -200,15 +221,25 @@
                 <div class="sw-dots"></div>
                 @if (change)
                 {
-                    <div class="qb-sub">@fullName 님의 지금 역할은 <b>@current?.Label</b>이에요. 바꿀 역할을 고르면 필요한 것만 다시 물어볼게요. 관리자가 승인하면 바뀌어요.</div>
+                    @* 지금 역할을 맨 위 큰 카드로 — 2026-11-08 A안 (이모지 없이 글자 크기와 색으로) *@
+                    <div class="sw-now @(curKind == "" ? "gray" : "")">
+                        <small>지금 내 역할</small>
+                        <b>@curBig</b>
+                        @if (curSub.Length > 0) { <em>@curSub</em> }
+                    </div>
+                    <div class="sw-lab">바꿀 역할을 골라 주세요</div>
                 }
                 else
                 {
                     <div class="qb-sub">@fullName 님, 고르면 필요한 것만 차례로 물어볼게요.</div>
                 }
-                <button type="button" class="sw-opt" data-role="S"><b>학생</b><small>유년부 어린이 @Tag("S")</small></button>
-                <button type="button" class="sw-opt" data-role="T"><b>교사</b><small>선생님 @Tag("T")</small></button>
-                <button type="button" class="sw-opt" data-role="P"><b>학부모</b><small>어린이의 부모님 @Tag("P")</small></button>
+                <button type="button" class="sw-opt @(Tag("S").Length > 0 ? "cur" : "")" data-role="S"><span class="t"><b>학생</b><small>@(Tag("S").Length > 0 ? "반이나 정보만 고칠 때" : "유년부 어린이")</small></span>@if (Tag("S").Length > 0) { <span class="tagnow">지금</span> }</button>
+                <button type="button" class="sw-opt @(Tag("T").Length > 0 ? "cur" : "")" data-role="T"><span class="t"><b>교사</b><small>선생님</small></span>@if (Tag("T").Length > 0) { <span class="tagnow">지금</span> }</button>
+                <button type="button" class="sw-opt @(Tag("P").Length > 0 ? "cur" : "")" data-role="P"><span class="t"><b>학부모</b><small>어린이의 부모님</small></span>@if (Tag("P").Length > 0) { <span class="tagnow">지금</span> }</button>
+                @if (change)
+                {
+                    <div class="sw-foot">관리자가 승인하면 바뀌어요. 그 전에는 지금 역할 그대로예요.</div>
+                }
             </div>
 
             @* 2) 같은 이름 확인 (학생 · 교사, 같은 이름이 있을 때만) *@
@@ -222,10 +253,10 @@
                     bool linked = !string.IsNullOrEmpty(p.UserName);
                     string cls = p.ClassYear > 0 && p.ClassBan > 0 ? $"{p.ClassYear}학년 {p.ClassBan}반" : "반 정보 없음";
                     <button type="button" class="sw-opt @(linked ? "off" : "")" data-person="@p.PersonId" disabled="@linked">
-                        <b>@p.FullName · @cls</b><small>@(linked ? "이미 다른 계정과 연결됨" : "이 사람이 저예요")</small>
+                        <span class="t"><b>@p.FullName · @cls</b><small>@(linked ? "이미 다른 계정과 연결됨" : "이 사람이 저예요")</small></span>
                     </button>
                 }
-                <button type="button" class="sw-opt" data-person="0"><b>위 사람들과 달라요</b><small>동명이인 — 새로 등록</small></button>
+                <button type="button" class="sw-opt" data-person="0"><span class="t"><b>위 사람들과 달라요</b><small>동명이인 — 새로 등록</small></span></button>
             </div>
 
             @* 학생 · 교사: 더 입력할지 고르기 — "역할만"을 고르면 바로 확인으로 (2026-11-08) *@
@@ -234,8 +265,8 @@
                 <h1 class="qb-h1">자세한 정보도 적을까요?</h1>
                 <div class="sw-dots"></div>
                 <div class="qb-sub">지금은 역할만 정하고 끝내도 돼요. 자세한 정보는 나중에 관리자가 채울 수 있어요.</div>
-                <button type="button" class="sw-opt" data-detail="false"><b>역할만 정하고 끝내기</b><small id="moreOnly"></small></button>
-                <button type="button" class="sw-opt" data-detail="true"><b>더 입력하기</b><small id="moreMore"></small></button>
+                <button type="button" class="sw-opt" data-detail="false"><span class="t"><b>역할만 정하고 끝내기</b><small id="moreOnly"></small></span></button>
+                <button type="button" class="sw-opt" data-detail="true"><span class="t"><b>더 입력하기</b><small id="moreMore"></small></span></button>
             </div>
 
             @* 3) 학생: 학년 · 반 *@
@@ -302,6 +333,11 @@
                 <button type="button" class="p" id="swNext">다음</button>
             </div>
         </form>
+
+        @if (change)
+        {
+            <a class="sw-quit" href="/HumanResource/ManageUserInfo?UserId=@ViewData["MyId"]">그만두고 돌아가기</a>
+        }
 
         <div class="qb-ft">
             <span>@(change ? "역할 변경" : "가입 마무리")</span>
