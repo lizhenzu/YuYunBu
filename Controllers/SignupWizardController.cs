@@ -54,6 +54,23 @@ namespace BulletinBoard.Controllers
             return (years.ToList(), bans.ToList());
         }
 
+        private string DeptNameFromSession()
+        {
+            try
+            {
+                var key = BulletinBoard.Common.CommonMetaDataCategory.DepartmentName.ToString();
+                var dept = HttpContext.Session.GetString(key);
+                if (string.IsNullOrEmpty(dept))
+                {
+                    foreach (var m in new BulletinBoard.BusinessLayer.ManageeCommon().getCommonMetaData())
+                        HttpContext.Session.SetString(m.Kind.ToString(), m.KindDesc);
+                    dept = HttpContext.Session.GetString(key);
+                }
+                return dept ?? "";
+            }
+            catch { return ""; }
+        }
+
         // ── 회원: 마법사 ──────────────────────────────────────────────
         [HttpGet]
         /// <param name="change">true = 정보 관리의 "역할 변경"으로 들어옴 (승인된 뒤에도 다시 신청할 수 있다)</param>
@@ -73,7 +90,9 @@ namespace BulletinBoard.Controllers
 
             var fullName = FullNameOf(me);
             ViewData["FullName"] = fullName;
-            ViewData["MyId"] = me.Id;             // 대기 화면 "나의 정보" 버튼 주소에 쓴다
+            // 화면 맨 위 인사 — "안녕하세요 / ○○님 / 유년부에 오심을 환영해요" (홈 · 가족팀 화면과 같은 문구)
+            ViewData["HiDept"] = DeptNameFromSession();
+            ViewData["MyId"] = me.Id;           // 대기 화면 "나의 정보" 버튼 주소에 쓴다
             ViewData["Change"] = change;
             ViewData["Current"] = change ? await _db.GetCurrentRoleAsync(me.UserName ?? "") : null;
             ViewData["ReturnUrl"] = SafeUrl(returnUrl);
