@@ -674,6 +674,59 @@ ORDER BY r.CreatedAt;";
             catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("수락하지 못했어요. 잠시 후 다시 시도해 주세요. (" + ex.Message + ")"); }
         }
 
+        /// <summary>
+        /// 관리자(SuperAdmin)가 팀원 대신 가입 신청을 수락한다 — 팀원 확인 외의 검사(이미 다른 팀 · 정원 · 팀 존재)는 똑같이 한다.
+        /// 초대(Kind='I')는 초대받은 본인이 수락해야 하므로 여기서 받지 않는다.
+        /// </summary>
+        public async Task<FamilyTeamResult> AdminAcceptRequestAsync(int teamId, int requestId)
+        {
+            using var c = Conn();
+            using var tx = await BeginAsync(c);
+            try
+            {
+                var r = await ReadRequestAsync(c, tx, requestId);
+                if (r == null || r.Kind != "R" || r.TeamId != teamId) return Rollback(tx, "이미 처리됐거나 사라진 신청이에요.");
+                if (!TryRelation(r.RelationKey, out _, out _))
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("없어진 관계로 들어온 신청이라 지웠어요. 다시 신청해 달라고 해 주세요.");
+                }
+                if (await HasActiveMembershipAsync(c, tx, r.Target))
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("그분은 그사이 다른 팀에 들어갔어요. 신청을 지웠어요.");
+                }
+                if (await TeamTypeOfAsync(c, tx, r.TeamId) == TypeFriend && await ActiveCountAsync(c, tx, r.TeamId) >= FriendCapacity)
+                {
+                    await Cmd(c, tx, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i;", ("@i", requestId)).ExecuteNonQueryAsync();
+                    tx.Commit();
+                    return FamilyTeamResult.Fail("친구팀은 2명까지예요. 정원이 찼어요.");
+                }
+                if (await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t AND IsActive=1;", ("@t", r.TeamId)) == 0)
+                    return Rollback(tx, "이 팀은 사용 중이 아니에요.");
+
+                await InsertMemberAsync(c, tx, r.TeamId, r.Target, r.RelationKey);
+                string teamName = await ScalarAsync<string>(c, tx, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", r.TeamId)) ?? "";
+                await ClearPendingOfAsync(c, tx, r.Target);
+                await ClearPendingIfFullAsync(c, tx, r.TeamId);
+                await Cmd(c, tx, "INSERT INTO dbo.DM2_FamilyNotice (UserName, FamilyTeamId, TeamName, Kind, CreatedAt) VALUES (@u,@t,@n,'JOINED',@now);",
+                    ("@u", r.Target), ("@t", r.TeamId), ("@n", teamName), ("@now", DateHelper.GetKoreaNow())).ExecuteNonQueryAsync();
+                tx.Commit();
+                return FamilyTeamResult.Success("수락했어요. 새 팀원이 들어왔어요.");
+            }
+            catch (Exception ex) { TryRollback(tx); return FamilyTeamResult.Fail("수락하지 못했어요. (" + ex.Message + ")"); }
+        }
+
+        /// <summary>관리자가 이 팀의 가입 신청 · 초대 한 건을 지운다(거절 · 취소)</summary>
+        public async Task<bool> AdminRemoveRequestAsync(int teamId, int requestId)
+        {
+            using var c = Conn();
+            await c.OpenAsync();
+            return await Cmd(c, null, "DELETE FROM dbo.DM2_FamilyRequest WHERE Id=@i AND FamilyTeamId=@t;", ("@i", requestId), ("@t", teamId)).ExecuteNonQueryAsync() > 0;
+        }
+
         /// <summary>팀원이 가입 신청을 거절한다 (신청은 지운다)</summary>
         public async Task<FamilyTeamResult> DeclineRequestAsync(string userName, int requestId)
         {

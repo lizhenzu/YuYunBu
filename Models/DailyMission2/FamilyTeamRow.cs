@@ -31,5 +31,19 @@
         public int? SelectedTeamId { get; set; }
         public FamilyTeamRow? SelectedTeam { get; set; }
         public List<FamilyMemberRow2> Members { get; set; } = new();
+        public List<FamilyRequestRow2> Requests { get; set; } = new();   // 이 팀의 대기 중인 가입 신청 · 초대
+    }
+
+    /// <summary>팀의 대기 중인 가입 신청(R) · 초대(I) 한 건 — 관리자 화면용</summary>
+    public class FamilyRequestRow2
+    {
+        public int Id { get; set; }
+        public string Kind { get; set; } = "";          // R = 가입 신청(신청자 = Target) · I = 초대(초대받은 사람 = Target)
+        public string TargetUserName { get; set; } = "";
+        public string TargetFullName { get; set; } = "";
+        public string FromUserName { get; set; } = "";
+        public string FromFullName { get; set; } = "";
+        public string RelationKey { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
     }
 }

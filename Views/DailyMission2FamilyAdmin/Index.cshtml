@@ -57,6 +57,18 @@
         .fm-row:hover .t b, .fm-row:hover .g { color: var(--blue); }
         .fm-row.off .t b { color: var(--dim); }
         .fm-row.flash { background: var(--soft); transition: background 1.2s; }
+        /* 가입 신청 · 초대 카드 */
+        .fm-req { margin-top: 10px; border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: #FBFCFE; }
+        .fm-req .top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .fm-req .top b { font-size: 16px; font-weight: 800; color: var(--ink); }
+        .fm-req .top small { margin-left: auto; font-size: 12px; color: var(--dim2); }
+        .fm-req .sub { margin-top: 4px; font-size: 13px; color: var(--dim2); line-height: 1.6; }
+        .fm-req .sub b { color: var(--ink); }
+        .fm-req .acts { display: flex; gap: 8px; margin-top: 10px; }
+        .fm-req .acts form { flex: 1; margin: 0; }
+        .fm-req .acts .qb-btn { width: 100%; }
+        .fm-tg.ap { background: #FFF4E0; color: #8A5300; }
+        .fm-tg.iv { background: var(--soft); color: var(--blue); }
         .fm-tg { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--grey); color: var(--dim2); font-size: 10.5px; font-weight: 800; vertical-align: 2px; }
         .fm-tg.role { background: var(--soft); color: var(--blue); }
         .fm-tg.me { background: var(--warnbg); color: var(--warn); }
@@ -216,6 +228,51 @@ else
             <button type="submit" class="qb-btn d fm-out">이 팀 강제 삭제</button>
         </form>
     </div>
+
+    @* ── 대기 중인 가입 신청 · 초대 (관리자가 대신 수락 · 거절) ── *@
+    var reqs = Model.Requests ?? new List<BulletinBoard.Models.DailyMission2.FamilyRequestRow2>();
+    string RelKeyLabel(string k) => BulletinBoard.Services.FamilyTeamService.Relations.FirstOrDefault(x => x.Key == k).Label ?? "";
+    <div class="qb-sec">가입 신청 · 초대 <small>@(reqs.Count > 0 ? reqs.Count + "건 대기 중" : "대기 중인 건 없어요")</small></div>
+    @foreach (var q in reqs)
+    {
+        bool isApply = q.Kind == "R";
+        <div class="fm-req">
+            <div class="top">
+                <b>@(isApply ? q.TargetFullName : q.TargetFullName)</b>
+                <span class="fm-tg @(isApply ? "ap" : "iv")">@(isApply ? "가입 신청" : "초대 보냄")</span>
+                <small>@q.CreatedAt.ToString("M월 d일")</small>
+            </div>
+            <div class="sub">
+                @q.TargetUserName
+                @if (isApply)
+                {
+                    var rl = RelKeyLabel(q.RelationKey);
+                    <text> · 이 팀의 <b>@(string.IsNullOrEmpty(rl) ? "친구" : rl)</b>(으)로 들어오고 싶어요</text>
+                }
+                else
+                {
+                    <text> · @q.FromFullName 님이 초대했어요 (본인이 로그인해서 수락해야 해요)</text>
+                }
+            </div>
+            <div class="acts">
+                <form method="post" action="/DailyMission2FamilyAdmin/RemoveRequest" data-confirm="@(isApply ? "이 가입 신청을 거절할까요?" : "이 초대를 취소할까요?")" data-wait="처리하는 중이에요">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+                    <input type="hidden" name="requestId" value="@q.Id" />
+                    <button type="submit" class="qb-btn g">@(isApply ? "거절" : "초대 취소")</button>
+                </form>
+                @if (isApply)
+                {
+                    <form method="post" action="/DailyMission2FamilyAdmin/AcceptRequest" data-wait="받아 주는 중이에요">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="teamId" value="@team.FamilyTeamId" />
+                        <input type="hidden" name="requestId" value="@q.Id" />
+                        <button type="submit" class="qb-btn p">수락</button>
+                    </form>
+                }
+            </div>
+        </div>
+    }
 
     <div class="qb-sec">구성원 <small>@(activeM.Count)명@(offM.Count > 0 ? $" · 뺀 사람 {offM.Count}명" : "")</small></div>
 
