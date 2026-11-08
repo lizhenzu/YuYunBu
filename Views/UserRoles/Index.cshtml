@@ -4,7 +4,7 @@
 
 @*  ══════════════════════════════════════════════════════════════
     사용자 권한 목록 — 2026-10-04 시안 확정 (DailyMission4 밝은 흰색 · 공용 wwwroot/css/quiz-bright.css)
-    · 번호 줄 목록 → 누르면 연락처 · 가입일 · 버튼이 펼쳐진다
+    · 2026-11-08 반응형 카드로 변경 — 접지 않고 연락처 · 가입일 · 최종 접속 · 버튼을 모두 보여 준다 (휴대폰 1열 ~ PC 4열)
     · 찾기 · Role 칩 · 같은 이름 · 정렬은 화면 안에서(서버 왕복 없음)
     · 권한 관리 · 이 사람으로 보기(가장) · 계정 삭제 주소는 예전 그대로.  삭제 · 가장은 화면 안 확인창 → 대기카드
     · 이전 화면은 Index.cshtml.bak_before_bright
@@ -72,17 +72,22 @@
         .ur-chips button b { font-weight: 800; margin-left: 3px; opacity: .8; }
         .ur-chips .gap { flex: 0 0 1px; background: var(--line); margin: 4px 2px; }
 
-        /* 사용자 줄 */
-        .ur-row { border-bottom: 1px solid var(--line); }
+        /* 넓은 화면에서는 카드가 여러 줄로 놓이도록 이 화면만 폭을 넓힌다 */
+        .qb.ur-wide { max-width: 1280px; }
+
+        /* 사용자 카드 (2026-11-08 시안 확정) — 한 사람 = 카드 한 장, 다 펼쳐서 보여 준다
+           휴대폰 1열 · 태블릿 2열 · PC 3~4열 */
+        .ur-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
+        .ur-row { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 14px 14px 12px; border-radius: 16px; background: #fff; box-shadow: inset 0 0 0 1px #E3E7ED; }
         .ur-row[hidden] { display: none; }
-        .ur-hd { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
-        .ur-hd .n { flex: 0 0 28px; font-size: 13px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+        .ur-hd { display: flex; align-items: flex-start; gap: 10px; }
+        .ur-av { flex: 0 0 40px; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--soft); color: var(--blue); font-size: 16px; font-weight: 800; }
         .ur-hd .t { flex: 1; min-width: 0; }
-        .ur-hd .t b { font-size: 15px; font-weight: 800; color: var(--ink); }
-        .ur-hd .t small { display: block; margin-top: 2px; font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ur-hd .rl { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; max-width: 46%; }
-        .ur-hd .g { flex: 0 0 auto; color: #C7CDD6; font-size: 16px; transition: transform .15s; }
-        .ur-row.open .ur-hd .g { transform: rotate(90deg); color: var(--blue); }
+        .ur-hd .n { display: block; font-size: 11px; font-weight: 800; color: #7FA3DB; font-variant-numeric: tabular-nums; }
+        .ur-hd .t b { font-size: 16px; font-weight: 800; color: var(--ink); word-break: keep-all; }
+        .ur-hd .t .ur-af { margin-top: 5px; }
+        .ur-hd .t .tag { display: block; }
+        .ur-rl { display: flex; gap: 4px; flex-wrap: wrap; }
         .ur-tg { font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 2px 8px; background: var(--grey); color: var(--dim2); white-space: nowrap; }
         .ur-tg.s { background: var(--redbg); color: var(--red); }
         .ur-tg.a { background: var(--soft); color: var(--blue); }
@@ -96,52 +101,47 @@
         .ur-af.of { background: #F3EEFF; color: #7048C8; }
         .ur-af.pa { background: var(--warnbg); color: var(--warn); }
         .ur-af.et { background: var(--grey); color: var(--dim2); }
-        /* 최종 접속 — 오늘·어제는 파랑, 30일 넘으면 흐리게 */
-        .ur-hd .t small.ur-ll { margin-top: 3px; font-size: 11.5px; color: var(--dim2); }
-        .ur-hd .t small.ur-ll.now { color: var(--blue); font-weight: 700; }
-        .ur-hd .t small.ur-ll.old, .ur-hd .t small.ur-ll.none { color: #B0B6C0; }
-        /* 소속 없음 — 연한 노란 배경 + 왼쪽 띠 */
-        .ur-row.noaff { background: #FFF8E6; box-shadow: inset 3px 0 0 #F2B544; }
-        .ur-row.noaff .ur-hd { padding-left: 10px; padding-right: 10px; }
+        /* 최종 접속 — 오늘·어제는 초록, 기록 없음은 빨강, 30일 넘으면 흐리게 */
+        .ur-meta dd.ur-ll.now { color: var(--ok); font-weight: 800; }
+        .ur-meta dd.ur-ll.none { color: var(--red); }
+        .ur-meta dd.ur-ll.old { color: var(--dim); }
+        /* 소속 없음 — 노란 카드 */
+        .ur-row.noaff { background: #FFF8E6; box-shadow: inset 0 0 0 1px #F2C879; }
         .ur-row.noaff .ur-hd .n { color: #C9922B; }
-        .ur-row.noaff .ur-bd { padding-right: 10px; }
+        .ur-row.noaff .ur-av { background: #FFE9BF; color: #A86A12; }
         .ur-af.no { background: #fff; color: #A86A12; box-shadow: inset 0 0 0 1px #F2C879; }
         .ur-chips button.na { background: #FFF1D6; color: #A86A12; }
         .ur-chips button.na.on { background: #E59A1A; color: #fff; }
-        /* 반 없는 학생 — 연한 하늘 배경 + 왼쪽 파란 띠 */
-        .ur-row.nocls { background: #EEF5FF; box-shadow: inset 3px 0 0 #7FA3DB; }
-        .ur-row.nocls .ur-hd { padding-left: 10px; padding-right: 10px; }
-        .ur-row.nocls .ur-bd { padding-right: 10px; }
+        /* 반 없는 학생 — 하늘색 카드 */
+        .ur-row.nocls { background: #EEF5FF; box-shadow: inset 0 0 0 1px #B9D0F2; }
+        .ur-row.nocls .ur-av { background: #DCE9FB; }
         .ur-row.nocls .ur-af.st { background: #fff; box-shadow: inset 0 0 0 1px #B9D0F2; }
         .ur-chips button.nc { background: #E3EEFC; color: #2F6FD0; }
         .ur-chips button.nc.on { background: #2F6FD0; color: #fff; }
         .ur-dup { margin-left: 6px; font-size: 10.5px; font-weight: 800; border-radius: 999px; padding: 1px 7px; background: var(--warnbg); color: var(--warn); vertical-align: 2px; }
 
-        .ur-bd { display: none; padding: 0 0 14px 40px; }
-        .ur-row.open .ur-bd { display: block; }
-        .ur-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--grey); font-size: 13px; }
+        .ur-meta { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 10px; margin: 0; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+        .ur-row.noaff .ur-meta { border-top-color: #F6DDA8; }
+        .ur-row.nocls .ur-meta { border-top-color: #CFE0F7; }
         .ur-meta dt { color: var(--dim2); }
         .ur-meta dd { margin: 0; color: var(--ink); font-weight: 500; word-break: break-all; }
-        .ur-acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-        .ur-btn { border: 0; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; background: var(--grey); color: var(--tx); }
+        .ur-acts { display: flex; gap: 6px; margin-top: auto; padding-top: 2px; }
+        .ur-btn { flex: 1 1 0; min-width: 0; border: 0; border-radius: 999px; padding: 9px 6px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; background: var(--grey); color: var(--tx); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ur-btn.w { flex-grow: 1.5; }
         .qb a.ur-btn.p, .ur-btn.p { background: var(--blue); color: #fff; }
         .ur-btn.d { background: var(--redbg); color: var(--red); }
-        .ur-empty { padding: 36px 0; text-align: center; font-size: 13px; color: var(--dim); }
+        .ur-empty { grid-column: 1 / -1; padding: 36px 0; text-align: center; font-size: 13px; color: var(--dim); }
+        .ur-empty[hidden] { display: none; }
 
         .qb-pop p b { color: #111827; }
         .qb-pop .bt button.d { background: #FDEEEE; color: #D9534F; }
-
-        @@media (max-width: 420px) {
-            .ur-bd { padding-left: 0; }
-            .ur-hd .rl { max-width: 40%; }
-        }
     </style>
 </head>
 <body>
 
 <div class="qb-wait" id="loadingOverlay"><div class="box"><div class="sp"></div><span id="waitText">처리하는 중이에요</span><small>잠시만 기다려 주세요</small></div></div>
 
-<div class="qb">
+<div class="qb ur-wide">
 
     <div class="qb-top">
         <span><a href="/">@ConstatsCommon.ToHome</a><span class="sep">·</span><a href="/HumanResource/ManageUserInfo#role">정보 관리</a><span class="sep">›</span>사용자 권한</span>
@@ -150,7 +150,7 @@
 
     <div class="qb-k">USER ROLES · S</div>
     <h1 class="qb-h1">사용자 권한<small id="urCount">@(users.Count)명</small></h1>
-    <div class="qb-sub">사람을 누르면 연락처와 버튼이 펼쳐져요</div>
+    <div class="qb-sub">한 사람당 카드 한 장 — 연락처와 버튼까지 모두 펼쳐 보여요</div>
     @if (TempData["UrMsg"] is string urMsg && urMsg.Length > 0)
     {
         <div role="status" style="margin-top:12px;padding:11px 14px;border-radius:12px;background:var(--soft);color:var(--blue);font-size:13.5px;font-weight:700">@urMsg</div>
@@ -179,10 +179,11 @@
             <span class="gap"></span>
             <button type="button" class="on" data-s="name">이름순</button>
             <button type="button" data-s="date">최근 가입순</button>
+            <button type="button" data-s="last">최근 접속순</button>
         </div>
     </div>
 
-    <div id="urRows">
+    <div id="urRows" class="ur-grid">
         @foreach (var user in users)
         {
             no++;
@@ -199,41 +200,39 @@
                  data-dup="@(dc > 1 ? "1" : "0")"
                  data-kind="@KindOf(user)"
                  data-name="@Norm(name)"
-                 data-date="@sortDate">
-                <button type="button" class="ur-hd">
-                    <span class="n">@no.ToString("00")</span>
+                 data-date="@sortDate"
+                 data-last="@(user.LastAccessAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "")">
+                <div class="ur-hd">
+                    <span class="ur-av" aria-hidden="true">@(name.Length > 0 ? name.Substring(0, 1) : "?")</span>
                     <span class="t">
+                        <span class="n">@no.ToString("00")</span>
                         <b>@name</b>@if (dc > 1) {<span class="ur-dup">같은 이름 @dc</span>}
-                        <small><span class="ur-af @KindOf(user)">@AffText(user)</span>@user.Email</small>
-                        <small class="ur-ll @LastCls(user.LastAccessAt)" title="@(user.LastAccessAt?.ToString("yyyy-MM-dd HH:mm") ?? "")">최종 접속 · @LastText(user.LastAccessAt)</small>
+                        <span class="tag"><span class="ur-af @KindOf(user)">@AffText(user)</span></span>
                     </span>
-                    <span class="rl">
-                        @if (roles.Count == 0)
+                </div>
+                <div class="ur-rl">
+                    @if (roles.Count == 0)
+                    {
+                        <span class="ur-tg none">Role 없음</span>
+                    }
+                    else
+                    {
+                        foreach (var r in roles)
                         {
-                            <span class="ur-tg none">Role 없음</span>
+                            <span class="ur-tg @RoleCls(r)">@r</span>
                         }
-                        else
-                        {
-                            foreach (var r in roles)
-                            {
-                                <span class="ur-tg @RoleCls(r)">@r</span>
-                            }
-                        }
-                    </span>
-                    <span class="g">›</span>
-                </button>
-                <div class="ur-bd">
-                    <dl class="ur-meta">
-                        <dt>소속</dt><dd>@(NoAff(user) ? "소속 없음 — 반 배정 · 교사 배정 · 승인된 역할이 없어요" : user.AffLabel)</dd>
-                        <dt>이메일</dt><dd>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</dd>
-                        <dt>연락처</dt><dd>@(string.IsNullOrWhiteSpace(user.PhoneNumber) ? "-" : user.PhoneNumber)</dd>
-                        <dt>가입일</dt><dd>@(user.InsertDT?.ToString("yyyy. MM. dd") ?? "-")</dd>
-                    </dl>
-                    <div class="ur-acts">
-                        <a class="ur-btn p" href="/UserRoles/Manage?userId=@user.UserId">권한 관리</a>
-                        <button type="button" class="ur-btn" data-imp="@user.UserId" data-name="@name">이 사람으로 보기</button>
-                        <button type="button" class="ur-btn d" data-del="@user.UserId" data-name="@name">탈퇴</button>
-                    </div>
+                    }
+                </div>
+                <dl class="ur-meta">
+                    <dt>이메일</dt><dd>@(string.IsNullOrWhiteSpace(user.Email) ? "-" : user.Email)</dd>
+                    <dt>연락처</dt><dd>@(string.IsNullOrWhiteSpace(user.PhoneNumber) ? "-" : user.PhoneNumber)</dd>
+                    <dt>가입일</dt><dd>@(user.InsertDT?.ToString("yyyy. MM. dd") ?? "-")</dd>
+                    <dt>최종 접속</dt><dd class="ur-ll @LastCls(user.LastAccessAt)" title="@(user.LastAccessAt?.ToString("yyyy-MM-dd HH:mm") ?? "")">@LastText(user.LastAccessAt)</dd>
+                </dl>
+                <div class="ur-acts">
+                    <a class="ur-btn p" href="/UserRoles/Manage?userId=@user.UserId">권한 관리</a>
+                    <button type="button" class="ur-btn w" data-imp="@user.UserId" data-name="@name">이 사람으로 보기</button>
+                    <button type="button" class="ur-btn d" data-del="@user.UserId" data-name="@name">탈퇴</button>
                 </div>
             </div>
         }
@@ -276,7 +275,9 @@
             const q = $('urSearch').value.trim().toLowerCase();
             const sorted = rows.slice().sort((a, b) => s === 'name'
                 ? a.dataset.name.localeCompare(b.dataset.name, 'ko')
-                : b.dataset.date.localeCompare(a.dataset.date));
+                : s === 'last'
+                    ? b.dataset.last.localeCompare(a.dataset.last) || a.dataset.name.localeCompare(b.dataset.name, 'ko')
+                    : b.dataset.date.localeCompare(a.dataset.date));
             let shown = 0;
             sorted.forEach(r => {
                 let ok = !q || r.dataset.filter.includes(q);
@@ -317,8 +318,6 @@
         $('urPopN').onclick = () => $('urPop').style.display = 'none';
 
         wrap.addEventListener('click', e => {
-            const hd = e.target.closest('.ur-hd');
-            if (hd) { hd.parentElement.classList.toggle('open'); return; }
             const del = e.target.closest('[data-del]');
             if (del) {
                 ask('탈퇴 처리할까요?',
