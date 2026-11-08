@@ -21,7 +21,7 @@
     function applyForm(h) {
         var name = 'ftRel' + (++formNo);
         var chips = rels.map(function (r, i) {
-            return '<label><input type="radio" name="relation" value="' + esc(r.k) + '" required /><span>' + esc(r.l) + '</span></label>';
+            return '<label><input type="radio" name="relation" value="' + esc(r.k) + '" required' + (rels.length === 1 ? ' checked' : '') + ' /><span>' + esc(r.l) + '</span></label>';
         }).join('');
         var warn = solo ? '<div class="ft-mem" style="margin-top:8px;color:var(--red)">신청하면 내가 만든 "' + esc(solo) + '"은 바로 삭제돼요.</div>' : '';
         var conf = solo ? ' data-confirm="' + esc(h.teamName + '에 가입 신청할까요?|내가 만든 "' + solo + '"은 바로 삭제돼요.|신청') + '"' : '';
@@ -53,7 +53,9 @@
         } else if (h.state === 'invited') {
             action = '<span class="ft-btn g">초대 보냄</span>';
         } else if (h.state === 'ok') {
-            if (canInvite && (!friendMode || h.isStudent)) action = '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '">초대</button>';
+            // 역할 기준 — 교사 · 임원(2 · 3)은 팀에 초대할 수 없다. 학생은 '학생'으로 초대한다
+            if (canInvite && (h.roleKind === 2 || h.roleKind === 3)) action = '<span class="ft-btn g">교사 · 임원</span>';
+            else if (canInvite && (!friendMode || h.isStudent)) action = '<button type="button" class="ft-btn p" data-u="' + esc(h.userName) + '" data-st="' + (h.isStudent ? '1' : '0') + '">초대</button>';
         } else if (h.teamType !== mode) {
             action = '<span class="ft-btn g">다른 종류의 팀</span>';
         } else if (h.isFull) {
@@ -104,7 +106,15 @@
         if (!b) return;
         var form = document.getElementById('invForm'), tgt = document.getElementById('invTarget');
         if (!form || !tgt) return;
-        if (!form.reportValidity()) return;   // 관계를 먼저 고른다
+        var rel = document.getElementById('invRel');
+        if (b.getAttribute('data-st') === '1' && rel) {
+            // 학생은 언제나 '학생' 관계 — 고른 칩은 보내지 않는다
+            form.querySelectorAll('input[type=radio][name=relation]').forEach(function (x) { x.checked = false; });
+            rel.setAttribute('name', 'relation');
+        } else {
+            if (rel) rel.removeAttribute('name');
+            if (!form.reportValidity()) return;   // 학부모는 관계를 먼저 고른다
+        }
         tgt.value = b.getAttribute('data-u');
         b.disabled = true;
         form.submit();

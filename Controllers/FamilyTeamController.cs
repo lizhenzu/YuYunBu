@@ -87,9 +87,17 @@ namespace BulletinBoard.Controllers
                     return View("Team", detail);
                 }
 
-                bool isStudent = await _svc.IsStudentAsync(Me);
+                // 역할 기준 (2026-11-08, Common/UserRole.cs) — 고를 수 있는 관계는 역할이 정한다. 교사 · 임원은 팀에 못 들어간다
+                var kind = await _svc.GetRoleKindAsync(Me);
+                bool isStudent = kind == UserRoleKind.Student;
                 ViewBag.IsStudent = isStudent;
+                ViewBag.Relations = FamilyTeamService.RelationsFor(kind);
                 ViewBag.Invites = await _svc.GetIncomingInvitesAsync(Me);
+                if (!UserRole.CanJoinFamily(kind))
+                {
+                    ViewBag.RoleBlocked = UserRole.LabelOf(kind);
+                    return View("Choose");
+                }
 
                 // 친구팀은 학생만
                 string? mode = NormalizeType(type);
@@ -142,6 +150,7 @@ namespace BulletinBoard.Controllers
                 teamType = h.TeamType,
                 isFull = h.IsFull,
                 isStudent = h.IsStudent,
+                roleKind = (int)h.RoleKind,   // 0 학부모 · 1 학생 · 2 교사 · 3 임원 (Common/UserRole.cs)
                 userName = h.UserName,
                 fullName = h.FullName,
                 state = h.State,

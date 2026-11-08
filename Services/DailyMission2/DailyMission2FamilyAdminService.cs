@@ -16,6 +16,29 @@ namespace BulletinBoard.Services
 
         private SqlConnection Conn() => new SqlConnection(_conn);
 
+        /// <summary>
+        /// 역할 기준 (2026-11-08, Common/UserRole.cs) — 관리자가 넣거나 고칠 때도 같은 규칙.
+        /// 맞지 않으면 InvalidOperationException(문구) 를 던진다.
+        /// </summary>
+        private async Task EnsureRoleRuleAsync(int teamId, string userName, int relRole)
+        {
+            using var conn = Conn();
+            await conn.OpenAsync();
+            string type;
+            using (var cmd = new SqlCommand("SELECT ISNULL(TeamType, N'FAMILY') FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", conn))
+            {
+                cmd.Parameters.AddWithValue("@t", teamId);
+                type = Convert.ToString(await cmd.ExecuteScalarAsync()) ?? "FAMILY";
+            }
+            var kind = string.Equals(userName, "test@gmail.com", StringComparison.OrdinalIgnoreCase)
+                ? BulletinBoard.Common.UserRoleKind.Student
+                : await BulletinBoard.Common.UserRole.GetKindAsync(conn, null, userName);
+            string? err = type == FamilyTeamService.TypeFriend
+                ? (BulletinBoard.Common.UserRole.CanJoinFriend(kind) ? null : "친구팀에는 학생만 들어갈 수 있어요.")
+                : BulletinBoard.Common.UserRole.FamilyRelationError(kind, relRole, self: false);
+            if (err != null) throw new InvalidOperationException(err);
+        }
+
         public async Task<List<FamilyTeamRow>> GetTeamsAsync()
         {
             const string sql = @"
@@ -224,6 +247,7 @@ WHERE FamilyTeamId=@id;";
         {
             // ✅ 학생이 아니면 관계는 의미 없으니 9로 강제
             if (roleCode != 0) relationCode = 9;
+            await EnsureRoleRuleAsync(teamId, userName.Trim(), roleCode);
 
             const string sql = @"
 INSERT INTO dbo.DM2_FamilyMember (FamilyTeamId, UserName, RoleCode, SortNo, IsActive, RelationCode)
@@ -244,6 +268,7 @@ VALUES (@tid, @uname, @role, @sort, 1, @rel);";
         {
             // ✅ 학생이 아니면 관계는 의미 없으니 9로 강제
             if (roleCode != 0) relationCode = 9;
+            if (isActive) await EnsureRoleRuleAsync(teamId, userName.Trim(), roleCode);
 
             const string sql = @"
 UPDATE dbo.DM2_FamilyMember

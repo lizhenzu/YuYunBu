@@ -377,6 +377,11 @@ namespace BulletinBoard.DataAccessLayer
                                 ("@i", a.UserId), ("@d", ConstatsCommon.FixedDeptCode), ("@r", role));
                         }
 
+                        // 2-1) 역할 기준 (2026-11-08) — 새 역할에 맞지 않는 팀에서 빠지고, 맞지 않는 신청 · 초대는 지운다
+                        var (leftTeam, newKind) = await BulletinBoard.Services.FamilyTeamService.FitTeamToRoleAsync(conn, tx, a.UserName);
+                        if (leftTeam != null)
+                            await NotifyLeftTeamAsync(conn, tx, a.UserName, decidedBy, leftTeam, newKind, now);
+
                         // 3) 신청서 닫기
                         await ExecAsync(conn, tx, @"UPDATE [dbo].[SignupApplication]
                             SET [Status] = N'APPROVED', [ClassYear] = @y, [ClassBan] = @b, [DecidedDT] = @now, [DecidedBy] = @by
@@ -385,7 +390,7 @@ namespace BulletinBoard.DataAccessLayer
                             ("@now", now), ("@by", decidedBy), ("@id", id));
 
                         tx.Commit();
-                        return (true, "승인했어요.", a);
+                        return (true, leftTeam != null ? $"승인했어요. 새 역할에 맞지 않아 \"{leftTeam}\"에서 뺐어요." : "승인했어요.", a);
                     }
                     catch
                     {
@@ -401,8 +406,10 @@ namespace BulletinBoard.DataAccessLayer
         /// roleCode: T001 코드(T1001 학생 · T1002 교사 · …) · 빈 값 = 학부모(역할 없음).
         /// 학생이면 classYear/classBan(0 = 미정). 정리 규칙은 역할 변경 승인과 같다.
         /// </summary>
-        public async Task ChangeRoleDirectAsync(string userId, string userName, string fullName, string roleCode, int classYear, int classBan)
+        /// 반환: 새 역할에 맞지 않아 빠진 팀 이름 (없으면 null)
+        public async Task<string?> ChangeRoleDirectAsync(string userId, string userName, string fullName, string roleCode, int classYear, int classBan, string changedBy = "")
         {
+            string? leftTeam = null;
             using (var conn = Conn())
             {
                 await conn.OpenAsync();
@@ -449,6 +456,12 @@ namespace BulletinBoard.DataAccessLayer
                             await ExecAsync(conn, tx, "INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[DeptCode],[RoleCode]) VALUES (@i,@d,@r);",
                                 ("@i", userId), ("@d", ConstatsCommon.FixedDeptCode), ("@r", roleCode));
 
+                        // 역할 기준 (2026-11-08) — 새 역할에 맞지 않는 팀에서 빠지고, 맞지 않는 신청 · 초대는 지운다
+                        var fit = await BulletinBoard.Services.FamilyTeamService.FitTeamToRoleAsync(conn, tx, userName);
+                        leftTeam = fit.LeftTeam;
+                        if (leftTeam != null)
+                            await NotifyLeftTeamAsync(conn, tx, userName, changedBy, leftTeam, fit.Kind, now);
+
                         tx.Commit();
                     }
                     catch
@@ -458,6 +471,18 @@ namespace BulletinBoard.DataAccessLayer
                     }
                 }
             }
+            return leftTeam;
+        }
+
+        /// <summary>역할이 바뀌어 팀에서 빠졌다고 본인에게 쪽지 (같은 트랜잭션)</summary>
+        private static async Task NotifyLeftTeamAsync(SqlConnection conn, SqlTransaction tx, string toUser, string fromUser, string teamName, UserRoleKind newKind, DateTime now)
+        {
+            string label = UserRole.LabelOf(newKind);
+            await ExecAsync(conn, tx, @"
+                IF OBJECT_ID(N'dbo.PopMessage') IS NOT NULL
+                    INSERT INTO [dbo].[PopMessage] ([MessageText],[ToWhom],[FromWhom],[updateDT],[InsertDT]) VALUES (@t,@to,@f,@now,@now);",
+                ("@t", $"역할이 {label}(으)로 바뀌어 \"{teamName}\"에서 빠졌어요. {(label == "학생" || label == "학부모" ? "새 역할에 맞는 팀에 다시 들어가 주세요." : "교사 · 임원은 팀에 들어가지 않아요.")}"),
+                ("@to", toUser), ("@f", string.IsNullOrWhiteSpace(fromUser) ? "Basic" : fromUser), ("@now", now));
         }
 
         /// <summary>지금 역할 — 역할 변경 화면 · 신청서의 "이전 역할" 표시용</summary>
@@ -467,8 +492,15 @@ namespace BulletinBoard.DataAccessLayer
             using (var conn = Conn())
             {
                 await conn.OpenAsync();
-                using (var cmd = new SqlCommand(@"SELECT TOP 1 ISNULL([RoleCode],N''), ISNULL([RoleNM],N''), ISNULL([ClassYear],0), ISNULL([ClassBan],0)
-                                                  FROM [dbo].[view_UserCompositeInfo_2026] WHERE [UserName] = @u", conn))
+                // 역할 기준 (2026-11-08) — UserRole.RoleCodeSql: 배정 표 우선, 없으면 승인된 역할(DeptRoleUserAssoc)
+                using (var cmd = new SqlCommand(@"SELECT TOP 1 x.rc,
+                                                         ISNULL((SELECT TOP 1 cd.[MinorNM] FROM [dbo].[CodeData] cd WHERE cd.[MajorCD] = 'T001' AND cd.[MinorCD] = x.rc), N''),
+                                                         ISNULL(ci.[ClassYear],0), ISNULL(ci.[ClassBan],0)
+                                                  FROM [Identity].[User] u
+                                                  CROSS APPLY (SELECT " + UserRole.RoleCodeSql("u.[Id]") + @" AS rc) x
+                                                  LEFT JOIN [dbo].[view_PersonMaster_2026] pm ON pm.[UserId] = u.[Id]
+                                                  LEFT JOIN [dbo].[ClassInfo_2026] ci ON ci.[PersonID] = pm.[PersonId]
+                                                  WHERE u.[UserName] = @u", conn))
                 {
                     cmd.Parameters.AddWithValue("@u", userName);
                     using (var rd = await cmd.ExecuteReaderAsync())

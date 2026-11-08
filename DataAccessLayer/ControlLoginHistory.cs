@@ -41,12 +41,14 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat(" ma.UserName, mb.Id UserId, ma.DC, ma.minInsertDT, ma.maxInsertDT, FullName,  "); sb.Append(Environment.NewLine);
             sb.AppendFormat(" isnull(ClassYear,0) ClassYear, "); sb.Append(Environment.NewLine);
             sb.AppendFormat(" isnull(ClassBan ,0) ClassBan, "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" UserId, RoleCode, RoleNM "); sb.Append(Environment.NewLine);
+            // 2026-11-08 역할 기준 — Common/UserRole.RoleCodeSql (배정 표 우선, 없으면 승인된 역할)
+            sb.Append(" UserId, x.rc RoleCode, (select top 1 MinorNM from [dbo].[CodeData] where MajorCD = 'T001' and MinorCD = x.rc) RoleNM "); sb.Append(Environment.NewLine);
 
 
-            sb.AppendFormat(" from  [dbo].[view_loginHistory_groupBy]        ma "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" join  [Identity].[User]                        mb on ma.UserName = mb.UserName "); sb.Append(Environment.NewLine);
-            sb.AppendFormat(" left outer join [dbo].[view_UserCompositeInfo_2026] mc on ma.UserName = mc.UserName "); sb.Append(Environment.NewLine);
+            sb.Append(" from  [dbo].[view_loginHistory_groupBy]        ma "); sb.Append(Environment.NewLine);
+            sb.Append(" join  [Identity].[User]                        mb on ma.UserName = mb.UserName "); sb.Append(Environment.NewLine);
+            sb.Append(" cross apply (select " + BulletinBoard.Common.UserRole.RoleCodeSql("mb.Id") + " as rc) x "); sb.Append(Environment.NewLine);
+            sb.Append(" left outer join [dbo].[view_UserCompositeInfo_2026] mc on ma.UserName = mc.UserName "); sb.Append(Environment.NewLine);
             return DataAccessModule.commonQuery(sb.ToString());
         }
         public void DeleteLoginHistory(string UserName)
