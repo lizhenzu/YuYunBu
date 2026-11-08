@@ -148,13 +148,35 @@ namespace BulletinBoard.DataAccessLayer
             }
         }
 
-        public async Task<List<SignupApplication>> GetPendingAsync()
+        /// <summary>대기 중인 신청. reqType: "JOIN" 가입 직후 · "CHANGE" 역할 변경 · null 이면 둘 다</summary>
+        public async Task<List<SignupApplication>> GetPendingAsync(string? reqType = null)
         {
             using (var conn = Conn())
             {
                 await conn.OpenAsync();
                 await EnsureTableAsync(conn);
+                if (reqType == "JOIN" || reqType == "CHANGE")
+                    return await QueryAsync(conn, "WHERE a.[Status] = N'PENDING' AND a.[ReqType] = @t", "", "a.[Id]", ("@t", reqType));
                 return await QueryAsync(conn, "WHERE a.[Status] = N'PENDING'", "", "a.[Id]");
+            }
+        }
+
+        /// <summary>대기 중인 신청 개수 (가입 · 역할 변경 따로) — 메뉴 배지용</summary>
+        public async Task<(int Join, int Change)> GetPendingCountsAsync()
+        {
+            using (var conn = Conn())
+            {
+                await conn.OpenAsync();
+                await EnsureTableAsync(conn);
+                using (var cmd = new SqlCommand(@"SELECT
+                        ISNULL(SUM(CASE WHEN [ReqType] = N'JOIN' THEN 1 ELSE 0 END), 0),
+                        ISNULL(SUM(CASE WHEN [ReqType] = N'CHANGE' THEN 1 ELSE 0 END), 0)
+                    FROM [dbo].[SignupApplication] WHERE [Status] = N'PENDING'", conn))
+                using (var rd = await cmd.ExecuteReaderAsync())
+                {
+                    await rd.ReadAsync();
+                    return (Convert.ToInt32(rd[0]), Convert.ToInt32(rd[1]));
+                }
             }
         }
 

@@ -162,7 +162,7 @@ namespace BulletinBoard.Controllers
                 var msg = new ControlWithdraw();
                 foreach (var name in to)
                     await msg.SendMessageAsync(name, a.UserName, change
-                        ? $"{a.FullName}({a.UserName}) 님이 역할 변경을 요청했어요 ({a.PrevRole} → {a.RoleLabel}). 정보 관리 › 가입 승인에서 확인해 주세요."
+                        ? $"{a.FullName}({a.UserName}) 님이 역할 변경을 요청했어요 ({a.PrevRole} → {a.RoleLabel}). 정보 관리 › 역할 변경 승인에서 확인해 주세요."
                         : $"{a.FullName}({a.UserName}) 님이 {a.RoleLabel}(으)로 가입 승인을 요청했어요. 정보 관리 › 가입 승인에서 확인해 주세요.");
             }
             catch { /* 쪽지가 실패해도 신청은 저장됐다 */ }
@@ -170,15 +170,23 @@ namespace BulletinBoard.Controllers
             return RedirectToAction(nameof(Index), new { returnUrl, change });
         }
 
-        // ── 관리자: 승인 목록 ────────────────────────────────────────
+        // ── 관리자: 승인 목록 — 가입 승인과 역할 변경 승인은 메뉴도 화면도 따로 ──────────
+        //   /SignupWizard/Approvals            가입 승인 (가입 직후 신청)
+        //   /SignupWizard/RoleChangeApprovals  역할 변경 승인 (나의 역할 변경 신청)
         [HttpGet]
-        public async Task<IActionResult> Approvals()
+        public async Task<IActionResult> Approvals() => await ApprovalList("JOIN");
+
+        [HttpGet]
+        public async Task<IActionResult> RoleChangeApprovals() => await ApprovalList("CHANGE");
+
+        private async Task<IActionResult> ApprovalList(string reqType)
         {
             if (!IsApprover()) return Forbid();
             var (years, bans) = ClassOptions();
             ViewData["Years"] = years;
             ViewData["Bans"] = bans;
-            return View(await _db.GetPendingAsync());
+            ViewData["ReqType"] = reqType;
+            return View("Approvals", await _db.GetPendingAsync(reqType));
         }
 
         [HttpPost]
