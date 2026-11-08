@@ -92,6 +92,9 @@
     .b2p .card .role.of { color: #7048C8; border-color: #DCD0F3; }
     .b2p .card .role.pa { color: #A86A12; border-color: #EBD9B8; }
     .b2p .card .role.et { color: var(--b2-dim2); }
+    /* 소속 없음 (반 배정 · 교사 배정 · 승인된 역할이 하나도 없음) — /UserRoles 와 같은 노란 표시 */
+    .b2p .card.noaff { background: linear-gradient(rgba(242,181,68,.16), rgba(242,181,68,.16)), var(--b2-card); box-shadow: inset 0 3px 0 #F2B544, 0 6px 16px -12px rgba(22,24,28,.35); }
+    .b2p .card .role.no { color: #A86A12; border-color: #F2C879; background: rgba(255,255,255,.55); }
 
     /* 기록 삭제 (관리자) */
     .b2p .card .del { margin: 8px auto 0; font-family: inherit; font-size: 10.5px; color: #B42318; background: transparent; border: 1px solid #F0C9C5; padding: 3px 9px; cursor: pointer; }
@@ -175,9 +178,11 @@
 
                 // 소속 — Common/UserAffiliation (역할은 UserRole 기준, /UserRoles 와 같다)
                 if (!aff.TryGetValue(u.UserId ?? "", out var a)) a = new UserAffiliationInfo();
-                string role = a.Label;
+                bool noAff = a.Kind == UserRoleKind.Parent && !a.Pending;   // 소속 없음
+                string role = noAff ? "소속 없음" : a.Label;
+                string roleCss = noAff ? "no" : a.Css;
 
-                <div class="card @(done ? "dn" : "")"
+                <div class="card @(done ? "dn" : "") @(noAff ? "noaff" : "")"
                      data-name="@(nm) @(u.UserName) @role"
                      data-rawprogress="@((long)Math.Round(Math.Max((double)u.TotalProgressRate, 0)))"
                      data-date="@u.ReadDate.Ticks">
@@ -196,7 +201,7 @@
                     <b>@nm</b>
                     @if (isSuperAdmin) { <span class="uid">@u.UserName</span> }
                     <div class="pc">@rate.ToString("F2")<small>%</small></div>
-                    <div><span class="role @a.Css">@role</span></div>
+                    <div><span class="role @roleCss">@role</span></div>
                     <div class="m">@(string.IsNullOrEmpty(lastBook) ? "" : lastBook + " · ")@when</div>
                     @if (canDelete)
                     {
