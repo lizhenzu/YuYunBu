@@ -5,8 +5,9 @@
 @*  ══════════════════════════════════════════════════════════════
     가입 마법사 — 2026-11-08 시안 확정 (DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
     · 역할(학생 · 교사 · 학부모) → 필요한 것만 차례로 → 확인 → 관리자 승인 요청
-      학생: (같은 이름 확인) → 학년·반 → 생일·성별 → 학교·부모님 연락처
-      교사: (같은 이름 확인) → 연락처
+      학생: (같은 이름 확인) → [역할만 정하고 끝내기 | 더 입력하기 → 학년·반 → 생일·성별 → 학교·부모님 연락처]
+      교사: (같은 이름 확인) → [역할만 정하고 끝내기 | 더 입력하기 → 연락처]
+      연락처는 어디서나 필수가 아니다 (2026-11-08)
       학부모: 고르면 끝 — 더 입력받지 않고 바로 확인 (2026-11-08 변경)
     · 단계는 화면 안에서만 넘어가고, 마지막에 한 번에 보낸다 (/SignupWizard/Submit)
     ══════════════════════════════════════════════════════════════ *@
@@ -26,6 +27,22 @@
     var current = ViewData["Current"] as CurrentRole;
     string curKind = current?.Kind ?? "";                         // S · T · X(임원 등) · ""(역할 없음 = 학부모)
     string Tag(string k) => change && (curKind == k || (k == "P" && curKind == "")) ? "지금 역할" : "";
+
+    // 신청 내용 한 줄 — 비어 있는 값은 빼고 보여 준다 (역할만 정한 신청이면 "더 입력한 정보 없음")
+    string SignupDetailText(SignupApplication a)
+    {
+        var parts = new List<string>();
+        if (a.RoleKind == "S")
+        {
+            if (a.ClassYear > 0 && a.ClassBan > 0) parts.Add($"{a.ClassYear}학년 {a.ClassBan}반");
+            if (a.BMonth > 0 && a.BDay > 0) parts.Add($"{a.BMonth}월 {a.BDay}일");
+            if (a.Sex == "M" || a.Sex == "F") parts.Add(a.Sex == "M" ? "남" : "여");
+            if (!string.IsNullOrEmpty(a.School)) parts.Add(a.School);
+            if (!string.IsNullOrEmpty(a.Phone)) parts.Add("부모님 " + a.Phone);
+        }
+        else if (a.RoleKind == "T" && !string.IsNullOrEmpty(a.Phone)) parts.Add("연락처 " + a.Phone);
+        return parts.Count == 0 ? "더 입력한 정보는 없어요." : string.Join(" · ", parts);
+    }
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -85,20 +102,7 @@
         </div>
         <div class="sw-sum">
             <b>@latest.RoleLabel</b> · @latest.FullName<br />
-            @if (latest.RoleKind == "S")
-            {
-                @(latest.ClassYear > 0 ? $"{latest.ClassYear}학년 {latest.ClassBan}반" : "반은 관리자가 정해요")<br />
-                @($"{latest.BMonth}월 {latest.BDay}일 · {(latest.Sex == "M" ? "남" : "여")}")<br />
-                @(string.IsNullOrEmpty(latest.School) ? "" : latest.School + " · ")<text>부모님 @latest.Phone</text>
-            }
-            else if (latest.RoleKind == "P")
-            {
-                <text>더 입력한 정보는 없어요.</text>
-            }
-            else
-            {
-                <text>연락처 @latest.Phone</text>
-            }
+            @SignupDetailText(latest)
         </div>
         <div class="qb-btns"><a class="qb-btn p" href="@returnUrl">@ConstatsCommon.ToHome</a></div>
     }
@@ -114,6 +118,7 @@
             <input type="hidden" name="personId" id="fPerson" value="0" />
             <input type="hidden" name="sex" id="fSex" />
             <input type="hidden" name="change" value="@(change ? "true" : "false")" />
+            <input type="hidden" name="detail" id="fDetail" value="false" />
 
             @* 1) 역할 *@
             <div class="sw-step" data-k="role">
@@ -148,6 +153,16 @@
                     </button>
                 }
                 <button type="button" class="sw-opt" data-person="0"><b>위 사람들과 달라요</b><small>동명이인 — 새로 등록</small></button>
+            </div>
+
+            @* 학생 · 교사: 더 입력할지 고르기 — "역할만"을 고르면 바로 확인으로 (2026-11-08) *@
+            <div class="sw-step" data-k="more">
+                <div class="qb-k" id="moreK">더 입력할까요?</div>
+                <h1 class="qb-h1">자세한 정보도 적을까요?</h1>
+                <div class="sw-dots"></div>
+                <div class="qb-sub">지금은 역할만 정하고 끝내도 돼요. 자세한 정보는 나중에 관리자가 채울 수 있어요.</div>
+                <button type="button" class="sw-opt" data-detail="false"><b>역할만 정하고 끝내기</b><small id="moreOnly"></small></button>
+                <button type="button" class="sw-opt" data-detail="true"><b>더 입력하기</b><small id="moreMore"></small></button>
             </div>
 
             @* 3) 학생: 학년 · 반 *@
@@ -186,7 +201,7 @@
                 <h1 class="qb-h1">학교와 부모님 연락처</h1>
                 <div class="sw-dots"></div>
                 <div class="sw-f"><label>학교 (선택)</label><input name="school" id="fSchool" maxlength="100" placeholder="○○초등학교" /></div>
-                <div class="sw-f"><label>부모님 연락처</label><input name="phone" id="fPhoneS" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
+                <div class="sw-f"><label>부모님 연락처 (선택)</label><input name="phone" id="fPhoneS" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
             </div>
 
             @* 교사: 연락처 *@
@@ -194,7 +209,7 @@
                 <div class="qb-k">교사</div>
                 <h1 class="qb-h1">연락처를 알려 주세요</h1>
                 <div class="sw-dots"></div>
-                <div class="sw-f"><label>연락처</label><input name="phone" id="fPhoneT" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
+                <div class="sw-f"><label>연락처 (선택)</label><input name="phone" id="fPhoneT" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
             </div>
 
             @* 학부모는 고르면 끝 — 더 입력받지 않고 바로 확인으로 (2026-11-08 결정) *@
@@ -230,13 +245,14 @@
     var hasSame = @(same.Count > 0 ? "true" : "false");
     var form = document.getElementById('swForm');
     var stepsEl = {}; form.querySelectorAll('.sw-step').forEach(function (s) { stepsEl[s.dataset.k] = s; });
-    var role = '', idx = 0, personPicked = false;
+    var role = '', idx = 0, personPicked = false, detail = null;   // detail: null = 아직 안 고름 · true 더 입력 · false 역할만
     var $ = function (id) { return document.getElementById(id); };
     var err = $('swErr');
 
     function flow() {
-        if (role === 'S') return ['role'].concat(hasSame ? ['same'] : []).concat(['cls', 'birth', 'etc', 'sum']);
-        if (role === 'T') return ['role'].concat(hasSame ? ['same'] : []).concat(['tel', 'sum']);
+        var head = ['role'].concat(hasSame ? ['same'] : []).concat(['more']);
+        if (role === 'S') return head.concat(detail ? ['cls', 'birth', 'etc'] : []).concat(['sum']);
+        if (role === 'T') return head.concat(detail ? ['tel'] : []).concat(['sum']);
         if (role === 'P') return ['role', 'sum'];
         return ['role'];
     }
@@ -247,6 +263,11 @@
         $('swPrev').style.display = idx > 0 ? '' : 'none';
         $('swNext').textContent = k === 'sum' ? '승인 요청 보내기' : '다음';
         if (k === 'sum') $('sumBox').innerHTML = summary();
+        if (k === 'more') {
+            $('moreK').textContent = (role === 'S' ? '학생' : '교사') + ' · 더 입력할까요?';
+            $('moreOnly').textContent = (role === 'S' ? '학생' : '교사') + '으로만 등록';
+            $('moreMore').textContent = role === 'S' ? '학년·반 · 생일 · 학교 · 부모님 연락처' : '연락처';
+        }
         err.textContent = '';
         window.scrollTo(0, 0);
     }
@@ -254,28 +275,39 @@
     function selText(id) { var e = $(id); return e && e.selectedIndex >= 0 ? e.options[e.selectedIndex].text : ''; }
     function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function summary() {
+        var label = role === 'S' ? '학생' : role === 'T' ? '교사' : '학부모';
+        if (role === 'P' || !detail) return '<b>' + label + '</b><br>역할만 정해요. 더 입력할 것은 없어요.';
+        var parts = [];
         if (role === 'S') {
-            var cls = ($('fYear').value === '0' || $('fBan').value === '0') ? '반은 관리자가 정해요' : selText('fYear') + ' ' + selText('fBan');
-            return '<b>학생</b><br>' + esc(cls) + '<br>' + esc(selText('fMonth') + ' ' + selText('fDay')) + ' · ' + ($('fSex').value === 'M' ? '남' : '여')
-                + '<br>' + (txt('fSchool') ? esc(txt('fSchool')) + ' · ' : '') + '부모님 ' + esc(txt('fPhoneS'));
+            parts.push(($('fYear').value === '0' || $('fBan').value === '0') ? '반은 관리자가 정해요' : selText('fYear') + ' ' + selText('fBan'));
+            if ($('fMonth').value && $('fDay').value) parts.push(selText('fMonth') + ' ' + selText('fDay'));
+            if ($('fSex').value) parts.push($('fSex').value === 'M' ? '남' : '여');
+            if (txt('fSchool')) parts.push(txt('fSchool'));
+            if (txt('fPhoneS')) parts.push('부모님 ' + txt('fPhoneS'));
+        } else {
+            parts.push(txt('fPhoneT') ? '연락처 ' + txt('fPhoneT') : '연락처 없음');
         }
-        if (role === 'T') return '<b>교사</b><br>연락처 ' + esc(txt('fPhoneT'));
-        return '<b>학부모</b><br>더 입력할 것은 없어요.';
+        return '<b>' + label + '</b><br>' + parts.map(esc).join(' · ');
     }
     function check(k) {
         if (k === 'role' && !role) return '역할을 골라 주세요';
         if (k === 'same' && !personPicked) return '나인지 골라 주세요';
+        if (k === 'more' && detail === null) return '역할만 정할지, 더 입력할지 골라 주세요';
         if (k === 'cls' && ($('fYear').value === '' || $('fBan').value === '')) return '학년과 반을 골라 주세요 (모르면 "잘 모르겠어요")';
         if (k === 'birth' && (!$('fMonth').value || !$('fDay').value)) return '생일을 골라 주세요';
         if (k === 'birth' && !$('fSex').value) return '성별을 골라 주세요';
-        if (k === 'etc' && !txt('fPhoneS')) return '부모님 연락처를 적어 주세요';
-        if (k === 'tel' && !txt('fPhoneT')) return '연락처를 적어 주세요';
+        // 연락처는 필수가 아니다 (2026-11-08 결정)
         return '';
     }
     function send() {
         // 고른 역할의 연락처 칸만 보낸다
-        ['fPhoneS', 'fPhoneT'].forEach(function (id) { $(id).disabled = !((role === 'S' && id === 'fPhoneS') || (role === 'T' && id === 'fPhoneT')); });
-        if (role !== 'S') { ['fYear', 'fBan', 'fMonth', 'fDay'].forEach(function (id) { $(id).value = '0'; }); }
+        ['fPhoneS', 'fPhoneT'].forEach(function (id) { $(id).disabled = !detail || !((role === 'S' && id === 'fPhoneS') || (role === 'T' && id === 'fPhoneT')); });
+        if (role !== 'S' || !detail) {
+            ['fYear', 'fBan'].forEach(function (id) { $(id).value = '0'; });
+            ['fMonth', 'fDay'].forEach(function (id) { $(id).value = ''; });
+            $('fSex').value = ''; $('fSchool').value = '';
+        }
+        $('fDetail').value = detail ? 'true' : 'false';
         if (role === 'P') $('fPerson').value = '0';
         $('swNext').disabled = true;
         form.onsubmit = null; form.submit();
@@ -293,6 +325,13 @@
             if (b.disabled) return;
             $('fPerson').value = b.dataset.person; personPicked = true;
             form.querySelectorAll('[data-person]').forEach(function (x) { x.classList.toggle('on', x === b); });
+            err.textContent = '';
+        });
+    });
+    form.querySelectorAll('[data-detail]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            detail = b.dataset.detail === 'true';
+            form.querySelectorAll('[data-detail]').forEach(function (x) { x.classList.toggle('on', x === b); });
             err.textContent = '';
         });
     });

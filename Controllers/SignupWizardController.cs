@@ -96,7 +96,7 @@ namespace BulletinBoard.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Submit(string role, int personId, int classYear, int classBan, int bMonth, int bDay,
-                                                string? sex, string? school, string? phone, string? returnUrl, bool change = false)
+                                                string? sex, string? school, string? phone, string? returnUrl, bool change = false, bool detail = false)
         {
             var me = await _userManager.GetUserAsync(User);
             if (me == null) return Challenge();
@@ -109,9 +109,10 @@ namespace BulletinBoard.Controllers
 
             role = (role ?? "").Trim().ToUpperInvariant();
             if (role != "S" && role != "T" && role != "P") return Back("역할을 골라 주세요.");
-            // 학부모는 고르면 끝 — 연락처 · 자녀 정보를 받지 않는다
-            if (role != "P" && string.IsNullOrWhiteSpace(phone)) return Back("연락처를 적어 주세요.");
-            if (role == "P") phone = "";
+            // 학부모는 고르면 끝. 학생 · 교사도 "역할만 정하고 끝내기"(detail=false)면 더 받지 않는다.
+            // 연락처는 필수가 아니다 (2026-11-08 결정)
+            if (role == "P" || !detail) phone = "";
+            phone ??= "";
 
             var a = new SignupApplication
             {
@@ -136,7 +137,7 @@ namespace BulletinBoard.Controllers
                 }
             }
 
-            if (role == "S")
+            if (role == "S" && detail)
             {
                 if (bMonth < 1 || bMonth > 12 || bDay < 1 || bDay > 31) return Back("생일을 골라 주세요.");
                 if (sex != "M" && sex != "F") return Back("성별을 골라 주세요.");
