@@ -113,6 +113,14 @@ namespace BulletinBoard.Controllers
 
             role = (role ?? "").Trim().ToUpperInvariant();
             if (role != "S" && role != "T" && role != "P") return Back("역할을 골라 주세요.");
+
+            // 역할 변경인데 지금과 같은 역할이면 바꿀 게 없다 (학생→학생 · 교사→교사 · 학부모→학부모)
+            if (change)
+            {
+                var cur = await _db.GetCurrentRoleAsync(me.UserName ?? "");
+                if ((role == "S" && cur.Kind == "S") || (role == "T" && cur.Kind == "T") || (role == "P" && cur.Kind == ""))
+                    return Back("지금과 같은 역할이에요. 다른 역할을 골라 주세요.");
+            }
             // 학부모는 고르면 끝. 학생 · 교사도 "역할만 정하고 끝내기"(detail=false)면 더 받지 않는다.
             // 연락처는 필수가 아니다 (2026-11-08 결정)
             if (role == "P" || !detail) phone = "";
@@ -238,6 +246,15 @@ namespace BulletinBoard.Controllers
                     if (app == null) return Json(new { ok = false, message = "이미 처리된 신청이에요." });
                     try { await notify.SendMessageAsync(app.UserName, admin, $"{(app.IsChange ? "역할 변경" : "가입 승인")} 요청이 반려됐어요. 사유: {reason.Trim()} — 홈에서 다시 입력할 수 있어요."); } catch { }
                     return Json(new { ok = true, message = "반려했어요." });
+                }
+
+                // 예전에 들어온 "같은 역할로 바꾸기" 신청은 승인해도 바뀌는 게 없다 — 반려하게 막는다
+                var pend = (await _db.GetPendingAsync()).FirstOrDefault(x => x.Id == id);
+                if (pend != null && pend.IsChange)
+                {
+                    var cur = await _db.GetCurrentRoleAsync(pend.UserName);
+                    if ((pend.RoleKind == "S" && cur.Kind == "S") || (pend.RoleKind == "T" && cur.Kind == "T") || (pend.RoleKind == "P" && cur.Kind == ""))
+                        return Json(new { ok = false, message = "지금과 같은 역할로 바꾸는 신청이에요. 승인할 수 없으니 반려해 주세요." });
                 }
 
                 var (ok, message, a) = await _db.ApproveAsync(id, admin, linkExisting, classYear, classBan, teacherRole);
