@@ -517,6 +517,11 @@ namespace BulletinBoard.Controllers
                 return Json(new { ok = true, label = roleName + cls, kind = RoleCode == "T1001" ? "S" : RoleCode.Length > 0 ? "T" : "P",
                                   message = leftTeam != null ? $"새 역할에 맞지 않아 \"{leftTeam}\"에서 뺐어요." : "" });
             }
+            catch (BulletinBoard.Services.FamilyTeamAwardLockException lockEx)
+            {
+                // 시상 기록이 있는 팀에 속해 있으면 역할을 바꾸지 않는다 (2026-11-09)
+                return Json(new { ok = false, message = lockEx.Message });
+            }
             catch (Exception ex)
             {
                 return Json(new { ok = false, message = "저장 오류: " + ex.Message });
