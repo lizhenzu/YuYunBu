@@ -1019,9 +1019,13 @@ public class Bible2Controller : Controller
             .Select(p => (DateTime?)p.ReadDate)
             .MaxAsync();
 
-        // ① UserBibleProgress 전체 삭제
+        // ① 이번 회차를 "완료"로 닫고 다음 회차를 연다 (2026-11-09 통합 통독 기록 — 읽은 절은 지우지 않고 그 회차에 남는다).
+        //    UserBibleProgress 는 열린 회차만 보여 주는 통로라, 화면에서는 예전처럼 빈 상태로 새로 시작한다.
         await _db.Database.ExecuteSqlRawAsync(
-            "DELETE FROM [dbo].[UserBibleProgress] WHERE UserId = {0}", userId);
+            "EXEC dbo.usp_DM2_CompleteReadingRound @UserName = {0}, @CompletedAt = {1}, @Now = {2}; " +
+            // 통로로 바꾸기(Swap SQL) 전이면 옛 표도 예전처럼 비운다 — 배포와 Swap 사이에 눌러도 어긋나지 않게
+            "IF OBJECTPROPERTY(OBJECT_ID(N'dbo.UserBibleProgress'), 'IsUserTable') = 1 DELETE FROM [dbo].[UserBibleProgress] WHERE UserId = {3};",
+            userName, lastReadDate ?? DateHelper.GetKoreaNow(), DateHelper.GetKoreaNow(), userId);
 
         // ② UserBibleProgressCompleted UPSERT
         int existing = await _db.Database

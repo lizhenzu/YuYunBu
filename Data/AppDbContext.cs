@@ -60,14 +60,25 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<UserBibleProgress>(entity =>
         {
-            entity.ToTable("UserBibleProgress");
+            // 2026-11-09: 통합 통독 기록 — 이 이름은 DM2_ReadingVerse 로 이어지는 통로(뷰 + INSTEAD OF 트리거)다.
+            //   트리거가 있다고 알려야 EF 가 OUTPUT 절 없이 저장한다.
+            entity.ToTable("UserBibleProgress", tb =>
+            {
+                tb.HasTrigger("TR_UserBibleProgress_Insert");
+                tb.HasTrigger("TR_UserBibleProgress_Update");
+                tb.HasTrigger("TR_UserBibleProgress_Delete");
+            });
             entity.HasKey(e => new { e.UserId, e.VerseId });
             entity.Property(e => e.UserId).HasMaxLength(450);
         });
 
         modelBuilder.Entity<UserBookMark>(entity =>
         {
-            entity.ToTable("UserBookMark");
+            entity.ToTable("UserBookMark", tb =>   // 통로(뷰 + 트리거) → DM2_ReadingBookmark (2026-11-09)
+            {
+                tb.HasTrigger("TR_UserBookMark_Insert");
+                tb.HasTrigger("TR_UserBookMark_Delete");
+            });
             entity.HasKey(e => new { e.UserId, e.VerseId });
             entity.Property(e => e.UserId).HasMaxLength(450);
             entity.Property(e => e.InsertDT).HasColumnName("InsertDT");

@@ -108,6 +108,9 @@ namespace BulletinBoard.DataAccessLayer
             One(G_Mission, "ClickHistoryForPoint", "UserName", 'U'),
 
             // 성경 읽기
+            One(G_Bible, "DM2_ReadingVerse", "UserName", 'U'),      // 통합 통독 기록 (2026-11-09) — 읽은 절 먼저, 회차는 그다음
+            One(G_Bible, "DM2_ReadingRound", "UserName", 'U'),
+            One(G_Bible, "DM2_ReadingBookmark", "UserName", 'U'),
             One(G_Bible, "UserBibleProgress", "UserId", 'I'),
             One(G_Bible, "UserBookMark", "UserId", 'I'),
             One(G_Bible, "BibleCompletionLog", "UserId", 'I'),
