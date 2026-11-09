@@ -306,7 +306,7 @@
                 }
             }
 
-            <div class="verse-card-r @(v.IsRead ? "is-read" : "") @(v.IsBookmarked ? "bookmarked" : "")"
+            <div class="verse-card-r @(v.IsRead ? "is-read" : "") @(v.IsBookmarked ? "bookmarked" : "") @(Model.SavedVerse > 1 && v.Zul == Model.SavedVerse ? "is-saved" : "")"
                  id="vc-@v.VerseId"
                  data-idx="@i"
                  data-zul="@v.Zul"
@@ -566,6 +566,9 @@
     .vtext-ko-line, .vtext-modern-line, .vtext-en-line { display: block; }
     .vtext-ko, body.lang-modern .vtext-modern, body.lang-en .vtext-en { font-family: "Noto Serif KR", serif; font-weight: 400; font-size: calc(16.5px * var(--b2fs)); line-height: 1.9; color: var(--b2-tx); word-break: keep-all; }
     .verse-card-r.bookmarked .vtext-ko { background: linear-gradient(transparent 64%, var(--b2-mark) 64%); }
+    /* 이어 읽기 — 보던 위치 표시 (읽음 표시와 따로) */
+    .verse-card-r.is-saved { box-shadow: inset 3px 0 0 var(--b2-acc); }
+    .verse-card-r.is-saved .vnum::after { content: "여기까지 봤어요"; display: block; margin-top: 3px; font-size: 10.5px; font-weight: 500; color: var(--b2-acc); white-space: nowrap; }
     .vtext-modern-line { margin-top: 6px; }
     .vtext-modern { font-family: "Noto Serif KR", serif; font-size: calc(14px * var(--b2fs)); line-height: 1.8; color: var(--b2-dim2); }
     .vtext-en-line { margin-top: 6px; }
@@ -665,7 +668,32 @@
             try { saved = localStorage.getItem(KEY) || 'm'; } catch (e) { }
             apply(saved, false);
         })();
-    </script>    <script>
+    </script>
+    <script>
+        /* 이어 읽기 — 스크롤이 멈추면(1.5초) 화면 맨 위쪽에 보이는 절을 "보던 위치"로 저장한다. 읽음 표시와는 따로. */
+        (function () {
+            var BOOK = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BookName));
+            var JANG = @Model.Jang;
+            var cards = Array.prototype.slice.call(document.querySelectorAll('.verse-card-r[data-zul]'));
+            if (!cards.length) return;
+            var last = @Model.SavedVerse, timer = null;
+            function topVisible() {
+                for (var i = 0; i < cards.length; i++) {
+                    var r = cards[i].getBoundingClientRect();
+                    if (r.bottom > 90) return parseInt(cards[i].dataset.zul, 10);
+                }
+                return parseInt(cards[cards.length - 1].dataset.zul, 10);
+            }
+            function save() {
+                var z = topVisible();
+                if (!z || z === last) return;
+                last = z;
+                if (window.$ && $.post) $.post('/Bible2/SavePosition', { bookName: BOOK, jang: JANG, zul: z });
+            }
+            window.addEventListener('scroll', function () { clearTimeout(timer); timer = setTimeout(save, 1500); }, { passive: true });
+        })();
+    </script>
+    <script>
         (function () {
             var OV_MODE_KEY = 'bibleOvMode';
             var OV_OPEN_KEY = 'bibleOvOpen';

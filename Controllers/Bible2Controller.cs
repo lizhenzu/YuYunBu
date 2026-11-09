@@ -332,12 +332,37 @@ public class Bible2Controller : Controller
                     Jang      = e.Jang,
                     Zul       = e.Zul,
                     VerseText = e.BibleData ?? string.Empty,
-                    ReadDate  = p.ReadDate
+                    ReadDate  = p.ReadDate,
+                    VerseId   = e.Id
                 })
             .OrderByDescending(x => x.ReadDate)
             .ThenByDescending(x => x.Jang)
             .ThenByDescending(x => x.Zul)
             .FirstOrDefaultAsync();
+
+        // 이어 읽기 — 마지막으로 "보던 위치"가 있으면 그것이 먼저다 (읽음 표시와 따로, 2026-11-09).
+        //   없으면 위의 "마지막으로 읽은 구절", 그것도 없으면 아래 "다음에 읽을 곳"이 대신한다.
+        try
+        {
+            var pos = await _db.Database
+                .SqlQueryRaw<ResumePosRow>(@"
+SELECT TOP 1 e.BibleText AS BookName, p.Chapter AS Jang, p.LastViewedVerse AS Zul, ISNULL(e.BibleData, N'') AS VerseText, e.Id AS VerseId, p.UpdatedAt AS UpdatedAt
+FROM dbo.DM2_ReadingChapterProgress p
+JOIN dbo.DM2_ReadingRound r ON r.UserName = p.UserName AND r.RoundNo = p.RoundNo AND r.CompletedAt IS NULL AND r.ClosedAt IS NULL
+JOIN [Identity].[User] u ON u.UserName = p.UserName
+JOIN dbo.DM2_VerseKey k ON k.BookId = p.BookId AND k.Chapter = p.Chapter AND k.Verse = p.LastViewedVerse
+JOIN dbo.eBible e ON e.Id = k.VerseId
+WHERE u.Id = {0}
+ORDER BY p.UpdatedAt DESC", userId)
+                .FirstOrDefaultAsync();
+            if (pos != null)
+                lastRead = new LastReadVerseItem
+                {
+                    BookName = pos.BookName, Jang = pos.Jang, Zul = pos.Zul,
+                    VerseText = pos.VerseText, ReadDate = pos.UpdatedAt, VerseId = pos.VerseId
+                };
+        }
+        catch { /* 표가 아직 없으면(SQL 실행 전) 예전처럼 마지막으로 읽은 구절을 쓴다 */ }
 
         var vm = new DashboardViewModel
         {
@@ -567,10 +592,29 @@ public class Bible2Controller : Controller
             .Where(e => e.BibleText == bookName && e.Jang == jang)
             .ToDictionaryAsync(e => e.Id, e => e.BibleData ?? string.Empty);
 
+        // 이 장에서 보던 절 (이어 읽기) — 없거나 표가 아직 없으면 0
+        int savedVerse = 0;
+        try
+        {
+            savedVerse = await _db.Database
+                .SqlQueryRaw<IntRow>(@"
+SELECT CAST(p.LastViewedVerse AS INT) AS Value
+FROM dbo.DM2_ReadingChapterProgress p
+JOIN dbo.DM2_ReadingRound r ON r.UserName = p.UserName AND r.RoundNo = p.RoundNo AND r.CompletedAt IS NULL AND r.ClosedAt IS NULL
+JOIN [Identity].[User] u ON u.UserName = p.UserName
+JOIN dbo.DM2_VerseKey k ON k.BookId = p.BookId AND k.Chapter = p.Chapter AND k.Verse = 1
+JOIN dbo.eBible e ON e.Id = k.VerseId AND e.BibleText = {1}
+WHERE u.Id = {0} AND p.Chapter = {2}", userId, bookName, (short)jang)
+                .Select(r => r.Value)
+                .FirstOrDefaultAsync();
+        }
+        catch { savedVerse = 0; }
+
         return View(new BibleReadViewModel
         {
             BookName = bookName,
             Jang = jang,
+            SavedVerse = savedVerse,
             Testament = NtBooks.Contains(bookName) ? "신약" : "구약",
             Verses = verses.Select(v => new VerseItem
             {
@@ -717,6 +761,26 @@ public class Bible2Controller : Controller
             .ToListAsync();
 
         return View(bms);
+    }
+
+    /// <summary>
+    /// 이어 읽기 — 이 장에서 보던 절을 기억한다 (읽음 표시와는 따로). 읽기 화면이 스크롤이 멈추면 부른다.
+    /// 표가 아직 없거나 실패해도 읽기에는 영향이 없어야 하므로 조용히 ok=false 만 돌려준다.
+    /// </summary>
+    [HttpPost]
+    public async Task<IActionResult> SavePosition(string bookName, int jang, int zul)
+    {
+        var userId = GetCurrentUserId();
+        if (string.IsNullOrEmpty(userId) || string.IsNullOrWhiteSpace(bookName) || jang < 1 || zul < 1)
+            return Json(new { ok = false });
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "EXEC dbo.usp_DM2_SaveReadingPosition @UserId = {0}, @BookName = {1}, @Chapter = {2}, @Verse = {3}, @Now = {4}",
+                userId, bookName.Trim(), (short)jang, (short)zul, DateHelper.GetKoreaNow());
+            return Json(new { ok = true });
+        }
+        catch { return Json(new { ok = false }); }
     }
 
     [HttpPost]
@@ -1079,6 +1143,17 @@ public class Bible2Controller : Controller
 
         // 컨트롤러 이름을 적지 않으면 지금 컨트롤러(Bible2)의 Participants 로 간다
         return RedirectToAction(nameof(Participants));
+    }
+
+    // 이어 읽기 "보던 위치" 한 줄 (raw-SQL 프로젝션)
+    private class ResumePosRow
+    {
+        public string   BookName  { get; set; } = "";
+        public int      Jang      { get; set; }
+        public int      Zul       { get; set; }
+        public string   VerseText { get; set; } = "";
+        public int      VerseId   { get; set; }
+        public DateTime UpdatedAt { get; set; }
     }
 
     // 내부용 raw-SQL 프로젝션 타입

@@ -10,6 +10,8 @@ public class BibleReadViewModel
     /// <summary>이 책에서 모든 절을 읽은 장 번호 집합</summary>
     public HashSet<int> ReadChapters { get; set; } = new();
     public bool IsChapterRead { get; set; }
+    /// <summary>이 장에서 마지막으로 보던 절 (이어 읽기 — 읽음 표시와 따로, 없으면 0)</summary>
+    public int SavedVerse { get; set; }
     public int ReadVerseCount => Verses.Count(v => v.IsRead);
     public bool AllVersesRead => Verses.Count > 0 && Verses.All(v => v.IsRead);
 
