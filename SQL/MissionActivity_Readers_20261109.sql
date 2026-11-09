@@ -89,7 +89,7 @@ C AS (
     WHERE (@UserName IS NULL OR LOWER(a.UserName) = LOWER(@UserName))
       AND ( P.D IS NULL
             OR (a.MissionItem <> 'Recite' AND a.MissionDate = P.D)
-            OR (a.MissionItem = 'Recite'  AND P.D BETWEEN a.ReciteWeekStart AND DATEADD(DAY, 6, a.ReciteWeekStart)) )
+            OR (a.MissionItem = 'Recite'  AND P.D BETWEEN a.ReciteWeekStart AND ISNULL((SELECT TOP 1 CAST(w.DateTo AS DATE) FROM dbo.WeeklyWordToRead w WHERE CAST(w.DateFrom AS DATE) = a.ReciteWeekStart ORDER BY w.DateTo DESC), DATEADD(DAY, 6, a.ReciteWeekStart))) )
     GROUP BY a.UserName
 )
 SELECT UserName, PrayPhraseToMe, PrayPhraseToParent,
@@ -124,7 +124,7 @@ C AS (
       AND (@CYear IS NULL OR YEAR(a.MissionDate) = @CYear)
       AND ( P.D IS NULL
             OR (a.MissionItem <> 'Recite' AND a.MissionDate = P.D)
-            OR (a.MissionItem = 'Recite'  AND P.D BETWEEN a.ReciteWeekStart AND DATEADD(DAY, 6, a.ReciteWeekStart)) )
+            OR (a.MissionItem = 'Recite'  AND P.D BETWEEN a.ReciteWeekStart AND ISNULL((SELECT TOP 1 CAST(w.DateTo AS DATE) FROM dbo.WeeklyWordToRead w WHERE CAST(w.DateFrom AS DATE) = a.ReciteWeekStart ORDER BY w.DateTo DESC), DATEADD(DAY, 6, a.ReciteWeekStart))) )
     GROUP BY a.UserName
 )
 SELECT UserName, PrayPhraseToMe, PrayPhraseToParent,
@@ -259,5 +259,38 @@ BEGIN
     LEFT JOIN t5 ON D.Date = t5.clickDate;
 
     RETURN;
+END
+GO
+
+/* ---- delete one user's mission history (also the unified tables) ---- */
+ALTER PROCEDURE [dbo].[usp_user_click_history]
+(
+    @UserName nvarchar(256) = NULL
+)
+AS
+BEGIN
+    delete from [dbo].[DM2_MissionActivity]             where  username = @UserName
+    delete from [dbo].[DM2_QuizAttempt]                 where  username = @UserName
+    delete from [dbo].[ClickHistoryForPrayPhrase]       where  username = @UserName
+    delete from [dbo].[ClickHistoryForQuestion]         where  username = @UserName
+    delete from [dbo].[ClickHistoryForTodayWordToRead]  where  username = @UserName
+    delete from [dbo].[ClickHistoryForWeeklyWordToRead] where  username = @UserName
+    delete from [dbo].[AwardUserClaim]                  where  username = @UserName
+END
+GO
+
+ALTER PROCEDURE [dbo].[usp_user_click_history_byDate]
+(
+    @ClickDate nvarchar(10),
+    @UserName nvarchar(256)
+)
+AS
+BEGIN
+    delete from [dbo].[DM2_MissionActivity]             where  username = @UserName and  CONVERT(VARCHAR,[MissionDate], 23) = lower(@ClickDate)
+    delete from [dbo].[DM2_QuizAttempt]                 where  username = @UserName and  CONVERT(VARCHAR,[MissionDate], 23) = lower(@ClickDate)
+    delete from [dbo].[ClickHistoryForPrayPhrase]       where  username = @UserName and  CONVERT(VARCHAR,[ClickDate], 23) = lower(@ClickDate)
+    delete from [dbo].[ClickHistoryForQuestion]         where  username = @UserName and  CONVERT(VARCHAR,[ClickDate], 23) = lower(@ClickDate)
+    delete from [dbo].[ClickHistoryForTodayWordToRead]  where  username = @UserName and  CONVERT(VARCHAR,[ClickDate], 23) = lower(@ClickDate)
+    delete from [dbo].[ClickHistoryForWeeklyWordToRead] where  username = @UserName and  CONVERT(VARCHAR,[ClickDate], 23) = lower(@ClickDate)
 END
 GO

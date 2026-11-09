@@ -161,18 +161,16 @@ namespace BulletinBoard.DataAccessLayer
         public DataSet fetchTodayStatusDataForAddPoint(string UserName, bool queryToday, DateTime workDT)
         {
             StringBuilder sb = new StringBuilder();
+            // 지난 날짜의 퀴즈를 나중에 맞힌 "추가 점수" — 통합 미션 기록의 퀴즈 정답 중 수행일이 미션 날짜와 다른 것 (2026-11-09)
             sb.AppendFormat("    SELECT  COUNT(*) AS Count           "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    FROM [dbo].[ClickHistoryForQuestion] CA                    "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    JOIN [dbo].[QuestionData] QD ON CA.[QuestionId] = QD.Id    "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    WHERE 1 = 1                                             "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    and LOWER(CA.[UserName]) = LOWER('{0}')       ", UserName); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    and       CA.[AnswerQ]   = CA.[CorrectAnswer]      "); sb.Append(Environment.NewLine);
-            //sb.AppendFormat("    and   CONVERT(varchar,CA.InsertDT, 23) = CONVERT(varchar,GETDATE(), 23)    "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("    FROM [dbo].[DM2_MissionActivity] CA                    "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("    WHERE CA.[MissionItem] = 'Quiz.Correct'               "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("    and LOWER(CA.[UserName]) = LOWER('{0}')       ", (UserName ?? "").Replace("'", "''")); sb.Append(Environment.NewLine);
             if (queryToday)
             {
-                sb.AppendFormat($"     and   CONVERT(VARCHAR, CA.InsertDT, 23) = '{DateHelper.GetKoreaToday().ToString("yyyy-MM-dd")}'   "); sb.Append(Environment.NewLine);
+                sb.AppendFormat($"     and   CONVERT(VARCHAR, CA.PerformedAt, 23) = '{DateHelper.GetKoreaToday().ToString("yyyy-MM-dd")}'   "); sb.Append(Environment.NewLine);
             }
-            sb.AppendFormat("    and   CONVERT(varchar,ClickDate, 23) != CONVERT(varchar,CA.InsertDT, 23)      "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("    and   CA.MissionDate != CAST(CA.PerformedAt AS DATE)      "); sb.Append(Environment.NewLine);
 
             DataSet ds = DataAccessModule.commonQuery(sb.ToString());
             return ds;
