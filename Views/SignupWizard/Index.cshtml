@@ -4,11 +4,10 @@
 
 @*  ══════════════════════════════════════════════════════════════
     가입 마법사 — 2026-11-08 시안 확정 (DailyMission4 밝은 흰색 · 공용 quiz-bright.css)
-    · 역할(학생 · 교사 · 학부모) → 필요한 것만 차례로 → 확인 → 관리자 승인 요청
-      학생: (같은 이름 확인) → [역할만 정하고 끝내기 | 더 입력하기 → 학년·반 → 생일·성별 → 학교·부모님 연락처]
-      교사: (같은 이름 확인) → [역할만 정하고 끝내기 | 더 입력하기 → 연락처]
-      연락처는 어디서나 필수가 아니다 (2026-11-08)
-      학부모: 고르면 끝 — 더 입력받지 않고 바로 확인 (2026-11-08 변경)
+    · 역할(학생 · 교사 · 학부모 · 기타) → 확인 → 관리자 승인 요청
+      2026-11-09 결정: 네 역할 모두 역할만 정하고 끝. 학년·반 · 생일 · 학교 · 연락처는 묻지 않는다
+      학생 · 교사: 같은 이름이 있을 때만 "나인지" 한 번 묻는다 → 확인
+      학부모 · 기타: 고르면 바로 확인
     · 단계는 화면 안에서만 넘어가고, 마지막에 한 번에 보낸다 (/SignupWizard/Submit)
     ══════════════════════════════════════════════════════════════ *@
 
@@ -229,7 +228,6 @@
             <input type="hidden" name="returnUrl" value="@returnUrl" />
             <input type="hidden" name="role" id="fRole" />
             <input type="hidden" name="personId" id="fPerson" value="0" />
-            <input type="hidden" name="sex" id="fSex" />
             <input type="hidden" name="change" value="@(change ? "true" : "false")" />
             <input type="hidden" name="detail" id="fDetail" value="false" />
 
@@ -250,7 +248,7 @@
                 }
                 else
                 {
-                    <div class="qb-sub">@fullName 님, 고르면 필요한 것만 차례로 물어볼게요.</div>
+                    <div class="qb-sub">@fullName 님, 역할만 골라 주세요. 다른 것은 묻지 않아요.</div>
                 }
                 @* 지금과 같은 역할은 고를 수 없다(바꿀 게 없음) — "지금" 표시만 하고 누를 수 없게 막는다 *@
                 <button type="button" class="sw-opt @(Tag("S").Length > 0 ? "cur" : "")" data-role="S" disabled="@(Tag("S").Length > 0)"><span class="t"><b>학생</b><small>@(Tag("S").Length > 0 ? "이미 이 역할이에요" : "유년부 어린이")</small></span>@if (Tag("S").Length > 0) { <span class="tagnow">지금</span> }</button>
@@ -280,64 +278,7 @@
                 <button type="button" class="sw-opt" data-person="0"><span class="t"><b>위 사람들과 달라요</b><small>동명이인 — 새로 등록</small></span></button>
             </div>
 
-            @* 학생 · 교사: 더 입력할지 고르기 — "역할만"을 고르면 바로 확인으로 (2026-11-08) *@
-            <div class="sw-step" data-k="more">
-                <div class="qb-k" id="moreK">더 입력할까요?</div>
-                <h1 class="qb-h1">자세한 정보도 적을까요?</h1>
-                <div class="sw-dots"></div>
-                <div class="qb-sub">지금은 역할만 정하고 끝내도 돼요. 자세한 정보는 나중에 관리자가 채울 수 있어요.</div>
-                <button type="button" class="sw-opt" data-detail="false"><span class="t"><b>역할만 정하고 끝내기</b><small id="moreOnly"></small></span></button>
-                <button type="button" class="sw-opt" data-detail="true"><span class="t"><b>더 입력하기</b><small id="moreMore"></small></span></button>
-            </div>
-
-            @* 3) 학생: 학년 · 반 *@
-            <div class="sw-step" data-k="cls">
-                <div class="qb-k">학생 · 반</div>
-                <h1 class="qb-h1">몇 학년 몇 반이에요?</h1>
-                <div class="sw-dots"></div>
-                <div class="sw-f"><label>학년</label>
-                    <select name="classYear" id="fYear"><option value="">골라 주세요</option>@foreach (var y in years) { <option value="@y">@(y)학년</option> }<option value="0">잘 모르겠어요</option></select>
-                </div>
-                <div class="sw-f"><label>반</label>
-                    <select name="classBan" id="fBan"><option value="">골라 주세요</option>@foreach (var b in bans) { <option value="@b">@(b)반</option> }<option value="0">잘 모르겠어요</option></select>
-                </div>
-                <div class="sw-note">모르면 "잘 모르겠어요"를 고르세요. 관리자가 정해 드려요.</div>
-            </div>
-
-            @* 4) 학생: 생일 · 성별 *@
-            <div class="sw-step" data-k="birth">
-                <div class="qb-k">학생 · 생일</div>
-                <h1 class="qb-h1">생일과 성별을 알려 주세요</h1>
-                <div class="sw-dots"></div>
-                <div class="sw-f"><label>생일</label>
-                    <div class="sw-row">
-                        <select name="bMonth" id="fMonth"><option value="">월</option>@for (int m = 1; m <= 12; m++) { <option value="@m">@(m)월</option> }</select>
-                        <select name="bDay" id="fDay"><option value="">일</option>@for (int d = 1; d <= 31; d++) { <option value="@d">@(d)일</option> }</select>
-                    </div>
-                </div>
-                <div class="sw-f"><label>성별</label>
-                    <div class="sw-sex"><button type="button" data-sex="M">남</button><button type="button" data-sex="F">여</button></div>
-                </div>
-            </div>
-
-            @* 5) 학생: 학교 · 부모님 연락처 *@
-            <div class="sw-step" data-k="etc">
-                <div class="qb-k">학생 · 연락</div>
-                <h1 class="qb-h1">학교와 부모님 연락처</h1>
-                <div class="sw-dots"></div>
-                <div class="sw-f"><label>학교 (선택)</label><input name="school" id="fSchool" maxlength="100" placeholder="○○초등학교" /></div>
-                <div class="sw-f"><label>부모님 연락처 (선택)</label><input name="phone" id="fPhoneS" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
-            </div>
-
-            @* 교사: 연락처 *@
-            <div class="sw-step" data-k="tel">
-                <div class="qb-k">교사</div>
-                <h1 class="qb-h1">연락처를 알려 주세요</h1>
-                <div class="sw-dots"></div>
-                <div class="sw-f"><label>연락처 (선택)</label><input name="phone" id="fPhoneT" inputmode="tel" maxlength="20" placeholder="010-0000-0000" /></div>
-            </div>
-
-            @* 학부모는 고르면 끝 — 더 입력받지 않고 바로 확인으로 (2026-11-08 결정) *@
+            @* 2026-11-09 결정: 네 역할 모두 역할만 정하고 끝 — 학년·반 · 생일 · 학교 · 연락처 단계는 없앴다 *@
 
             @* 마지막: 확인 *@
             <div class="sw-step" data-k="sum">
@@ -374,15 +315,14 @@
     var hasSame = @(same.Count > 0 ? "true" : "false");
     var form = document.getElementById('swForm');
     var stepsEl = {}; form.querySelectorAll('.sw-step').forEach(function (s) { stepsEl[s.dataset.k] = s; });
-    var role = '', idx = 0, personPicked = false, detail = null;   // detail: null = 아직 안 고름 · true 더 입력 · false 역할만
+    var role = '', idx = 0, personPicked = false;
     var $ = function (id) { return document.getElementById(id); };
     var err = $('swErr');
 
+    // 네 역할 모두 역할만 정하고 끝. 학생 · 교사는 같은 이름이 있을 때만 "나인지" 한 번 묻는다 (2026-11-09)
     function flow() {
-        var head = ['role'].concat(hasSame ? ['same'] : []).concat(['more']);
-        if (role === 'S') return head.concat(detail ? ['cls', 'birth', 'etc'] : []).concat(['sum']);
-        if (role === 'T') return head.concat(detail ? ['tel'] : []).concat(['sum']);
-        if (role === 'P' || role === 'E') return ['role', 'sum'];   // 학부모 · 기타는 역할만 정하고 끝
+        if (role === 'S' || role === 'T') return ['role'].concat(hasSame ? ['same'] : []).concat(['sum']);
+        if (role === 'P' || role === 'E') return ['role', 'sum'];
         return ['role'];
     }
     function show() {
@@ -392,51 +332,21 @@
         $('swPrev').style.display = idx > 0 ? '' : 'none';
         $('swNext').textContent = k === 'sum' ? '승인 요청 보내기' : '다음';
         if (k === 'sum') $('sumBox').innerHTML = summary();
-        if (k === 'more') {
-            $('moreK').textContent = (role === 'S' ? '학생' : '교사') + ' · 더 입력할까요?';
-            $('moreOnly').textContent = (role === 'S' ? '학생' : '교사') + '으로만 등록';
-            $('moreMore').textContent = role === 'S' ? '학년·반 · 생일 · 학교 · 부모님 연락처' : '연락처';
-        }
         err.textContent = '';
         window.scrollTo(0, 0);
     }
-    function txt(id) { var e = $(id); return e ? e.value.trim() : ''; }
-    function selText(id) { var e = $(id); return e && e.selectedIndex >= 0 ? e.options[e.selectedIndex].text : ''; }
-    function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function summary() {
         var label = role === 'S' ? '학생' : role === 'T' ? '교사' : role === 'E' ? '기타' : '학부모';
-        if (role === 'P' || role === 'E' || !detail) return '<b>' + label + '</b><br>역할만 정해요. 더 입력할 것은 없어요.';
-        var parts = [];
-        if (role === 'S') {
-            parts.push(($('fYear').value === '0' || $('fBan').value === '0') ? '반은 관리자가 정해요' : selText('fYear') + ' ' + selText('fBan'));
-            if ($('fMonth').value && $('fDay').value) parts.push(selText('fMonth') + ' ' + selText('fDay'));
-            if ($('fSex').value) parts.push($('fSex').value === 'M' ? '남' : '여');
-            if (txt('fSchool')) parts.push(txt('fSchool'));
-            if (txt('fPhoneS')) parts.push('부모님 ' + txt('fPhoneS'));
-        } else {
-            parts.push(txt('fPhoneT') ? '연락처 ' + txt('fPhoneT') : '연락처 없음');
-        }
-        return '<b>' + label + '</b><br>' + parts.map(esc).join(' · ');
+        var note = role === 'S' ? '역할만 정해요. 학년 · 반은 관리자가 정해 드려요.' : '역할만 정해요. 더 입력할 것은 없어요.';
+        return '<b>' + label + '</b><br>' + note;
     }
     function check(k) {
         if (k === 'role' && !role) return '역할을 골라 주세요';
         if (k === 'same' && !personPicked) return '나인지 골라 주세요';
-        if (k === 'more' && detail === null) return '역할만 정할지, 더 입력할지 골라 주세요';
-        if (k === 'cls' && ($('fYear').value === '' || $('fBan').value === '')) return '학년과 반을 골라 주세요 (모르면 "잘 모르겠어요")';
-        if (k === 'birth' && (!$('fMonth').value || !$('fDay').value)) return '생일을 골라 주세요';
-        if (k === 'birth' && !$('fSex').value) return '성별을 골라 주세요';
-        // 연락처는 필수가 아니다 (2026-11-08 결정)
         return '';
     }
     function send() {
-        // 고른 역할의 연락처 칸만 보낸다
-        ['fPhoneS', 'fPhoneT'].forEach(function (id) { $(id).disabled = !detail || !((role === 'S' && id === 'fPhoneS') || (role === 'T' && id === 'fPhoneT')); });
-        if (role !== 'S' || !detail) {
-            ['fYear', 'fBan'].forEach(function (id) { $(id).value = '0'; });
-            ['fMonth', 'fDay'].forEach(function (id) { $(id).value = ''; });
-            $('fSex').value = ''; $('fSchool').value = '';
-        }
-        $('fDetail').value = detail ? 'true' : 'false';
+        $('fDetail').value = 'false';
         if (role === 'P' || role === 'E') $('fPerson').value = '0';
         $('swNext').disabled = true;
         form.onsubmit = null; form.submit();
@@ -455,19 +365,6 @@
             $('fPerson').value = b.dataset.person; personPicked = true;
             form.querySelectorAll('[data-person]').forEach(function (x) { x.classList.toggle('on', x === b); });
             err.textContent = '';
-        });
-    });
-    form.querySelectorAll('[data-detail]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            detail = b.dataset.detail === 'true';
-            form.querySelectorAll('[data-detail]').forEach(function (x) { x.classList.toggle('on', x === b); });
-            err.textContent = '';
-        });
-    });
-    form.querySelectorAll('[data-sex]').forEach(function (b) {
-        b.addEventListener('click', function () {
-            $('fSex').value = b.dataset.sex;
-            form.querySelectorAll('[data-sex]').forEach(function (x) { x.classList.toggle('on', x === b); });
         });
     });
 
