@@ -279,7 +279,7 @@ LEFT JOIN dbo.view_PersonMaster_2026 pm WITH (NOLOCK)
     ON pm.UserId = u.UserId
 LEFT JOIN dbo.ClassInfo_2026 ci WITH (NOLOCK)
     ON ci.PersonId = pm.PersonId
-LEFT JOIN dbo.view_All_Person_2026 ap WITH (NOLOCK)
+LEFT JOIN dbo.DeptRoleUserAssoc ap WITH (NOLOCK)
     ON ap.UserId = u.UserId
 LEFT JOIN dbo.CodeData cd WITH (NOLOCK)
     ON cd.MajorCD = 'T001'

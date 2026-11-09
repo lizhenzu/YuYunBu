@@ -48,14 +48,7 @@ namespace BulletinBoard.Areas.Identity.Pages.Account
                 return Page();
             }
 
-            // In our UI email and user name are one and the same, so when we update the email
-            // we need to update the user name.
-            var setUserNameResult = await _userManager.SetUserNameAsync(user, email);
-            if (!setUserNameResult.Succeeded)
-            {
-                StatusMessage = "Error changing user name.";
-                return Page();
-            }
+            // 이메일을 바꿔도 아이디(UserName)는 그대로 둔다 (2026-11-09) — 모든 기록이 아이디로 사람을 가리킨다.
 
             await _signInManager.RefreshSignInAsync(user);
             StatusMessage = "Thank you for confirming your email change.";

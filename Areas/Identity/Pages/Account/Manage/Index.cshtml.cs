@@ -76,7 +76,7 @@ namespace BulletinBoard.Areas.Identity.Pages.Account.Manage
             {
                 return NotFound($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
             }
-            UserNameChangeLimitMessage = $"You can change your username {user.UsernameChangeLimit} more time(s).";
+            UserNameChangeLimitMessage = "아이디는 바꿀 수 없어요.";
             await LoadAsync(user);
             return Page();
         }
@@ -118,30 +118,8 @@ namespace BulletinBoard.Areas.Identity.Pages.Account.Manage
                 user.LastName = Input.LastName;
                 await _userManager.UpdateAsync(user);
             }
-            if (user.UsernameChangeLimit > 0)
-            {
-                if (Input.Username != user.UserName)
-                {
-                    var userNameExists = await _userManager.FindByNameAsync(Input.Username);
-                    if (userNameExists != null)
-                    {
-                        StatusMessage = "User name already taken. Select a different username.";
-                        return RedirectToPage();
-                    }
-
-                    var setUserName = await _userManager.SetUserNameAsync(user, Input.Username);
-                    if (!setUserName.Succeeded)
-                    {
-                        StatusMessage = "Unexpected error when trying to set user name.";
-                        return RedirectToPage();
-                    }
-                    else
-                    {
-                        user.UsernameChangeLimit -= 1;
-                        await _userManager.UpdateAsync(user);
-                    }
-                }
-            }
+            // 아이디(UserName)는 바꿀 수 없다 (2026-11-09) — 모든 기록이 아이디로 사람을 가리킨다.
+            // 입력 칸 값은 무시한다. 정말 바꿔야 하면 플랫폼 관리자에게 요청한다.
 
             if (Request.Form.Files.Count > 0)
             {

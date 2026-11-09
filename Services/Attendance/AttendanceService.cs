@@ -1448,7 +1448,22 @@ END";
                 await cmd.ExecuteNonQueryAsync();
             }
 
+            // 담임으로 배정하면 교사 — 역할은 역할 표 한 곳에서만 읽으므로 함께 적는다 (2026-11-09)
+            {
+                var uid = await GetUserIdByPersonIdAsync(con, teacherPersonId);
+                if (!string.IsNullOrEmpty(uid))
+                    await BulletinBoard.Common.UserRole.EnsureRoleAsync(con, null, uid, BulletinBoard.Common.UserRole.TeacherCode);
+            }
+
             return true;
+        }
+
+        private static async Task<string?> GetUserIdByPersonIdAsync(SqlConnection con, int personId)
+        {
+            using var cmd = new SqlCommand("SELECT TOP 1 [UserId] FROM [dbo].[view_PersonMaster_2026] WHERE [PersonId] = @p AND [UserId] IS NOT NULL", con);
+            cmd.Parameters.Add("@p", SqlDbType.Int).Value = personId;
+            var o = await cmd.ExecuteScalarAsync();
+            return (o == null || o == DBNull.Value) ? null : Convert.ToString(o);
         }
 
         public AttendanceCheckVM BuildCheckVm(string? dateStr, int? classYear, int? classBan, string? loginUserId)
