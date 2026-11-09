@@ -1,10 +1,10 @@
 /* ==========================================================================
    TeamAward_20261109.sql
-   Team award record table + award-lock switch.
-     - dbo.DM2_TeamAward   : "team X got the award of step T" (one row per team + step)
-     - dbo.DM2_TeamSetting : small key/value settings (AwardLockEnabled = 1 / 0)
-   The family-team lock and the team-name reuse check read ONLY these tables
-   (they no longer parse the gift order memo text).
+   Team award record table.
+     - dbo.DM2_TeamAward : "team X got the award of step T" (one row per team + step)
+   The family-team lock (leave / kick / role change are blocked once a team has an award row)
+   and the team-name reuse check read ONLY this table (they no longer parse the gift order memo text).
+   There is no on/off switch: a team without an award row is simply not locked.
 
    Safe to run more than once (creates only what is missing, backfill adds only missing rows).
    Run it BEFORE deploying the new code. Old code keeps working (it does not use these tables).
@@ -26,20 +26,6 @@ BEGIN
     );
     CREATE INDEX IX_DM2_TeamAward_Key ON dbo.DM2_TeamAward (AwardKey);
 END
-GO
-
-IF OBJECT_ID(N'dbo.DM2_TeamSetting') IS NULL
-BEGIN
-    CREATE TABLE dbo.DM2_TeamSetting (
-        SettingKey    NVARCHAR(50)  NOT NULL CONSTRAINT PK_DM2_TeamSetting PRIMARY KEY,
-        SettingValue  NVARCHAR(200) NOT NULL,
-        UpdatedAt     DATETIME      NOT NULL CONSTRAINT DF_DM2_TeamSetting_At DEFAULT (GETDATE())
-    );
-END
-GO
-
-IF NOT EXISTS (SELECT 1 FROM dbo.DM2_TeamSetting WHERE SettingKey = N'AwardLockEnabled')
-    INSERT INTO dbo.DM2_TeamSetting (SettingKey, SettingValue) VALUES (N'AwardLockEnabled', N'1');
 GO
 
 /* Backfill from the existing gift orders (old memo format: family prefix + key [+ ":" + step], friend prefix + key + ":" + step).
@@ -78,5 +64,4 @@ GROUP BY q.Kind, LTRIM(RTRIM(q.AwardKey)), q.Threshold;
 GO
 
 SELECT Kind, AwardKey, Threshold, AwardedAt FROM dbo.DM2_TeamAward ORDER BY AwardedAt;
-SELECT SettingKey, SettingValue FROM dbo.DM2_TeamSetting;
 GO
