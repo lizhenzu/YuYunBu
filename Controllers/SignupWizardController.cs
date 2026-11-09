@@ -140,8 +140,9 @@ namespace BulletinBoard.Controllers
                 if ((role == "S" && cur.Kind == "S") || (role == "T" && cur.Kind == "T") || (role == "P" && cur.Kind == "") || (role == "E" && cur.Kind == "E"))
                     return Back("지금과 같은 역할이에요. 다른 역할을 골라 주세요.");
             }
-            // 학부모는 고르면 끝. 학생 · 교사도 "역할만 정하고 끝내기"(detail=false)면 더 받지 않는다.
-            // 연락처는 필수가 아니다 (2026-11-08 결정)
+            // 2026-11-09 결정: 네 역할 모두 역할만 정하고 끝 — 학년·반 · 생일 · 학교 · 연락처는 받지 않는다
+            //   (학생 · 교사는 같은 이름이 있을 때만 "나인지" 한 번 묻는다. 학년·반은 관리자가 승인할 때 정한다)
+            detail = false;
             if (role == "P" || role == "E" || !detail) phone = "";
             phone ??= "";
 
