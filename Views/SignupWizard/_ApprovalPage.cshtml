@@ -154,7 +154,8 @@
                     </div>
                 }
 
-                @if (a.RoleKind == "S")
+                @* 역할 변경 승인은 역할만 바꾼다 — 학생이어도 학년 · 반은 묻지 않는다 (2026-11-09). 가입 승인만 학년 · 반을 고른다 *@
+                @if (a.RoleKind == "S" && !isChange)
                 {
                     int y0 = a.ClassYear > 0 ? a.ClassYear : a.TargetClassYear;
                     int b0 = a.ClassBan > 0 ? a.ClassBan : a.TargetClassBan;
@@ -204,7 +205,7 @@
         var why = row.querySelector('.ap-why').value.trim();
         err.textContent = '';
         if (!approve && !why) { err.textContent = '반려 사유를 적어 주세요'; return; }
-        if (approve && row.dataset.role === 'S') {
+        if (approve && row.dataset.role === 'S' && row.querySelector('.ap-y')) {
             var y = row.querySelector('.ap-y').value, b = row.querySelector('.ap-b').value;
             if ((y === '0') !== (b === '0')) { err.textContent = '학년과 반을 둘 다 고르거나 둘 다 미정으로 두세요'; return; }
         }
