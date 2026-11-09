@@ -1046,10 +1046,33 @@ ORDER BY CASE o.Status WHEN 'DRAFT' THEN 1 WHEN 'PURCHASED' THEN 2 ELSE 3 END;
             };
         }
 
+        // ─────────────────────────────────────────────────────────────
+        // 시상 기록 (DM2_TeamAward) — 팀이 단계 선물을 고르면 한 줄 적고, 고른 선물을 모두 취소하면 지운다.
+        // 가족팀 시상 잠금과 팀 이름 재사용 판정은 이 표만 본다 (메모 글자를 읽지 않는다). 표가 아직 없으면 건너뛴다.
+        // ─────────────────────────────────────────────────────────────
+        private const string AwardAddSql = @"
+IF OBJECT_ID(N'dbo.DM2_TeamAward') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM dbo.DM2_TeamAward WHERE Kind = @AKind AND AwardKey = @AKey AND Threshold = @ATh)
+    INSERT INTO dbo.DM2_TeamAward (Kind, AwardKey, Threshold, AwardedAt) VALUES (@AKind, @AKey, @ATh, GETDATE());";
+
+        private const string AwardRemoveIfNoOrderSql = @"
+IF OBJECT_ID(N'dbo.DM2_TeamAward') IS NOT NULL
+    DELETE FROM dbo.DM2_TeamAward
+    WHERE Kind = @AKind AND AwardKey = @AKey AND Threshold = @ATh
+      AND NOT EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo);";
+
+        private static void AddAwardParams(SqlCommand cmd, string kind, string awardKey, int threshold)
+        {
+            cmd.Parameters.AddWithValue("@AKind", kind);
+            cmd.Parameters.AddWithValue("@AKey",  awardKey);
+            cmd.Parameters.AddWithValue("@ATh",   threshold);
+        }
+
         public async Task SelectFamilyGiftAsync(string topScorerUserName, int productId, int teamTotalDm2, string teamName)
         {
             if (string.IsNullOrWhiteSpace(topScorerUserName)) throw new ArgumentException("topScorerUserName required");
-            string memoKey = $"가족합산:{await AwardKeyOfAsync(teamName)}";
+            string awardKey = await AwardKeyOfAsync(teamName);
+            string memoKey = $"가족합산:{awardKey}";
 
             // 기존 DRAFT가 있으면 삭제 후 새로 삽입 (변경 허용)
             const string sql = @"
@@ -1060,13 +1083,14 @@ INSERT INTO dbo.StudentPointGiftOrder
     (UserName, ProductId, CreditCostSnapshot, Status, CreatedAt, IsCurrentDraft, Memo, MileStone)
 VALUES
     (@UserName, @ProductId, @TeamTotal, 'DRAFT', GETDATE(), 0, @Memo, 1000);
-";
+" + AwardAddSql;
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@UserName",  topScorerUserName);
             cmd.Parameters.AddWithValue("@ProductId", productId);
             cmd.Parameters.AddWithValue("@TeamTotal", teamTotalDm2);
             cmd.Parameters.AddWithValue("@Memo",      memoKey);
+            AddAwardParams(cmd, "FAMILY", awardKey, 1000);
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();
         }
@@ -1234,14 +1258,16 @@ ORDER BY t.FamilyTeamId, m.RelationCode;";
 
         public async Task CancelFamilyGiftAsync(string topScorerUserName, string teamName)
         {
-            string memoKey = $"가족합산:{await AwardKeyOfAsync(teamName)}";
+            string awardKey = await AwardKeyOfAsync(teamName);
+            string memoKey = $"가족합산:{awardKey}";
             const string sql = @"
 DELETE FROM dbo.StudentPointGiftOrder
 WHERE Memo = @Memo AND Status = 'DRAFT';
-";
+" + AwardRemoveIfNoOrderSql;
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@Memo", memoKey);
+            AddAwardParams(cmd, "FAMILY", awardKey, 1000);
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();
         }
@@ -1651,13 +1677,14 @@ WHERE m.UserName = @U AND m.IsActive = 1 AND (t.TeamName = @T OR t.AwardKey = @T
 
         public async Task SelectFamilyGiftForMilestoneAsync(string topScorerUserName, int productId, int teamTotalDm2, string teamName, int threshold)
         {
-            var memoKey = MilestoneGiftMemoKey(await AwardKeyOfAsync(teamName), threshold);
+            string awardKey = await AwardKeyOfAsync(teamName);
+            var memoKey = MilestoneGiftMemoKey(awardKey, threshold);
             const string sql = @"
 DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND Status = 'DRAFT';
 INSERT INTO dbo.StudentPointGiftOrder
     (UserName, ProductId, CreditCostSnapshot, Status, CreatedAt, IsCurrentDraft, Memo, MileStone)
 VALUES
-    (@UserName, @ProductId, @TeamTotal, 'DRAFT', GETDATE(), 0, @Memo, @Threshold);";
+    (@UserName, @ProductId, @TeamTotal, 'DRAFT', GETDATE(), 0, @Memo, @Threshold);" + AwardAddSql;
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@UserName",  topScorerUserName);
@@ -1665,6 +1692,7 @@ VALUES
             cmd.Parameters.AddWithValue("@TeamTotal", teamTotalDm2);
             cmd.Parameters.AddWithValue("@Memo",      memoKey);
             cmd.Parameters.AddWithValue("@Threshold", threshold);
+            AddAwardParams(cmd, "FAMILY", awardKey, threshold);
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();
         }
@@ -1707,11 +1735,13 @@ ORDER BY o.OrderId DESC;";
 
         public async Task CancelFamilyGiftForMilestoneAsync(string teamName, int threshold)
         {
-            var memoKey = MilestoneGiftMemoKey(await AwardKeyOfAsync(teamName), threshold);
-            const string sql = @"DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND Status = 'DRAFT';";
+            string awardKey = await AwardKeyOfAsync(teamName);
+            var memoKey = MilestoneGiftMemoKey(awardKey, threshold);
+            const string sql = @"DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND Status = 'DRAFT';" + AwardRemoveIfNoOrderSql;
             using var conn = Conn();
             using var cmd  = new SqlCommand(sql, conn);
             cmd.Parameters.AddWithValue("@Memo", memoKey);
+            AddAwardParams(cmd, "FAMILY", awardKey, threshold);
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();
         }
@@ -1826,6 +1856,7 @@ BEGIN
     DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND UserName = @U AND Status = 'DRAFT';
     INSERT INTO dbo.StudentPointGiftOrder (UserName, ProductId, CreditCostSnapshot, Status, CreatedAt, IsCurrentDraft, Memo, MileStone)
     VALUES (@U, @P, @Total, 'DRAFT', GETDATE(), 0, @Memo, @Th);
+" + AwardAddSql + @"
     SELECT 1;
 END";
             using var conn = Conn();
@@ -1837,6 +1868,7 @@ END";
             cmd.Parameters.AddWithValue("@P", productId);
             cmd.Parameters.AddWithValue("@Total", teamTotal);
             cmd.Parameters.AddWithValue("@Th", threshold);
+            AddAwardParams(cmd, "FRIEND", awardKey, threshold);
             bool ok = Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 1;
             tx.Commit();
             return ok;
@@ -1845,9 +1877,10 @@ END";
         public async Task CancelFriendGiftAsync(string userName, string awardKey, int threshold)
         {
             using var conn = Conn();
-            using var cmd = new SqlCommand("DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND UserName = @U AND Status = 'DRAFT';", conn);
+            using var cmd = new SqlCommand("DELETE FROM dbo.StudentPointGiftOrder WHERE Memo = @Memo AND UserName = @U AND Status = 'DRAFT';" + AwardRemoveIfNoOrderSql, conn);
             cmd.Parameters.AddWithValue("@Memo", FriendMemoKey(awardKey, threshold));
             cmd.Parameters.AddWithValue("@U", userName);
+            AddAwardParams(cmd, "FRIEND", awardKey, threshold);
             await conn.OpenAsync();
             await cmd.ExecuteNonQueryAsync();
         }
