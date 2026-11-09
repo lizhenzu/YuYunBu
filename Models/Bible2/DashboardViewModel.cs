@@ -32,6 +32,8 @@ public class LastReadVerseItem
     public int    Zul         { get; set; }
     public string VerseText   { get; set; } = string.Empty;
     public DateTime ReadDate  { get; set; }
+    /// <summary>절 번호(eBible.Id) — 읽기 화면의 #vc-{VerseId} 자리로 바로 가는 데 쓴다 (0 = 모름)</summary>
+    public int    VerseId     { get; set; }
 }
 
 public class BookProgressItem
