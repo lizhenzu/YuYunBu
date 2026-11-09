@@ -409,7 +409,7 @@ namespace BulletinBoard.Controllers
 
             // 이번주 시상
             var manageCheckPoint = new ManageCheckPoint();
-            ViewBag.PointAwardUser = manageCheckPoint.getGetThisWeekRewardingByAward(string.Empty, _hostingEnvironment);
+            ViewBag.PointAwardUser = manageCheckPoint.getGetThisWeekRewardingByAward(_hostingEnvironment);
 
 
             List<BibleLastReadInfo> BibleLastReadInfos = manageReadBible.GetLastReadVerse(UserId, 0, 0);
@@ -615,7 +615,7 @@ namespace BulletinBoard.Controllers
 
             List<AllStatusData> allStatusDatas = manageeCommon.getAllStatusData(UserName);
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             ViewData["userInfo"] = userInfo[0];
             return View(allStatusDatas);
@@ -639,7 +639,7 @@ namespace BulletinBoard.Controllers
 
             List<AllStatusData> allStatusDatas = manageeCommon.getAllStatusData(UserName);
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             ViewData["userInfo"] = userInfo[0];
             return View(allStatusDatas);

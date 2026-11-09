@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -141,8 +141,7 @@ namespace BulletinBoard.DataAccessLayer
 
             // 계정에 딸린 연결 (Identity.User 자체는 호출한 쪽이 UserManager 로 지운다)
             One(G_Account, "DeptRoleUserAssoc", "UserId", 'I'),
-            One(G_Account, "DeptInfo", "UserId", 'I'),
-            One(G_Account, "PersonLinkRequest", "UserName", 'U'),
+           One(G_Account, "PersonLinkRequest", "UserName", 'U'),
             One(G_Account, "SignupApplication", "UserId", 'I'),   // 가입 마법사 신청(연락처 · 학교 · 자녀 정보)
 
             // 사람 명부는 마지막에

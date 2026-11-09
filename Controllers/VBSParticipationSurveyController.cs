@@ -51,7 +51,7 @@ namespace BulletinBoard.Controllers
             if (string.IsNullOrWhiteSpace(UserId)) return null;
 
             var m = new ManageHumanResource();
-            var list = m.getUserInfos(_env, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            var list = m.getUserInfos(_env, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
             return list.FirstOrDefault();
         }
 
@@ -108,8 +108,8 @@ namespace BulletinBoard.Controllers
                 };
 
             var m = new ManageHumanResource();
-            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, DeptCodeType.D1001.ToString(), opt);
-            var vm = await _svc.GetAdminVMAsync(users, DeptCodeType.D1001.ToString());
+            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, opt);
+            var vm = await _svc.GetAdminVMAsync(users);
             ViewBag.ViewMode = view ?? "All";
             return View(vm);
         }
@@ -166,9 +166,9 @@ namespace BulletinBoard.Controllers
                 };
 
             var m = new ManageHumanResource();
-            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, opt);
+            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, opt);
 
-            var vm = await _svc.GetAdminVMAsync(users , DeptCodeType.D1001.ToString());
+            var vm = await _svc.GetAdminVMAsync(users);
             ViewBag.ViewMode = view ?? "All";
             return View(vm);
         }
@@ -190,9 +190,9 @@ namespace BulletinBoard.Controllers
                 };
 
             var m = new ManageHumanResource();
-            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, DeptCodeType.D1001.ToString(), opt);
+            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, opt);
 
-            var vm = await _svc.GetAdminVMAsync(users, DeptCodeType.D1001.ToString());
+            var vm = await _svc.GetAdminVMAsync(users);
             ViewBag.ViewMode = view ?? "All";
             return View(vm);
         }
@@ -221,9 +221,9 @@ namespace BulletinBoard.Controllers
                 };
 
             var m = new ManageHumanResource();
-            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, DeptCodeType.D1001.ToString(), opt);
+            var users = m.getUserInfos(_env, string.Empty, string.Empty, 0, 0, 0, string.Empty, opt);
 
-            var vm = await _svc.GetAdminVMAsync(users, DeptCodeType.D1001.ToString());
+            var vm = await _svc.GetAdminVMAsync(users);
 
             var days = vm.Days ?? new[]
             {

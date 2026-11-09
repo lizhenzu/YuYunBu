@@ -18,7 +18,7 @@
         public int? ClassBan { get; set; }
 
         // 교사면
-        public string DeptCode { get; set; } = "";
+        
         public string RoleCode { get; set; } = "";
         public string RoleName { get; set; } = "";
 

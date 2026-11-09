@@ -651,8 +651,8 @@ WHERE Id IN ({string.Join(",", p)});
             }
 
             // =====================================================
-            // 4.5 교사 역할/부서 (학생 반정보가 없으면 교사로 간주)
-            //   - view_All_Person_2026(UserId, DeptCode, RoleCode, PersonId, FullName)
+            // 4.5 교사 역할 (학생 반정보가 없으면 교사로 간주)
+            //   - view_All_Person_2026(UserId, RoleCode, PersonId, FullName)
             //   - CodeData(MajorCD='T001') 와 RoleCode=MinorCD 조인해서 MinorNM(RoleName)
             // =====================================================
             var teacherCandidateUserIds = new List<string>();
@@ -670,7 +670,7 @@ WHERE Id IN ({string.Join(",", p)});
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var teacherMapByUserId = new Dictionary<string, (string deptCode, string roleCode, string roleName)>(StringComparer.OrdinalIgnoreCase);
+            var teacherMapByUserId = new Dictionary<string, (string roleCode, string roleName)>(StringComparer.OrdinalIgnoreCase);
 
             if (teacherCandidateUserIds.Count > 0)
             {
@@ -688,7 +688,6 @@ WHERE Id IN ({string.Join(",", p)});
                 cmd.CommandText = $@"
 SELECT
     t.UserId,
-    t.DeptCode,
     t.RoleCode,
     cd.MinorNM AS RoleName
 FROM dbo.view_All_Person_2026 t
@@ -702,12 +701,11 @@ WHERE t.UserId IN ({string.Join(",", p)});
                 while (await r.ReadAsync())
                 {
                     var userId = r["UserId"].ToString()!;
-                    var deptCode = r["DeptCode"]?.ToString() ?? "";
                     var roleCode = r["RoleCode"]?.ToString() ?? "";
                     var roleName = (r["RoleName"] == DBNull.Value) ? "" : r["RoleName"].ToString()!;
 
                     if (!string.IsNullOrWhiteSpace(userId))
-                        teacherMapByUserId[userId] = (deptCode, roleCode, roleName);
+                        teacherMapByUserId[userId] = (roleCode, roleName);
                 }
             }
 
@@ -798,7 +796,6 @@ WHERE ProductID IN ({string.Join(",", p)});
 
                         if (teacherMapByUserId.TryGetValue(row.UserId!, out var t))
                         {
-                            row.DeptCode = t.deptCode;
                             row.RoleCode = t.roleCode;
                             row.RoleName = string.IsNullOrWhiteSpace(t.roleName) ? "교사" : t.roleName;
 

@@ -51,7 +51,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> ViewMainBirthDay()
         {
             // 유년부 전용 사이트: 부서를 고르는 화면 없이 바로 생일 목록으로 간다
-            return RedirectToAction(nameof(addressBookDetailBirthDay), new { DeptCode = ConstatsCommon.FixedDeptCode, RankQueryOptionData = "None", ClassYear = 0, ClassBan = 0 });
+            return RedirectToAction(nameof(addressBookDetailBirthDay), new { RankQueryOptionData = "None", ClassYear = 0, ClassBan = 0 });
         }
 
 
@@ -117,14 +117,13 @@ namespace BulletinBoard.Controllers
                 UserId = this.UserId;
             }
 
-            // ✅ 여기에서 "홍길동 + D1001 + StudentOnly"로 1명 조회
+            // ✅ 여기에서 UserId 로 1명 조회
             ManageHumanResource manageHumanResourceA = new ManageHumanResource();
             List<UserInfo> users = manageHumanResourceA.getUserInfos(
                 _hostingEnvironment,
                UserId,
                string.Empty,
                 0, 0, 0,
-                string.Empty,
                 string.Empty,
                 RankQueryOption.None);
 
@@ -157,15 +156,11 @@ namespace BulletinBoard.Controllers
 
 
 
-        public async Task<IActionResult> printStudentCard(string DeptCode, int ClassYear,int ClassBan)
+        public async Task<IActionResult> printStudentCard(int ClassYear,int ClassBan)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-            if (string.IsNullOrEmpty(DeptCode))
-            {
-                DeptCode = "D1001"; // HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString()) as string;
-            }
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, DeptCode, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, RankQueryOption.None);
          
             var orderedList = userInfo.OrderBy(user => user.ClassYear).ThenBy(user => user.ClassBan).ToList();
             ViewData["ClassYear"] = ClassYear;
@@ -191,7 +186,7 @@ namespace BulletinBoard.Controllers
                 var result = await SetUserInfo();
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 ViewData["ClassYear"] = userInfo[0].ClassYear;
                 ViewData["ClassBan"] = userInfo[0].ClassBan;
@@ -227,20 +222,20 @@ namespace BulletinBoard.Controllers
             return View(data);
         }
 
-        public async Task<IActionResult> addressBookDetail(string DeptCode, string RankQueryOptionData, int ClassYear, int ClassBan)
+        public async Task<IActionResult> addressBookDetail(string RankQueryOptionData, int ClassYear, int ClassBan)
         {         
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
             RankQueryOption groupNameEnum = (RankQueryOption)Enum.Parse(typeof(RankQueryOption), RankQueryOptionData);
 
-            var data = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, DeptCode, groupNameEnum);
+            var data = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, groupNameEnum);
             ViewData["DisplayMode"] = "All";
             return View(data);
         }
 
         [AllowAnonymous]
-        public async Task<IActionResult> addressBookDetailBirthDay(string DeptCode, string RankQueryOptionData, int ClassYear, int ClassBan)
+        public async Task<IActionResult> addressBookDetailBirthDay(string RankQueryOptionData, int ClassYear, int ClassBan)
         {
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
@@ -248,7 +243,7 @@ namespace BulletinBoard.Controllers
             RankQueryOption groupNameEnum = (RankQueryOption)Enum.Parse(typeof(RankQueryOption), RankQueryOptionData);
             ViewData["DisplayMode"] = "BirthDay";
 
-            var data = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, DeptCode, groupNameEnum);
+            var data = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, ClassYear, ClassBan, string.Empty, groupNameEnum);
 
             var orderedList = data.OrderBy(user => user.bMonth).ThenBy(user => user.bDay).ToList();
 
@@ -267,7 +262,7 @@ namespace BulletinBoard.Controllers
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
             if (userInfo.Count == 0)
                 return Content("사용자 정보를 찾을 수 없어요.");
 
@@ -292,7 +287,7 @@ namespace BulletinBoard.Controllers
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment , UserId, string.Empty, PersonId, 0,0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment , UserId, string.Empty, PersonId, 0,0, string.Empty, RankQueryOption.None);
             if (userInfo.Count == 0)
                 return Content("사용자 정보를 찾을 수 없어요.");
 
@@ -307,7 +302,7 @@ namespace BulletinBoard.Controllers
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, PersonId, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, PersonId, 0, 0, string.Empty, RankQueryOption.None);
             if (userInfo.Count == 0)
                 return Content("사용자 정보를 찾을 수 없어요.");
 
@@ -337,12 +332,12 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> ChangeUseRoleMain(string UserId)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0,string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0,string.Empty, RankQueryOption.None);
             ViewData["userInfo"] = userInfo[0];
 
-            ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
+            ManageCodeData manageCodeData = new ManageCodeData();
 
-            List<CodeData> codeDatas = manageDeptInfo.getCodeData("T001");
+            List<CodeData> codeDatas = manageCodeData.getCodeData("T001");
             return View(codeDatas);
         }         
 
@@ -352,8 +347,8 @@ namespace BulletinBoard.Controllers
             //H0101
             if (model.RoleCode == "T1001" || model.RoleCode == "T1002")
             { 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-                                userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
+                                userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
                 
                 ViewData["RoleCode"] = model.RoleCode;
                 ViewData["RoleNM"] = model.RoleNM;
@@ -365,10 +360,10 @@ namespace BulletinBoard.Controllers
 
                 await controlHumanResource.DeleteClassInfoAsync(model.UserId);
                 await controlHumanResource.DeleteDeptRoleUserAssocAsync(model.UserId);
-                await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, ConstatsCommon.FixedDeptCode, model.RoleCode);
+                await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, model.RoleCode);
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-                userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
+                userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 return View("ChangeUserDeptInfoProcessResult", userInfo[0]);
             }
@@ -390,8 +385,8 @@ namespace BulletinBoard.Controllers
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-            var noDept = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.UnClassify);
-            var inRole = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.All);
+            var noDept = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.UnClassify);
+            var inRole = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.All);
             var noClass = inRole.Where(u => (u.RoleCode == "T1001" || u.RoleCode == "T1002") && (u.ClassYear <= 0 || u.ClassBan <= 0));
 
             var members = noDept.Concat(noClass)
@@ -400,8 +395,8 @@ namespace BulletinBoard.Controllers
                                 .OrderBy(u => u.FullName)
                                 .ToList();
 
-            ManageDeptInfo manageDeptInfo = new ManageDeptInfo();
-            ViewData["Roles"] = manageDeptInfo.getCodeData("T001");
+            ManageCodeData manageCodeData = new ManageCodeData();
+            ViewData["Roles"] = manageCodeData.getCodeData("T001");
             // 가입 직후 "이 사람이 저예요" 연결 요청을 보내 확인을 기다리는 회원
             var pendingNames = await new ControlPersonMatch().GetPendingUserNamesAsync();
             // 가입 마법사로 승인을 요청한 회원도 가입 승인 화면에서 처리한다
@@ -447,7 +442,7 @@ namespace BulletinBoard.Controllers
                 await controlHumanResource.DeleteDeptRoleUserAssocAsync(UserId);
                 if (needClass)
                     await controlHumanResource.SaveClassInfoAsync(UserId, ClassYear, ClassBan);
-                await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, ConstatsCommon.FixedDeptCode, RoleCode);
+                await controlHumanResource.SaveDeptRoleUserAssocAsync(UserId, RoleCode);
 
                 return Json(new { ok = true });
             }
@@ -469,12 +464,12 @@ namespace BulletinBoard.Controllers
             if (!IsRoleAdmin()) return Forbid();
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            var all = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            var all = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
             var people = all.Where(u => !string.IsNullOrWhiteSpace(u.UserId))
                             .GroupBy(u => u.UserId).Select(g => g.First())
                             .OrderBy(u => u.FullName).ToList();
 
-            ViewData["Roles"] = new ManageDeptInfo().getCodeData("T001");
+            ViewData["Roles"] = new ManageCodeData().getCodeData("T001");
             var years = new SortedSet<int>();
             var bans = new SortedSet<int>();
             var ds = new ControlHumanResource().fetchClassOptions();
@@ -503,7 +498,7 @@ namespace BulletinBoard.Controllers
                 string roleName = "학부모(역할 없음)";
                 if (RoleCode.Length > 0)
                 {
-                    var code = new ManageDeptInfo().getCodeData("T001").FirstOrDefault(c => c.MinorCD == RoleCode);
+                    var code = new ManageCodeData().getCodeData("T001").FirstOrDefault(c => c.MinorCD == RoleCode);
                     if (code == null) return Json(new { ok = false, message = "역할을 다시 골라 주세요." });
                     roleName = code.MinorNM;
                 }
@@ -568,7 +563,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> ChangeUserClassInfo(string UserId)
         {
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
             return View(userInfo[0]);
         }
         [HttpPost]
@@ -581,11 +576,11 @@ namespace BulletinBoard.Controllers
             await controlHumanResource.DeleteDeptRoleUserAssocAsync(model.UserId);
 
             await controlHumanResource.SaveClassInfoAsync(model.UserId, model.ClassYear, model.ClassBan);
-            await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, ConstatsCommon.FixedDeptCode, model.RoleCode);
+            await controlHumanResource.SaveDeptRoleUserAssocAsync(model.UserId, model.RoleCode);
 
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-            userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
+            userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, model.UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             return View("ChangeUserDeptInfoProcessResult", userInfo[0]);
         }
@@ -599,7 +594,7 @@ namespace BulletinBoard.Controllers
 
      
 
-            return Json(manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty,0, ClassYear, ClassBan, BanMode, string.Empty, RankQueryOption.None));
+            return Json(manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, string.Empty,0, ClassYear, ClassBan, BanMode, RankQueryOption.None));
         }
 
         [AllowAnonymous]

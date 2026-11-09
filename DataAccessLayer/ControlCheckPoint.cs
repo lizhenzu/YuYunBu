@@ -53,11 +53,12 @@ namespace BulletinBoard.DataAccessLayer
  
 
 
-        public DataSet fetchGetThisWeekRewarding(string DeptCode)
+        // 부서 구분 없음 (2026-11-09) — 예전 GetThisWeekRewardingP(@deptCode) 대신 인자 없는 GetThisWeekRewarding()
+        public DataSet fetchGetThisWeekRewarding()
         {
             StringBuilder sb = new StringBuilder();
 
-            sb.AppendFormat(" select * from [GetThisWeekRewardingP]('{0}') order by DC_Total desc ", DeptCode); sb.Append(Environment.NewLine);
+            sb.AppendFormat(" select * from [dbo].[GetThisWeekRewarding]() order by DC_Total desc "); sb.Append(Environment.NewLine);
 
             DataSet ds = DataAccessModule.commonQuery(sb.ToString());
             return ds;
@@ -82,7 +83,7 @@ namespace BulletinBoard.DataAccessLayer
         /// <param name="rankQueryOption"></param>
         /// <param name="orderBy"></param>
         /// <returns></returns>
-        public DataSet fetchGroupByUsernameDataN(RankQueryOption rankQueryOption , string UserId, string DeptCode, string orderBy)
+        public DataSet fetchGroupByUsernameDataN(RankQueryOption rankQueryOption , string UserId, string orderBy)
 		{
 			StringBuilder sb = new StringBuilder();
 
@@ -96,12 +97,6 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat("   select ROW_NUMBER() OVER(ORDER BY {0} desc) sequenceNo, *  , '' ProfilePicturePath ", orderBy); sb.Append(Environment.NewLine);
             sb.AppendFormat("   from [dbo].[view_Ranking_By_Person_ext]  "); sb.Append(Environment.NewLine);
             sb.AppendFormat("   where 1 = 1  "); sb.Append(Environment.NewLine);
-            
-
-            if (!string.IsNullOrEmpty(DeptCode))
-			{
-				sb.AppendFormat("      and   DeptCode = '{0}' ", DeptCode); sb.Append(Environment.NewLine);
-			}
 
 			if (!string.IsNullOrEmpty(UserId))
 			{
@@ -150,7 +145,7 @@ namespace BulletinBoard.DataAccessLayer
 			sb.AppendFormat("   select top 100 ROW_NUMBER() OVER(ORDER BY {0} desc) sequenceNo, *  ", orderBy); sb.Append(Environment.NewLine);
 			sb.AppendFormat("   from   "); sb.Append(Environment.NewLine);
 			sb.AppendFormat("   (  "); sb.Append(Environment.NewLine);
-			sb.AppendFormat("   select   (DC - isnull(AD.AwardLevel, 0)) DC ,  DC DC_Total, MA.userName  , MA.[LastName], MA.[FirstName] , MA.FullName  ,MA.ClassYear, MA.ClassBan, RoleCode, DeptCode ,RoleNM, DeptNM , "); sb.Append(Environment.NewLine);
+			sb.AppendFormat("   select   (DC - isnull(AD.AwardLevel, 0)) DC ,  DC DC_Total, MA.userName  , MA.[LastName], MA.[FirstName] , MA.FullName  ,MA.ClassYear, MA.ClassBan, RoleCode, RoleNM, "); sb.Append(Environment.NewLine);
 			sb.AppendFormat("               [minclickDate], [maxclickDate] ,isnull(AD.AwardLevel, 0) AwardLevel, isnull(AwardLevel1000Value, 0) AwardLevel1000Value, UserId "); sb.Append(Environment.NewLine);
 			sb.AppendFormat("      from [dbo].view_Ranking_By_Person  MA   "); sb.Append(Environment.NewLine);
 			sb.AppendFormat("      left outer join [dbo].[awardData] AD on MA.userName = AD.userName  "); sb.Append(Environment.NewLine);
@@ -159,30 +154,6 @@ namespace BulletinBoard.DataAccessLayer
 
             return sb.ToString();
 		}
-
-		public DataSet fetchGroupByClassData(RankQueryOption rankQueryOption, int duration, string DeptCode)
-        {
-            StringBuilder sb = new StringBuilder();
-
-            sb.AppendFormat("   select top 10 ROW_NUMBER() OVER(ORDER BY DC desc) sequenceNo, *  "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("   from   "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("   (  "); sb.Append(Environment.NewLine);
-
-            sb.AppendFormat("  select ClassYear, ClassBan , SUM(DC) DC "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("  from [GetPointByDate] (16, -{0}) ", duration); sb.Append(Environment.NewLine);
-            sb.AppendFormat("  where 1 = 1 "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("      and   DeptCode = '{0}' ", DeptCode); sb.Append(Environment.NewLine);
-
-            if (rankQueryOption == RankQueryOption.StudentOnly)
-            {
-                sb.AppendFormat("   and RoleCode = 'T1001' "); sb.Append(Environment.NewLine);
-            }
-            sb.AppendFormat("  group by ClassYear, ClassBan "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("    ) data   "); sb.Append(Environment.NewLine);
-
-            DataSet ds = DataAccessModule.commonQuery(sb.ToString());
-            return ds;
-        }
 
 
         public DataSet fetchAwardBase()

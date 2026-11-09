@@ -14,8 +14,7 @@ namespace BulletinBoard.Models
 
         public string RoleCode { get; set; }
         public string RoleNM { get; set; }
-        public string DeptCode { get; set; }
-        public string DeptNM { get; set; }
+        
         public int readBibleAllCount { get; set; }
         public int ClassYear { get; set; }
         public int ClassBan { get; set; }

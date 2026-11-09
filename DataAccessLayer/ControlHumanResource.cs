@@ -14,7 +14,7 @@ namespace BulletinBoard.DataAccessLayer
         /// <summary>
         /// PhoneNumber2, , 
         /// </summary>
-        public DataSet fetchgetUserInfos(string UserId, string UserName, int PersonId, int ClassYear, int ClassBan, string BanMode, string DeptCode, RankQueryOption RankQueryOptionData)
+        public DataSet fetchgetUserInfos(string UserId, string UserName, int PersonId, int ClassYear, int ClassBan, string BanMode, RankQueryOption RankQueryOptionData)
         {
             StringBuilder sb = new StringBuilder();
 
@@ -71,12 +71,8 @@ namespace BulletinBoard.DataAccessLayer
             }
             else if (RankQueryOptionData == RankQueryOption.UnClassify)
             {
-                sb.AppendFormat(" and isnull(DeptCode,'') = '' ", ClassBan); sb.Append(Environment.NewLine);
-            }
-
-            if (!string.IsNullOrEmpty(DeptCode))
-            {
-                sb.AppendFormat($" and DeptCode = '{DeptCode}'  "); sb.Append(Environment.NewLine);
+                // 배정 표(반 · 담임 · 부서 교사)에 없는 사람 — 예전 "부서 없음"과 같은 뜻
+                sb.AppendFormat(" and isnull(RoleCode,'') = '' "); sb.Append(Environment.NewLine);
             }
 
             DataSet ds = DataAccessModule.commonQuery(sb.ToString());
@@ -128,11 +124,9 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat("  isnull(ClassBan  ,0)  ClassBan      , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  PhoneNumber , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  PhoneNumber2 , "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("  DeptCode     , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  HomeAaddress , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  school       , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  sex         , "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("  DeptNM      , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  RoleCode    , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  RoleNM      , "); sb.Append(Environment.NewLine);
  
@@ -170,8 +164,6 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat("  '' school       , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  '' sex       , "); sb.Append(Environment.NewLine);
 
-            sb.AppendFormat("  '' DeptCode     , "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("  '' DeptNM       , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  '' RoleCode     , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  0 DC_Total      , "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  '' RoleNM       , "); sb.Append(Environment.NewLine);
@@ -595,7 +587,8 @@ namespace BulletinBoard.DataAccessLayer
             }
         }
 
-        public async Task SaveDeptRoleUserAssocAsync(string UserId, string DeptCode, string RoleCode)
+        /// <summary>역할 저장 (사람당 한 줄). 부서 구분은 없다 (2026-11-09)</summary>
+        public async Task SaveDeptRoleUserAssocAsync(string UserId, string RoleCode)
         {
             using (SqlConnection conn = new SqlConnection(DataAccessModule.connectionString_Server))
             {
@@ -603,15 +596,13 @@ namespace BulletinBoard.DataAccessLayer
 
                 string sqlUpdate = @$"
                                     UPDATE [DeptRoleUserAssoc]
-                                    SET [DeptCode] = @DeptCode,
-                                        [RoleCode] = @RoleCode,
+                                    SET [RoleCode] = @RoleCode,
                                         [updateDT] = @updateDT
                                     WHERE [UserId] = @UserId";
 
                 using (SqlCommand cmdUpdate = new SqlCommand(sqlUpdate, conn))
                 {
                     cmdUpdate.Parameters.AddWithValue("@UserId", UserId);
-                    cmdUpdate.Parameters.AddWithValue("@DeptCode", DeptCode);
                     cmdUpdate.Parameters.AddWithValue("@RoleCode", RoleCode);
                     cmdUpdate.Parameters.AddWithValue("@updateDT", SharedComm.GetKoreaNow());
 
@@ -620,13 +611,12 @@ namespace BulletinBoard.DataAccessLayer
                     if (rowsAffected == 0)
                     {
                         string sqlInsert = @$"
-                                            INSERT INTO [DeptRoleUserAssoc] ([UserId], [DeptCode], [RoleCode])
-                                            VALUES (@UserId, @DeptCode, @RoleCode)";
+                                            INSERT INTO [DeptRoleUserAssoc] ([UserId], [RoleCode])
+                                            VALUES (@UserId, @RoleCode)";
 
                         using (SqlCommand cmdInsert = new SqlCommand(sqlInsert, conn))
                         {
                             cmdInsert.Parameters.AddWithValue("@UserId", UserId);
-                            cmdInsert.Parameters.AddWithValue("@DeptCode", DeptCode);
                             cmdInsert.Parameters.AddWithValue("@RoleCode", RoleCode);
 
                             await cmdInsert.ExecuteNonQueryAsync();

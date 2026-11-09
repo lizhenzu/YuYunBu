@@ -6,6 +6,7 @@
    - Class assignment of those members is removed (Etc has no class) (1 row)
    - Remaining members: DeptCode = D1001, RoleCode = T1099 (29 rows)
    Run once. Safe to re-run: second run finds nothing to change.
+   NOTE 2026-11-09: already applied on the production DB (by a test run). Running it again changes nothing.
    ========================================================================== */
 SET NOCOUNT ON;
 SET XACT_ABORT ON;

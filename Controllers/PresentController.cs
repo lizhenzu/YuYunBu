@@ -118,7 +118,7 @@ namespace BulletinBoard.Controllers
             try
             {
                 var manageHR = new ManageHumanResource();
-                var userInfoList = manageHR.getUserInfos(_hostingEnvironment, userId, "", 0, 0, 0, "", "", RankQueryOption.All);
+                var userInfoList = manageHR.getUserInfos(_hostingEnvironment, userId, "", 0, 0, 0, "", RankQueryOption.All);
                 var targetInfo = userInfoList?.FirstOrDefault();
                 if (targetInfo != null)
                     targetFullName = !string.IsNullOrWhiteSpace(targetInfo.FullName)

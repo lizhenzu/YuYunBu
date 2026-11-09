@@ -187,8 +187,6 @@ order by ft.FamilyTeamId, m.RoleCode, m.RelationCode, m.SortNo");
             HttpContext.Session.Remove(HttpContextSessionCategory.UserFullName.ToString());
             HttpContext.Session.Remove(HttpContextSessionCategory.UserId.ToString());
             HttpContext.Session.Remove(HttpContextSessionCategory.UserName.ToString());
-            HttpContext.Session.Remove(HttpContextSessionCategory.DeptCode.ToString());
-            HttpContext.Session.Remove(HttpContextSessionCategory.DeptNM.ToString());
 
             return Redirect("/Home/Index");
         }

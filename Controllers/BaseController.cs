@@ -54,13 +54,11 @@ namespace BulletinBoard.Controllers
             var sessionFullName = HttpContext.Session.GetString(HttpContextSessionCategory.UserFullName.ToString());
             var sessionUserName = HttpContext.Session.GetString(HttpContextSessionCategory.UserName.ToString());
             var sessionUserId   = HttpContext.Session.GetString(HttpContextSessionCategory.UserId.ToString());
-            var deptCode        = HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString());
-            var deptNM          = HttpContext.Session.GetString(HttpContextSessionCategory.DeptNM.ToString());
 
             // 세션에 이미 있으면 그대로 사용 (가장 포함 — SignInAsync 후 세션 갱신됨)
             if (!string.IsNullOrEmpty(sessionFullName))
             {
-                ApplyUserContext(sessionUserId, sessionUserName, sessionFullName, deptCode, deptNM);
+                ApplyUserContext(sessionUserId, sessionUserName, sessionFullName);
             }
             // 없으면 현재 Identity 클레임 기준으로 채움
             else
@@ -119,8 +117,7 @@ namespace BulletinBoard.Controllers
                 ApplyUserContext(
                     user.Id,
                     user.UserName,
-                    $"{user.LastName}{user.FirstName}",
-                    "", ""
+                    $"{user.LastName}{user.FirstName}"
                 );
             }
             else
@@ -138,7 +135,7 @@ namespace BulletinBoard.Controllers
         /// <summary>
         /// 실제 세션/뷰데이터/필드 반영
         /// </summary>
-        protected void ApplyUserContext(string? userID, string? userName, string? userFullName, string? deptCode, string? deptNM)
+        protected void ApplyUserContext(string? userID, string? userName, string? userFullName)
         {
             UserId = userID ?? "";
             UserName = userName ?? "";
@@ -151,12 +148,6 @@ namespace BulletinBoard.Controllers
             HttpContext.Session.SetString(HttpContextSessionCategory.UserFullName.ToString(), UserFullName);
             HttpContext.Session.SetString(HttpContextSessionCategory.UserId.ToString(), UserId);
             HttpContext.Session.SetString(HttpContextSessionCategory.UserName.ToString(), UserName);
-
-            if (!string.IsNullOrEmpty(deptCode))
-                HttpContext.Session.SetString(HttpContextSessionCategory.DeptCode.ToString(), deptCode);
-
-            if (!string.IsNullOrEmpty(deptNM))
-                HttpContext.Session.SetString(HttpContextSessionCategory.DeptNM.ToString(), deptNM);
         }
     }
 }

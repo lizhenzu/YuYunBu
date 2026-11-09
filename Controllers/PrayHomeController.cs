@@ -123,12 +123,10 @@ namespace BulletinBoard.Controllers
                 var result = await SetUserInfo();
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 if (userInfo.Count > 0)
                 {
-                    HttpContext.Session.SetString(HttpContextSessionCategory.DeptCode.ToString(), userInfo[0].DeptCode);
-                    HttpContext.Session.SetString(HttpContextSessionCategory.DeptNM.ToString(), userInfo[0].DeptNM);
                     _UserInfos = ViewBag.UserInfos = userInfo[0];
                 }
 

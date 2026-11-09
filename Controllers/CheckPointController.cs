@@ -55,7 +55,7 @@ namespace BulletinBoard.Controllers
 		{
             int ClassYear = 0;
             int ClassBan = 0;
-			await SetDept();
+			await LoadSignedUser();
 			ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
 
             if (await _authService.IsSignedIn(User))
@@ -64,7 +64,7 @@ namespace BulletinBoard.Controllers
 
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
                 if (userInfo != null)
                 {
                     ClassYear = userInfo[0].ClassYear;
@@ -76,19 +76,18 @@ namespace BulletinBoard.Controllers
 
 		public async Task<IActionResult> ChampionList()
         {
-            await SetDept();
+            await LoadSignedUser();
 
              ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
             RankQueryOption groupNameEnum = RankQueryOption.None;
-            var DeptCode = HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString()) as string;
-            return View(manageCheckPoint.getGroupByUsernameData(groupNameEnum, string.Empty, "DC_Total", DeptCode, _hostingEnvironment));
+            return View(manageCheckPoint.getGroupByUsernameData(groupNameEnum, string.Empty, "DC_Total", _hostingEnvironment));
         }
 
         // 퀴즈 답변 정정(목록 · 보정)은 SuperAdmin 전용 — 2026-10-04
         [Authorize(Roles = nameof(Roles.SuperAdmin))]
         public async Task<IActionResult> MismatchClickHistoryForQuestion()
         {
-            await SetDept();
+            await LoadSignedUser();
 
             ManageClickHistoryForQuestion manageClickHistoryForQuestion = new ManageClickHistoryForQuestion();
             return View(manageClickHistoryForQuestion.MismatchClickHistoryForQuestion());
@@ -124,16 +123,13 @@ namespace BulletinBoard.Controllers
             ViewBag.ActionName = urlInfo.ActionName;
             ViewBag.FullURL = $"{ViewBag.Domain}/{ViewBag.ControllerName}/{ViewBag.ActionName}";
 
-            await SetDept();
+            await LoadSignedUser();
 
             ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
-            var DeptCode = HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString()) as string;
-
-            DeptCode = SharedComm.DefaultDeptCode(DeptCode);
 
             ViewBag.viewOption = viewOption;
 
-            return View(manageCheckPoint.getGetThisWeekRewardingByAward(DeptCode, _hostingEnvironment));
+            return View(manageCheckPoint.getGetThisWeekRewardingByAward(_hostingEnvironment));
         }
 
 
@@ -150,12 +146,11 @@ namespace BulletinBoard.Controllers
                 var result = await SetUserInfo();
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 ViewData["userInfo"] = userInfo[0];
 
-                var DeptCode = userInfo[0].DeptCode;
-                _PointByUserName = manageCheckPoint.getGetThisWeekRewarding(DeptCode, _hostingEnvironment);
+                _PointByUserName = manageCheckPoint.getGetThisWeekRewarding(_hostingEnvironment);
 
             }
 
@@ -286,11 +281,10 @@ namespace BulletinBoard.Controllers
             ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
              
             RankQueryOption groupNameEnum = (RankQueryOption)Enum.Parse(typeof(RankQueryOption), "TeacherOnly");
-            var DeptCode = HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString()) as string;
             List<AwardBase> data = manageCheckPoint.getAwardBase();
             ViewBag._AwardBase = data;
 
-            return View(manageCheckPoint.getGroupByUsernameData(groupNameEnum, UserId, orderBy, DeptCode, _hostingEnvironment));
+            return View(manageCheckPoint.getGroupByUsernameData(groupNameEnum, UserId, orderBy, _hostingEnvironment));
         }
 
         public async Task<IActionResult> SetPoint(string userName, int value)
@@ -307,7 +301,6 @@ namespace BulletinBoard.Controllers
             ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
             ViewBag.Kind = rankQueryOption;
             RankQueryOption groupNameEnum = (RankQueryOption)Enum.Parse(typeof(RankQueryOption), rankQueryOption);
-            var DeptCode = HttpContext.Session.GetString(HttpContextSessionCategory.DeptCode.ToString()) as string;
             ViewBag.RankQueryOption = groupNameEnum;
 
 
@@ -326,7 +319,7 @@ namespace BulletinBoard.Controllers
                 ViewBag.maxAwardLevel = 1000;
             }
 
-            return View("CheckPointDetailList2", manageCheckPoint.getGroupByUsernameData(groupNameEnum, string.Empty, orderBy, DeptCode, _hostingEnvironment));
+            return View("CheckPointDetailList2", manageCheckPoint.getGroupByUsernameData(groupNameEnum, string.Empty, orderBy, _hostingEnvironment));
         }
 
 
@@ -360,25 +353,14 @@ namespace BulletinBoard.Controllers
             return RedirectToAction(nameof(HomeController.Index), "Home");
         }
 
-        public async Task<IActionResult> SetDept()
+        private async Task<IActionResult> LoadSignedUser()
         {
             if (await _authService.IsSignedIn(User))
             {
                 var result = await SetUserInfo();
-
-                //ManageHumanResource manageHumanResource = new ManageHumanResource();
-
-                //List<UserInfos> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
-
-                //if (userInfo.Count > 0)
-                //{
-                //    HttpContext.Session.SetString(HttpContextSessionCategory.DeptCode.ToString(), userInfo[0].DeptCode);
-                //    HttpContext.Session.SetString(HttpContextSessionCategory.DeptNM.ToString(), userInfo[0].DeptNM);
-                //}
             }
 
-            // 기본 가짜 데이터 반환
-            return Json(new { success = false, message = "Set Dept." });
+            return Json(new { success = false });
 
         }
     }

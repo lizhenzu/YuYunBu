@@ -57,7 +57,7 @@ namespace BulletinBoard.Services.Abstract
         /// <summary>
         /// 관리자 표 데이터 생성 (미응답 포함)
         /// </summary>
-        Task<VBSParticipationSurveyAdminVM> GetAdminVMAsync(IEnumerable<Models.UserInfo> users, string DeptCode);
+        Task<VBSParticipationSurveyAdminVM> GetAdminVMAsync(IEnumerable<Models.UserInfo> users);
     }
 
     public class VBSParticipationSurveyAdminVM

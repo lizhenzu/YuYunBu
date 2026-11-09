@@ -45,10 +45,9 @@ namespace BulletinBoard.Models
         [Display(Name = "반")]
         public int ClassBan { get; set; }
 
-        public string DeptCode { get; set; }
         public string RoleCode { get; set; }
 
-        public string DeptNM { get; set; }
+        
         public string RoleNM { get; set; }
 
 

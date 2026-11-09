@@ -216,7 +216,6 @@ VALUES
                 string.Empty,
                 0, 0, 0,
                 string.Empty,
-                "D1001",
                 RankQueryOption.StudentOnly);
 
             // UserId 없는 항목은 제외(안전)
@@ -466,7 +465,7 @@ WHERE PickId = @PickId;
                 hostingEnvironment,
                 string.Empty, string.Empty,
                 0, 0, 0,
-                string.Empty, string.Empty,
+                string.Empty,
                 RankQueryOption.StudentOnly);
 
             // 2) 올해(1/1~12/31) 생일 후보 전체

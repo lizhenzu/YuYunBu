@@ -126,9 +126,7 @@ namespace BulletinBoard.Common
 
     public enum HttpContextSessionCategory
     {
-        DeptCode,
-        DeptNM,
-        UserFullName,
+       UserFullName,
         UserName,
         UserId,
         ImpersonateUserId,
