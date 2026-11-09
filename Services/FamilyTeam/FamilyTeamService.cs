@@ -1227,12 +1227,12 @@ SELECT @r;";
             => await ScalarAsync<string>(c, tx, "SELECT ISNULL(CreatorUserName, N'') FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
 
         /// <summary>
-        /// 이 팀이 "시상 잠금"에 걸리는가 — 잠금 스위치가 켜져 있고, 시상 기록(DM2_TeamAward) 또는 박수 숨김 기록이 있을 때.
-        /// 시상 기록은 시상 기록 표만 본다 (선물 메모 글자를 읽지 않는다). 스위치를 끄면 기록이 있어도 잠그지 않는다.
+        /// 이 팀에 시상 기록이 있는가 — 있으면 나가기 · 내보내기 · 역할 바꾸기가 막힌다 (예외 없음).
+        /// 시상 기록 표(DM2_TeamAward) 또는 박수 숨김 기록만 본다 (선물 메모 글자를 읽지 않는다).
+        /// 시상 기록이 없는 팀(시상을 하지 않는 경우 포함)은 저절로 잠기지 않는다.
         /// </summary>
         private static async Task<bool> HasAwardRecordAsync(SqlConnection c, SqlTransaction? tx, int teamId)
         {
-            if (!await AwardLockEnabledAsync(c, tx)) return false;
             string key = await ScalarAsync<string>(c, tx, "SELECT ISNULL(AwardKey, TeamName) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
             const string sql = @"
 DECLARE @r INT = 0;
@@ -1242,45 +1242,6 @@ IF @r = 0 AND OBJECT_ID(N'dbo.DM2_TeamAward') IS NOT NULL
          N'@k NVARCHAR(200), @o INT OUTPUT', @k = @key, @o = @r OUTPUT;
 SELECT @r;";
             return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@key", key)) == 1;
-        }
-
-        /// <summary>시상 잠금 스위치 (DM2_TeamSetting.AwardLockEnabled) — 표나 값이 없으면 켜진 것으로 본다</summary>
-        private static async Task<bool> AwardLockEnabledAsync(SqlConnection c, SqlTransaction? tx)
-        {
-            const string sql = @"
-DECLARE @v NVARCHAR(200) = N'1';
-IF OBJECT_ID(N'dbo.DM2_TeamSetting') IS NOT NULL
-    EXEC sp_executesql N'SELECT @o = SettingValue FROM dbo.DM2_TeamSetting WHERE SettingKey = N''AwardLockEnabled''',
-         N'@o NVARCHAR(200) OUTPUT', @o = @v OUTPUT;
-SELECT ISNULL(@v, N'1');";
-            string v = (await ScalarAsync<string>(c, tx, sql) ?? "1").Trim();
-            return v != "0";
-        }
-
-        public async Task<bool> GetAwardLockEnabledAsync()
-        {
-            using var c = Conn();
-            await c.OpenAsync();
-            return await AwardLockEnabledAsync(c, null);
-        }
-
-        /// <summary>시상 잠금 스위치를 켜거나 끈다 (표가 아직 없으면 false)</summary>
-        public async Task<bool> SetAwardLockEnabledAsync(bool enabled)
-        {
-            using var c = Conn();
-            await c.OpenAsync();
-            const string sql = @"
-IF OBJECT_ID(N'dbo.DM2_TeamSetting') IS NULL
-    SELECT 0;
-ELSE
-BEGIN
-    EXEC sp_executesql N'
-        UPDATE dbo.DM2_TeamSetting SET SettingValue = @v, UpdatedAt = GETDATE() WHERE SettingKey = N''AwardLockEnabled'';
-        IF @@ROWCOUNT = 0 INSERT INTO dbo.DM2_TeamSetting (SettingKey, SettingValue) VALUES (N''AwardLockEnabled'', @v);',
-        N'@v NVARCHAR(200)', @v = @val;
-    SELECT 1;
-END";
-            return await ScalarAsync<int>(c, null, sql, ("@val", enabled ? "1" : "0")) == 1;
         }
     }
 }

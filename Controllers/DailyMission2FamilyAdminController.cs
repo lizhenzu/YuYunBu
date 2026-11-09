@@ -37,19 +37,8 @@ namespace BulletinBoard.Controllers
 
             ViewBag.Error = TempData["Error"] as string;
             ViewBag.Info = TempData["Info"] as string;
-            ViewBag.AwardLockEnabled = await _teamSvc.GetAwardLockEnabledAsync();
 
             return View(vm);
-        }
-
-        /// <summary>시상 잠금 스위치 켜기/끄기 (시상 기록이 있는 팀의 나가기 · 내보내기 · 역할 바꾸기)</summary>
-        [HttpPost]
-        public async Task<IActionResult> SetAwardLock(bool enabled)
-        {
-            bool ok = await _teamSvc.SetAwardLockEnabledAsync(enabled);
-            if (ok) TempData["Info"] = enabled ? "시상 잠금을 켰어요." : "시상 잠금을 껐어요.";
-            else TempData["Error"] = "설정 표가 아직 없어요. SQL/TeamAward_20261109.sql 을 먼저 실행해 주세요.";
-            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost]
