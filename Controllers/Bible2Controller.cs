@@ -1,4 +1,4 @@
-﻿using BibleReadingThrough.Data;
+using BibleReadingThrough.Data;
 using BibleReadingThrough.Models;
 using BulletinBoard.BusinessLayer;
 using BulletinBoard.Common;
