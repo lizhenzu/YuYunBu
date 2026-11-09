@@ -36,6 +36,11 @@ namespace BulletinBoard
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
+
+            // DB 접속 정보는 설정 파일에서만 읽는다 (2026-11-09) — 다른 어떤 DB 조회보다 먼저 넣어 둔다
+            BulletinBoard.Common.DataAccessModule.Configure(
+                configuration.GetConnectionString("DefaultConnection"),
+                configuration.GetConnectionString("LocalConnection"));
         }
 
         public IConfiguration Configuration { get; }

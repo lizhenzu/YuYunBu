@@ -10,15 +10,20 @@ namespace BulletinBoard.Common
 
     public static class DataAccessModule
     {
-        public static string connectionString_Server = "Data Source=SQL5088.site4now.net;Initial Catalog=db_a64b16_youyunbu;User ID=db_a64b16_youyunbu_admin;Password=YouYunBu@2024;";
+        // 접속 정보는 코드에 두지 않는다 (2026-11-09) — Startup 생성자가 설정 파일 값을 넣어 준다.
+        //   운영: ConnectionStrings:DefaultConnection · 로컬: ConnectionStrings:LocalConnection
+        public static void Configure(string? server, string? local)
+        {
+            connectionString_Server = server ?? "";
+            connectionString_Local = local ?? "";
+        }
 
-        public static string connectionString_Local = "Data Source=localhost;Initial Catalog=Bulletin;User ID=sa;Password=sds@2010;";
+        public static string connectionString_Server = "";
+
+        public static string connectionString_Local = "";
 
 
-        //        public static string connectionString = "Data Source=SQL5061.site4now.net;Initial Catalog=db_a64b16_mystock;User Id=db_a64b16_mystock_admin;Password=unierp@2010";
 
-        // ASP.NET  "Data Source=sql5083.site4now.net;Initial Catalog=DB_A64B16_ClothAlba  ;User Id=DB_A64B16_ClothAlba_admin  ;Password=sds@2010
-        // ASP.NET  "Data Source=sql5083.site4now.net;Initial Catalog=DB_A64B16_ClothMaster;User Id=DB_A64B16_ClothMaster_admin;Password=sds@2010
 
         public static int executeScalar(string sqlStatements)
         {
