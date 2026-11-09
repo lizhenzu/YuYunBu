@@ -789,68 +789,45 @@ ORDER BY Id;";
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // Word
+            // Word · Pray — 통합 미션 기록(DM2_MissionActivity)에서 그날 한 항목 = 한 줄 (2026-11-09)
             {
                 string sql = @"
-SELECT TOP 1 ToMe, ToParent
-FROM dbo.ClickHistoryForTodayWordToRead
+SELECT MissionItem
+FROM dbo.DM2_MissionActivity
 WHERE UserName = @UserName
-  AND ClickDate = @ClickDate
-ORDER BY Id DESC;";
+  AND MissionDate = @D
+  AND MissionItem IN ('Word.Me','Word.Parent','Prayer.Me','Prayer.Others');";
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = day });
+                cmd.Parameters.Add(new SqlParameter("@D", SqlDbType.Date) { Value = day });
 
                 using var r = await cmd.ExecuteReaderAsync();
-                if (await r.ReadAsync())
+                while (await r.ReadAsync())
                 {
-                    var toMe = (r["ToMe"]?.ToString() ?? "n");
-                    var toParent = (r["ToParent"]?.ToString() ?? "n");
-
-                    status.Word_ToMe = toMe.Equals("y", StringComparison.OrdinalIgnoreCase);
-                    status.Word_ToParent = toParent.Equals("y", StringComparison.OrdinalIgnoreCase);
-                    status.WordDone = status.Word_ToMe || status.Word_ToParent;
+                    switch (r.GetString(0))
+                    {
+                        case "Word.Me": status.Word_ToMe = true; break;
+                        case "Word.Parent": status.Word_ToParent = true; break;
+                        case "Prayer.Me": status.Pray_ToMe = true; break;
+                        case "Prayer.Others": status.Pray_ToParent = true; break;
+                    }
                 }
+                status.WordDone = status.Word_ToMe || status.Word_ToParent;
+                status.PrayDone = status.Pray_ToMe || status.Pray_ToParent;
             }
 
-            // Pray
-            {
-                string sql = @"
-SELECT TOP 1 ToMe, ToParent, ToFriend
-FROM dbo.ClickHistoryForPrayPhrase
-WHERE UserName = @UserName
-  AND ClickDate = @ClickDate
-ORDER BY Id DESC;";
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = day });
-
-                using var r = await cmd.ExecuteReaderAsync();
-                if (await r.ReadAsync())
-                {
-                    var toMe = (r["ToMe"]?.ToString() ?? "n");
-                    var toParent = (r["ToParent"]?.ToString() ?? "n");
-                    var toFriend = (r["ToFriend"]?.ToString() ?? "n");
-
-                    status.Pray_ToMe = toMe.Equals("y", StringComparison.OrdinalIgnoreCase);
-                    status.Pray_ToParent = toParent.Equals("y", StringComparison.OrdinalIgnoreCase);
-                    status.Pray_ToFriend = toFriend.Equals("y", StringComparison.OrdinalIgnoreCase);
-                    status.PrayDone = status.Pray_ToMe || status.Pray_ToParent || status.Pray_ToFriend;
-                }
-            }
-
-            // Quiz
+            // Quiz — 시도 기록(DM2_QuizAttempt)
             {
                 string sql = @"
 SELECT
-    ISNULL(MAX(TryCnt), 0) AS TryCntMax,
-    MAX(CASE WHEN AnswerQ = CorrectAnswer THEN 1 ELSE 0 END) AS CorrectYn
-FROM dbo.ClickHistoryForQuestion
+    ISNULL(MAX(AttemptNo), 0) AS TryCntMax,
+    MAX(CAST(IsCorrect AS INT)) AS CorrectYn
+FROM dbo.DM2_QuizAttempt
 WHERE UserName = @UserName
-  AND ClickDate = @ClickDate;";
+  AND MissionDate = @ClickDate;";
                 using var cmd = new SqlCommand(sql, conn);
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = day });
+                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.Date) { Value = day });
 
                 using var r = await cmd.ExecuteReaderAsync();
                 if (await r.ReadAsync())
@@ -861,12 +838,12 @@ WHERE UserName = @UserName
                 }
             }
 
-            // Recite (이번 주 weeklyId 찾아서 완료 여부)
+            // Recite (이번 주 암송의 시작일을 찾아서 완료 여부 — 암송 기록은 주 시작일로 한 줄)
             {
-                int? weeklyId = null;
+                DateTime? weekStart = null;
 
                 string sqlWeek = @"
-SELECT TOP 1 Id
+SELECT TOP 1 CONVERT(date, DateFrom)
 FROM dbo.WeeklyWordToRead
 WHERE CONVERT(date, DateFrom) <= @D
   AND CONVERT(date, DateTo) >= @D
@@ -876,19 +853,20 @@ ORDER BY DateFrom DESC, Id DESC;";
                     cmd.Parameters.Add(new SqlParameter("@D", SqlDbType.Date) { Value = day });
                     var obj = await cmd.ExecuteScalarAsync();
                     if (obj != null && obj != DBNull.Value)
-                        weeklyId = Convert.ToInt32(obj);
+                        weekStart = Convert.ToDateTime(obj).Date;
                 }
 
-                if (weeklyId.HasValue)
+                if (weekStart.HasValue)
                 {
                     string sql = @"
 SELECT TOP 1 1
-FROM dbo.ClickHistoryForWeeklyWordToRead
+FROM dbo.DM2_MissionActivity
 WHERE UserName = @UserName
-  AND WeeklyWordToReadId = @WeeklyId;";
+  AND MissionItem = 'Recite'
+  AND ReciteWeekStart = @W;";
                     using var cmd = new SqlCommand(sql, conn);
                     cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                    cmd.Parameters.Add(new SqlParameter("@WeeklyId", SqlDbType.Int) { Value = weeklyId.Value });
+                    cmd.Parameters.Add(new SqlParameter("@W", SqlDbType.Date) { Value = weekStart.Value });
 
                     var obj = await cmd.ExecuteScalarAsync();
                     status.ReciteDone = (obj != null);
@@ -953,73 +931,8 @@ FROM dbo.ufn_DM2_GetUserDailyPoints(@UserName, @From, @To);";
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            // ✅ 1) 기존 값 조회
-            string getSql = @"
-SELECT TOP 1 ToMe, ToParent
-FROM dbo.ClickHistoryForTodayWordToRead
-WHERE UserName = @UserName AND ClickDate = @ClickDate;";
-
-            bool oldToMe = false;
-            bool oldToParent = false;
-            bool exists = false;
-
-            using (var getCmd = new SqlCommand(getSql, conn))
-            {
-                getCmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                getCmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-
-                using var r = await getCmd.ExecuteReaderAsync();
-                if (await r.ReadAsync())
-                {
-                    exists = true;
-                    oldToMe = (r["ToMe"]?.ToString() ?? "n").Equals("y", StringComparison.OrdinalIgnoreCase);
-                    oldToParent = (r["ToParent"]?.ToString() ?? "n").Equals("y", StringComparison.OrdinalIgnoreCase);
-                }
-            }
-
-            // ✅ 2) 새 요청값을 기존값에 "합쳐서(OR)" 저장
-            bool mergedToMe = oldToMe || toMe;
-            bool mergedToParent = oldToParent || toParent;
-
-            if (exists)
-            {
-                string upSql = @"
-UPDATE dbo.ClickHistoryForTodayWordToRead
-SET TodayWordToReadId = @TodayWordToReadId,
-    ToMe = @ToMe,
-    ToParent = @ToParent,
-    updateDT = GETDATE(),
-    cYear = @cYear
-WHERE UserName = @UserName AND ClickDate = @ClickDate;";
-
-                using var cmd = new SqlCommand(upSql, conn);
-                cmd.Parameters.Add(new SqlParameter("@TodayWordToReadId", SqlDbType.Int) { Value = todayWordToReadId });
-                cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ToMe", SqlDbType.NVarChar, 1) { Value = mergedToMe ? "y" : "n" });
-                cmd.Parameters.Add(new SqlParameter("@ToParent", SqlDbType.NVarChar, 1) { Value = mergedToParent ? "y" : "n" });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-                cmd.Parameters.Add(new SqlParameter("@cYear", SqlDbType.Int) { Value = cYear });
-
-                await cmd.ExecuteNonQueryAsync();
-            }
-            else
-            {
-                string insSql = @"
-INSERT INTO dbo.ClickHistoryForTodayWordToRead
-(TodayWordToReadId, UserName, ToMe, ToParent, ClickDate, InsertDT, updateDT, cYear)
-VALUES
-(@TodayWordToReadId, @UserName, @ToMe, @ToParent, @ClickDate, GETDATE(), GETDATE(), @cYear);";
-
-                using var cmd = new SqlCommand(insSql, conn);
-                cmd.Parameters.Add(new SqlParameter("@TodayWordToReadId", SqlDbType.Int) { Value = todayWordToReadId });
-                cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ToMe", SqlDbType.NVarChar, 1) { Value = mergedToMe ? "y" : "n" });
-                cmd.Parameters.Add(new SqlParameter("@ToParent", SqlDbType.NVarChar, 1) { Value = mergedToParent ? "y" : "n" });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-                cmd.Parameters.Add(new SqlParameter("@cYear", SqlDbType.Int) { Value = cYear });
-
-                await cmd.ExecuteNonQueryAsync();
-            }
+            // 통합 미션 기록 — 고른 항목마다 한 줄(1점). 이미 있으면 그대로 둔다 (예전처럼 "합쳐서(OR)" 저장)
+            await AddActivityAsync(conn, userName, clickDate, toMe ? "Word.Me" : null, toParent ? "Word.Parent" : null);
 
             return new SaveResult { Ok = true, Message = "말씀 완료! ✅" };
         }
@@ -1035,38 +948,21 @@ VALUES
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            string sql = @"
-IF EXISTS (
-    SELECT 1 FROM dbo.ClickHistoryForPrayPhrase
-    WHERE UserName = @UserName AND ClickDate = @ClickDate
-)
-BEGIN
-    UPDATE dbo.ClickHistoryForPrayPhrase
-    SET PrayPhraseId = @PrayPhraseId,
-        ToMe = @ToMe,
-        ToParent = @ToParent,
-        ToFriend = @ToFriend,
-        cYear = @cYear
-    WHERE UserName = @UserName AND ClickDate = @ClickDate;
-END
-ELSE
-BEGIN
-    INSERT INTO dbo.ClickHistoryForPrayPhrase
-    (PrayPhraseId, ToMe, ToParent, ToFriend, UserName, ClickDate, InsertDT, cYear)
-    VALUES
-    (@PrayPhraseId, @ToMe, @ToParent, @ToFriend, @UserName, @ClickDate, GETDATE(), @cYear);
-END";
+            // 통합 미션 기록 — 예전처럼 이번에 고른 상태로 덮어쓴다: 나 = Prayer.Me, 부모·친구 = Prayer.Others (각 1점)
+            bool others = toParent || toFriend;
+            using (var del = new SqlCommand(@"
+DELETE FROM dbo.DM2_MissionActivity
+WHERE UserName = @UserName AND MissionDate = @D
+  AND ((MissionItem = 'Prayer.Me' AND @Me = 0) OR (MissionItem = 'Prayer.Others' AND @Others = 0));", conn))
+            {
+                del.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
+                del.Parameters.Add(new SqlParameter("@D", SqlDbType.Date) { Value = clickDate });
+                del.Parameters.Add(new SqlParameter("@Me", SqlDbType.Bit) { Value = toMe });
+                del.Parameters.Add(new SqlParameter("@Others", SqlDbType.Bit) { Value = others });
+                await del.ExecuteNonQueryAsync();
+            }
+            await AddActivityAsync(conn, userName, clickDate, toMe ? "Prayer.Me" : null, others ? "Prayer.Others" : null);
 
-            using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.Add(new SqlParameter("@PrayPhraseId", SqlDbType.Int) { Value = prayPhraseId });
-            cmd.Parameters.Add(new SqlParameter("@ToMe", SqlDbType.NVarChar, 1) { Value = toMe ? "y" : "n" });
-            cmd.Parameters.Add(new SqlParameter("@ToParent", SqlDbType.NVarChar, 1) { Value = toParent ? "y" : "n" });
-            cmd.Parameters.Add(new SqlParameter("@ToFriend", SqlDbType.NVarChar, 1) { Value = toFriend ? "y" : "n" });
-            cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-            cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-            cmd.Parameters.Add(new SqlParameter("@cYear", SqlDbType.Int) { Value = cYear });
-
-            await cmd.ExecuteNonQueryAsync();
             return new SaveResult { Ok = true, Message = "기도 완료! ✅" };
         }
 
@@ -1102,16 +998,16 @@ END";
 
             string stateSql = @"
 SELECT
-    ISNULL(MAX(TryCnt), 0) AS TryCntMax,
-    MAX(CASE WHEN AnswerQ = CorrectAnswer THEN 1 ELSE 0 END) AS CorrectYn
-FROM dbo.ClickHistoryForQuestion
-WHERE UserName=@UserName AND QuestionId=@QuestionId AND ClickDate=@ClickDate;";
+    ISNULL(MAX(AttemptNo), 0) AS TryCntMax,
+    MAX(CAST(IsCorrect AS INT)) AS CorrectYn
+FROM dbo.DM2_QuizAttempt
+WHERE UserName=@UserName AND QuestionId=@QuestionId AND MissionDate=@ClickDate;";
 
             using (var cmd = new SqlCommand(stateSql, conn))
             {
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
                 cmd.Parameters.Add(new SqlParameter("@QuestionId", SqlDbType.Int) { Value = questionId });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
+                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.Date) { Value = clickDate });
 
                 using var r = await cmd.ExecuteReaderAsync();
                 if (await r.ReadAsync())
@@ -1129,21 +1025,26 @@ WHERE UserName=@UserName AND QuestionId=@QuestionId AND ClickDate=@ClickDate;";
 
             int nextTry = tryMax + 1;
 
+            // 시도 한 줄 + 맞았으면 그날의 퀴즈 정답 1점 (정답 비교는 예전과 같이 SQL 의 = 비교)
             string insSql = @"
-INSERT INTO dbo.ClickHistoryForQuestion
-(QuestionId, UserName, AnswerQ, CorrectAnswer, TryCnt, ClickDate, InsertDT, cYear)
+DECLARE @ok BIT = CASE WHEN @AnswerQ = @CorrectAnswer THEN 1 ELSE 0 END;
+INSERT INTO dbo.DM2_QuizAttempt
+(UserName, MissionDate, QuestionId, AttemptNo, AnswerText, CorrectAnswerText, IsCorrect, AttemptedAt)
 VALUES
-(@QuestionId, @UserName, @AnswerQ, @CorrectAnswer, @TryCnt, @ClickDate, GETDATE(), @cYear);";
+(@UserName, @ClickDate, @QuestionId, @TryCnt, @AnswerQ, @CorrectAnswer, @ok, @Now);
+IF @ok = 1 AND NOT EXISTS (SELECT 1 FROM dbo.DM2_MissionActivity WHERE UserName = @UserName AND MissionDate = @ClickDate AND MissionItem = 'Quiz.Correct')
+    INSERT INTO dbo.DM2_MissionActivity (UserName, MissionDate, MissionItem, Points, PerformedAt)
+    VALUES (@UserName, @ClickDate, 'Quiz.Correct', 1, @Now);";
 
             using (var cmd = new SqlCommand(insSql, conn))
             {
                 cmd.Parameters.Add(new SqlParameter("@QuestionId", SqlDbType.Int) { Value = questionId });
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@AnswerQ", SqlDbType.NVarChar, 200) { Value = answerQ });
-                cmd.Parameters.Add(new SqlParameter("@CorrectAnswer", SqlDbType.NVarChar, 200) { Value = dbCorrect });
-                cmd.Parameters.Add(new SqlParameter("@TryCnt", SqlDbType.Int) { Value = nextTry });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-                cmd.Parameters.Add(new SqlParameter("@cYear", SqlDbType.Int) { Value = cYear });
+                cmd.Parameters.Add(new SqlParameter("@AnswerQ", SqlDbType.NVarChar, 400) { Value = answerQ });
+                cmd.Parameters.Add(new SqlParameter("@CorrectAnswer", SqlDbType.NVarChar, 400) { Value = dbCorrect });
+                cmd.Parameters.Add(new SqlParameter("@TryCnt", SqlDbType.TinyInt) { Value = (byte)nextTry });
+                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.Date) { Value = clickDate });
+                cmd.Parameters.Add(new SqlParameter("@Now", SqlDbType.DateTime2) { Value = DateHelper.GetKoreaNow() });
 
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -1171,20 +1072,20 @@ VALUES
             await conn.OpenAsync();
 
             string sql = @"
-SELECT AnswerQ
-FROM dbo.ClickHistoryForQuestion
-WHERE UserName=@UserName AND QuestionId=@QuestionId AND ClickDate=@ClickDate
-ORDER BY TryCnt;";
+SELECT AnswerText
+FROM dbo.DM2_QuizAttempt
+WHERE UserName=@UserName AND QuestionId=@QuestionId AND MissionDate=@ClickDate
+ORDER BY AttemptNo;";
 
             using var cmd = new SqlCommand(sql, conn);
             cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
             cmd.Parameters.Add(new SqlParameter("@QuestionId", SqlDbType.Int) { Value = questionId });
-            cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
+            cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.Date) { Value = clickDate });
 
             using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
             {
-                var a = r["AnswerQ"] as string;
+                var a = r["AnswerText"] as string;
                 if (!string.IsNullOrWhiteSpace(a)) list.Add(a.Trim());
             }
             return list;
@@ -1208,37 +1109,27 @@ ORDER BY TryCnt;";
             if (!dateFrom.HasValue)
                 return new SaveResult { Ok = false, Message = "주간 암송 데이터(DateFrom)를 찾을 수 없어요." };
 
-            var clickDate = dateFrom.Value.Date;
-            var cYear = clickDate.Year;
+            var clickDate = dateFrom.Value.Date;   // 암송은 그 주의 시작일 하루로 기록한다 (예전과 같음)
 
-            {
-                string sql = @"
-SELECT TOP 1 1
-FROM dbo.ClickHistoryForWeeklyWordToRead
-WHERE UserName=@UserName AND WeeklyWordToReadId=@WeeklyId;";
-                using var cmd = new SqlCommand(sql, conn);
-                cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@WeeklyId", SqlDbType.Int) { Value = weeklyWordToReadId });
-
-                var exists = await cmd.ExecuteScalarAsync();
-                if (exists != null)
-                    return new SaveResult { Ok = false, Message = "이번 주 암송은 이미 완료했어요! 🎉" };
-            }
-
+            // 통합 미션 기록 — 주 시작일당 한 줄(1점)
             string ins = @"
-INSERT INTO dbo.ClickHistoryForWeeklyWordToRead
-(WeeklyWordToReadId, UserName, ClickDate, InsertDT, cYear)
-VALUES
-(@WeeklyId, @UserName, @ClickDate, GETDATE(), @cYear);";
+IF EXISTS (SELECT 1 FROM dbo.DM2_MissionActivity WHERE UserName = @UserName AND MissionItem = 'Recite' AND ReciteWeekStart = @W)
+    SELECT 0;
+ELSE
+BEGIN
+    INSERT INTO dbo.DM2_MissionActivity (UserName, MissionDate, MissionItem, Points, ReciteWeekStart, PerformedAt)
+    VALUES (@UserName, @W, 'Recite', 1, @W, @Now);
+    SELECT 1;
+END";
 
             using (var cmd = new SqlCommand(ins, conn))
             {
-                cmd.Parameters.Add(new SqlParameter("@WeeklyId", SqlDbType.Int) { Value = weeklyWordToReadId });
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-                cmd.Parameters.Add(new SqlParameter("@ClickDate", SqlDbType.DateTime) { Value = clickDate });
-                cmd.Parameters.Add(new SqlParameter("@cYear", SqlDbType.Int) { Value = cYear });
+                cmd.Parameters.Add(new SqlParameter("@W", SqlDbType.Date) { Value = clickDate });
+                cmd.Parameters.Add(new SqlParameter("@Now", SqlDbType.DateTime2) { Value = DateHelper.GetKoreaNow() });
 
-                await cmd.ExecuteNonQueryAsync();
+                if (Convert.ToInt32(await cmd.ExecuteScalarAsync()) == 0)
+                    return new SaveResult { Ok = false, Message = "이번 주 암송은 이미 완료했어요! 🎉" };
             }
 
             return new SaveResult { Ok = true, Message = "이번 주 암송 완료! 🎉 +1점" };
@@ -1288,37 +1179,58 @@ VALUES
 
             const string sql = @"
 SELECT COUNT(DISTINCT UserName)
-FROM dbo.ClickHistoryForTodayWordToRead
-WHERE ClickDate >= @Start AND ClickDate < @End
-  AND (ToMe IN ('y','Y') OR ToParent IN ('y','Y'));";
+FROM dbo.DM2_MissionActivity
+WHERE MissionDate = @D
+  AND MissionItem IN ('Word.Me','Word.Parent');";
 
             using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.Add(new SqlParameter("@Start", SqlDbType.DateTime) { Value = day.Date });
-            cmd.Parameters.Add(new SqlParameter("@End", SqlDbType.DateTime) { Value = day.Date.AddDays(1) });
+            cmd.Parameters.Add(new SqlParameter("@D", SqlDbType.Date) { Value = day.Date });
 
             var v = await cmd.ExecuteScalarAsync();
             return (v == null || v == DBNull.Value) ? 0 : Convert.ToInt32(v);
         }
 
-        private async Task<HashSet<DateTime>> GetWordDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
+        /// <summary>
+        /// 통합 미션 기록(DM2_MissionActivity)에 항목을 한 줄씩(1점) 넣는다. 이미 있는 항목은 건너뛴다 (null 항목은 무시).
+        /// 수행 시각은 한국 시간.
+        /// </summary>
+        private static async Task AddActivityAsync(SqlConnection conn, string userName, DateTime day, params string?[] items)
+        {
+            foreach (var item in items)
+            {
+                if (string.IsNullOrEmpty(item)) continue;
+                using var cmd = new SqlCommand(@"
+IF NOT EXISTS (SELECT 1 FROM dbo.DM2_MissionActivity WHERE UserName = @UserName AND MissionDate = @D AND MissionItem = @Item)
+    INSERT INTO dbo.DM2_MissionActivity (UserName, MissionDate, MissionItem, Points, PerformedAt)
+    VALUES (@UserName, @D, @Item, 1, @Now);", conn);
+                cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
+                cmd.Parameters.Add(new SqlParameter("@D", SqlDbType.Date) { Value = day.Date });
+                cmd.Parameters.Add(new SqlParameter("@Item", SqlDbType.VarChar, 20) { Value = item });
+                cmd.Parameters.Add(new SqlParameter("@Now", SqlDbType.DateTime2) { Value = DateHelper.GetKoreaNow() });
+                try { await cmd.ExecuteNonQueryAsync(); }
+                catch (SqlException ex) when (ex.Number == 2601 || ex.Number == 2627) { /* 동시에 두 번 눌러 이미 들어갔다 — 그대로 둔다 */ }
+            }
+        }
+
+        /// <summary>기간 안에서 이 항목들 중 하나라도 한 날짜 (통합 미션 기록)</summary>
+        private async Task<HashSet<DateTime>> GetActivityDatesAsync(string userName, DateTime start, DateTime endExclusive, string itemsCsv)
         {
             var set = new HashSet<DateTime>();
 
             using var conn = new SqlConnection(_connectionString);
             await conn.OpenAsync();
 
-            string sql = @"
-SELECT CONVERT(date, ClickDate) AS D
-FROM dbo.ClickHistoryForTodayWordToRead
+            string sql = $@"
+SELECT DISTINCT MissionDate AS D
+FROM dbo.DM2_MissionActivity
 WHERE UserName = @UserName
-  AND ClickDate >= @Start AND ClickDate < @End
-  AND (ToMe IN ('y','Y') OR ToParent IN ('y','Y'))
-GROUP BY CONVERT(date, ClickDate);";
+  AND MissionDate >= @Start AND MissionDate < @End
+  AND MissionItem IN ({itemsCsv});";
 
             using var cmd = new SqlCommand(sql, conn);
             cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-            cmd.Parameters.Add(new SqlParameter("@Start", SqlDbType.DateTime) { Value = start });
-            cmd.Parameters.Add(new SqlParameter("@End", SqlDbType.DateTime) { Value = endExclusive });
+            cmd.Parameters.Add(new SqlParameter("@Start", SqlDbType.Date) { Value = start.Date });
+            cmd.Parameters.Add(new SqlParameter("@End", SqlDbType.Date) { Value = endExclusive.Date });
 
             using var r = await cmd.ExecuteReaderAsync();
             while (await r.ReadAsync())
@@ -1327,59 +1239,14 @@ GROUP BY CONVERT(date, ClickDate);";
             return set;
         }
 
-        private async Task<HashSet<DateTime>> GetPrayDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
-        {
-            var set = new HashSet<DateTime>();
+        private Task<HashSet<DateTime>> GetWordDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
+            => GetActivityDatesAsync(userName, start, endExclusive, "'Word.Me','Word.Parent'");
 
-            using var conn = new SqlConnection(_connectionString);
-            await conn.OpenAsync();
+        private Task<HashSet<DateTime>> GetPrayDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
+            => GetActivityDatesAsync(userName, start, endExclusive, "'Prayer.Me','Prayer.Others'");
 
-            string sql = @"
-SELECT CONVERT(date, ClickDate) AS D
-FROM dbo.ClickHistoryForPrayPhrase
-WHERE UserName = @UserName
-  AND ClickDate >= @Start AND ClickDate < @End
-  AND (ToMe IN ('y','Y') OR ToParent IN ('y','Y') OR ToFriend IN ('y','Y'))
-GROUP BY CONVERT(date, ClickDate);";
-
-            using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-            cmd.Parameters.Add(new SqlParameter("@Start", SqlDbType.DateTime) { Value = start });
-            cmd.Parameters.Add(new SqlParameter("@End", SqlDbType.DateTime) { Value = endExclusive });
- await DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
-            using var r = await cmd.ExecuteReaderAsync();
-            while (await r.ReadAsync())
-                set.Add(Convert.ToDateTime(r["D"]).Date);
-
-            return set;
-        }
-
-        private async Task<HashSet<DateTime>> GetQuizDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
-        {
-            var set = new HashSet<DateTime>();
-
-            using var conn = new SqlConnection(_connectionString);
-            await conn.OpenAsync();
-
-            string sql = @"
-SELECT CONVERT(date, ClickDate) AS D
-FROM dbo.ClickHistoryForQuestion
-WHERE UserName = @UserName
-  AND ClickDate >= @Start AND ClickDate < @End
-  AND AnswerQ = CorrectAnswer
-GROUP BY CONVERT(date, ClickDate);";
-
-            using var cmd = new SqlCommand(sql, conn);
-            cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
-            cmd.Parameters.Add(new SqlParameter("@Start", SqlDbType.DateTime) { Value = start });
-            cmd.Parameters.Add(new SqlParameter("@End", SqlDbType.DateTime) { Value = endExclusive });
- await DbLogger.LogDebugAsync($"{SqlDebugHelper.ToDebugSql(cmd)}");
-            using var r = await cmd.ExecuteReaderAsync();
-            while (await r.ReadAsync())
-                set.Add(Convert.ToDateTime(r["D"]).Date);
-
-            return set;
-        }
+        private Task<HashSet<DateTime>> GetQuizDoneDatesAsync(string userName, DateTime start, DateTime endExclusive)
+            => GetActivityDatesAsync(userName, start, endExclusive, "'Quiz.Correct'");
 
         private async Task<Dictionary<DateTime, bool>> GetReciteDoneMapByDayAsync(string userName, DateTime start, DateTime endExclusive)
         {
@@ -1410,29 +1277,30 @@ WHERE DateFrom <= @EndMinus1
                 }
             }
 
-            var doneWeekIds = new HashSet<int>();
+            // 암송 기록은 그 주의 시작일(ReciteWeekStart)로 남는다 (통합 미션 기록)
+            var doneWeekStarts = new HashSet<DateTime>();
             using (var conn = new SqlConnection(_connectionString))
             {
                 await conn.OpenAsync();
 
                 string sqlDone = @"
-SELECT DISTINCT WeeklyWordToReadId
-FROM dbo.ClickHistoryForWeeklyWordToRead
-WHERE UserName = @UserName;";
+SELECT DISTINCT ReciteWeekStart
+FROM dbo.DM2_MissionActivity
+WHERE UserName = @UserName AND MissionItem = 'Recite';";
 
                 using var cmd = new SqlCommand(sqlDone, conn);
                 cmd.Parameters.Add(new SqlParameter("@UserName", SqlDbType.NVarChar, 256) { Value = userName });
 
                 using var r = await cmd.ExecuteReaderAsync();
                 while (await r.ReadAsync())
-                    doneWeekIds.Add(Convert.ToInt32(r["WeeklyWordToReadId"]));
+                    doneWeekStarts.Add(Convert.ToDateTime(r["ReciteWeekStart"]).Date);
             }
 
             for (int i = 0; i < 42; i++)
             {
                 var day = start.AddDays(i).Date;
                 var w = weeks.FirstOrDefault(x => x.From <= day && day <= x.To);
-                result[day] = (w.Id != 0) && doneWeekIds.Contains(w.Id);
+                result[day] = (w.Id != 0) && doneWeekStarts.Contains(w.From);
             }
 
             return result;

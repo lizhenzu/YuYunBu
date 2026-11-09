@@ -92,7 +92,9 @@ namespace BulletinBoard.DataAccessLayer
             Raw(G_Class, "AttendanceNewComerVisit", "[NewComerId] IN (SELECT [Id] FROM [dbo].[AttendanceNewComer] WHERE [PersonId] IN (SELECT [PersonId] FROM [dbo].[PersonMaster_2026] WHERE [UserName] = @u))", "NewComerId"),
             One(G_Class, "AttendanceNewComer", "PersonId", 'P'),
 
-            // 미션 기록 (UserName)
+            // 미션 기록 (UserName) — 통합 표(2026-11-09) + 옛 표(백업)
+            One(G_Mission, "DM2_MissionActivity", "UserName", 'U'),
+            One(G_Mission, "DM2_QuizAttempt", "UserName", 'U'),
             One(G_Mission, "ClickHistoryForTodayWordToRead", "UserName", 'U'),
             One(G_Mission, "ClickHistoryForTodayWordToRead_2025", "UserName", 'U'),
             One(G_Mission, "ClickHistoryForPrayPhrase", "UserName", 'U'),
