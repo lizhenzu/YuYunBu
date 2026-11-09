@@ -30,10 +30,11 @@ namespace BulletinBoard.BusinessLayer
         }
 
 
-        public List<PointByUserName> getGetThisWeekRewarding(string DeptCode, IWebHostEnvironment _hostingEnvironment)
+        public List<PointByUserName> getGetThisWeekRewarding(IWebHostEnvironment _hostingEnvironment)
         {
             ControlCheckPoint controlCheckPoint = new ControlCheckPoint();
-            DataSet ds = controlCheckPoint.fetchGetThisWeekRewarding(DeptCode);
+            DataSet ds = controlCheckPoint.fetchGetThisWeekRewarding();
+            if (ds == null || ds.Tables.Count == 0) return new List<PointByUserName>();   // 함수가 없거나 오류면 빈 목록
 
             List<PointByUserName> value = MakeNewDataSet(_hostingEnvironment, ds);
 
@@ -51,9 +52,9 @@ namespace BulletinBoard.BusinessLayer
             return value;
         }
 
-        public List<PointAwardUser> getGetThisWeekRewardingByAward(string DeptCode, IWebHostEnvironment _hostingEnvironment)
+        public List<PointAwardUser> getGetThisWeekRewardingByAward(IWebHostEnvironment _hostingEnvironment)
         {
-            List<PointByUserName> aadd = getGetThisWeekRewarding(DeptCode, _hostingEnvironment);
+            List<PointByUserName> aadd = getGetThisWeekRewarding(_hostingEnvironment);
             List<AwardItemByUser> aa = getAwardItemPickAll(string.Empty);
 
             // 병합 결과 리스트
@@ -80,9 +81,7 @@ namespace BulletinBoard.BusinessLayer
                     UserId = user.UserId,
                     ProfilePicturePath = user.ProfilePicturePath,
                     RoleNM = user.RoleNM,
-                    DeptNM = user.DeptNM,
                     RoleCode = user.RoleCode,
-                    DeptCode = user.DeptCode,
 
                     // AwardItemByUser 속성 복사 (nullable로 설정)
                     ProductID = award?.ProductID,
@@ -98,10 +97,10 @@ namespace BulletinBoard.BusinessLayer
 
 
 
-        public List<PointByUserName> getGroupByUsernameData(RankQueryOption rankQueryOption, string UserId, string orderBy, string DeptCode, IWebHostEnvironment hostingEnv)
+        public List<PointByUserName> getGroupByUsernameData(RankQueryOption rankQueryOption, string UserId, string orderBy, IWebHostEnvironment hostingEnv)
         {
             ControlCheckPoint controlCheckPoint = new ControlCheckPoint();
-            DataSet ds = controlCheckPoint.fetchGroupByUsernameDataN(rankQueryOption, UserId, DeptCode, orderBy);            
+            DataSet ds = controlCheckPoint.fetchGroupByUsernameDataN(rankQueryOption, UserId, orderBy);
 
             if (ds == null || ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return new List<PointByUserName>();
@@ -169,10 +168,7 @@ namespace BulletinBoard.BusinessLayer
                 pointByUserName.FullName = dr["FullName"].ToString() as string;
 
                 pointByUserName.RoleNM = dr["RoleNM"].ToString() as string;
-                pointByUserName.DeptNM = dr["DeptNM"].ToString() as string;
                 pointByUserName.RoleCode = dr["RoleCode"].ToString() as string;
-                pointByUserName.DeptCode = dr["DeptCode"].ToString() as string;
-                 
 
                 pointByUserName.DC = int.Parse(dr["DC"].ToString());
                 pointByUserName.DC_Total = int.Parse(dr["DC_Total"].ToString());
@@ -203,13 +199,6 @@ namespace BulletinBoard.BusinessLayer
             return value;
         }
 
-        public List<PointByClass> getGroupByClassData(RankQueryOption rankQueryOption, int duration, string DeptCode)
-        {
-            ControlCheckPoint controlCheckPoint = new ControlCheckPoint();
-            DataSet ds = controlCheckPoint.fetchGroupByClassData(rankQueryOption, duration, DeptCode);
-            List<PointByClass> value = ds.Tables[0].ToList<PointByClass>();
-            return value;
-        }
 
 
         //public List<ExpectedAward> getExpectedAward(IHostingEnvironment _hostingEnvironment)

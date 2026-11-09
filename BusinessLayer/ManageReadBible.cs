@@ -98,8 +98,6 @@ namespace BulletinBoard.BusinessLayer
 
                 data.RoleCode = dr["RoleCode"].ToString() as string;
                 data.RoleNM = dr["RoleNM"].ToString() as string;
-                data.DeptCode = dr["DeptCode"].ToString() as string;
-                data.DeptNM = dr["DeptNM"].ToString() as string;
 
                 if (dr["readBibleAllCount"] == DBNull.Value)
                     continue;

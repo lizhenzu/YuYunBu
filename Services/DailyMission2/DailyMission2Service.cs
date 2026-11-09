@@ -265,7 +265,6 @@ SELECT
     ci.ClassYear,
     ci.ClassBan,
 
-    ap.DeptCode,
     ap.RoleCode,
     cd.MinorNM AS RoleName,
 
@@ -331,7 +330,6 @@ ORDER BY ISNULL(dm.YearPoint,0) DESC, ISNULL(pm.FullName,'') ASC;
                     ConsecutiveDays = (r["ConsecutiveDays"] == DBNull.Value) ? 0 : Convert.ToInt32(r["ConsecutiveDays"]),
                     ClassYear = (r["ClassYear"] == DBNull.Value) ? null : (int?)Convert.ToInt32(r["ClassYear"]),
                     ClassBan = (r["ClassBan"] == DBNull.Value) ? null : (int?)Convert.ToInt32(r["ClassBan"]),
-                    DeptCode = r["DeptCode"]?.ToString() ?? "",
                     RoleCode = r["RoleCode"]?.ToString() ?? "",
                     RoleName = r["RoleName"]?.ToString() ?? "",
                 };

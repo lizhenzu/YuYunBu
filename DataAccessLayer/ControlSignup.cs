@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BulletinBoard.Common;
@@ -55,7 +55,7 @@ namespace BulletinBoard.DataAccessLayer
 
     /// <summary>
     /// 가입 마법사 신청 저장 · 관리자 승인/반려.
-    /// 승인하면 사람 명부(PersonMaster_2026) · 반(ClassInfo_2026) · 역할(DeptRoleUserAssoc, 부서 D1001 고정)을 한 트랜잭션으로 반영한다.
+    /// 승인하면 사람 명부(PersonMaster_2026) · 반(ClassInfo_2026) · 역할(DeptRoleUserAssoc)을 한 트랜잭션으로 반영한다.
     /// 학부모는 역할 코드 없이 사람 명부(이름 · 연락처)만 만든다. 자녀 정보는 참고용으로 신청서에만 남긴다.
     /// </summary>
     public class ControlSignup
@@ -379,8 +379,8 @@ namespace BulletinBoard.DataAccessLayer
                         {
                             await ExecAsync(conn, tx, @"
                                 DELETE FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i;
-                                INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[DeptCode],[RoleCode]) VALUES (@i,@d,@r);",
-                                ("@i", a.UserId), ("@d", ConstatsCommon.FixedDeptCode), ("@r", role));
+                                INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[RoleCode]) VALUES (@i,@r);",
+                                ("@i", a.UserId), ("@r", role));
                         }
 
                         // 2-1) 역할 기준 (2026-11-08) — 새 역할에 맞지 않는 팀에서 빠지고, 맞지 않는 신청 · 초대는 지운다
@@ -459,8 +459,8 @@ namespace BulletinBoard.DataAccessLayer
 
                         await ExecAsync(conn, tx, "DELETE FROM [dbo].[DeptRoleUserAssoc] WHERE [UserId] = @i;", ("@i", userId));
                         if (roleCode.Length > 0)
-                            await ExecAsync(conn, tx, "INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[DeptCode],[RoleCode]) VALUES (@i,@d,@r);",
-                                ("@i", userId), ("@d", ConstatsCommon.FixedDeptCode), ("@r", roleCode));
+                            await ExecAsync(conn, tx, "INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId],[RoleCode]) VALUES (@i,@r);",
+                                ("@i", userId), ("@r", roleCode));
 
                         // 역할 기준 (2026-11-08) — 새 역할에 맞지 않는 팀에서 빠지고, 맞지 않는 신청 · 초대는 지운다
                         var fit = await BulletinBoard.Services.FamilyTeamService.FitTeamToRoleAsync(conn, tx, userName);

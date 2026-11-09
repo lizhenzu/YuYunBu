@@ -773,7 +773,7 @@ namespace BulletinBoard.Controllers
                 new ManageeCommon().GetMissionMenusByRole()));
 
             var tAward = CachedAsync(CK_Award, TTL_Medium, () => Task.Run(() =>
-                new ManageCheckPoint().getGetThisWeekRewardingByAward(string.Empty, _hostingEnvironment)));
+                new ManageCheckPoint().getGetThisWeekRewardingByAward(_hostingEnvironment)));
 
             var tOneLine = CachedAsync(CK_OneLine, TTL_Long, () => Task.Run(() =>
                 new ManageOneLineFamousWord().getOneLineFamousWord(0)));
@@ -899,7 +899,7 @@ namespace BulletinBoard.Controllers
 
             var manageHumanResource = new ManageHumanResource();
             List<UserInfo> userInfo = manageHumanResource.getUserInfos(
-                _hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                _hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             if (userInfo.Count > 0)
             {
@@ -907,8 +907,6 @@ namespace BulletinBoard.Controllers
                 ViewData["UserId"] = userInfo[0].UserId;
                 ViewData["UserInfo"] = userInfo[0];
 
-                HttpContext.Session.SetString(HttpContextSessionCategory.DeptCode.ToString(), userInfo[0].DeptCode);
-                HttpContext.Session.SetString(HttpContextSessionCategory.DeptNM.ToString(), userInfo[0].DeptNM);
             }
             else
             {
@@ -1087,7 +1085,7 @@ namespace BulletinBoard.Controllers
 
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
 
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 if (userInfo.Count > 0)
                 {
@@ -1131,7 +1129,6 @@ namespace BulletinBoard.Controllers
 
                 ManageCheckPoint manageCheckPoint = new ManageCheckPoint();
 
-                var DeptCode = userInfo[0].DeptCode;
 
                 List<CheckPoint> _CheckPoint = manageCheckPoint.getViewAllPointInfo(UserId);
                 var __CheckPoint = _CheckPoint.FirstOrDefault(p => p.UserId == UserId);
@@ -1152,7 +1149,7 @@ namespace BulletinBoard.Controllers
                     ViewBag.maxAwardLevel = 1000;
                 }
 
-                List<PointAwardUser> PointAwardUsers = manageCheckPoint.getGetThisWeekRewardingByAward(string.Empty, _hostingEnvironment);
+                List<PointAwardUser> PointAwardUsers = manageCheckPoint.getGetThisWeekRewardingByAward(_hostingEnvironment);
 
                 ViewBag.PointAwardUserExists = false;
                 ViewBag.PointAwardUserExists = PointAwardUsers.Any(p => p.UserName != null && p.UserName == this.UserName);
@@ -1186,7 +1183,7 @@ namespace BulletinBoard.Controllers
 
             List<AllStatusData> allStatusDatas = manageeCommon.getAllStatusData(UserName);
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             ViewData["userInfo"] = userInfo[0];
             return View(allStatusDatas);
@@ -1210,7 +1207,7 @@ namespace BulletinBoard.Controllers
 
             List<AllStatusData> allStatusDatas = manageeCommon.getAllStatusData(UserName);
             ManageHumanResource manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+            List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, string.Empty, UserName, 0, 0, 0, string.Empty, RankQueryOption.None);
 
             ViewData["userInfo"] = userInfo[0];
             return View(allStatusDatas);

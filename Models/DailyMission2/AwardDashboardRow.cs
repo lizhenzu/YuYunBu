@@ -29,7 +29,7 @@ namespace BulletinBoard.Models.DailyMission2
         public bool IsTeacher { get; set; }
         public string? RoleCode { get; set; }         // ex) T1002
         public string? RoleName { get; set; }         // CodeData.MinorNM
-        public string? DeptCode { get; set; }         // view_All_Person_2026.DeptCode
+        
         public string DisplayGroupText { get; set; } = "학년/반 없음"; // ✅ 뷰에 뿌릴 값(학생이면 학년반, 교사면 역할명)
 
 

@@ -200,7 +200,7 @@ namespace BulletinBoard.Controllers
                 _hostingEnvironment,
                 UserId,
                 string.Empty, 0, 0, 0,
-                string.Empty, string.Empty,
+                string.Empty,
                 RankQueryOption.None);
 
             var me = userInfos.FirstOrDefault();

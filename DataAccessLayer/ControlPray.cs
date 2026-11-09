@@ -17,7 +17,7 @@ namespace BulletinBoard.DataAccessLayer
             sb.AppendFormat(" select top 150 ROW_NUMBER() OVER(ORDER BY WhenPray )  sequenceNo , * from  "); sb.Append(Environment.NewLine);
             sb.AppendFormat("   "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  ( select UserId, LastName, FirstName, FullName, UserName, bMonth, bDay, email, "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("           PhoneNumber, PhoneNumber2, HomeAaddress, school, sex, ClassYear, ClassBan, PersonId, DeptCode, RoleCode, DeptNM, RoleNM, ProfilePicture  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("           PhoneNumber, PhoneNumber2, HomeAaddress, school, sex, ClassYear, ClassBan, PersonId, RoleCode, RoleNM, ProfilePicture  "); sb.Append(Environment.NewLine);
             sb.AppendFormat("    from view_UserCompositeInfo  "); sb.Append(Environment.NewLine);
             sb.AppendFormat($"   where 1 = 1 "); sb.Append(Environment.NewLine);
             //
@@ -28,7 +28,7 @@ namespace BulletinBoard.DataAccessLayer
             }
             else
             {
-                sb.AppendFormat($"   and RoleCode != 'T1001'  and DeptCode = 'D1001' "); sb.Append(Environment.NewLine);
+                sb.AppendFormat($"   and RoleCode != 'T1001' "); sb.Append(Environment.NewLine);
             }
             sb.AppendFormat($"   ) A "); sb.Append(Environment.NewLine);
             sb.AppendFormat("  left outer join ( "); sb.Append(Environment.NewLine);

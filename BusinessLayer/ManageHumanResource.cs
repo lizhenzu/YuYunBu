@@ -14,10 +14,10 @@ namespace BulletinBoard.BusinessLayer
 {
     public class ManageHumanResource
     {
-        public List<UserInfo> getUserInfos(IWebHostEnvironment _hostingEnvironment, string UserId, string UserName, int PersonId, int ClassYear, int ClassBan,  string BanMode, string DeptCode, RankQueryOption RankQueryOptionData)
+        public List<UserInfo> getUserInfos(IWebHostEnvironment _hostingEnvironment, string UserId, string UserName, int PersonId, int ClassYear, int ClassBan,  string BanMode, RankQueryOption RankQueryOptionData)
         {
             ControlHumanResource controlHumanResource = new ControlHumanResource();
-            DataSet ds = controlHumanResource.fetchgetUserInfos(UserId, UserName, PersonId, ClassYear, ClassBan, BanMode, DeptCode, RankQueryOptionData);
+            DataSet ds = controlHumanResource.fetchgetUserInfos(UserId, UserName, PersonId, ClassYear, ClassBan, BanMode, RankQueryOptionData);
             //     List<UserInfos> value = ds.Tables[0].ToList<UserInfos>();
 
             List<UserInfo> value = new List<UserInfo>();
@@ -77,8 +77,6 @@ namespace BulletinBoard.BusinessLayer
 
                 //userInfos.insertDT = DateTime.Parse(dr["insertDT"].ToString());
                 
-                userInfos.DeptCode = dr["DeptCode"].ToString() as string;
-                userInfos.DeptNM = dr["DeptNM"].ToString() as string;
                 userInfos.RoleCode = dr["RoleCode"].ToString() as string;
                 userInfos.RoleNM = dr["RoleNM"].ToString() as string;
 

@@ -62,8 +62,7 @@ namespace BulletinBoard.Common
         public static string RoleCodeSql(string userIdExpr) =>
             "COALESCE(" +
             $"(SELECT TOP 1 LTRIM(RTRIM(ap.[RoleCode])) FROM [dbo].[view_All_Person_2026] ap WHERE ap.[userid] = {userIdExpr} AND ISNULL(ap.[RoleCode], N'') <> N'' ORDER BY ap.[RoleCode]), " +
-            $"(SELECT TOP 1 LTRIM(RTRIM(dr.[RoleCode])) FROM [dbo].[DeptRoleUserAssoc] dr WHERE dr.[UserId] = {userIdExpr} AND ISNULL(dr.[RoleCode], N'') <> N'' " +
-            $"ORDER BY CASE WHEN dr.[DeptCode] = N'{ConstatsCommon.FixedDeptCode}' THEN 0 ELSE 1 END), N'')";
+            $"(SELECT TOP 1 LTRIM(RTRIM(dr.[RoleCode])) FROM [dbo].[DeptRoleUserAssoc] dr WHERE dr.[UserId] = {userIdExpr} AND ISNULL(dr.[RoleCode], N'') <> N''), N'')";
 
         /// <summary>
         /// 로그인 아이디로 역할을 읽는다 (트랜잭션 안에서도 쓸 수 있다).

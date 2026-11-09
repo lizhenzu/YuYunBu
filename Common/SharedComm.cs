@@ -86,15 +86,6 @@ namespace BulletinBoard.Common
 
 
 
-        public static string DefaultDeptCode(string DeptCode)
-        {
-            if (string.IsNullOrEmpty(DeptCode))
-            {
-                return "D1001";
-            };
-            return DeptCode;
-        }
-
         public static string MakeBibleSerialJangZul(string BibleText, int FromJang, int FromZul, int ToJang, int ToZul)
         {
             if (FromJang == 0)

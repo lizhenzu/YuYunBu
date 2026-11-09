@@ -19,9 +19,8 @@ namespace BulletinBoard.Models
     //    public DateTime maxclickDate { get; set; }
     //    public string UserId { get; set; }
     //    public string RoleNM { get; set; }
-    //    public string DeptNM { get; set; }
     //    public string RoleCode { get; set; }
-    //    public string DeptCode { get; set; }
+    
     //}
 
     public class PointByUserName : view_Ranking_By_Person

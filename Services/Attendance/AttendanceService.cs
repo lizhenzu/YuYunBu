@@ -1986,7 +1986,7 @@ ORDER BY ci.ClassYear, ci.ClassBan, ci.visibleOrder;
             var manage = new ManageHumanResource();
             var users  = manage.getUserInfos(env,
                 string.Empty, string.Empty, 0, 0, 0,
-                string.Empty, string.Empty,
+                string.Empty,
                 RankQueryOption.StudentOnly);
 
             if (users == null || users.Count == 0)

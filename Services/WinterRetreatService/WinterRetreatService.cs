@@ -246,7 +246,7 @@ WHERE rn = 1;";
         }
 
 
-        public async Task<VBSParticipationSurveyAdminVM> GetAdminVMAsync(IEnumerable<Models.UserInfo> users , string DeptCode)
+        public async Task<VBSParticipationSurveyAdminVM> GetAdminVMAsync(IEnumerable<Models.UserInfo> users)
         {
             var vm = new VBSParticipationSurveyAdminVM { Days = Days };
 
@@ -383,7 +383,7 @@ WHERE RetreatDate IN (@D1,@D2,@D3)
                 var infoSql = $@"
 SELECT UserName, FullName, PersonId, RoleCode, ClassYear, ClassBan, RoleNM
 FROM dbo.view_UserCompositeInfo_2026 WITH (NOLOCK)
-WHERE DeptCode = '{DeptCode}' and UserName IN ({string.Join(",", userNames.Select((x, i) => $"@IU{i}"))})
+WHERE UserName IN ({string.Join(",", userNames.Select((x, i) => $"@IU{i}"))})
 {(hasFullNames ? $"   OR FullName IN ({string.Join(",", fullNames.Select((x, i) => $"@IF{i}"))})" : "")};";
 
                 await using var cmdInfo = new SqlCommand(infoSql, conInfo);

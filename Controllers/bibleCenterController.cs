@@ -122,7 +122,7 @@ namespace BulletinBoard.Controllers
                 }
 
                 ManageHumanResource manageHumanResource = new ManageHumanResource();
-                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, string.Empty, RankQueryOption.None);
+                List<UserInfo> userInfo = manageHumanResource.getUserInfos(_hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
 
                 if (userInfo.Count > 0)
                 {
