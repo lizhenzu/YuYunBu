@@ -398,6 +398,12 @@ namespace BulletinBoard.DataAccessLayer
                         tx.Commit();
                         return (true, leftTeam != null ? $"승인했어요. 새 역할에 맞지 않아 \"{leftTeam}\"에서 뺐어요." : "승인했어요.", a);
                     }
+                    catch (BulletinBoard.Services.FamilyTeamAwardLockException lockEx)
+                    {
+                        // 시상 기록이 있는 팀에 속해 있다 — 아무것도 바꾸지 않고 안내만 한다 (신청은 대기로 남는다)
+                        try { tx.Rollback(); } catch { }
+                        return (false, lockEx.Message, a);
+                    }
                     catch
                     {
                         try { tx.Rollback(); } catch { }

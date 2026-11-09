@@ -62,6 +62,20 @@ namespace BulletinBoard.Services
         public string TeamType { get; set; } = "FAMILY";
     }
 
+    /// <summary>
+    /// 시상 기록이 있는 팀에 속한 사람의 역할을 바꾸려 했고, 새 역할로는 그 팀에 남을 수 없을 때 (2026-11-09).
+    /// 역할 변경 승인 · 관리자 즉시 변경은 이 예외를 받으면 트랜잭션을 되돌리고 Message 를 보여 준다.
+    /// </summary>
+    public sealed class FamilyTeamAwardLockException : Exception
+    {
+        public string TeamName { get; }
+        public FamilyTeamAwardLockException(string teamName)
+            : base($"시상 기록이 있는 \"{teamName}\"에 속해 있어 역할을 바꿀 수 없어요. 바꿔야 하면 가족팀 관리 화면에서 먼저 팀을 정리해 주세요.")
+        {
+            TeamName = teamName;
+        }
+    }
+
     public sealed class FamilyTeamDetail
     {
         public int TeamId { get; set; }
@@ -1178,6 +1192,12 @@ SELECT @r;";
             if (fits) return null;
 
             string teamName = await ScalarAsync<string>(c, tx, "SELECT TeamName FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
+
+            // 시상 기록이 있는 팀에서는 빠질 수 없다 (2026-11-09) — 역할 변경을 통째로 되돌리게 한다.
+            // 빠진 뒤 다른 팀에 들어가 다시 시상받는 것을 막는다. 관리자 가족팀 관리 화면 · 회원 탈퇴는 예외(사용자 결정)
+            if (await HasAwardRecordAsync(c, tx, teamId))
+                throw new FamilyTeamAwardLockException(teamName.Length > 0 ? teamName : "팀");
+
             if (string.Equals(await CreatorOfAsync(c, tx, teamId), userName, StringComparison.OrdinalIgnoreCase))
             {
                 string? next = await ScalarAsync<string>(c, tx,
