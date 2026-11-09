@@ -652,7 +652,7 @@ WHERE Id IN ({string.Join(",", p)});
 
             // =====================================================
             // 4.5 교사 역할 (학생 반정보가 없으면 교사로 간주)
-            //   - view_All_Person_2026(UserId, RoleCode, PersonId, FullName)
+            //   - DeptRoleUserAssoc(UserId, RoleCode) — 역할은 이 표 한 곳 (2026-11-09)
             //   - CodeData(MajorCD='T001') 와 RoleCode=MinorCD 조인해서 MinorNM(RoleName)
             // =====================================================
             var teacherCandidateUserIds = new List<string>();
@@ -690,7 +690,7 @@ SELECT
     t.UserId,
     t.RoleCode,
     cd.MinorNM AS RoleName
-FROM dbo.view_All_Person_2026 t
+FROM dbo.DeptRoleUserAssoc t
 LEFT JOIN dbo.CodeData cd
     ON cd.MajorCD = 'T001'
    AND cd.MinorCD = t.RoleCode

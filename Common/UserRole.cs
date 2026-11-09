@@ -6,7 +6,7 @@ namespace BulletinBoard.Common
 {
     // ──────────────────────────────────────────────────────────────
     //  역할 기준 (2026-11-08) — 설계서 docs/역할기준_설계서.md
-    //   · 역할 코드는 RoleCodeSql 한 곳에서 읽는다: 배정 표(view_All_Person_2026) 우선, 없으면 DeptRoleUserAssoc
+    //   · 역할 코드는 RoleCodeSql 한 곳에서 읽는다: DeptRoleUserAssoc 하나뿐 (2026-11-09, 반 배정은 역할을 정하지 않는다)
     //       T1001 = 학생 · T1002/T1003 = 교사 · 그 밖의 코드 = 임원 · 코드 없음 = 학부모
     //   · 팀 규칙도 여기 한 곳에서 정한다
     //       가족팀: 학생(관계 "학생"만) · 학부모(엄마 · 아빠 · 할머니 · 할아버지) — 교사 · 임원은 못 들어간다
@@ -54,15 +54,30 @@ namespace BulletinBoard.Common
 
         /// <summary>
         /// SQL 안에서 한 사람의 역할 코드를 읽는 식 (userIdExpr = [Identity].[User].Id 를 가리키는 식).
-        /// 2026-11-08 사용자 결정 — 배정 표 우선, 없으면 승인된 역할:
-        ///   1) view_All_Person_2026 (반 배정 = T1001 · 담임/부담임 = T1002 · 부서 교사 표 = 그 코드) — 대부분의 화면이 보는 것과 같다
-        ///   2) DeptRoleUserAssoc (가입 승인 · 역할 변경이 쓰는 표 — 반 없는 학생, 담임 아닌 교사)
-        ///   3) 둘 다 없으면 빈 문자열 = 학부모
+        /// 2026-11-09 — 역할은 DeptRoleUserAssoc 한 곳에서만 읽는다 (사람당 한 줄).
+        /// 반 배정 · 담임 배정은 역할을 정하지 않는다. 배정 화면이 저장할 때 EnsureRoleAsync 로 이 표에 역할을 함께 적는다.
+        /// 없으면 빈 문자열 = 학부모.
         /// </summary>
         public static string RoleCodeSql(string userIdExpr) =>
-            "COALESCE(" +
-            $"(SELECT TOP 1 LTRIM(RTRIM(ap.[RoleCode])) FROM [dbo].[view_All_Person_2026] ap WHERE ap.[userid] = {userIdExpr} AND ISNULL(ap.[RoleCode], N'') <> N'' ORDER BY ap.[RoleCode]), " +
-            $"(SELECT TOP 1 LTRIM(RTRIM(dr.[RoleCode])) FROM [dbo].[DeptRoleUserAssoc] dr WHERE dr.[UserId] = {userIdExpr} AND ISNULL(dr.[RoleCode], N'') <> N''), N'')";
+            $"ISNULL((SELECT TOP 1 LTRIM(RTRIM(dr.[RoleCode])) FROM [dbo].[DeptRoleUserAssoc] dr WHERE dr.[UserId] = {userIdExpr} AND ISNULL(dr.[RoleCode], N'') <> N''), N'')";
+
+        /// <summary>
+        /// 한 사람의 역할을 DeptRoleUserAssoc 에 적는다 (있으면 바꾸고, 없으면 넣는다).
+        /// 반 배정 · 담임 배정 화면이 저장할 때 부른다 — 역할이 이 표 한 곳에서만 읽히기 때문.
+        /// </summary>
+        public static async Task EnsureRoleAsync(SqlConnection c, SqlTransaction? tx, string userId, string roleCode)
+        {
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(roleCode)) return;
+            const string sql = @"
+UPDATE [dbo].[DeptRoleUserAssoc] SET [RoleCode] = @r, [updateDT] = @now WHERE [UserId] = @u;
+IF @@ROWCOUNT = 0
+    INSERT INTO [dbo].[DeptRoleUserAssoc] ([UserId], [RoleCode], [InsertDT], [updateDT]) VALUES (@u, @r, @now, @now);";
+            using var cmd = new SqlCommand(sql, c, tx);
+            cmd.Parameters.AddWithValue("@u", userId);
+            cmd.Parameters.AddWithValue("@r", roleCode);
+            cmd.Parameters.AddWithValue("@now", BulletinBoard.Helpers.DateHelper.GetKoreaNow());
+            await cmd.ExecuteNonQueryAsync();
+        }
 
         /// <summary>
         /// 로그인 아이디로 역할을 읽는다 (트랜잭션 안에서도 쓸 수 있다).

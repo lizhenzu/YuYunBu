@@ -541,6 +541,9 @@ namespace BulletinBoard.DataAccessLayer
                             await cmd.ExecuteNonQueryAsync();
                         }
 
+                        // 반에 배정하면 학생 — 역할은 역할 표 한 곳에서만 읽으므로 함께 적는다 (2026-11-09)
+                        await BulletinBoard.Common.UserRole.EnsureRoleAsync(conn, tx, UserId, BulletinBoard.Common.UserRole.StudentCode);
+
                         tx.Commit();
                     }
                     catch
