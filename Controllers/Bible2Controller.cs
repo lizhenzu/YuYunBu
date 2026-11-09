@@ -346,7 +346,7 @@ public class Bible2Controller : Controller
         {
             var pos = await _db.Database
                 .SqlQueryRaw<ResumePosRow>(@"
-SELECT TOP 1 e.BibleText AS BookName, p.Chapter AS Jang, p.LastViewedVerse AS Zul, ISNULL(e.BibleData, N'') AS VerseText, e.Id AS VerseId, p.UpdatedAt AS UpdatedAt
+SELECT TOP 1 e.BibleText AS BookName, CAST(p.Chapter AS INT) AS Jang, CAST(p.LastViewedVerse AS INT) AS Zul, ISNULL(e.BibleData, N'') AS VerseText, e.Id AS VerseId, p.UpdatedAt AS UpdatedAt
 FROM dbo.DM2_ReadingChapterProgress p
 JOIN dbo.DM2_ReadingRound r ON r.UserName = p.UserName AND r.RoundNo = p.RoundNo AND r.CompletedAt IS NULL AND r.ClosedAt IS NULL
 JOIN [Identity].[User] u ON u.UserName = p.UserName
