@@ -1030,17 +1030,17 @@ ORDER BY r.CreatedAt;";
         private static async Task<int> PendingCountAsync(SqlConnection c, SqlTransaction tx, string userName)
             => await ScalarAsync<int>(c, tx, "SELECT COUNT(*) FROM dbo.DM2_FamilyRequest WHERE FromUserName=@u;", ("@u", userName));
 
-        /// <summary>팀 이름이 이미 쓰였나 — 숨겨진 팀과, 선물 기록("가족합산:팀이름")에 남은 이름도 쓰인 것으로 본다</summary>
+        /// <summary>팀 이름이 이미 쓰였나 — 숨겨진 팀과, 시상 기록(DM2_TeamAward)에 남은 이름도 쓰인 것으로 본다</summary>
         private static async Task<bool> NameTakenAsync(SqlConnection c, SqlTransaction tx, string name)
         {
             const string sql = @"
 DECLARE @r INT = 0;
 IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyTeam WITH (UPDLOCK, HOLDLOCK) WHERE TeamName = @n OR AwardKey = @n) SET @r = 1;
-IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
-    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'' OR LEFT(Memo, LEN(@q) + 1) = @q + N'':'') SET @o = 1',
-         N'@p NVARCHAR(300), @q NVARCHAR(300), @o INT OUTPUT', @p = @pref, @q = @prefF, @o = @r OUTPUT;
+IF @r = 0 AND OBJECT_ID(N'dbo.DM2_TeamAward') IS NOT NULL
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.DM2_TeamAward WHERE AwardKey = @k) SET @o = 1',
+         N'@k NVARCHAR(200), @o INT OUTPUT', @k = @n, @o = @r OUTPUT;
 SELECT @r;";
-            return await ScalarAsync<int>(c, tx, sql, ("@n", name), ("@pref", "가족합산:" + name), ("@prefF", "친구합산:" + name)) == 1;
+            return await ScalarAsync<int>(c, tx, sql, ("@n", name)) == 1;
         }
 
         /// <summary>새 구성원을 넣는다. 예전에 숨겨진 줄(IsActive=0)이 이 사람의 표 전체 유일 칸(UserName)을 막으니 먼저 지운다</summary>
@@ -1226,18 +1226,61 @@ SELECT @r;";
         private static async Task<string> CreatorOfAsync(SqlConnection c, SqlTransaction? tx, int teamId)
             => await ScalarAsync<string>(c, tx, "SELECT ISNULL(CreatorUserName, N'') FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
 
-        /// <summary>이 팀에 시상 기록이 있는가 — 선물 기록(메모의 팀 키) 또는 박수 숨김 기록</summary>
+        /// <summary>
+        /// 이 팀이 "시상 잠금"에 걸리는가 — 잠금 스위치가 켜져 있고, 시상 기록(DM2_TeamAward) 또는 박수 숨김 기록이 있을 때.
+        /// 시상 기록은 시상 기록 표만 본다 (선물 메모 글자를 읽지 않는다). 스위치를 끄면 기록이 있어도 잠그지 않는다.
+        /// </summary>
         private static async Task<bool> HasAwardRecordAsync(SqlConnection c, SqlTransaction? tx, int teamId)
         {
+            if (!await AwardLockEnabledAsync(c, tx)) return false;
             string key = await ScalarAsync<string>(c, tx, "SELECT ISNULL(AwardKey, TeamName) FROM dbo.DM2_FamilyTeam WHERE FamilyTeamId=@t;", ("@t", teamId)) ?? "";
             const string sql = @"
 DECLARE @r INT = 0;
 IF EXISTS (SELECT 1 FROM dbo.DM2_FamilyMilestoneHidden WHERE FamilyTeamId = @t) SET @r = 1;
-IF @r = 0 AND OBJECT_ID(N'dbo.StudentPointGiftOrder') IS NOT NULL
-    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.StudentPointGiftOrder WHERE Memo = @p OR LEFT(Memo, LEN(@p) + 1) = @p + N'':'' OR LEFT(Memo, LEN(@q) + 1) = @q + N'':'') SET @o = 1',
-         N'@p NVARCHAR(300), @q NVARCHAR(300), @o INT OUTPUT', @p = @pref, @q = @prefF, @o = @r OUTPUT;
+IF @r = 0 AND OBJECT_ID(N'dbo.DM2_TeamAward') IS NOT NULL
+    EXEC sp_executesql N'IF EXISTS (SELECT 1 FROM dbo.DM2_TeamAward WHERE AwardKey = @k) SET @o = 1',
+         N'@k NVARCHAR(200), @o INT OUTPUT', @k = @key, @o = @r OUTPUT;
 SELECT @r;";
-            return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@pref", "가족합산:" + key), ("@prefF", "친구합산:" + key)) == 1;
+            return await ScalarAsync<int>(c, tx, sql, ("@t", teamId), ("@key", key)) == 1;
+        }
+
+        /// <summary>시상 잠금 스위치 (DM2_TeamSetting.AwardLockEnabled) — 표나 값이 없으면 켜진 것으로 본다</summary>
+        private static async Task<bool> AwardLockEnabledAsync(SqlConnection c, SqlTransaction? tx)
+        {
+            const string sql = @"
+DECLARE @v NVARCHAR(200) = N'1';
+IF OBJECT_ID(N'dbo.DM2_TeamSetting') IS NOT NULL
+    EXEC sp_executesql N'SELECT @o = SettingValue FROM dbo.DM2_TeamSetting WHERE SettingKey = N''AwardLockEnabled''',
+         N'@o NVARCHAR(200) OUTPUT', @o = @v OUTPUT;
+SELECT ISNULL(@v, N'1');";
+            string v = (await ScalarAsync<string>(c, tx, sql) ?? "1").Trim();
+            return v != "0";
+        }
+
+        public async Task<bool> GetAwardLockEnabledAsync()
+        {
+            using var c = Conn();
+            await c.OpenAsync();
+            return await AwardLockEnabledAsync(c, null);
+        }
+
+        /// <summary>시상 잠금 스위치를 켜거나 끈다 (표가 아직 없으면 false)</summary>
+        public async Task<bool> SetAwardLockEnabledAsync(bool enabled)
+        {
+            using var c = Conn();
+            await c.OpenAsync();
+            const string sql = @"
+IF OBJECT_ID(N'dbo.DM2_TeamSetting') IS NULL
+    SELECT 0;
+ELSE
+BEGIN
+    EXEC sp_executesql N'
+        UPDATE dbo.DM2_TeamSetting SET SettingValue = @v, UpdatedAt = GETDATE() WHERE SettingKey = N''AwardLockEnabled'';
+        IF @@ROWCOUNT = 0 INSERT INTO dbo.DM2_TeamSetting (SettingKey, SettingValue) VALUES (N''AwardLockEnabled'', @v);',
+        N'@v NVARCHAR(200)', @v = @val;
+    SELECT 1;
+END";
+            return await ScalarAsync<int>(c, null, sql, ("@val", enabled ? "1" : "0")) == 1;
         }
     }
 }

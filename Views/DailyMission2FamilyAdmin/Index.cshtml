@@ -131,6 +131,17 @@
     @if (!string.IsNullOrWhiteSpace(err)) { <div class="fm-toast err">@err</div> }
     else if (!string.IsNullOrWhiteSpace(info)) { <div class="fm-toast">@info</div> }
 
+    @* 시상 잠금 스위치 (2026-11-09) — 시상 기록이 있는 팀의 나가기 · 내보내기 · 역할 바꾸기를 막을지 *@
+    bool awardLockOn = ViewBag.AwardLockEnabled is bool awardLockFlag ? awardLockFlag : true;
+    <form method="post" action="/DailyMission2FamilyAdmin/SetAwardLock" style="margin-top:14px" data-wait="저장하는 중이에요">
+        <input type="hidden" name="enabled" value="@(awardLockOn ? "false" : "true")" />
+        <div class="fm-sw" style="background:var(--grey)">
+            <span><b>시상 받은 팀은 나가기 · 내보내기 · 역할 바꾸기 막기</b></span>
+            <button type="submit" class="@(awardLockOn ? "on" : "")" aria-pressed="@(awardLockOn ? "true" : "false")" aria-label="시상 잠금 @(awardLockOn ? "끄기" : "켜기")"></button>
+        </div>
+        <div class="fm-hint">@(awardLockOn ? "켜져 있어요. 시상 기록이 있는 팀은 나가거나 내보낼 수 없어요." : "꺼져 있어요. 시상 기록이 있어도 자유롭게 나가고 내보낼 수 있어요.")</div>
+    </form>
+
     <div class="fm-search"><input id="teamQ" type="search" placeholder="팀 이름이나 메모로 찾기" aria-label="팀 찾기" /></div>
     <div class="qb-chips" id="teamFilter">
         <button type="button" class="on" data-f="on">활성</button>
