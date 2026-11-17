@@ -3316,13 +3316,18 @@
               }).ToList();
 
               // ②-1 친구팀 — 2명이 찼고 선물이 열린 팀. 실패해도 홈은 그대로 나온다
-              var celFriendRows = new List<BulletinBoard.Services.Abstract.FriendCelebrationVM>();
-              try
+              // ⚡ 컨트롤러가 미리 읽어 둔 값(1분 캐시)을 쓴다. 없으면 예전처럼 여기서 읽는다 (2026-11-17)
+              var celFriendRows = ViewBag.FriendCelebrations as List<BulletinBoard.Services.Abstract.FriendCelebrationVM>;
+              if (celFriendRows == null)
               {
-                  if (Context.RequestServices.GetService(typeof(BulletinBoard.Services.Abstract.IStudentPointGiftService)) is BulletinBoard.Services.Abstract.IStudentPointGiftService celGiftSvc)
-                      celFriendRows = await celGiftSvc.GetFriendCelebrationsAsync(BulletinBoard.Helpers.DateHelper.GetKoreaNow().Year);
+                  celFriendRows = new List<BulletinBoard.Services.Abstract.FriendCelebrationVM>();
+                  try
+                  {
+                      if (Context.RequestServices.GetService(typeof(BulletinBoard.Services.Abstract.IStudentPointGiftService)) is BulletinBoard.Services.Abstract.IStudentPointGiftService celGiftSvc)
+                          celFriendRows = await celGiftSvc.GetFriendCelebrationsAsync(BulletinBoard.Helpers.DateHelper.GetKoreaNow().Year);
+                  }
+                  catch { }
               }
-              catch { }
 
               bool celAny = celGiftRows.Count > 0 || celTeamRows.Count > 0 || celFriendRows.Count > 0 || celBibleRows.Count > 0;
           }
