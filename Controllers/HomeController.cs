@@ -123,6 +123,8 @@ namespace BulletinBoard.Controllers
         {
             _homeSw.Restart();
             _homeLastMs = 0;
+            // 화면(View) 안에서도 구간을 잴 수 있게 넘겨준다 — Index.cshtml 의 HM("…")
+            HttpContext.Items["HomeMark"] = (Action<string>)HomeMark;
             Response.OnStarting(() =>
             {
                 // 응답 머리가 나가는 순간 = 화면(View) 그리기까지 끝난 뒤
@@ -1013,6 +1015,7 @@ namespace BulletinBoard.Controllers
             {
                 ViewBag.ShowVBSParticipationSurveyGuide =
                     await _VBSParticipationSurveyService.ShouldShowGuideAsync(this.UserName, this.UserId);
+                HomeMark("vbs");
             }
             catch
             {
@@ -1024,6 +1027,12 @@ namespace BulletinBoard.Controllers
             ViewBag.VBSParticipationSurveyGuideBtn_Later = "다음에 할래요";
             ViewBag.VBSParticipationSurveyGuideBtn_3d = "3일후 할래요";
             ViewBag.VBSParticipationSurveyGuideBtn_7d = "7일후 할래요";
+
+            // ⚡ 2026-11-17: 아래 세 조회(성경 진도율 · 오늘 미션 상태 · 오늘 퀴즈)는 홈(Index.cshtml)에서 쓰지 않는다.
+            //    그런데도 매번 비동기 아닌 방식으로 차례로 돌아 홈이 4초 넘게 걸렸다 (오늘 미션 상태는 퀴즈 안에서 한 번 더 돌았다).
+            //    홈은 건너뛰고, 이 값을 쓰는 IndexComplex 화면만 예전처럼 읽는다.
+            if (string.Equals(viewName, "Index", StringComparison.OrdinalIgnoreCase))
+                return View(viewName);
 
             // ✅ 진행률/오늘미션/퀴즈 세팅 후 모델 반환
             var manageReadBible = new ManageReadBible();
