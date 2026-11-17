@@ -54,7 +54,8 @@ namespace BulletinBoard.Controllers
         // 생일 수정 화면에서 바로 비울 수 있도록 키를 HomeCacheHelper 와 공유한다
         private const string CK_Birthdays  = HomeCacheHelper.BirthdaysKey;    // + 날짜
         private const string CK_BandTop    = "home:bandtop:v1";
-        // 가족 마일스톤은 조건(구성원·점수·설정)이 바뀌면 바로 보여야 해서 캐시하지 않는다. (키는 남겨 둠)
+        // 가족 마일스톤: 구성원·설정이 바뀌면 HomeCacheHelper.InvalidateFamilyMilestones 가 바로 비운다.
+        //    2026-11-17 부터 1분(TTL_Shared) 캐시 — 점수 변화는 길어야 1분 늦게 보인다.
         private const string CK_Milestones = HomeCacheHelper.FamilyMilestonesKey;
         private const string CK_MsConfigs  = HomeCacheHelper.FamilyMsConfigsKey;
         private const string CK_Jubo       = "home:jubo:v1";
@@ -72,6 +73,16 @@ namespace BulletinBoard.Controllers
         private const string CK_BibleRates = "home:biblerates:v1";     // 성경 진도 상위 100명
         private const string CK_BibleDone  = "home:bibledone:v1";      // 완독 횟수 목록
         private const string CK_BibleMeta  = "home:biblechaptermeta:v1"; // 책+장별 전체 절 수 (바뀌지 않음)
+
+        // ⚡ 모든 사람에게 같은 값 — 1분만 묵힌다 (2026-11-17, 2차)
+        //    선물 신청 · 점수 변화가 홈 카드에 길어야 1분 늦게 반영된다. 사람마다 다른 값(내 점수 · 선물함)은 캐시하지 않는다.
+        //    가족 마일스톤 · 설정은 위의 CK_Milestones / CK_MsConfigs (HomeCacheHelper) 키를 쓴다 —
+        //    관리자가 가족팀 · 구성원 · 설정을 바꾸면 그 화면이 이 캐시를 바로 비운다. 점수 변화만 1분 늦게 보인다.
+        private const string CK_PurchaseAll  = "home:purchaselist:v1";      // 선물 신청 전체 (숨김 포함)
+        private const string CK_FriendCel    = "home:friendcel:v1:";        // + 연도 — 친구팀 축하
+        private const string CK_BibleLogMap  = "home:biblecompletionmap:v1"; // 완독 날짜
+        private const string CK_BibleGiftPick = "home:biblegiftpicks:v1";   // 완독 선물 고른 것
+        private static readonly TimeSpan TTL_Shared = TimeSpan.FromMinutes(1);
 
         // 완독자 목록은 "방금 완독한 사람"이 곧 보여야 하므로 아주 짧게만 묵힌다 (2026-11-17)
         private static readonly TimeSpan TTL_BibleRates = TimeSpan.FromSeconds(30);
@@ -256,8 +267,10 @@ namespace BulletinBoard.Controllers
                 int cYearGuestPre  = DateHelper.GetKoreaNow().Year;
                 var kTodayGuestPre = DateHelper.GetKoreaNow().Date;
 
-                tGuestMilestones = _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYearGuestPre);
-                tGuestConfigs    = _studentPointGiftService.GetMilestoneConfigsAsync(cYearGuestPre);
+                tGuestMilestones = CachedAsync(CK_Milestones + cYearGuestPre, TTL_Shared,
+                                       () => _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYearGuestPre));
+                tGuestConfigs    = CachedAsync(CK_MsConfigs + cYearGuestPre, TTL_Shared,
+                                       () => _studentPointGiftService.GetMilestoneConfigsAsync(cYearGuestPre));
                 // 비로그인용 오늘 말씀은 사용자 정보가 없으므로 그대로 캐시할 수 있다
                 tGuestWord       = CachedAsync(CK_GuestWord + kTodayGuestPre.ToString("yyyyMMdd"), TTL_Long,
                                        () => _dailyMission2Service.GetTodayWordDetailAsync(kTodayGuestPre, "KR", ""));
@@ -355,6 +368,12 @@ namespace BulletinBoard.Controllers
             var tTodayJoinPre = CachedAsync(CK_TodayJoin + __kToday.ToString("yyyyMMdd"), TTL_Short,
                 () => _dailyMission2Service.GetTodayWordParticipantCountAsync(__kToday));
 
+            // 친구팀 축하 목록 — 예전에는 화면이 그려지는 도중에 회원마다 점수 함수를 돌렸다.
+            //    여기서 미리 시작해 다른 조회와 겹쳐 돌리고, 1분 캐시한다 (2026-11-17)
+            int __celYear = __kToday.Year;
+            var tFriendCelPre = CachedAsync(CK_FriendCel + __celYear, TTL_Shared,
+                () => _studentPointGiftService.GetFriendCelebrationsAsync(__celYear));
+
             // ⚡ IndexCore 에서 쓸 무거운 조회 2건을 여기서 미리 시작한다.
             //    아래 마일스톤 대기와 겹쳐 돌아가므로 그만큼 시간이 줄어든다.
             _tBirthdaysPre = GetUpcomingBirthdaysVmAsync();
@@ -377,11 +396,14 @@ namespace BulletinBoard.Controllers
                         var t4       = _devotionPointsService.GetMyTotalPointsAsync(capturedUserId);
                         var t5       = _attendanceService.GetEvangelismCountByUserIdAsync(capturedUserId)
                                            .ContinueWith(t => t.IsFaulted ? 0 : t.Result);
-                        var t7       = _studentPointGiftService.GetAdminPurchaseListAsync(includeHidden: true);
+                        var t7       = CachedAsync(CK_PurchaseAll, TTL_Shared,
+                                           () => _studentPointGiftService.GetAdminPurchaseListAsync(includeHidden: true));
                         var t8       = _studentPointGiftService.GetFamilyTeamGiftStatusAsync(capturedUserName, cYear, 1000);
                         // 마일스톤/설정은 사용자와 무관한 공통 값이라 비로그인 화면과 캐시를 공유한다
-                        var t9       = _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYear);
-                        var t10      = _studentPointGiftService.GetMilestoneConfigsAsync(cYear);
+                        var t9       = CachedAsync(CK_Milestones + cYear, TTL_Shared,
+                                           () => _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYear));
+                        var t10      = CachedAsync(CK_MsConfigs + cYear, TTL_Shared,
+                                           () => _studentPointGiftService.GetMilestoneConfigsAsync(cYear));
                         var t11      = _studentPointGiftService.GetMyFamilyTreeAsync(capturedUserName, cYear)
                                            .ContinueWith(t => t.IsFaulted ? null : t.Result);
                         var tPreload = _studentPointGiftService.PreloadEvalStateAsync(capturedUserName);
@@ -604,8 +626,10 @@ namespace BulletinBoard.Controllers
                         int cYearFb = DateHelper.GetKoreaNow().Year;
                         try
                         {
-                            ViewBag.FamilyMilestones       = await _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYearFb);
-                            ViewBag.FamilyMilestoneConfigs = await _studentPointGiftService.GetMilestoneConfigsAsync(cYearFb);
+                            ViewBag.FamilyMilestones       = await CachedAsync(CK_Milestones + cYearFb, TTL_Shared,
+                                                                 () => _studentPointGiftService.GetHomepageFamilyMilestonesAsync(cYearFb));
+                            ViewBag.FamilyMilestoneConfigs = await CachedAsync(CK_MsConfigs + cYearFb, TTL_Shared,
+                                                                 () => _studentPointGiftService.GetMilestoneConfigsAsync(cYearFb));
                         }
                         catch
                         {
@@ -632,7 +656,7 @@ namespace BulletinBoard.Controllers
                 // ⚡ 위에서 미리 시작해 둔 비로그인용 조회를 회수합니다.
                 if (tGuestMilestones != null)
                 {
-                    // 가족 마일스톤은 캐시 없이 매번 조회하므로, 실패해도 화면이 죽지 않게 각각 받는다
+                    // 실패해도 화면이 죽지 않게 각각 받는다
                     try { await Task.WhenAll(tGuestMilestones, tGuestConfigs, tGuestWord); } catch { }
                     ViewBag.FamilyMilestones       = tGuestMilestones.IsCompletedSuccessfully ? tGuestMilestones.Result : null;
                     ViewBag.FamilyMilestoneConfigs = tGuestConfigs.IsCompletedSuccessfully    ? tGuestConfigs.Result    : null;
@@ -648,8 +672,11 @@ namespace BulletinBoard.Controllers
 
 
             // ⚡ 위에서 미리 시작해 둔 조회들을 한 번에 회수합니다.
-            await Task.WhenAll(tJuboPre, tBibleRatesPre, tBibleDonePre, tTodayJoinPre);
+            await Task.WhenAll(tJuboPre, tBibleRatesPre, tBibleDonePre, tTodayJoinPre, tFriendCelPre);
             HomeMark("bible");
+
+            // null = 조회 실패 → 화면이 예전처럼 직접 읽는다
+            ViewBag.FriendCelebrations = tFriendCelPre.Result;
 
             ViewBag.DM2TodayJoinCount = tTodayJoinPre.Result;
 
@@ -682,16 +709,16 @@ namespace BulletinBoard.Controllers
             //    표(BibleCompletionLog)가 아직 없으면 날짜 없이 지금처럼 보여 준다.
             try
             {
-                var logs = await _db.BibleCompletionLogs
-                    .OrderBy(l => l.UserId).ThenBy(l => l.RoundNo)
-                    .Select(l => new { l.UserId, l.RoundNo, l.CompletedAt })
-                    .ToListAsync();
-
-                ViewBag.BibleCompletionMap = logs
+                ViewBag.BibleCompletionMap = await CachedAsync(CK_BibleLogMap, TTL_Shared, async () =>
+                    (await _db.BibleCompletionLogs
+                        .OrderBy(l => l.UserId).ThenBy(l => l.RoundNo)
+                        .Select(l => new { l.UserId, l.RoundNo, l.CompletedAt })
+                        .ToListAsync())
                     .GroupBy(l => l.UserId)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(x => (Round: x.RoundNo, Date: x.CompletedAt)).ToList());
+                        g => g.Select(x => (Round: x.RoundNo, Date: x.CompletedAt)).ToList()))
+                    ?? new Dictionary<string, List<(int Round, DateTime Date)>>();
             }
             catch
             {
@@ -718,7 +745,8 @@ namespace BulletinBoard.Controllers
 
                 // 완독 축하 카드에 "고른 선물"을 함께 보여 주기 위한 목록
                 if (giftSvc != null)
-                    ViewBag.BibleGiftPickMap = await giftSvc.GetCurrentPicksAsync();
+                    ViewBag.BibleGiftPickMap = await CachedAsync(CK_BibleGiftPick, TTL_Shared,
+                        () => giftSvc.GetCurrentPicksAsync());
             }
             catch
             {
