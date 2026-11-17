@@ -20,6 +20,8 @@ namespace BulletinBoard.Services.Abstract
 
         Task<List<GiftItemVM>> GetGiftListAsync(int availableCredit);
         Task<GiftBoxVM> GetMyGiftBoxAsync(string userName, int integratedTotal);
+        /// <summary>지금 고른(승인 대기) 선물 하나만 — 홈 화면용</summary>
+        Task<GiftOrderVM?> GetCurrentDraftAsync(string userName);
         Task<bool> IsStudentAsync(string userName);
         Task SelectGiftAsync(string userName, int productId, int integratedTotal);
         // ✅ (신규) 내 선물함에서 현재 선택(DRAFT) 취소(완전 삭제)

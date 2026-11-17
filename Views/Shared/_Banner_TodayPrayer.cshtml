@@ -19,8 +19,14 @@
     bool tp365Open = !Cfg.StaffOnly || tpStaff;   // 오늘 기도 제목 · 며칠째 표시도 같은 기준으로 보인다
     if (tp365Open)
     {
-        try { tpTitle = await Prayer365.GetTitleAsync(Cfg.Md(tpToday)); }
-        catch { tpTitle = null; }   // 표 문제면 제목 없이
+        // ⚡ 홈에서는 컨트롤러가 읽어 둔 값(하루 캐시)을 쓴다 — 2026-11-17
+        if (ViewData["P365TitleLoaded"] is bool tpPre && tpPre)
+            tpTitle = ViewBag.P365TodayTitle as string;
+        else
+        {
+            try { tpTitle = await Prayer365.GetTitleAsync(Cfg.Md(tpToday)); }
+            catch { tpTitle = null; }   // 표 문제면 제목 없이
+        }
     }
 
     // 나의 기도 일수(이번 주 도장 · 숫자 세 칸)는 2026-10-18 홈 카드에서 뺐다 — 계산도 하지 않는다
