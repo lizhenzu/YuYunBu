@@ -9,8 +9,10 @@
 @{
     var user        = await AuthService.GetSignedUser(User);
     var isSignedIn  = await AuthService.IsSignedIn(User);
-    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
-    var isAdmin     = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
+    // ⚡ 홈에서는 컨트롤러가 읽어 둔 역할을 쓴다 (없으면 예전처럼 하나씩 확인) — 2026-11-17
+    var homeRoles    = ViewBag.HomeRoles as HashSet<string>;
+    var isSuperAdmin = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.SuperAdmin)) : await AuthService.IsInRole(user, nameof(Roles.SuperAdmin)));
+    var isAdmin      = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.Admin))      : await AuthService.IsInRole(user, nameof(Roles.Admin)));
     bool isStaff    = isAdmin || isSuperAdmin;
 
     // 선물 관리 화면을 열 수 있는 사람 — Admin · SuperAdmin 역할, 예외로 "Basic" 계정
@@ -33,8 +35,9 @@
                                       .Select(x => x.ProductId!.Value).Distinct().ToList();
         if (giftIds.Count > 0)
         {
-            var allItems = GiftDb.AwardItems.AsNoTracking().ToList();
-            foreach (var it in allItems.Where(a => giftIds.Contains(a.ProductID)))
+            // ⚡ 표 전체가 아니라 필요한 선물만 읽는다 (2026-11-17)
+            var allItems = await GiftDb.AwardItems.AsNoTracking().Where(a => giftIds.Contains(a.ProductID)).ToListAsync();
+            foreach (var it in allItems)
             {
                 giftInfo[it.ProductID] = (it.ProductDescription ?? "", it.ExternalUrl ?? "");
             }

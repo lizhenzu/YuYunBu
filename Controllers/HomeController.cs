@@ -69,6 +69,45 @@ namespace BulletinBoard.Controllers
         private const string CK_GuestWord  = "home:guestword:v1:";    // + 날짜
         private const string CK_TodayJoin  = "home:todayjoin:v1:";    // + 날짜
         private const string CK_MenuPolicy = "home:menupolicy:v1";
+        private const string CK_BibleRates = "home:biblerates:v1";     // 성경 진도 상위 100명
+        private const string CK_BibleDone  = "home:bibledone:v1";      // 완독 횟수 목록
+        private const string CK_BibleMeta  = "home:biblechaptermeta:v1"; // 책+장별 전체 절 수 (바뀌지 않음)
+
+        // 완독자 목록은 "방금 완독한 사람"이 곧 보여야 하므로 아주 짧게만 묵힌다 (2026-11-17)
+        private static readonly TimeSpan TTL_BibleRates = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan TTL_BibleMeta  = TimeSpan.FromHours(12);
+
+        // ── 홈 단계별 소요 시간 → 응답 헤더 Server-Timing (브라우저 개발자 도구 › 네트워크 › 타이밍에서 본다) ──
+        private readonly System.Diagnostics.Stopwatch _homeSw = new System.Diagnostics.Stopwatch();
+        private readonly List<string> _homeMarks = new List<string>();
+        private double _homeLastMs;
+        private bool _userInfoLoaded;
+
+        private void HomeMark(string name)
+        {
+            if (!_homeSw.IsRunning) return;
+            var now = _homeSw.Elapsed.TotalMilliseconds;
+            _homeMarks.Add($"{name};dur={now - _homeLastMs:0}");
+            _homeLastMs = now;
+        }
+
+        private void StartHomeTiming()
+        {
+            _homeSw.Restart();
+            _homeLastMs = 0;
+            Response.OnStarting(() =>
+            {
+                // 응답 머리가 나가는 순간 = 화면(View) 그리기까지 끝난 뒤
+                var total = _homeSw.Elapsed.TotalMilliseconds;
+                var parts = new List<string>(_homeMarks)
+                {
+                    $"render;dur={total - _homeLastMs:0}",
+                    $"total;dur={total:0}"
+                };
+                Response.Headers["Server-Timing"] = string.Join(", ", parts);
+                return Task.CompletedTask;
+            });
+        }
 
         private static readonly TimeSpan TTL_Birthdays  = TimeSpan.FromMinutes(10);
         private static readonly TimeSpan TTL_BandTop    = TimeSpan.FromMinutes(2);
@@ -179,11 +218,32 @@ namespace BulletinBoard.Controllers
             if (ShouldShowHomeSplash())
                 return View("~/Views/Home/IndexSplash.cshtml");
 
+            StartHomeTiming();
+
             // ✅ 로그인 사용자면 BaseController.SetUserInfo로 this.UserName 채우기
             //    (IsSignedIn 은 아래에서도 쓰므로 한 번만 호출해 재사용합니다)
             bool __signedIn = await _authService.IsSignedIn(User);
             if (__signedIn)
+            {
                 await SetUserInfo();
+                _userInfoLoaded = true;   // IndexCore 에서 다시 부르지 않는다 (DB 1회 절약)
+            }
+
+            // ⚡ 역할은 여기서 한 번만 읽어 화면(Index · _FamilyMilestoneBlock)에 넘긴다.
+            //    예전에는 화면이 그려지는 도중에 IsInRole 을 7번 따로 불러 DB 를 7번 다녀왔다 (2026-11-17)
+            HashSet<string> __roles = null;
+            if (__signedIn)
+            {
+                try
+                {
+                    var __ru = await _authService.GetSignedUser(User);
+                    var __rl = __ru != null ? await _authService.GetUserRoles(__ru) : null;
+                    __roles = new HashSet<string>(__rl ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+                }
+                catch { __roles = null; }   // 실패하면 화면이 예전처럼 직접 확인한다
+            }
+            ViewBag.HomeRoles = __roles;
+            HomeMark("auth");
 
             // ⚡ 성능: 비로그인 화면에 필요한 조회를 여기서 미리 시작합니다.
             //    (기존에는 아래 else 블록에서 순차로 await 해 약 2초를 썼습니다)
@@ -223,6 +283,10 @@ namespace BulletinBoard.Controllers
                 {
                     __showHomeStats = true;
                 }
+                else if (__roles != null)
+                {
+                    __showHomeStats = __roles.Contains(nameof(Roles.SuperAdmin));
+                }
                 else
                 {
                     try
@@ -250,6 +314,7 @@ namespace BulletinBoard.Controllers
                 catch { /* 저장 실패해도 화면은 그대로 보여 준다 */ }
             }
             ViewBag.UserType = 'A';
+            HomeMark("pref");
 
             // ✅ 메뉴 정책 로드해서 View로 전달 (거의 바뀌지 않으므로 캐시)
             ViewBag.MenuPolicyMap = await CachedAsync(CK_MenuPolicy, TTL_Long,
@@ -268,21 +333,22 @@ namespace BulletinBoard.Controllers
             var tJuboPre = CachedAsync(CK_Jubo, TTL_Short,
                 () => _bandBoardService.GetPostsPageAsync("BandJuboPosts", 1, 1));
 
-            // ⚠ 캐시를 쓰지 않는다 — 이 값은 "지금 이 순간 100% 인 사람"을 실시간으로 걸러내는
-            //    조회라, 여러 사람이 공유하는 캐시로 몇 분만 묵혀도 방금 완독한 사람이
-            //    한동안 축하 카드에 안 뜨는 문제가 생긴다. 매 요청마다 새로 조회한다.
-            var tBibleRatesPre = Task.Run(() =>
+            // ⚠ 이 값은 "지금 이 순간 100% 인 사람"을 걸러내는 조회라 몇 분씩 묵히면
+            //    방금 완독한 사람이 한동안 축하 카드에 안 뜬다.
+            // ⚡ 그렇다고 매 요청마다 새로 읽으면 UserBibleProgress 표 전체를 사람별로 묶는 무거운 조회가
+            //    방문자 수만큼 돈다 → 30초만 묵힌다. 완독 후 길어야 30초 안에 카드에 뜬다 (2026-11-17)
+            var tBibleRatesPre = CachedAsync(CK_BibleRates, TTL_BibleRates, () => Task.Run(() =>
             {
                 var mgr = new ManageReadBible();
                 return mgr.GetUserTotalProgressRatesByUser(
                     _hostingEnvironment, BilbeProcessOption.TotalProgressRate);
-            });
+            }));
 
-            var tBibleDonePre = Task.Run(() =>
+            var tBibleDonePre = CachedAsync(CK_BibleDone, TTL_BibleRates, () => Task.Run(() =>
             {
                 var mgr = new ManageReadBible();
                 return mgr.GetUserTotalProgressRatesByUserCompleted(_hostingEnvironment);
-            });
+            }));
 
             // 오늘 "매일성경 말씀"을 수행한 사람 수 (로그인 여부와 무관하게 표시)
             var __kToday = DateHelper.GetKoreaNow().Date;
@@ -488,11 +554,15 @@ namespace BulletinBoard.Controllers
                             var _bList = _bMgr.GetLastReadVerse(capturedUserId, 0, 0);
                             ViewBag.BibleLastReadInfo = _bList.Count > 0 ? _bList[0] : null;
 
-                            // 장 메타 (책+장 별 전체 절 수)
-                            var _bChapterMeta = await _db.EBibles
-                                .GroupBy(e => new { e.BibleText, e.Jang })
-                                .Select(g => new { BibleText = g.Key.BibleText ?? "", Jang = g.Key.Jang, TotalVerses = g.Count() })
-                                .ToListAsync();
+                            // 장 메타 (책+장 → 전체 절 수) — 성경 본문은 바뀌지 않으므로 오래 캐시한다.
+                            //    ⚡ 예전에는 매 요청마다 성경 전체(약 3만 1천 절)를 묶어 셌다 (2026-11-17)
+                            var _bChapterMeta = await CachedAsync(CK_BibleMeta, TTL_BibleMeta, async () =>
+                                (await _db.EBibles
+                                    .GroupBy(e => new { e.BibleText, e.Jang })
+                                    .Select(g => new { BibleText = g.Key.BibleText ?? "", Jang = g.Key.Jang, TotalVerses = g.Count() })
+                                    .ToListAsync())
+                                .ToDictionary(x => $"{x.BibleText}_{x.Jang}", x => x.TotalVerses))
+                                ?? new Dictionary<string, int>();
 
                             // 사용자가 읽은 구절 (책+장+절id)
                             var _bUserProgress = await _db.UserBibleProgresses
@@ -503,12 +573,10 @@ namespace BulletinBoard.Controllers
 
                             // 완독 장 집합 (해당 장의 모든 절을 읽어야 완독)
                             var _bReadSet = _bUserProgress
-                                .GroupBy(x => new { x.BibleText, x.Jang })
-                                .Where(g => {
-                                    var meta = _bChapterMeta.FirstOrDefault(c => c.BibleText == g.Key.BibleText && c.Jang == g.Key.Jang);
-                                    return meta != null && meta.TotalVerses == g.Select(x => x.VerseId).Distinct().Count();
-                                })
-                                .Select(g => $"{g.Key.BibleText}_{g.Key.Jang}")
+                                .GroupBy(x => $"{x.BibleText}_{x.Jang}")
+                                .Where(g => _bChapterMeta.TryGetValue(g.Key, out var total)
+                                         && total == g.Select(x => x.VerseId).Distinct().Count())
+                                .Select(g => g.Key)
                                 .ToHashSet();
 
                             int _bTotalChaps = _bChapterMeta.Count;
@@ -547,6 +615,7 @@ namespace BulletinBoard.Controllers
                     }
                 }
 
+                HomeMark("user");
                 ViewBag.IntegratedTotal      = integratedTotal;
                 ViewBag.GiftAvailable        = giftAvailable;
                 ViewBag.MilestoneJustReached = milestoneJustReached;
@@ -580,6 +649,7 @@ namespace BulletinBoard.Controllers
 
             // ⚡ 위에서 미리 시작해 둔 조회들을 한 번에 회수합니다.
             await Task.WhenAll(tJuboPre, tBibleRatesPre, tBibleDonePre, tTodayJoinPre);
+            HomeMark("bible");
 
             ViewBag.DM2TodayJoinCount = tTodayJoinPre.Result;
 
@@ -655,6 +725,7 @@ namespace BulletinBoard.Controllers
                 ViewBag.BibleGiftBanner = null;   // 표가 아직 없으면 배너 없이 간다
             }
 
+            HomeMark("gift");
             return await IndexCore(viewName: "Index");
         }
 
@@ -742,7 +813,7 @@ namespace BulletinBoard.Controllers
         {
             // ✅ 로그인 상태면 여기서 1번 확실히 채우기 (UserName 타이밍 꼬임 방지)
             var signedIn = await _authService.IsSignedIn(User);
-            if (signedIn)
+            if (signedIn && !_userInfoLoaded)   // Index() 에서 이미 채웠으면 다시 DB 에 가지 않는다
                 await SetUserInfo();
 
             var urlInfo = UrlInfoHelper.GetUrlInfo(HttpContext);
@@ -787,6 +858,7 @@ namespace BulletinBoard.Controllers
 
             await Task.WhenAll(tBirthdays, tAttendanceTrend, tBandBoard, tNoticeBoardTops,
                                tMenus, tAward, tOneLine, tRhapsody, tPinned);
+            HomeMark("core");
 
             // ── 회수 후 ViewBag/ViewData 할당 (단일 스레드) ──
             var birthVm = tBirthdays.Result;
@@ -832,6 +904,7 @@ namespace BulletinBoard.Controllers
             if (signedIn)
             {
                 await BindSignedUserHeaderAndMessagesAsync(currentDate);
+                HomeMark("header");
             }
 
             // ✅ 비로그인: 팝업도 의미 없으니 false

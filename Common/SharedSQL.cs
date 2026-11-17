@@ -33,10 +33,12 @@ namespace BulletinBoard.Common
             // 예전처럼 UserBibleProgressCompleted 를 join 하면 완독 기록이 여러 줄인 사람이
             // 그 수만큼 중복 행으로 불어나, 아래 TOP 100 자리를 잡아먹어 다른 사람이 잘려 나갔다.
             sb.AppendFormat("        isnull((SELECT MAX([readBibleAllCount]) FROM [dbo].[UserBibleProgressCompleted] WHERE UserName = MB.UserName), 0)  [readBibleAllCount],  "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("        isnull((SELECT TOP 1 RoleCode FROM [dbo].[view_UserCompositeInfo_2026] WHERE UserName = MB.UserName), '') RoleCode,  "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("        isnull((SELECT TOP 1 RoleNM   FROM [dbo].[view_UserCompositeInfo_2026] WHERE UserName = MB.UserName), '') RoleNM,  "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("        isnull((SELECT TOP 1 ClassYear FROM [dbo].[view_UserCompositeInfo_2026] WHERE UserName = MB.UserName), 0) ClassYear,  "); sb.Append(Environment.NewLine);
-            sb.AppendFormat("        isnull((SELECT TOP 1 ClassBan  FROM [dbo].[view_UserCompositeInfo_2026] WHERE UserName = MB.UserName), 0) ClassBan,  "); sb.Append(Environment.NewLine);
+            // ⚡ 성능 (2026-11-17): 예전에는 아래 4칸을 칸마다 따로 view_UserCompositeInfo_2026 에서 읽어
+            //    한 사람에 뷰를 4번(100명이면 400번) 돌렸다. OUTER APPLY 로 한 사람에 한 번만 읽는다.
+            sb.AppendFormat("        isnull(VI.RoleCode , '') RoleCode,  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("        isnull(VI.RoleNM   , '') RoleNM,  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("        isnull(VI.ClassYear, 0) ClassYear,  "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("        isnull(VI.ClassBan , 0) ClassBan,  "); sb.Append(Environment.NewLine);
             sb.AppendFormat("        ''                   ProfilePicture "); sb.Append(Environment.NewLine);
 
             sb.AppendFormat("      FROM (");
@@ -47,6 +49,7 @@ namespace BulletinBoard.Common
             sb.AppendFormat("             GROUP BY UserId");
             sb.AppendFormat("           ) MA");
             sb.AppendFormat("    join [Identity].[User]                  MB on MA.UserId = MB.Id "); sb.Append(Environment.NewLine);
+            sb.AppendFormat("    outer apply (SELECT TOP 1 RoleCode, RoleNM, ClassYear, ClassBan FROM [dbo].[view_UserCompositeInfo_2026] WHERE UserName = MB.UserName) VI "); sb.Append(Environment.NewLine);
             sb.AppendFormat("    where 1 = 1   "); sb.Append(Environment.NewLine);
             // TOP 100 에 바깥 ORDER BY 가 없으면 어느 100명이 올지 정해지지 않는다.
             // (정렬은 ROW_NUMBER() 안에만 있어서 결과 순서를 보장하지 못한다.)

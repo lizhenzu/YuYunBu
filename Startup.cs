@@ -112,6 +112,19 @@ namespace BulletinBoard
             // 로그인 쿠키의 계정 확인 주기 — 탈퇴로 지워진 계정은 길어야 1분 안에 로그아웃된다
             services.Configure<SecurityStampValidatorOptions>(o => o.ValidationInterval = TimeSpan.FromMinutes(1));
 
+            // ⚡ 응답 압축 (2026-11-17) — 홈 HTML 이 수백 KB 라 압축하면 받는 양이 크게 준다.
+            //    기본 형식(html · css · js · json 등)만 압축한다. 이미지 · 동영상은 이미 압축돼 있어 건드리지 않는다.
+            services.AddResponseCompression(o =>
+            {
+                o.EnableForHttps = true;
+                o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+                o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+            });
+            services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o =>
+                o.Level = System.IO.Compression.CompressionLevel.Fastest);
+            services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o =>
+                o.Level = System.IO.Compression.CompressionLevel.Fastest);
+
             // 메모리 캐시
             services.AddDistributedMemoryCache();
             services.AddMemoryCache();
@@ -250,6 +263,9 @@ namespace BulletinBoard
             }
 
             app.UseHttpsRedirection();
+
+            // ⚡ 응답 압축 — 정적 파일 · 화면 응답보다 앞에 둬야 둘 다 압축된다
+            app.UseResponseCompression();
 
             // 검색 엔진 설정 (2026-10-05)
             //  · 공개 주소  = https://www.jamsilkids.com  → 홈("/")만 검색 허용, 나머지는 noindex

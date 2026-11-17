@@ -16,10 +16,12 @@
 @{
     var user = await AuthService.GetSignedUser(User);
     var isSignedIn = await AuthService.IsSignedIn(User);
-    var isSuperAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.SuperAdmin));
-    var isAdmin = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Admin));
-    var isBasic = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Basic));
-    var isModerator = isSignedIn && await AuthService.IsInRole(user, nameof(Roles.Moderator));
+    // ⚡ 컨트롤러가 역할을 한 번에 읽어 넘겨준다 (없으면 예전처럼 하나씩 확인) — 2026-11-17
+    var homeRoles = ViewBag.HomeRoles as HashSet<string>;
+    var isSuperAdmin = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.SuperAdmin)) : await AuthService.IsInRole(user, nameof(Roles.SuperAdmin)));
+    var isAdmin      = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.Admin))      : await AuthService.IsInRole(user, nameof(Roles.Admin)));
+    var isBasic      = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.Basic))      : await AuthService.IsInRole(user, nameof(Roles.Basic)));
+    var isModerator  = isSignedIn && (homeRoles != null ? homeRoles.Contains(nameof(Roles.Moderator))  : await AuthService.IsInRole(user, nameof(Roles.Moderator)));
 
 
     bool isStaff = (isAdmin || isSuperAdmin);
