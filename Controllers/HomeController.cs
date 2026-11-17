@@ -123,6 +123,8 @@ namespace BulletinBoard.Controllers
         {
             _homeSw.Restart();
             _homeLastMs = 0;
+            // 화면(View) 안에서도 구간을 잴 수 있게 넘겨준다 — Index.cshtml 의 HM("…")
+            HttpContext.Items["HomeMark"] = (Action<string>)HomeMark;
             Response.OnStarting(() =>
             {
                 // 응답 머리가 나가는 순간 = 화면(View) 그리기까지 끝난 뒤
@@ -1013,6 +1015,7 @@ namespace BulletinBoard.Controllers
             {
                 ViewBag.ShowVBSParticipationSurveyGuide =
                     await _VBSParticipationSurveyService.ShouldShowGuideAsync(this.UserName, this.UserId);
+                HomeMark("vbs");
             }
             catch
             {
