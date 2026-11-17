@@ -383,6 +383,8 @@ namespace BulletinBoard.Controllers
             {
                 if (!string.IsNullOrWhiteSpace(this.UserId) && !string.IsNullOrWhiteSpace(this.UserName))
                 {
+                    // EF(_db)를 쓰는 미리 시작한 조회 — 실패로 아래 catch 에 가도 끝날 때까지 기다린 뒤 다음 EF 조회를 한다
+                    Task __bibleEfTask = null;
                     try
                     {
                         int cYear = DateHelper.GetKoreaNow().Year;
@@ -413,6 +415,21 @@ namespace BulletinBoard.Controllers
                         var tDoneMap = _dailyMission2Service.GetCalendarAllDoneMapAsync(capturedUserName, kToday)
                                            .ContinueWith(t => t.IsFaulted ? null : t.Result);
 
+                        // ⚡ 점수와 상관없는 조회도 여기서 함께 시작한다 (예전에는 점수 계산이 끝난 뒤에 하나씩 했다 — 2026-11-17)
+                        //    · 지금 고른 선물 하나 (예전: 선물함 전체를 읽고 선물 평가까지 다시 했다)
+                        //    · 성경 마지막 읽은 구절 · 내 진도 — 위 조회들은 EF(AppDbContext)를 쓰지 않으므로 _db 를 겹쳐 써도 안전하다
+                        var tDraft    = _studentPointGiftService.GetCurrentDraftAsync(capturedUserName)
+                                            .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : null);
+                        var tLastRead = Task.Run(() =>
+                                            {
+                                                var l = new ManageReadBible().GetLastReadVerse(capturedUserId, 0, 0);
+                                                return l.Count > 0 ? (object)l[0] : null;
+                                            })
+                                            .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : null);
+                        var tBibleStats = LoadBibleStatsAsync(capturedUserId)
+                                            .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : ((int Read, int Total, double Rate)?)null);
+                        __bibleEfTask = tBibleStats;
+
                         await Task.WhenAll(t1, t2, t3, t4, t5, t7, t8, t9, t10, tPreload, tWord, tDoneMap);
                         await t11;
 
@@ -432,12 +449,7 @@ namespace BulletinBoard.Controllers
                         giftCredit          = eval?.AvailableCredit ?? 0;
 
                         // ✅ 이미 고른(아직 관리자 승인 대기중인) 선물이 있으면 홈 카드에서 바꿀 곳을 다르게 안내한다
-                        try
-                        {
-                            var giftBox = await _studentPointGiftService.GetMyGiftBoxAsync(capturedUserName, integratedTotal);
-                            ViewBag.GiftCurrentDraft = giftBox.CurrentDraft;
-                        }
-                        catch { ViewBag.GiftCurrentDraft = null; }
+                        ViewBag.GiftCurrentDraft = await tDraft;
 
                         // ── 7번 결과 적용 ──
                         var giftList = t7.Result;
@@ -569,47 +581,15 @@ namespace BulletinBoard.Controllers
                         ViewBag.DM2DoneMap             = tDoneMap.Result;
                         ViewBag.DM2BiblePoint          = biblePoint;
 
-                        // ── 성경통독 마지막 읽은 구절 + 통계 (/BIBLE 동일 로직) ──
-                        try
+                        // ── 성경통독 마지막 읽은 구절 + 통계 (/BIBLE 동일 로직) — 위에서 미리 시작해 둔 것을 회수 ──
+                        ViewBag.BibleLastReadInfo = await tLastRead;
+                        var _bStats = await tBibleStats;
+                        if (_bStats.HasValue)
                         {
-                            var _bMgr  = new ManageReadBible();
-                            var _bList = _bMgr.GetLastReadVerse(capturedUserId, 0, 0);
-                            ViewBag.BibleLastReadInfo = _bList.Count > 0 ? _bList[0] : null;
-
-                            // 장 메타 (책+장 → 전체 절 수) — 성경 본문은 바뀌지 않으므로 오래 캐시한다.
-                            //    ⚡ 예전에는 매 요청마다 성경 전체(약 3만 1천 절)를 묶어 셌다 (2026-11-17)
-                            var _bChapterMeta = await CachedAsync(CK_BibleMeta, TTL_BibleMeta, async () =>
-                                (await _db.EBibles
-                                    .GroupBy(e => new { e.BibleText, e.Jang })
-                                    .Select(g => new { BibleText = g.Key.BibleText ?? "", Jang = g.Key.Jang, TotalVerses = g.Count() })
-                                    .ToListAsync())
-                                .ToDictionary(x => $"{x.BibleText}_{x.Jang}", x => x.TotalVerses))
-                                ?? new Dictionary<string, int>();
-
-                            // 사용자가 읽은 구절 (책+장+절id)
-                            var _bUserProgress = await _db.UserBibleProgresses
-                                .Where(p => p.UserId == capturedUserId)
-                                .Join(_db.EBibles, p => p.VerseId, e => e.Id,
-                                      (p, e) => new { BibleText = e.BibleText ?? "", e.Jang, p.VerseId })
-                                .ToListAsync();
-
-                            // 완독 장 집합 (해당 장의 모든 절을 읽어야 완독)
-                            var _bReadSet = _bUserProgress
-                                .GroupBy(x => $"{x.BibleText}_{x.Jang}")
-                                .Where(g => _bChapterMeta.TryGetValue(g.Key, out var total)
-                                         && total == g.Select(x => x.VerseId).Distinct().Count())
-                                .Select(g => g.Key)
-                                .ToHashSet();
-
-                            int _bTotalChaps = _bChapterMeta.Count;
-                            int _bReadChaps  = _bReadSet.Count;
-                            double _bRate    = _bTotalChaps > 0 ? Math.Round(_bReadChaps * 100.0 / _bTotalChaps, 1) : 0;
-
-                            ViewBag.BibleReadChapters  = _bReadChaps;
-                            ViewBag.BibleTotalChapters = _bTotalChaps;
-                            ViewBag.BibleProgressRate  = _bRate;
+                            ViewBag.BibleReadChapters  = _bStats.Value.Read;
+                            ViewBag.BibleTotalChapters = _bStats.Value.Total;
+                            ViewBag.BibleProgressRate  = _bStats.Value.Rate;
                         }
-                        catch { ViewBag.BibleLastReadInfo = null; }
                     }
                     catch (Exception exHome)
                     {
@@ -617,6 +597,7 @@ namespace BulletinBoard.Controllers
                         //    예전에는 가족 마일스톤까지 null 로 비워, 로그인 사용자에게만 카드가 사라졌다.
                         //    마일스톤은 사용자와 무관한 공통 값이므로 따로 다시 채운다.
                         try { _ = DbLogger.LogErrorAsync($"[Home/Index] 로그인 사용자 조회 실패: {exHome.Message}"); } catch { }
+                        if (__bibleEfTask != null) { try { await __bibleEfTask; } catch { } }
 
                         ViewBag.GiftRecipientList = null;
                         ViewBag.FamilyTeamGift    = null;
@@ -837,6 +818,38 @@ namespace BulletinBoard.Controllers
             return await IndexCore(viewName: "IndexComplex");
         }
 
+        /// <summary>
+        /// 성경통독 내 진도 (/BIBLE 과 같은 계산) — 읽은 장 수 · 전체 장 수 · 진도율.
+        /// 장마다의 전체 절 수는 바뀌지 않으므로 12시간 캐시한다.
+        /// </summary>
+        private async Task<(int Read, int Total, double Rate)> LoadBibleStatsAsync(string userId)
+        {
+            var chapterMeta = await CachedAsync(CK_BibleMeta, TTL_BibleMeta, async () =>
+                (await _db.EBibles
+                    .GroupBy(e => new { e.BibleText, e.Jang })
+                    .Select(g => new { BibleText = g.Key.BibleText ?? "", Jang = g.Key.Jang, TotalVerses = g.Count() })
+                    .ToListAsync())
+                .ToDictionary(x => $"{x.BibleText}_{x.Jang}", x => x.TotalVerses))
+                ?? new Dictionary<string, int>();
+
+            // 사용자가 읽은 구절 (책+장+절id)
+            var userProgress = await _db.UserBibleProgresses
+                .Where(p => p.UserId == userId)
+                .Join(_db.EBibles, p => p.VerseId, e => e.Id,
+                      (p, e) => new { BibleText = e.BibleText ?? "", e.Jang, p.VerseId })
+                .ToListAsync();
+
+            // 완독 장 = 그 장의 모든 절을 읽은 장
+            int read = userProgress
+                .GroupBy(x => $"{x.BibleText}_{x.Jang}")
+                .Count(g => chapterMeta.TryGetValue(g.Key, out var total)
+                         && total == g.Select(x => x.VerseId).Distinct().Count());
+
+            int totalChaps = chapterMeta.Count;
+            double rate = totalChaps > 0 ? Math.Round(read * 100.0 / totalChaps, 1) : 0;
+            return (read, totalChaps, rate);
+        }
+
         private async Task<IActionResult> IndexCore(string viewName)
         {
             // ✅ 로그인 상태면 여기서 1번 확실히 채우기 (UserName 타이밍 꼬임 방지)
@@ -996,18 +1009,46 @@ namespace BulletinBoard.Controllers
 
         private async Task BindSignedUserHeaderAndMessagesAsync(DateTime currentDate)
         {
-            await SetUserInfo();
+            // ⚡ 2026-11-17: Index() 에서 이미 사용자 정보를 읽었으면 다시 DB 에 가지 않는다 (홈 요청에서 세 번째 호출이었다)
+            if (!_userInfoLoaded)
+                await SetUserInfo();
 
-            var manageHumanResource = new ManageHumanResource();
-            List<UserInfo> userInfo = manageHumanResource.getUserInfos(
-                _hostingEnvironment, UserId, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None);
+            string uid = UserId, uname = UserName;
 
+            // ⚡ 프로필 · 팝업 메시지 — 서로 상관없으므로 동시에 읽는다 (예전에는 하나씩 기다렸다)
+            var tInfo = Task.Run(() => new ManageHumanResource().getUserInfos(
+                _hostingEnvironment, uid, string.Empty, 0, 0, 0, string.Empty, RankQueryOption.None));
+            var tPop  = Task.Run(() => new ManageMessageCenter().getPopMessage(
+                _hostingEnvironment, 0, string.Empty, uname, PopMessageReadMehod.CheckMyNessMessage, uname));
+
+            // 역할은 Index() 가 읽어 둔 것을 쓴다 (없으면 예전처럼 확인)
+            var homeRoles = ViewBag.HomeRoles as HashSet<string>;
+            bool isSuperAdmin = homeRoles != null
+                ? homeRoles.Contains(nameof(Roles.SuperAdmin))
+                : await _authService.IsInRole(await _authService.GetSignedUser(User), nameof(Roles.SuperAdmin));
+
+            // SuperAdmin 전용 통계 5건도 동시에 시작한다
+            Task<string> tDbName = null;
+            Task<List<VisitInfoData>> tVisit = null;
+            Task<List<VisitDateInfoData>> tVisitDate = null;
+            Task<List<BessingACoupleDatas>> tHusband = null, tWife = null;
+            if (isSuperAdmin)
+            {
+                string exposeDate = SharedComm.GetTodayString();
+                tDbName    = Task.Run(() => new ManageeCommon().get_DB_NAME());
+                tVisit     = Task.Run(() => new ManageeCommon().getVisitInfo());
+                tVisitDate = Task.Run(() => new ManageeCommon().getVisitDateInfo());
+                tHusband   = Task.Run(() => new ManageBessingACouple().getBessingACouple(Couple.Husband.ToString(), 0, exposeDate));
+                tWife      = Task.Run(() => new ManageBessingACouple().getBessingACouple(Couple.Wife.ToString(), 0, exposeDate));
+            }
+
+            // ── 회수 후 ViewData/ViewBag 할당 (요청 스레드에서만) ──
+            List<UserInfo> userInfo = await tInfo;
             if (userInfo.Count > 0)
             {
                 ViewData["ProfilePicturePath"] = userInfo[0].ProfilePicturePath;
                 ViewData["UserId"] = userInfo[0].UserId;
                 ViewData["UserInfo"] = userInfo[0];
-
             }
             else
             {
@@ -1015,29 +1056,19 @@ namespace BulletinBoard.Controllers
                 ViewData["UserId"] = UserId;
             }
 
-            var managePopMessage = new ManageMessageCenter();
-            ViewBag.PopMessages = managePopMessage.getPopMessage(
-                _hostingEnvironment, 0, string.Empty, UserName, PopMessageReadMehod.CheckMyNessMessage, UserName);
+            ViewBag.PopMessages = await tPop;
 
-            bool isSuperAdmin = await _authService.IsInRole(await _authService.GetSignedUser(User), nameof(Roles.SuperAdmin));
             if (isSuperAdmin)
             {
-                var manageeCommon = new ManageeCommon();
-                ViewBag.DB_NAME = manageeCommon.get_DB_NAME();
+                ViewBag.DB_NAME = await tDbName;
 
-                List<VisitInfoData> visitInfo = manageeCommon.getVisitInfo();
-                List<VisitDateInfoData> visitDateInfo = manageeCommon.getVisitDateInfo();
-
-                foreach (var va in visitInfo)
+                foreach (var va in await tVisit)
                     ViewData[va.kind.ToString()] = va.visited;
 
-                ViewBag.VisitDateInfoDatas = visitDateInfo;
+                ViewBag.VisitDateInfoDatas = await tVisitDate;
 
-                var manageBessing = new ManageBessingACouple();
-                string exposeDate = SharedComm.GetTodayString();
-
-                var dataHusband = manageBessing.getBessingACouple(Couple.Husband.ToString(), 0, exposeDate);
-                var dataWife = manageBessing.getBessingACouple(Couple.Wife.ToString(), 0, exposeDate);
+                var dataHusband = await tHusband;
+                var dataWife    = await tWife;
 
                 int idxH = SharedComm.CalculateIndex(dataHusband.Count, currentDate);
                 int idxW = SharedComm.CalculateIndex(dataWife.Count, currentDate);

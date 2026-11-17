@@ -466,6 +466,52 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
             }).ToList();
         }
 
+        /// <summary>
+        /// 지금 고른(관리자 승인 대기 중인) 선물 하나만 읽는다. 홈 화면용 — 선물함 전체(평가 · 기록 · 고를 수 있는 선물)를 읽지 않는다 (2026-11-17)
+        /// </summary>
+        public async Task<GiftOrderVM?> GetCurrentDraftAsync(string userName)
+        {
+            using var conn = Conn();
+            await conn.OpenAsync();
+            return await ReadCurrentDraftAsync(conn, userName);
+        }
+
+        private static async Task<GiftOrderVM?> ReadCurrentDraftAsync(SqlConnection conn, string userName)
+        {
+            using (var cmd = new SqlCommand(@"
+                                                SELECT TOP 1 o.OrderId, o.ProductID, a.ProductName, a.ProductDescription, o.CreditCostSnapshot, o.Status, o.CreatedAt, o.PurchasedAt, isnull(c.milestone,0) milestone
+                                                FROM dbo.StudentPointGiftOrder o WITH (NOLOCK)
+                                                JOIN dbo.AwardItem a WITH (NOLOCK) ON a.ProductID=o.ProductID
+                                                LEFT OUTER JOIN [dbo].[GiftPopupActionLog] c WITH (NOLOCK) ON c.Id =o.OrderId
+                                                WHERE o.UserName=@U AND o.Status='DRAFT' AND o.IsCurrentDraft=1
+                                                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(o.Memo,'') NOT LIKE N'친구합산:%'
+                                                ORDER BY o.OrderId DESC;", conn))
+            {
+                cmd.Parameters.AddWithValue("@U", userName);
+
+                _ = DbLogger.LogDebugAsync($" current draft gift {SqlDebugHelper.ToDebugSql(cmd)}");
+
+                using var r = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
+                if (await r.ReadAsync())
+                {
+                    return new GiftOrderVM
+                    {
+                        OrderId = r.GetInt32(0),
+                        ProductID = r.GetInt32(1),
+                        ProductName = r.GetString(2),
+                        ProductDescription = r.GetString(3),
+                        CreditCostSnapshot = r.GetInt32(4),
+                        Status = r.GetString(5),
+                        CreatedAt = r.GetDateTime(6),
+                        PurchasedAt = r.IsDBNull(7) ? null : r.GetDateTime(7),
+                        Milestone = r.GetInt32(8)
+                    };
+                }
+            }
+            return null;
+
+        }
+
         public async Task<GiftBoxVM> GetMyGiftBoxAsync(string userName, int integratedTotal)
         {
             var eval = await EvaluateAsync(userName, integratedTotal);
@@ -484,36 +530,7 @@ VALUES (@UserName, @Milestone, @ActionType, @CreatedAtUtc);", conn);
             await conn.OpenAsync();
 
             // current draft
-            using (var cmd = new SqlCommand(@"
-                                                SELECT TOP 1 o.OrderId, o.ProductID, a.ProductName, a.ProductDescription, o.CreditCostSnapshot, o.Status, o.CreatedAt, o.PurchasedAt, isnull(c.milestone,0) milestone
-                                                FROM dbo.StudentPointGiftOrder o WITH (NOLOCK)
-                                                JOIN dbo.AwardItem a WITH (NOLOCK) ON a.ProductID=o.ProductID
-                                                LEFT OUTER JOIN [dbo].[GiftPopupActionLog] c WITH (NOLOCK) ON c.Id =o.OrderId
-                                                WHERE o.UserName=@U AND o.Status='DRAFT' AND o.IsCurrentDraft=1
-                                                  AND ISNULL(o.Memo,'') NOT LIKE N'가족합산:%' AND ISNULL(o.Memo,'') NOT LIKE N'친구합산:%'
-                                                ORDER BY o.OrderId DESC;", conn))
-            {
-                cmd.Parameters.AddWithValue("@U", userName);
-
-                _ = DbLogger.LogDebugAsync($" current draft gift {SqlDebugHelper.ToDebugSql(cmd)}");
-
-                using var r = await cmd.ExecuteReaderAsync(CommandBehavior.SingleRow);
-                if (await r.ReadAsync())
-                {
-                    vm.CurrentDraft = new GiftOrderVM
-                    {
-                        OrderId = r.GetInt32(0),
-                        ProductID = r.GetInt32(1),
-                        ProductName = r.GetString(2),
-                        ProductDescription = r.GetString(3),
-                        CreditCostSnapshot = r.GetInt32(4),
-                        Status = r.GetString(5),
-                        CreatedAt = r.GetDateTime(6),
-                        PurchasedAt = r.IsDBNull(7) ? null : r.GetDateTime(7),
-                        Milestone = r.GetInt32(8)
-                    };
-                }
-            }
+            vm.CurrentDraft = await ReadCurrentDraftAsync(conn, userName);
 
             // history
             using (var cmd = new SqlCommand(@"
