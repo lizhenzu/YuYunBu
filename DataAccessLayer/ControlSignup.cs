@@ -60,8 +60,12 @@ namespace BulletinBoard.DataAccessLayer
     /// </summary>
     public class ControlSignup
     {
+        // ⚡ 표 확인은 앱이 떠 있는 동안 한 번만 (홈을 열 때마다 DB 에 한 번 더 다녀왔다 — 2026-11-17)
+        private static volatile bool _tableReady;
+
         private static async Task EnsureTableAsync(SqlConnection conn)
         {
+            if (_tableReady) return;
             const string sql = @"
                 IF OBJECT_ID(N'[dbo].[SignupApplication]', N'U') IS NULL
                 CREATE TABLE [dbo].[SignupApplication] (
@@ -88,6 +92,7 @@ namespace BulletinBoard.DataAccessLayer
                     [DecidedBy]    NVARCHAR(256) NULL
                 );";
             using (var cmd = new SqlCommand(sql, conn)) { await cmd.ExecuteNonQueryAsync(); }
+            _tableReady = true;
         }
 
         private static SqlConnection Conn() => new SqlConnection(DataAccessModule.connectionString_Server);

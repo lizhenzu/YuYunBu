@@ -14,6 +14,15 @@ namespace BulletinBoard.Helpers
         public const string FamilyMilestonesKey = "home:milestones:v1:";   // + 연도
         public const string FamilyMsConfigsKey  = "home:msconfigs:v1:";    // + 연도
         public const string BirthdaysKey        = "home:birthdays:v2:";    // + 날짜(yyyyMMdd)
+        public const string Prayer365TitleKey   = "home:p365title:v1:";    // + MonthDay('1117')
+
+        /// <summary>홈 "오늘의 기도" 카드의 365 기도 제목 캐시 비우기 — 기도문을 저장 · 삭제하면 부른다 (2026-11-17)</summary>
+        public static void InvalidatePrayer365Title(HttpContext? http, string? monthDay)
+        {
+            var cache = http?.RequestServices?.GetService<IMemoryCache>();
+            if (cache == null || string.IsNullOrEmpty(monthDay)) return;
+            cache.Remove(Prayer365TitleKey + monthDay);
+        }
 
         /// <summary>가족 마일스톤 캐시 비우기 (올해·작년·내년 모두 — 연도 경계 대비)</summary>
         public static void InvalidateFamilyMilestones(HttpContext? http)

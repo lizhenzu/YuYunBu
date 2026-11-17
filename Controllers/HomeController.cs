@@ -370,6 +370,22 @@ namespace BulletinBoard.Controllers
 
             // 친구팀 축하 목록 — 예전에는 화면이 그려지는 도중에 회원마다 점수 함수를 돌렸다.
             //    여기서 미리 시작해 다른 조회와 겹쳐 돌리고, 1분 캐시한다 (2026-11-17)
+            // 오늘 365 기도 제목 (홈 "오늘의 기도" 카드) — 모든 사람에게 같다. 저장 · 삭제하면 Prayer365 화면이 캐시를 비운다.
+            //    공개 전(StaffOnly)이면 로그인한 사람에게만 보이므로 그때만 읽는다 (화면 조각과 같은 기준)
+            Task<string> tPrayerTitlePre = null;
+            if (!BulletinBoard.Models.Prayer365.Prayer365Config.StaffOnly || __signedIn)
+            {
+                var __p365Md = BulletinBoard.Models.Prayer365.Prayer365Config.Md(DateHelper.GetKoreaToday());
+                //    SSMS 에서 SQL 로 고친 것은 사이트가 알 수 없으므로 1시간만 묵힌다
+                tPrayerTitlePre = CachedAsync(HomeCacheHelper.Prayer365TitleKey + __p365Md, TimeSpan.FromHours(1),
+                    async () =>
+                    {
+                        var p365 = HttpContext.RequestServices.GetService(typeof(BulletinBoard.Services.Prayer365.IPrayer365Service))
+                                   as BulletinBoard.Services.Prayer365.IPrayer365Service;
+                        return p365 == null ? null : (await p365.GetTitleAsync(__p365Md) ?? "");   // "" = 오늘 기도문 없음 (캐시해 둔다)
+                    });
+            }
+
             int __celYear = __kToday.Year;
             var tFriendCelPre = CachedAsync(CK_FriendCel + __celYear, TTL_Shared,
                 () => _studentPointGiftService.GetFriendCelebrationsAsync(__celYear));
@@ -429,6 +445,9 @@ namespace BulletinBoard.Controllers
                         var tBibleStats = LoadBibleStatsAsync(capturedUserId)
                                             .ContinueWith(t => t.IsCompletedSuccessfully ? t.Result : ((int Read, int Total, double Rate)?)null);
                         __bibleEfTask = tBibleStats;
+                        // 화면 조각(가입 상태 카드 · 생일 배너)이 그리는 도중에 하나씩 읽던 것 — 여기서 함께 읽는다
+                        var tSignup    = new ControlSignup().GetLatestOfAsync(capturedUserId);
+                        var tIsStudent = _studentPointGiftService.IsStudentAsync(capturedUserName);
 
                         await Task.WhenAll(t1, t2, t3, t4, t5, t7, t8, t9, t10, tPreload, tWord, tDoneMap);
                         await t11;
@@ -450,6 +469,10 @@ namespace BulletinBoard.Controllers
 
                         // ✅ 이미 고른(아직 관리자 승인 대기중인) 선물이 있으면 홈 카드에서 바꿀 곳을 다르게 안내한다
                         ViewBag.GiftCurrentDraft = await tDraft;
+
+                        // 가입 상태 · 학생 여부 — 실패하면 넘기지 않는다 (화면 조각이 예전처럼 직접 읽는다)
+                        try { ViewBag.SignupLatest = await tSignup; ViewData["SignupLoaded"] = true; } catch { }
+                        try { ViewBag.HomeIsStudent = await tIsStudent; ViewBag.HomeIsStudentFor = capturedUserName; } catch { }
 
                         // ── 7번 결과 적용 ──
                         var giftList = t7.Result;
@@ -653,11 +676,19 @@ namespace BulletinBoard.Controllers
 
 
             // ⚡ 위에서 미리 시작해 둔 조회들을 한 번에 회수합니다.
-            await Task.WhenAll(tJuboPre, tBibleRatesPre, tBibleDonePre, tTodayJoinPre, tFriendCelPre);
+            await Task.WhenAll(tJuboPre, tBibleRatesPre, tBibleDonePre, tTodayJoinPre, tFriendCelPre,
+                               tPrayerTitlePre ?? Task.FromResult<string>(null));
             HomeMark("bible");
 
             // null = 조회 실패 → 화면이 예전처럼 직접 읽는다
             ViewBag.FriendCelebrations = tFriendCelPre.Result;
+
+            // 오늘 365 기도 제목 — 읽었으면 화면 조각이 다시 읽지 않는다 ("" 는 오늘 기도문 없음)
+            if (tPrayerTitlePre?.Result != null)
+            {
+                ViewData["P365TitleLoaded"] = true;
+                ViewBag.P365TodayTitle = tPrayerTitlePre.Result.Length == 0 ? null : tPrayerTitlePre.Result;
+            }
 
             ViewBag.DM2TodayJoinCount = tTodayJoinPre.Result;
 

@@ -210,6 +210,7 @@ public class Prayer365Controller : Controller
             return RedirectToAction(nameof(Edit), new { md });
         }
         await _svc.SaveAsync(item, User.Identity?.Name);
+        BulletinBoard.Helpers.HomeCacheHelper.InvalidatePrayer365Title(HttpContext, md);   // 홈 카드 제목 바로 반영
         TempData["P365Toast"] = $"{Cfg.Label(md)} 기도문을 저장했어요.";
         return RedirectToAction(nameof(Edit), new { md });
     }
