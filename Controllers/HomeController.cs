@@ -102,6 +102,23 @@ namespace BulletinBoard.Controllers
             _homeLastMs = now;
         }
 
+        // ── 대기 화면(스플래시)은 홈이 느릴 때만 (2026-11-17) ──
+        //    최근 홈 처리 시간(서버 기준, 지수 이동 평균)을 기억해 두고, 이 값이 기준보다 빠르면 대기 화면 없이 바로 홈을 보낸다.
+        //    앱이 막 켜졌을 때(-1 = 아직 모름)는 첫 요청이 느리므로 대기 화면을 보낸다.
+        private static long _homeAvgMs = -1;
+        private const long SplashThresholdMs = 1500;
+
+        private static void RecordHomeTotal(double totalMs)
+        {
+            long x = (long)totalMs;
+            while (true)
+            {
+                long old = System.Threading.Interlocked.Read(ref _homeAvgMs);
+                long next = old < 0 ? x : (old * 7 + x * 3) / 10;   // 최근 값에 30% 가중
+                if (System.Threading.Interlocked.CompareExchange(ref _homeAvgMs, next, old) == old) return;
+            }
+        }
+
         private void StartHomeTiming()
         {
             _homeSw.Restart();
@@ -110,6 +127,7 @@ namespace BulletinBoard.Controllers
             {
                 // 응답 머리가 나가는 순간 = 화면(View) 그리기까지 끝난 뒤
                 var total = _homeSw.Elapsed.TotalMilliseconds;
+                RecordHomeTotal(total);
                 var parts = new List<string>(_homeMarks)
                 {
                     $"render;dur={total - _homeLastMs:0}",
@@ -804,6 +822,10 @@ namespace BulletinBoard.Controllers
             var req = Request;
             if (!HttpMethods.IsGet(req.Method)) return false;
             if (req.Query.ContainsKey("_full")) return false;
+
+            // 최근 홈이 빨랐으면 대기 화면 없이 바로 — 왕복 한 번과 화면 깜빡임을 없앤다
+            long avg = System.Threading.Interlocked.Read(ref _homeAvgMs);
+            if (avg >= 0 && avg < SplashThresholdMs) return false;
 
             // 사이트 안의 다른 화면에서 홈을 누른 경우는 그 화면이 이미 대기 카드를 보여 준다 → 대기 화면을 또 띄우지 않는다.
             var referer = req.Headers["Referer"].ToString();
