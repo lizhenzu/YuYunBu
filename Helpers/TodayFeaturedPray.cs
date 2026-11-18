@@ -10,7 +10,7 @@ namespace BulletinBoard.Helpers
     public static class TodayFeaturedPray
     {
         /// <summary>적용하는 날 (한국 시간)</summary>
-        public static readonly DateTime Date = new DateTime(2026, 11, 18);
+        public static readonly DateTime Date = new DateTime(2026, 11, 19);   // 수능 당일
 
         /// <summary>수험생 기도문 번호 (/EntranceExamPray/Detail?PrayId=…)</summary>
         public const int PrayId = 79;
