@@ -100,6 +100,14 @@ namespace BulletinBoard.Controllers
             int total = _mgr.GetRotationCount();
             var today = _mgr.GetTodayPray();
 
+            // 🙏 오늘의 특별 기도 (Helpers/TodayFeaturedPray) — 그날은 순환 대신 정해진 기도문을 보여 준다 (2026-11-19)
+            bool featured = false;
+            if (TodayFeaturedPray.IsActive())
+            {
+                var fp = _mgr.GetById(TodayFeaturedPray.PrayId);
+                if (fp != null) { today = fp; featured = true; }
+            }
+
             bool isSuper = IsPrayManager;   // 기도 관리자(Basic · SuperAdmin 계정)
 
             // 일반 사용자가 오늘의 기도문 화면에 들어오면 조회수 +1
@@ -111,7 +119,7 @@ namespace BulletinBoard.Controllers
 
             ViewBag.IsSuperAdmin = isSuper;
             ViewBag.TotalCount   = total;
-            ViewBag.RotationNo   = _mgr.GetTodayRotationNo(total);
+            ViewBag.RotationNo   = featured ? _mgr.GetRotationNo(today.PrayId) : _mgr.GetTodayRotationNo(total);
             ViewBag.TodayKst     = DateHelper.GetKoreaNow();
 
             return View(today);
