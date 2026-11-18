@@ -866,8 +866,8 @@ namespace BulletinBoard.Controllers
 
         /// <summary>
         /// 오늘의 특별 기도로 보낼지 (2026-11-17)
-        ///  · TodayFeaturedPray 의 날(한국 시간)에만, 사람이 화면으로 들어온 첫 홈 요청에만
-        ///  · 같은 브라우저는 하루 한 번 (쿠키) — 본 뒤에는 홈이 그대로 열린다
+        ///  · TodayFeaturedPray 의 날(한국 시간)에만, 사람이 화면으로 들어온 홈 요청에만
+        ///  · 그날은 홈에 들어올 때마다 (2026-11-19 사용자 요청) — 안내 화면의 홈 버튼(?_full=1)은 건너뛴다
         ///  · 사이트 안에서 홈을 누른 경우 · 수집기 · ajax · 미리 불러오기는 보내지 않는다
         /// </summary>
         private bool ShouldRedirectToFeaturedPray()
@@ -876,7 +876,8 @@ namespace BulletinBoard.Controllers
 
             var req = Request;
             if (!HttpMethods.IsGet(req.Method)) return false;
-            if (req.Cookies.ContainsKey(TodayFeaturedPray.CookieName)) return false;
+            // 2026-11-19: 하루 한 번 → 그날은 홈에 들어올 때마다 (사용자 요청). 안내 화면의 "유년부 홈으로 가기"는 ?_full=1 로 건너뛴다
+            if (req.Query.ContainsKey("_full")) return false;
 
             var referer = req.Headers["Referer"].ToString();
             if (!string.IsNullOrEmpty(referer)
@@ -891,16 +892,6 @@ namespace BulletinBoard.Controllers
             if (purpose.IndexOf("prefetch", StringComparison.OrdinalIgnoreCase) >= 0) return false;
             if (IsBotUserAgent(req)) return false;
 
-            // 한국 시간 자정에 만료 — 다음 날에는 다시 보낼 일이 없지만(날짜가 지나면 IsActive=false) 깔끔하게 지운다
-            var today = DateHelper.GetKoreaToday().Date;
-            Response.Cookies.Append(TodayFeaturedPray.CookieName, today.ToString("yyyyMMdd"), new CookieOptions
-            {
-                Expires  = new DateTimeOffset(today.AddDays(1), TimeSpan.FromHours(9)),
-                HttpOnly = true,
-                Secure   = req.IsHttps,
-                SameSite = SameSiteMode.Lax,
-                IsEssential = true
-            });
             return true;
         }
 
