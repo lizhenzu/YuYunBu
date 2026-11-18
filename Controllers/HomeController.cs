@@ -244,9 +244,10 @@ namespace BulletinBoard.Controllers
 
             // ⏳ 처음 들어오면 가벼운 대기 화면을 먼저 보내고, 그 화면이 곧바로 진짜 홈(?_full=1)을 불러온다.
             //    홈을 만드는 데 시간이 걸려도 하얀 화면 대신 '잠시만 기다려 주세요' 카드가 보인다.
-            // 🙏 오늘의 특별 기도 — 정해진 날 처음 홈에 들어오면 그 기도문으로 보낸다 (하루 한 번, TodayFeaturedPray)
+            // 🙏 오늘의 특별 기도 — 정해진 날 처음 홈에 들어오면 안내 화면(버튼 두 개: 수험생 기도 · 유년부 홈)을 보여 준다
+            //    (하루 한 번, TodayFeaturedPray) — 2026-11-19: 기도문으로 바로 보내던 것을 안내 화면으로 바꿈
             if (ShouldRedirectToFeaturedPray())
-                return Redirect(TodayFeaturedPray.Url);
+                return View("~/Views/Home/SuneungLanding.cshtml");
 
             if (ShouldShowHomeSplash())
                 return View("~/Views/Home/IndexSplash.cshtml");
