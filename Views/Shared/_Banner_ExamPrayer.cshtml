@@ -1,0 +1,59 @@
+@using BulletinBoard.Helpers
+@*  ══════════════════════════════════════════════════════════════
+    홈 "수험생을 위한 기도" 카드 — 2026-11-19
+    · 예전에는 "오늘의 기도" 카드(_Banner_TodayPrayer) 안의 한 줄이었다 → 예배 안내 카드 바로 아래 따로 둔다
+    · 카드 전체를 누르면 이동 (버튼 · › 없음)
+    · 특별 기도 날(Helpers/TodayFeaturedPray)에는 그 기도문 제목을 보여 주고 그 기도문으로, 다른 날은 /EntranceExamPray/Index
+    · 백업: Views/Home/Index.cshtml.bak_before_examcard · Views/Shared/_Banner_TodayPrayer.cshtml.bak_before_examcard
+    ══════════════════════════════════════════════════════════════ *@
+@{
+    var exToday = DateHelper.GetKoreaToday();
+
+    // 수능 D-day — 해가 바뀌면 이 한 줄만 고치면 된다
+    var exSuneung = new DateTime(2026, 11, 19);
+    int exDday = (int)(exSuneung - exToday.Date).TotalDays;
+    string[] exDow = { "일", "월", "화", "수", "목", "금", "토" };
+    string exSuneungText = $"{exSuneung:yyyy년 M월 d일} {exDow[(int)exSuneung.DayOfWeek]}요일 수능";
+    string exDLabel, exDSub, exLine;
+    if (exDday > 0)       { exDLabel = $"D-{exDday}"; exDSub = "수능까지";  exLine = "오늘도 수험생을 위해 기도해요"; }
+    else if (exDday == 0) { exDLabel = "D-DAY";        exDSub = "오늘 수능"; exLine = "시험장에 나아가는 아이와 함께 기도해요"; }
+    else                  { exDLabel = "수고했어요";    exDSub = "수능 이후"; exLine = "지나온 걸음을 감사하며 기도해요"; }
+    bool exDIsText = exDday < 0;
+
+    string exUrl = "/EntranceExamPray/Index";
+    if (TodayFeaturedPray.IsActive())
+    {
+        exUrl = TodayFeaturedPray.Url;
+        try
+        {
+            var exFeatured = new BulletinBoard.BusinessLayer.ManageEntranceExamPray().GetById(TodayFeaturedPray.PrayId);
+            if (!string.IsNullOrWhiteSpace(exFeatured?.Title)) exLine = exFeatured.Title;
+        }
+        catch { /* 제목을 못 읽으면 기본 문구 그대로 */ }
+    }
+}
+<style>
+    .examCard { display: flex; align-items: center; gap: 14px; padding: 20px 18px; margin: 10px 0;
+                background: #fff; border: 1.5px solid #DDD9F7; border-radius: 16px; box-shadow: 0 2px 10px rgba(91,84,201,.10);
+                color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent; transition: background .15s; }
+    .examCard:hover { background: #FBFAFF; }
+    .examCard:active { background: #F7F6FE; }
+    .examCard:focus-visible { outline: 3px solid #C7C3F3; outline-offset: 2px; }
+    .examChip { flex: none; width: 60px; border-radius: 12px; overflow: hidden; background: #fff; text-align: center;
+                box-shadow: 0 1px 2px rgba(17,24,39,.08), 0 0 0 1px #EEF0F3; }
+    .examChip small { display: block; padding: 4px 0; background: #5B54C9; color: #fff; font-size: 11px; font-weight: 800; }
+    .examChip strong { display: block; padding: 7px 0 8px; font-size: 17px; font-weight: 800; color: #5B54C9; letter-spacing: -.02em; }
+    .examChip strong.txt { font-size: 12.5px; }
+    .examTx { flex: 1; min-width: 0; }
+    .examTx b { display: block; font-size: 16.5px; font-weight: 800; color: #111827; }
+    .examTx .vl { display: block; margin-top: 4px; font-size: 14px; font-weight: 700; color: #5B54C9; word-break: keep-all; }
+    .examTx .dt { display: block; margin-top: 3px; font-size: 12.5px; color: #6B7280; }
+</style>
+<a class="examCard" href="@exUrl" onclick="if (typeof showNavLoading === 'function') showNavLoading();" aria-label="수험생을 위한 기도 — @exLine">
+    <span class="examChip"><small>@exDSub</small><strong class="@(exDIsText ? "txt" : "")">@exDLabel</strong></span>
+    <span class="examTx">
+        <b>수험생을 위한 기도</b>
+        <span class="vl">@exLine</span>
+        <span class="dt">@exSuneungText</span>
+    </span>
+</a>
