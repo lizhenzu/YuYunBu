@@ -187,7 +187,8 @@ namespace BulletinBoard.Controllers
             ViewBag.IsSuperAdmin = isSuper;
             ViewBag.TotalCount   = _mgr.GetRotationCount();
             ViewBag.RotationNo   = _mgr.GetRotationNo(PrayId);
-            ViewBag.IsTodayPray  = _mgr.GetTodayPray()?.PrayId == PrayId;
+            ViewBag.IsTodayPray  = _mgr.GetTodayPray()?.PrayId == PrayId
+                                   || (TodayFeaturedPray.IsActive() && PrayId == TodayFeaturedPray.PrayId);   // 특별 기도 날에는 그 기도문이 오늘의 기도
             ViewBag.TodayKst     = DateHelper.GetKoreaNow();
 
             return View(item);
