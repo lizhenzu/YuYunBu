@@ -82,7 +82,10 @@
     .qz .epFlash.err { border-color: #B4531F; color: #B4531F; }
 
     .qz .epTitle { font-family: "Noto Serif KR", serif; font-weight: 500; font-size: calc(19px * var(--fs)); line-height: 1.5; margin: 26px 0 0; word-break: keep-all; }
-    .qz .epBody { font-family: "Noto Serif KR", serif; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: #2A2C30; margin: 16px 0 0; white-space: pre-line; word-break: keep-all; }
+    .qz .epBody { font-family: "Noto Serif KR", serif; font-size: calc(15.5px * var(--fs)); line-height: 1.95; color: #2A2C30; margin: 16px 0 0; word-break: keep-all; }
+    /* 문단 = 빈 줄로 나뉜 덩어리. 줄 간격(1.95)은 그대로, 문단 사이만 예전(빈 줄 한 줄 = 1.95em)의 절반 — 2026-11-17 */
+    .qz .epBody .epPara { display: block; white-space: pre-line; }
+    .qz .epBody .epPara + .epPara { margin-top: .975em; }
     .qz .epBody .nm { color: inherit; font-weight: 500; background: linear-gradient(transparent 60%, var(--mark) 60%); padding: 0 2px; }
     .qz .epQuote { border-left: 2px solid var(--acc); padding: 2px 0 2px 14px; margin-top: 24px; }
     .qz .epVr { font-size: 10px; font-weight: 600; letter-spacing: .16em; color: var(--acc); }
@@ -149,7 +152,13 @@
 
         <article>
             <h2 class="epTitle">@Model.Title</h2>
-            <p class="epBody">@PrayTextHelper.MarkNames(Model.PrayText)</p>
+            @{
+                // 빈 줄(공백만 있는 줄 포함)로 문단을 나눈다
+                var epParas = System.Text.RegularExpressions.Regex
+                    .Split((Model.PrayText ?? "").Replace("\r\n", "\n").Trim('\n', ' ', '\t'), @"\n[ \t]*\n\s*")
+                    .Where(x => !string.IsNullOrWhiteSpace(x));
+            }
+            <div class="epBody">@foreach (var epP in epParas) {<span class="epPara">@PrayTextHelper.MarkNames(epP)</span>}</div>
 
             @if (!string.IsNullOrWhiteSpace(Model.BibleText) || !string.IsNullOrWhiteSpace(Model.BibleRef))
             {

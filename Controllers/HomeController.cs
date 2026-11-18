@@ -244,6 +244,10 @@ namespace BulletinBoard.Controllers
 
             // ⏳ 처음 들어오면 가벼운 대기 화면을 먼저 보내고, 그 화면이 곧바로 진짜 홈(?_full=1)을 불러온다.
             //    홈을 만드는 데 시간이 걸려도 하얀 화면 대신 '잠시만 기다려 주세요' 카드가 보인다.
+            // 🙏 오늘의 특별 기도 — 정해진 날 처음 홈에 들어오면 그 기도문으로 보낸다 (하루 한 번, TodayFeaturedPray)
+            if (ShouldRedirectToFeaturedPray())
+                return Redirect(TodayFeaturedPray.Url);
+
             if (ShouldShowHomeSplash())
                 return View("~/Views/Home/IndexSplash.cshtml");
 
@@ -841,12 +845,61 @@ namespace BulletinBoard.Controllers
             var purpose = req.Headers["Sec-Purpose"].ToString() + req.Headers["Purpose"].ToString();
             if (purpose.IndexOf("prefetch", StringComparison.OrdinalIgnoreCase) >= 0) return false;
 
-            var ua = req.Headers["User-Agent"].ToString();
-            if (string.IsNullOrEmpty(ua)) return false;
-            string[] bots = { "bot", "spider", "crawl", "kakaotalk-scrap", "facebookexternalhit", "slurp", "yeti", "daum", "preview", "whatsapp", "telegram", "line/" };
-            foreach (var b in bots)
-                if (ua.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (IsBotUserAgent(req)) return false;
 
+            return true;
+        }
+
+        private static readonly string[] HomeBotUa =
+            { "bot", "spider", "crawl", "kakaotalk-scrap", "facebookexternalhit", "slurp", "yeti", "daum", "preview", "whatsapp", "telegram", "line/" };
+
+        /// <summary>검색엔진 · 카톡 미리보기 등 수집기이거나 User-Agent 가 없으면 true</summary>
+        private static bool IsBotUserAgent(HttpRequest req)
+        {
+            var ua = req.Headers["User-Agent"].ToString();
+            if (string.IsNullOrEmpty(ua)) return true;
+            foreach (var b in HomeBotUa)
+                if (ua.IndexOf(b, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// 오늘의 특별 기도로 보낼지 (2026-11-17)
+        ///  · TodayFeaturedPray 의 날(한국 시간)에만, 사람이 화면으로 들어온 첫 홈 요청에만
+        ///  · 같은 브라우저는 하루 한 번 (쿠키) — 본 뒤에는 홈이 그대로 열린다
+        ///  · 사이트 안에서 홈을 누른 경우 · 수집기 · ajax · 미리 불러오기는 보내지 않는다
+        /// </summary>
+        private bool ShouldRedirectToFeaturedPray()
+        {
+            if (!TodayFeaturedPray.IsActive()) return false;
+
+            var req = Request;
+            if (!HttpMethods.IsGet(req.Method)) return false;
+            if (req.Cookies.ContainsKey(TodayFeaturedPray.CookieName)) return false;
+
+            var referer = req.Headers["Referer"].ToString();
+            if (!string.IsNullOrEmpty(referer)
+                && Uri.TryCreate(referer, UriKind.Absolute, out var refUri)
+                && string.Equals(refUri.Host, req.Host.Host, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var accept = req.Headers["Accept"].ToString();
+            if (string.IsNullOrEmpty(accept) || accept.IndexOf("text/html", StringComparison.OrdinalIgnoreCase) < 0) return false;
+            if (string.Equals(req.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase)) return false;
+            var purpose = req.Headers["Sec-Purpose"].ToString() + req.Headers["Purpose"].ToString();
+            if (purpose.IndexOf("prefetch", StringComparison.OrdinalIgnoreCase) >= 0) return false;
+            if (IsBotUserAgent(req)) return false;
+
+            // 한국 시간 자정에 만료 — 다음 날에는 다시 보낼 일이 없지만(날짜가 지나면 IsActive=false) 깔끔하게 지운다
+            var today = DateHelper.GetKoreaToday().Date;
+            Response.Cookies.Append(TodayFeaturedPray.CookieName, today.ToString("yyyyMMdd"), new CookieOptions
+            {
+                Expires  = new DateTimeOffset(today.AddDays(1), TimeSpan.FromHours(9)),
+                HttpOnly = true,
+                Secure   = req.IsHttps,
+                SameSite = SameSiteMode.Lax,
+                IsEssential = true
+            });
             return true;
         }
 

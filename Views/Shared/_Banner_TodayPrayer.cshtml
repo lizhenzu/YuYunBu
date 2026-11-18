@@ -48,6 +48,19 @@
     else if (tpDday == 0) { tpDLabel = "D-DAY";        tpDSub = "오늘 수능"; tpExamTitle = "시험장에 나아가는 아이와 함께 기도해요"; }
     else                  { tpDLabel = "수고했어요";    tpDSub = "수능 이후"; tpExamTitle = "지나온 걸음을 감사하며 기도해요"; }
     bool tpDIsText = tpDday < 0;
+
+    // 🙏 오늘의 특별 기도 (TodayFeaturedPray) — 그날은 수험생 줄에 그 기도문 제목을 보여 주고 그 기도문으로 보낸다 (2026-11-17)
+    string tpExamUrl = "/EntranceExamPray/Index";
+    if (BulletinBoard.Helpers.TodayFeaturedPray.IsActive())
+    {
+        tpExamUrl = BulletinBoard.Helpers.TodayFeaturedPray.Url;
+        try
+        {
+            var tpFeatured = new BulletinBoard.BusinessLayer.ManageEntranceExamPray().GetById(BulletinBoard.Helpers.TodayFeaturedPray.PrayId);
+            if (!string.IsNullOrWhiteSpace(tpFeatured?.Title)) tpExamTitle = tpFeatured.Title;
+        }
+        catch { /* 제목을 못 읽으면 기본 문구 그대로 */ }
+    }
 }
 <section class="tpCard" aria-label="오늘의 기도">
     <style>
@@ -161,7 +174,7 @@
             <span class="tpG" aria-hidden="true">›</span>
         </a>
 
-        <a class="tpRow" href="/EntranceExamPray/Index" aria-label="수험생을 위한 기도">
+        <a class="tpRow" href="@tpExamUrl" aria-label="수험생을 위한 기도">
             <span class="tpChip dd"><small>@tpDSub</small><strong class="@(tpDIsText ? "txt" : "")">@tpDLabel</strong></span>
             <span class="tpTx">
                 <b>수험생을 위해</b>
