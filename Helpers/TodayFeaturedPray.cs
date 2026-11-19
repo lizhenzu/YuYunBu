@@ -20,5 +20,16 @@ namespace BulletinBoard.Helpers
         public static string Url => $"/EntranceExamPray/Detail?PrayId={PrayId}";
 
         public static bool IsActive() => DateHelper.GetKoreaToday().Date == Date.Date;
+
+        /// <summary>수능이 끝난 뒤(다음 날부터) 계속 고정해서 보여 줄 기도문 번호 (2026-11-20) — 바꾸려면 이 값만 고친다</summary>
+        public const int AfterPrayId = 26;
+
+        /// <summary>수능이 끝났는지 (한국 시간으로 수능 다음 날부터)</summary>
+        public static bool IsAfter() => DateHelper.GetKoreaToday().Date > Date.Date;
+
+        /// <summary>지금 고정해서 보여 줄 기도문 번호 — 수능 당일 PrayId, 수능 이후 AfterPrayId, 그 전에는 0(순환)</summary>
+        public static int FixedPrayId() => IsActive() ? PrayId : (IsAfter() ? AfterPrayId : 0);
+
+        public static string FixedUrl => $"/EntranceExamPray/Detail?PrayId={FixedPrayId()}";
     }
 }
