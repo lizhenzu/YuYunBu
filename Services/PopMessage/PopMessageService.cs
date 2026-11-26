@@ -52,7 +52,14 @@ WHERE UserId = @UserId AND UserId IS NOT NULL AND UserName IS NOT NULL
             using var conn = OpenConn();
             conn.Open();
 
+            // 2026-11-26: 사람 명단(view_PersonMaster_2026)에 없는 실제 계정(SuperAdmin 등 관리자)에게도 보낼 수 있게
+            //   — 단체 알림(보낸 사람 SuperAdmin)에 답장하면 "수신자가 없거나…" 오류가 났다.
+            //   로그인 계정([Identity].[User])이 있으면 보낼 수 있다. 계정이 지워진 사람에게는 여전히 못 보낸다.
             var sql = @"
+SELECT TOP 1 1
+FROM [Identity].[User]
+WHERE UserName = @ToUserName
+UNION ALL
 SELECT TOP 1 1
 FROM dbo.view_PersonMaster_2026
 WHERE UserName = @ToUserName
