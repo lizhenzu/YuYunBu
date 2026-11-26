@@ -72,6 +72,31 @@ WHERE UserName = @ToUserName
             return cmd.ExecuteScalar() != null;
         }
 
+        /// <summary>
+        /// 받는 사람 입력(아이디 또는 이메일) → 실제 로그인 아이디 (2026-11-26)
+        ///  · 아이디가 이메일과 다른 사람(예: 아이디 jycherish77, 이메일 jycherish77@hanmail.net)에게 이메일로 보내면
+        ///    "수신자가 없거나…" 오류가 났다. 아이디가 맞으면 그대로, 아니면 이메일로 찾은 계정의 아이디를 쓴다.
+        /// </summary>
+        public string? ResolveToUserName(string toInput)
+        {
+            toInput = (toInput ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(toInput)) return null;
+
+            using var conn = OpenConn();
+            conn.Open();
+
+            var sql = @"
+SELECT TOP 1 UserName
+FROM [Identity].[User]
+WHERE UserName = @X OR Email = @X
+ORDER BY CASE WHEN UserName = @X THEN 0 ELSE 1 END;
+";
+            using var cmd = new SqlCommand(sql, conn);
+            cmd.Parameters.Add(new SqlParameter("@X", SqlDbType.NVarChar, 256) { Value = toInput });
+            var v = cmd.ExecuteScalar();
+            return v == null || v == DBNull.Value ? null : Convert.ToString(v);
+        }
+
         public PopMessageComposeVM GetComposeVM(string toUserName, string? returnUrl)
         {
             toUserName = (toUserName ?? "").Trim();
@@ -462,6 +487,7 @@ WHERE UserId IS NOT NULL
      OR UserName LIKE '%' + @Q + '%'
      OR PhoneNumber LIKE '%' + @Q + '%'
      OR PhoneNumber2 LIKE '%' + @Q + '%'
+     OR UserName IN (SELECT u.UserName FROM [Identity].[User] u WHERE u.Email LIKE '%' + @Q + '%')   -- 이메일로도 찾기 (2026-11-26)
   )
 ORDER BY fullName ASC;
 ";

@@ -6,6 +6,8 @@ namespace BulletinBoard.Services.Abstract
     public interface IPopMessageService
     {
         bool CanSendTo(string toUserName);
+        /// <summary>받는 사람 입력(아이디 또는 이메일) → 실제 로그인 아이디. 못 찾으면 null (2026-11-26)</summary>
+        string? ResolveToUserName(string toInput);
         PopMessageComposeVM GetComposeVM(string toUserName, string? returnUrl);
         void Send(string toUserName, string fromUserName, string messageText);
 

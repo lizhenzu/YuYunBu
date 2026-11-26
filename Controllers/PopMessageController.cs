@@ -56,9 +56,10 @@ namespace BulletinBoard.Controllers
         {
             to = (to ?? "").Trim();
             if (string.IsNullOrWhiteSpace(to)) return NotFound();
+            to = _svc.ResolveToUserName(to) ?? to;   // 이메일로 와도 계정 아이디로 (2026-11-26)
 
             if (!_svc.CanSendTo(to))
-                return Content("수신자(UserName)가 없거나(UserId NULL) 메시지를 보낼 수 없습니다.");
+                return Content($"받는 사람 '{to}' 계정을 찾을 수 없어 보낼 수 없어요. 아이디나 이메일을 확인해 주세요.");
 
             var vm = _svc.GetComposeVM(to, returnUrl);
             return View("~/Views/PopMessage/Compose.cshtml", vm);
@@ -82,6 +83,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> Send(PopMessageComposeVM vm)
         {
             var to = (vm.ToUserName ?? "").Trim();
+            to = _svc.ResolveToUserName(to) ?? to;   // 이메일로 와도 계정 아이디로 (2026-11-26)
             var msg = NormalizeNewlines(vm.MessageText);
 
             var from = await GetMyUserName_ByUserIdView();
@@ -104,6 +106,7 @@ namespace BulletinBoard.Controllers
         public async Task<IActionResult> SendAjax([FromForm] string ToUserName, [FromForm] string MessageText)
         {
             var to = (ToUserName ?? "").Trim();
+            to = _svc.ResolveToUserName(to) ?? to;   // 이메일로 와도 계정 아이디로 (2026-11-26)
             var msg = NormalizeNewlines(MessageText);
 
             var from = await GetMyUserName_ByUserIdView();
@@ -262,7 +265,7 @@ namespace BulletinBoard.Controllers
                 return $"메시지는 최대 {MAX_LEN}자까지 가능합니다.";
 
             if (!_svc.CanSendTo(to))
-                return "수신자(UserName)가 없거나(UserId NULL) 메시지를 보낼 수 없습니다.";
+                return $"받는 사람 '{to}' 계정을 찾을 수 없어 보낼 수 없어요. 아이디나 이메일을 확인해 주세요.";
 
             var lower = msg.ToLowerInvariant();
             var bad = BLOCK_WORDS.FirstOrDefault(w =>
