@@ -1121,9 +1121,13 @@ namespace BulletinBoard.Controllers
         // ============================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveWord(string date, int todayWordToReadId, bool toMe, bool toParent, string lang = "")
+        public async Task<IActionResult> SaveWord(string date, int todayWordToReadId, bool toMe, bool toParent, string lang = "", string back = "")
         {
             lang = await ResolveLangAsync(lang);
+
+            // 누른 화면으로 돌아간다 — 성경 읽기 화면(BibleRead)에도 같은 두 버튼이 있다 (2026-11-26)
+            var backAction = string.Equals(back, nameof(BibleRead), StringComparison.OrdinalIgnoreCase)
+                ? nameof(BibleRead) : nameof(Word);
 
             if (await _authService.IsSignedIn(User)) await SetUserInfo();
 
@@ -1132,7 +1136,7 @@ namespace BulletinBoard.Controllers
             if (!IsActionableDate(selected))
             {
                 TempData["Toast"] = "이 날짜는 수행할 수 없어요. (오늘/어제/그저께만 가능)";
-                return RedirectToAction(nameof(Word), new { date = selected.ToString("yyyy-MM-dd"), lang });
+                return RedirectToAction(backAction, new { date = selected.ToString("yyyy-MM-dd"), lang });
             }
 
             var before = await _iDailyMission2Service.GetDayStatusAsync(this.UserName, selected);
@@ -1158,7 +1162,7 @@ namespace BulletinBoard.Controllers
                 var popup = await _awardService.HandleAwardIfReachedAsync(this.UserName, selected.Year, yearPoint.YearTotalPoint, added);
                 ApplyAwardPopupResult(popup);
             }
-            return RedirectToAction(nameof(Word), new { date = selected.ToString("yyyy-MM-dd"), lang = "", YearTotalPoint = YearTotalPoint });
+            return RedirectToAction(backAction, new { date = selected.ToString("yyyy-MM-dd"), lang = "", YearTotalPoint = YearTotalPoint });
         }
 
         // ============================================================

@@ -470,6 +470,16 @@ body.lang-ko .vtext-modern-line { display:none !important; }
     .cm-arrow { font-size: .88rem; }
 }
 
+/* ── 말씀 미션 두 버튼 — 위 초록 큰 버튼과 같은 모양, 반짝임만 뺌 (2026-11-26) ── */
+.wm2Head { margin: 18px 4px 8px; display: flex; align-items: baseline; gap: 8px; }
+.wm2Head b { font-size: .95rem; font-weight: 900; color: #065f46; }
+.wm2Head small { font-size: .78rem; font-weight: 700; color: #64748b; }
+.wm2List { display: flex; flex-direction: column; gap: 12px; }
+.wm2List form { margin: 0; }
+.wm2List .complete-mega.is-not-done::after { display: none; }
+.wm2List .complete-mega.is-done:disabled { opacity: 1; cursor: default; }
+.wm2Note { margin: 8px 4px 0; font-size: .78rem; font-weight: 700; color: #64748b; }
+
 /* ── 성경 전체 통독률 카드 ── */
 .bible-overall-card {
     margin: 12px 0 10px;
@@ -842,6 +852,59 @@ body.lang-ko .vtext-modern-line { display:none !important; }
             </a>
         </div>
     </div>
+
+    @* ── 말씀 미션 — "내가 읽었어요" · "부모님께 읽어드렸어요" (말씀 미션 화면 Word 와 같은 저장, 각 1점) — 2026-11-26 ── *@
+    @if (Model.Content?.TodayWordToReadId != null)
+    {
+        var wmSt        = Model.DayStatus;
+        bool wmToMe     = wmSt?.Word_ToMe ?? false;
+        bool wmToParent = wmSt?.Word_ToParent ?? false;
+        bool wmDone     = wmToMe || wmToParent;
+        bool wmCanAct   = Model.IsActionable;
+        int  wmWordId   = Model.Content.TodayWordToReadId.Value;
+
+        <div class="wm2Head"><b>✍️ 말씀 미션 · 어떻게 읽었나요?</b><small>@(wmDone ? "눌렀어요" : "각 1점")</small></div>
+        <div class="wm2List">
+            <form method="post" action="/DailyMission2/SaveWord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="date" value="@d" />
+                <input type="hidden" name="todayWordToReadId" value="@wmWordId" />
+                <input type="hidden" name="toMe" value="true" />
+                <input type="hidden" name="back" value="BibleRead" />
+                <button type="submit" class="complete-mega @(wmToMe ? "is-done" : "is-not-done")" @((wmCanAct && !wmToMe) ? "" : "disabled")>
+                    <div class="cm-icon-circle">@(wmToMe ? "✅" : "🙋")</div>
+                    <div class="cm-body">
+                        <span class="complete-mega-title">@(wmToMe ? "내가 읽기 완료됨" : "내가 읽었어요")</span>
+                        <span class="complete-mega-desc">@(wmToMe ? "(말씀 미션 +1점 받았어요)" : (wmDone ? "(누르면 1점 더)" : "(누르면 말씀 미션 1점)"))</span>
+                    </div>
+                    <div class="cm-badge"><span class="complete-mega-count">@(wmToMe ? "완료" : "+1점")</span></div>
+                </button>
+            </form>
+            <form method="post" action="/DailyMission2/SaveWord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="date" value="@d" />
+                <input type="hidden" name="todayWordToReadId" value="@wmWordId" />
+                <input type="hidden" name="toParent" value="true" />
+                <input type="hidden" name="back" value="BibleRead" />
+                <button type="submit" class="complete-mega @(wmToParent ? "is-done" : "is-not-done")" @((wmCanAct && !wmToParent) ? "" : "disabled")>
+                    <div class="cm-icon-circle">@(wmToParent ? "✅" : "👨‍👩‍👧")</div>
+                    <div class="cm-body">
+                        <span class="complete-mega-title">@(wmToParent ? "부모님께 읽기 완료됨" : "부모님께 읽어드렸어요")</span>
+                        <span class="complete-mega-desc">@(wmToParent ? "(말씀 미션 +1점 받았어요)" : (wmDone ? "(누르면 1점 더)" : "(누르면 말씀 미션 1점)"))</span>
+                    </div>
+                    <div class="cm-badge"><span class="complete-mega-count">@(wmToParent ? "완료" : "+1점")</span></div>
+                </button>
+            </form>
+        </div>
+        @if (!wmDone)
+        {
+            <div class="wm2Note">둘 중 하나만 눌러도 미션 완료예요 · 둘 다 하면 2점</div>
+        }
+        @if (!wmCanAct)
+        {
+            <div class="wm2Note">🔒 오늘/어제/그저께만 수행할 수 있어요.</div>
+        }
+    }
 
     <!-- ── 하단 네비 ── -->
     <div class="dashboard-btn-wrap">
@@ -1388,3 +1451,10 @@ body.lang-ko .vtext-modern-line { display:none !important; }
 })();
 </script>
 }
+
+@* 말씀 미션 버튼을 누른 뒤 — 말씀 미션 화면(Word)과 같은 완료 팝업 · 선물 안내 (2026-11-26) *@
+@{
+    var brOkPopupMsg = TempData["DM2_OK_POPUP"] as string;
+    var brAwardUrl   = TempData["DM2_AWARD_URL"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission2/Partials/_OkPopup.cshtml", new { Message = brOkPopupMsg, AutoCloseSeconds = BulletinBoard.Common.ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = brAwardUrl, RedirectLabel = "선물 선택" })
