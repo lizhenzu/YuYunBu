@@ -255,6 +255,15 @@ body.lang-en .vtext-en { font-style: normal; }
 .complete-mega.is-done .complete-mega-count { color: #15803D; font-weight: 500; opacity: 1; }
 .cm-mark { flex: none; font-family: inherit; font-weight: 300; font-size: 22px; line-height: 1; color: #fff; opacity: 1; }
 .complete-mega.is-done .cm-mark { color: #15803D; }
+/* 말씀 미션 두 버튼 — 위 큰 버튼과 같은 모양 (2026-11-26) */
+.wmHead { margin: 22px 2px 8px; display: flex; align-items: baseline; gap: 8px; }
+.wmHead b { font-size: 14px; font-weight: 800; color: #111827; }
+.wmHead small { font-size: 12px; color: #6B7280; }
+.wmList { display: flex; flex-direction: column; gap: 10px; }
+.wmList form { margin: 0; }
+.wmList .complete-mega:disabled { cursor: default; }
+.wmList .complete-mega.is-done:disabled { opacity: 1; }
+.wmNote { margin: 8px 2px 0; font-size: 12px; color: #6B7280; }
 .cm-arrow, .cm-icon-circle { display: none; }
 
 /* ── 날짜 이동 ── */
@@ -606,6 +615,53 @@ body.lang-en .vtext-en { font-style: normal; }
             <div class="cm-mark" id="cmMark">@(isAllRead ? "✓" : "→")</div>
         </button>
     </div>
+
+    @* ── 말씀 미션 — "혼자 읽었어요" · "부모님께 읽어드렸어요" (말씀 미션 화면 Word 와 같은 저장, 각 1점) — 2026-11-26 ── *@
+    @if (!rangeMode && Model.Content?.TodayWordToReadId != null)
+    {
+        var wmSt       = Model.DayStatus;
+        bool wmToMe     = wmSt?.Word_ToMe ?? false;
+        bool wmToParent = wmSt?.Word_ToParent ?? false;
+        bool wmDone     = wmToMe || wmToParent;
+        bool wmCanAct   = Model.IsActionable;
+        int  wmWordId   = Model.Content.TodayWordToReadId.Value;
+
+        <div class="wmHead"><b>말씀 미션 · 어떻게 읽었나요?</b><small>@(wmDone ? "눌렀어요" : "각 1점")</small></div>
+        <div class="wmList">
+            <form method="post" action="/DailyMission4/SaveWord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="date" value="@d" />
+                <input type="hidden" name="todayWordToReadId" value="@wmWordId" />
+                <input type="hidden" name="toMe" value="true" />
+                <input type="hidden" name="back" value="BibleRead" />
+                <button type="submit" class="complete-mega @(wmToMe ? "is-done" : "is-not-done")" @((wmCanAct && !wmToMe) ? "" : "disabled")>
+                    <div class="cm-body">
+                        <span class="complete-mega-title">혼자 읽었어요</span>
+                        <span class="complete-mega-desc">@(wmToMe ? "✓ 완료 +1점" : (wmDone ? "누르면 말씀 미션 1점 더" : "누르면 말씀 미션 1점"))</span>
+                    </div>
+                    <div class="cm-mark">@(wmToMe ? "✓" : "→")</div>
+                </button>
+            </form>
+            <form method="post" action="/DailyMission4/SaveWord">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="date" value="@d" />
+                <input type="hidden" name="todayWordToReadId" value="@wmWordId" />
+                <input type="hidden" name="toParent" value="true" />
+                <input type="hidden" name="back" value="BibleRead" />
+                <button type="submit" class="complete-mega @(wmToParent ? "is-done" : "is-not-done")" @((wmCanAct && !wmToParent) ? "" : "disabled")>
+                    <div class="cm-body">
+                        <span class="complete-mega-title">부모님께 읽어드렸어요</span>
+                        <span class="complete-mega-desc">@(wmToParent ? "✓ 완료 +1점" : (wmDone ? "누르면 말씀 미션 1점 더" : "누르면 말씀 미션 1점"))</span>
+                    </div>
+                    <div class="cm-mark">@(wmToParent ? "✓" : "→")</div>
+                </button>
+            </form>
+        </div>
+        @if (!wmDone)
+        {
+            <div class="wmNote">둘 중 하나만 눌러도 미션 완료예요 · 둘 다 하면 2점</div>
+        }
+    }
 
     <!-- ── 하단 네비 ── -->
     <div class="dashboard-btn-wrap">
@@ -1241,3 +1297,10 @@ body.lang-en .vtext-en { font-style: normal; }
 
 @* 페이지 이동 대기 카드 *@
 @await Html.PartialAsync("~/Views/DailyMission4/Partials/_HomeWaitCard.cshtml")
+
+@* 말씀 미션 버튼을 누른 뒤 — 말씀 미션 화면(Word)과 같은 완료 팝업 · 선물 안내 (2026-11-26) *@
+@{
+    var brOkPopupMsg = TempData["DM2_OK_POPUP"] as string;
+    var brAwardUrl   = TempData["DM2_AWARD_URL"]?.ToString();
+}
+@await Html.PartialAsync("~/Views/DailyMission4/Partials/_OkPopup.cshtml", new { Message = brOkPopupMsg, AutoCloseSeconds = ConstatsCommon.popupAutoCloseSeconds, RedirectUrl = brAwardUrl, RedirectLabel = "선물 선택" })
