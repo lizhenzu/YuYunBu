@@ -4,6 +4,7 @@
     · 예전에는 "오늘의 기도" 카드(_Banner_TodayPrayer) 안의 한 줄이었다 → 예배 안내 카드 바로 아래 따로 둔다
     · 카드 전체를 누르면 이동 (버튼 · › 없음)
     · 특별 기도 날(Helpers/TodayFeaturedPray)에는 그 기도문 제목을 보여 주고 그 기도문으로, 다른 날은 /EntranceExamPray/Index
+    · 수능 이후에는 26번(TodayFeaturedPray.AfterPrayId) 제목을 보여 주고 26번으로 (2026-11-20)
     · 백업: Views/Home/Index.cshtml.bak_before_examcard · Views/Shared/_Banner_TodayPrayer.cshtml.bak_before_examcard
     ══════════════════════════════════════════════════════════════ *@
 @{
@@ -21,12 +22,14 @@
     bool exDIsText = exDday < 0;
 
     string exUrl = "/EntranceExamPray/Index";
-    if (TodayFeaturedPray.IsActive())
+    // 수능 당일은 79번, 수능 이후는 26번(TodayFeaturedPray.AfterPrayId)을 고정 — 2026-11-20
+    int exFixedId = TodayFeaturedPray.FixedPrayId();
+    if (exFixedId > 0)
     {
-        exUrl = TodayFeaturedPray.Url;
+        exUrl = TodayFeaturedPray.FixedUrl;
         try
         {
-            var exFeatured = new BulletinBoard.BusinessLayer.ManageEntranceExamPray().GetById(TodayFeaturedPray.PrayId);
+            var exFeatured = new BulletinBoard.BusinessLayer.ManageEntranceExamPray().GetById(exFixedId);
             if (!string.IsNullOrWhiteSpace(exFeatured?.Title)) exLine = exFeatured.Title;
         }
         catch { /* 제목을 못 읽으면 기본 문구 그대로 */ }

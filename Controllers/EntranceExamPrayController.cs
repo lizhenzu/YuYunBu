@@ -101,10 +101,12 @@ namespace BulletinBoard.Controllers
             var today = _mgr.GetTodayPray();
 
             // 🙏 오늘의 특별 기도 (Helpers/TodayFeaturedPray) — 그날은 순환 대신 정해진 기도문을 보여 준다 (2026-11-19)
+            //    수능이 끝난 뒤에는 AfterPrayId(26번)를 계속 고정해서 보여 준다 (2026-11-20)
             bool featured = false;
-            if (TodayFeaturedPray.IsActive())
+            int fixedId = TodayFeaturedPray.FixedPrayId();
+            if (fixedId > 0)
             {
-                var fp = _mgr.GetById(TodayFeaturedPray.PrayId);
+                var fp = _mgr.GetById(fixedId);
                 if (fp != null) { today = fp; featured = true; }
             }
 
@@ -188,7 +190,8 @@ namespace BulletinBoard.Controllers
             ViewBag.TotalCount   = _mgr.GetRotationCount();
             ViewBag.RotationNo   = _mgr.GetRotationNo(PrayId);
             bool isFeaturedToday = TodayFeaturedPray.IsActive() && PrayId == TodayFeaturedPray.PrayId;
-            ViewBag.IsTodayPray  = _mgr.GetTodayPray()?.PrayId == PrayId || isFeaturedToday;   // 특별 기도 날에는 그 기도문이 오늘의 기도
+            int fixedId = TodayFeaturedPray.FixedPrayId();   // 수능 당일 79번 · 수능 이후 26번 고정 (2026-11-20)
+            ViewBag.IsTodayPray  = fixedId > 0 ? PrayId == fixedId : _mgr.GetTodayPray()?.PrayId == PrayId;   // 특별 기도 날에는 그 기도문이 오늘의 기도
             ViewBag.IsFeaturedToday = isFeaturedToday;
             ViewBag.TodayKst     = DateHelper.GetKoreaNow();
 
